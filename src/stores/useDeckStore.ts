@@ -38,6 +38,7 @@ interface DeckState {
   updateDeck: (id: string, updates: Partial<DeckRow>) => Promise<boolean>;
   moveDeck: (deckId: string, newParentId: string | null) => Promise<boolean>;
   shareDeck: (deckId: string) => Promise<string | null>;
+  reset: () => void;
 }
 
 interface DeckWithCardsQuery extends DeckRow {
@@ -50,12 +51,26 @@ export const useDeckStore = create<DeckState>((set, get) => ({
   isLoading: false,
   error: null,
 
+  reset: () => {
+    set({ decks: [], currentDeck: null, isLoading: false, error: null });
+  },
+
   fetchDecks: async () => {
     set({ isLoading: true, error: null });
     try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        set({ decks: [], isLoading: false });
+        return;
+      }
+
       const { data, error } = await supabase
         .from('decks')
         .select('*, cards(id, due)')
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;

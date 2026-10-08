@@ -27,12 +27,17 @@ interface CardState {
     card: CardRow,
     rating: FSRSRating
   ) => Promise<{ updatedCard: CardRow; isAgain: boolean } | null>;
+  reset: () => void;
 }
 
 export const useCardStore = create<CardState>((set) => ({
   cards: [],
   isLoading: false,
   error: null,
+
+  reset: () => {
+    set({ cards: [], isLoading: false, error: null });
+  },
 
   fetchCardsByDeck: async (deckId: string) => {
     set({ isLoading: true, error: null });

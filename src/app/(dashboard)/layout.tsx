@@ -1,9 +1,18 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores';
+import { supabase } from '@/lib/supabase';
+import {
+  User as UserIcon,
+  Moon,
+  Sparkles,
+  HelpCircle,
+  LogOut,
+  ChevronsUpDown,
+} from 'lucide-react';
 
 interface NavItem {
   name: string;
@@ -68,20 +77,78 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isMobileUserMenuOpen, setIsMobileUserMenuOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
-  const { user, initialize } = useAuthStore();
+  const userMenuRef = useRef<HTMLDivElement>(null);
+  const mobileUserMenuRef = useRef<HTMLDivElement>(null);
+  const { user, initialize, signOut, isLoading } = useAuthStore();
 
   useEffect(() => {
     setIsMounted(true);
     initialize();
   }, [initialize]);
 
-  const userInitial = isMounted && user?.email ? user.email.charAt(0).toUpperCase() : 'D';
+  // Si finalizó de verificar la autenticación y no hay sesión activa, redirigir a /login
+  useEffect(() => {
+    if (isMounted && !isLoading && !user) {
+      router.push('/login');
+    }
+  }, [isMounted, isLoading, user, router]);
+
+  // Cerrar menús al hacer clic fuera o presionar Escape
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (userMenuRef.current && !userMenuRef.current.contains(target)) {
+        setIsUserMenuOpen(false);
+      }
+      if (mobileUserMenuRef.current && !mobileUserMenuRef.current.contains(target)) {
+        setIsMobileUserMenuOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsUserMenuOpen(false);
+        setIsMobileUserMenuOpen(false);
+        setMobileMenuOpen(false);
+      }
+    };
+
+    if (isUserMenuOpen || isMobileUserMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleKeyDown);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isUserMenuOpen, isMobileUserMenuOpen]);
+
+  const handleSignOut = async () => {
+    setIsUserMenuOpen(false);
+    setIsMobileUserMenuOpen(false);
+    setMobileMenuOpen(false);
+    try {
+      await signOut();
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.error('Error al cerrar sesión:', err);
+    } finally {
+      router.push('/login');
+    }
+  };
+
+  const userInitial = isMounted && user?.email ? user.email.charAt(0).toUpperCase() : 'U';
   const userName =
     isMounted && user?.email
       ? user?.user_metadata?.full_name || (user?.email === 'demo@flashcards.app' ? 'Usuario Demo' : user?.email)
-      : 'Usuario Demo';
+      : 'Usuario';
+  const userEmail = isMounted && user?.email ? user.email : '';
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col md:flex-row">
@@ -94,48 +161,241 @@ export default function DashboardLayout({
           <span className="font-semibold text-white tracking-tight">Flashcards</span>
         </Link>
 
-        <button
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          aria-label="Toggle navigation menu"
-          className="p-2 rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-800/60 transition"
-        >
-          {mobileMenuOpen ? (
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          ) : (
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          )}
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Mobile User Profile Avatar & Dropdown */}
+          <div className="relative" ref={mobileUserMenuRef}>
+            <button
+              onClick={() => {
+                setIsMobileUserMenuOpen((prev) => !prev);
+                setMobileMenuOpen(false);
+              }}
+              aria-label="Abrir menú de usuario"
+              aria-expanded={isMobileUserMenuOpen}
+              aria-haspopup="true"
+              className="w-8 h-8 rounded-full bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 hover:border-indigo-400/60 hover:bg-indigo-500/30 flex items-center justify-center font-medium text-xs transition cursor-pointer"
+            >
+              {userInitial}
+            </button>
+
+            {/* Mobile Dropdown Popover (Drops Downwards) */}
+            {isMobileUserMenuOpen && (
+              <div
+                className="absolute right-0 top-full mt-2 w-64 z-50 rounded-2xl bg-neutral-900/95 backdrop-blur-xl border border-neutral-800/90 shadow-2xl shadow-black/80 p-1.5 space-y-0.5 animate-in fade-in slide-in-from-top-2 duration-150"
+                role="menu"
+                aria-orientation="vertical"
+              >
+                {/* Header Info */}
+                <div className="px-2.5 py-2 mb-1 border-b border-neutral-800/80">
+                  <p className="text-xs font-semibold text-white truncate">{userName}</p>
+                  <p className="text-[11px] text-neutral-400 truncate">{userEmail}</p>
+                </div>
+
+                {/* 1. Mi Perfil (Inactivo) */}
+                <button
+                  type="button"
+                  disabled
+                  className="w-full flex items-center justify-between px-2.5 py-2 text-xs font-medium rounded-xl text-neutral-400 hover:text-neutral-300 hover:bg-neutral-800/50 transition-colors cursor-not-allowed select-none group text-left"
+                >
+                  <span className="flex items-center gap-2.5">
+                    <UserIcon className="w-4 h-4 text-neutral-500 group-hover:text-neutral-400" />
+                    <span>Mi Perfil</span>
+                  </span>
+                  <span className="text-[10px] text-neutral-500 bg-neutral-800/80 px-1.5 py-0.5 rounded font-mono">
+                    Pronto
+                  </span>
+                </button>
+
+                {/* 2. Apariencia (Inactivo) */}
+                <button
+                  type="button"
+                  disabled
+                  className="w-full flex items-center justify-between px-2.5 py-2 text-xs font-medium rounded-xl text-neutral-400 hover:text-neutral-300 hover:bg-neutral-800/50 transition-colors cursor-not-allowed select-none group text-left"
+                >
+                  <span className="flex items-center gap-2.5">
+                    <Moon className="w-4 h-4 text-neutral-500 group-hover:text-neutral-400" />
+                    <span>Apariencia</span>
+                  </span>
+                  <span className="text-[10px] text-neutral-400 bg-neutral-800/80 px-1.5 py-0.5 rounded font-medium">
+                    Oscuro
+                  </span>
+                </button>
+
+                {/* 3. Suscripción (Inactivo con destacado PRO) */}
+                <button
+                  type="button"
+                  disabled
+                  className="w-full flex items-center justify-between px-2.5 py-2 text-xs font-medium rounded-xl bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/20 text-neutral-300 hover:border-amber-500/30 transition-colors cursor-not-allowed select-none group text-left"
+                >
+                  <span className="flex items-center gap-2.5">
+                    <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span className="font-semibold text-amber-200/90">Suscripción</span>
+                  </span>
+                  <span className="text-[10px] font-bold text-amber-400 bg-amber-500/20 border border-amber-500/30 px-1.5 py-0.5 rounded-full shadow-sm shadow-amber-500/10">
+                    PRO
+                  </span>
+                </button>
+
+                {/* 4. Soporte y Feedback (Inactivo) */}
+                <button
+                  type="button"
+                  disabled
+                  className="w-full flex items-center justify-between px-2.5 py-2 text-xs font-medium rounded-xl text-neutral-400 hover:text-neutral-300 hover:bg-neutral-800/50 transition-colors cursor-not-allowed select-none group text-left"
+                >
+                  <span className="flex items-center gap-2.5">
+                    <HelpCircle className="w-4 h-4 text-neutral-500 group-hover:text-neutral-400" />
+                    <span>Soporte y Feedback</span>
+                  </span>
+                </button>
+
+                {/* Separador */}
+                <div className="my-1 border-t border-neutral-800/80" />
+
+                {/* 5. Cerrar Sesión (Activo) */}
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  className="w-full flex items-center gap-2.5 px-2.5 py-2 text-xs font-medium rounded-xl text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors cursor-pointer group text-left"
+                  role="menuitem"
+                >
+                  <LogOut className="w-4 h-4 text-red-400 group-hover:text-red-300 transition-colors" />
+                  <span className="font-medium">Cerrar Sesión</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Mobile Menu Hamburger Button */}
+          <button
+            onClick={() => {
+              setMobileMenuOpen(!mobileMenuOpen);
+              setIsMobileUserMenuOpen(false);
+            }}
+            aria-label="Toggle navigation menu"
+            className="p-2 rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-800/60 transition cursor-pointer"
+          >
+            {mobileMenuOpen ? (
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            ) : (
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            )}
+          </button>
+        </div>
       </header>
 
-      {/* Mobile Menu Dropdown */}
+      {/* Mobile Menu Drawer */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-b border-neutral-800 bg-neutral-900/95 backdrop-blur px-4 py-3 space-y-1 z-30">
-          {navItems.map((item) => {
-            const isActive =
-              item.href === '/'
-                ? pathname === '/' || pathname === '/decks'
-                : pathname.startsWith(item.href);
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setMobileMenuOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition ${
-                  isActive
-                    ? 'bg-indigo-600/15 text-indigo-400 border border-indigo-500/30'
-                    : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/40'
-                }`}
-              >
-                <Icon className="w-5 h-5" />
-                {item.name}
-              </Link>
-            );
-          })}
+        <div className="md:hidden border-b border-neutral-800 bg-neutral-900/95 backdrop-blur px-4 py-3 space-y-3 z-30">
+          <div className="space-y-1">
+            {navItems.map((item) => {
+              const isActive =
+                item.href === '/'
+                  ? pathname === '/' || pathname === '/decks'
+                  : pathname.startsWith(item.href);
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition ${
+                    isActive
+                      ? 'bg-indigo-600/15 text-indigo-400 border border-indigo-500/30'
+                      : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/40'
+                  }`}
+                >
+                  <Icon className="w-5 h-5" />
+                  {item.name}
+                </Link>
+              );
+            })}
+          </div>
+
+          {/* User profile & full options in mobile drawer */}
+          <div className="pt-3 border-t border-neutral-800/80 space-y-1">
+            <div className="flex items-center gap-2.5 px-2.5 py-2 mb-1">
+              <div className="w-7 h-7 rounded-full bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center font-medium text-xs shrink-0">
+                {userInitial}
+              </div>
+              <div className="truncate">
+                <p className="text-xs font-medium text-neutral-200 truncate">{userName}</p>
+                <p className="text-[10px] text-neutral-500 truncate">{userEmail}</p>
+              </div>
+            </div>
+
+            {/* 1. Mi Perfil (Inactivo) */}
+            <button
+              type="button"
+              disabled
+              className="w-full flex items-center justify-between px-2.5 py-2 text-xs font-medium rounded-xl text-neutral-400 cursor-not-allowed select-none text-left"
+            >
+              <span className="flex items-center gap-2.5">
+                <UserIcon className="w-4 h-4 text-neutral-500" />
+                <span>Mi Perfil</span>
+              </span>
+              <span className="text-[10px] text-neutral-500 bg-neutral-800/80 px-1.5 py-0.5 rounded font-mono">
+                Pronto
+              </span>
+            </button>
+
+            {/* 2. Apariencia (Inactivo) */}
+            <button
+              type="button"
+              disabled
+              className="w-full flex items-center justify-between px-2.5 py-2 text-xs font-medium rounded-xl text-neutral-400 cursor-not-allowed select-none text-left"
+            >
+              <span className="flex items-center gap-2.5">
+                <Moon className="w-4 h-4 text-neutral-500" />
+                <span>Apariencia</span>
+              </span>
+              <span className="text-[10px] text-neutral-400 bg-neutral-800/80 px-1.5 py-0.5 rounded font-medium">
+                Oscuro
+              </span>
+            </button>
+
+            {/* 3. Suscripción */}
+            <button
+              type="button"
+              disabled
+              className="w-full flex items-center justify-between px-2.5 py-2 text-xs font-medium rounded-xl bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/20 text-neutral-300 cursor-not-allowed select-none text-left"
+            >
+              <span className="flex items-center gap-2.5">
+                <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+                <span className="font-semibold text-amber-200/90">Suscripción</span>
+              </span>
+              <span className="text-[10px] font-bold text-amber-400 bg-amber-500/20 border border-amber-500/30 px-1.5 py-0.5 rounded-full shadow-sm shadow-amber-500/10">
+                PRO
+              </span>
+            </button>
+
+            {/* 4. Soporte y Feedback */}
+            <button
+              type="button"
+              disabled
+              className="w-full flex items-center justify-between px-2.5 py-2 text-xs font-medium rounded-xl text-neutral-400 cursor-not-allowed select-none text-left"
+            >
+              <span className="flex items-center gap-2.5">
+                <HelpCircle className="w-4 h-4 text-neutral-500" />
+                <span>Soporte y Feedback</span>
+              </span>
+            </button>
+
+            {/* Separador */}
+            <div className="my-1 border-t border-neutral-800/80" />
+
+            {/* 5. Cerrar Sesión */}
+            <button
+              type="button"
+              onClick={handleSignOut}
+              className="w-full flex items-center gap-2.5 px-2.5 py-2 text-xs font-medium rounded-xl text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors cursor-pointer text-left"
+            >
+              <LogOut className="w-4 h-4 text-red-400" />
+              <span className="font-medium">Cerrar Sesión</span>
+            </button>
+          </div>
         </div>
       )}
 
@@ -183,19 +443,115 @@ export default function DashboardLayout({
           </nav>
         </div>
 
-        {/* Footer / User Profile badge */}
-        <div className="pt-4 border-t border-neutral-800/80">
-          <div className="flex items-center gap-2.5 p-2 rounded-xl bg-neutral-900/60 border border-neutral-800">
-            <div className="w-8 h-8 rounded-full bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center font-medium text-xs shrink-0">
-              {userInitial}
+        {/* Footer / User Profile Dropdown */}
+        <div className="relative pt-4 border-t border-neutral-800/80" ref={userMenuRef}>
+          {/* Popover Dropdown (Opens Upwards) */}
+          {isUserMenuOpen && (
+            <div
+              className="absolute bottom-full mb-2 left-0 right-0 z-50 rounded-2xl bg-neutral-900/95 backdrop-blur-xl border border-neutral-800/90 shadow-2xl shadow-black/80 p-1.5 space-y-0.5 animate-in fade-in slide-in-from-bottom-2 duration-150"
+              role="menu"
+              aria-orientation="vertical"
+            >
+              {/* Header Info */}
+              <div className="px-2.5 py-2 mb-1 border-b border-neutral-800/80">
+                <p className="text-xs font-semibold text-white truncate">{userName}</p>
+                <p className="text-[11px] text-neutral-400 truncate">{userEmail}</p>
+              </div>
+
+              {/* 1. Mi Perfil (Inactivo) */}
+              <button
+                type="button"
+                disabled
+                className="w-full flex items-center justify-between px-2.5 py-2 text-xs font-medium rounded-xl text-neutral-400 hover:text-neutral-300 hover:bg-neutral-800/50 transition-colors cursor-not-allowed select-none group text-left"
+              >
+                <span className="flex items-center gap-2.5">
+                  <UserIcon className="w-4 h-4 text-neutral-500 group-hover:text-neutral-400" />
+                  <span>Mi Perfil</span>
+                </span>
+                <span className="text-[10px] text-neutral-500 bg-neutral-800/80 px-1.5 py-0.5 rounded font-mono">
+                  Pronto
+                </span>
+              </button>
+
+              {/* 2. Apariencia (Inactivo con icono de luna/sol) */}
+              <button
+                type="button"
+                disabled
+                className="w-full flex items-center justify-between px-2.5 py-2 text-xs font-medium rounded-xl text-neutral-400 hover:text-neutral-300 hover:bg-neutral-800/50 transition-colors cursor-not-allowed select-none group text-left"
+              >
+                <span className="flex items-center gap-2.5">
+                  <Moon className="w-4 h-4 text-neutral-500 group-hover:text-neutral-400" />
+                  <span>Apariencia</span>
+                </span>
+                <span className="text-[10px] text-neutral-400 bg-neutral-800/80 px-1.5 py-0.5 rounded font-medium">
+                  Oscuro
+                </span>
+              </button>
+
+              {/* 3. Suscripción (Inactivo, sutilmente destacado con icono de estrella/chispa y acento) */}
+              <button
+                type="button"
+                disabled
+                className="w-full flex items-center justify-between px-2.5 py-2 text-xs font-medium rounded-xl bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/20 text-neutral-300 hover:border-amber-500/30 transition-colors cursor-not-allowed select-none group text-left"
+              >
+                <span className="flex items-center gap-2.5">
+                  <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span className="font-semibold text-amber-200/90">Suscripción</span>
+                </span>
+                <span className="text-[10px] font-bold text-amber-400 bg-amber-500/20 border border-amber-500/30 px-1.5 py-0.5 rounded-full shadow-sm shadow-amber-500/10">
+                  PRO
+                </span>
+              </button>
+
+              {/* 4. Soporte y Feedback (Inactivo) */}
+              <button
+                type="button"
+                disabled
+                className="w-full flex items-center justify-between px-2.5 py-2 text-xs font-medium rounded-xl text-neutral-400 hover:text-neutral-300 hover:bg-neutral-800/50 transition-colors cursor-not-allowed select-none group text-left"
+              >
+                <span className="flex items-center gap-2.5">
+                  <HelpCircle className="w-4 h-4 text-neutral-500 group-hover:text-neutral-400" />
+                  <span>Soporte y Feedback</span>
+                </span>
+              </button>
+
+              {/* Línea divisoria / Separador */}
+              <div className="my-1 border-t border-neutral-800/80" />
+
+              {/* 5. Cerrar Sesión (Activo, tono rojo suave) */}
+              <button
+                type="button"
+                onClick={handleSignOut}
+                className="w-full flex items-center gap-2.5 px-2.5 py-2 text-xs font-medium rounded-xl text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors cursor-pointer group text-left"
+                role="menuitem"
+              >
+                <LogOut className="w-4 h-4 text-red-400 group-hover:text-red-300 transition-colors" />
+                <span className="font-medium">Cerrar Sesión</span>
+              </button>
             </div>
-            <div className="truncate">
-              <p className="text-xs font-medium text-neutral-200 truncate">
-                {userName}
-              </p>
-              <p className="text-[10px] text-neutral-500 truncate">Supabase RLS Activo</p>
+          )}
+
+          {/* Interactive User Box Button */}
+          <button
+            type="button"
+            onClick={() => setIsUserMenuOpen((prev) => !prev)}
+            aria-expanded={isUserMenuOpen}
+            aria-haspopup="true"
+            className="w-full flex items-center justify-between p-2 rounded-xl bg-neutral-900/60 hover:bg-neutral-800/70 border border-neutral-800 hover:border-neutral-700/80 transition-all duration-150 text-left group cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-full bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center font-medium text-xs shrink-0 group-hover:border-indigo-400/50 transition-colors">
+                {userInitial}
+              </div>
+              <div className="truncate min-w-0">
+                <p className="text-xs font-medium text-neutral-200 truncate group-hover:text-white transition-colors">
+                  {userName}
+                </p>
+                <p className="text-[10px] text-neutral-500 truncate">Supabase RLS Activo</p>
+              </div>
             </div>
-          </div>
+            <ChevronsUpDown className="w-4 h-4 text-neutral-500 group-hover:text-neutral-300 transition-colors shrink-0 ml-1" />
+          </button>
         </div>
       </aside>
 

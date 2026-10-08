@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { useDeckStore, type DeckWithStats } from '@/stores';
+import { useDeckStore, useAuthStore, type DeckWithStats } from '@/stores';
 import { ShareDeckModal } from './ShareDeckModal';
 
 const COLOR_PALETTE = [
@@ -89,6 +89,7 @@ export function DecksSkeleton() {
 function DecksViewContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { user, isLoading: authLoading } = useAuthStore();
   const { decks, isLoading, error, fetchDecks, createDeck, deleteDeck, updateDeck, moveDeck } = useDeckStore();
 
   // Navegación jerárquica por carpetas (Adjacency List)
@@ -135,8 +136,10 @@ function DecksViewContent() {
   }, [searchParams]);
 
   useEffect(() => {
-    fetchDecks();
-  }, [fetchDecks]);
+    if (!authLoading) {
+      fetchDecks();
+    }
+  }, [authLoading, user?.id, fetchDecks]);
 
   // Menú contextual de opciones por tarjeta (⋮)
   const [activeDropdownDeckId, setActiveDropdownDeckId] = useState<string | null>(null);

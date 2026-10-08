@@ -29,6 +29,7 @@ interface SettingsState {
   fetchSettings: () => Promise<FSRSSettings | null>;
   updateSettings: (newSettings: Partial<FSRSSettings>) => Promise<boolean>;
   resetToDefaults: () => Promise<boolean>;
+  reset: () => void;
 }
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
@@ -37,6 +38,16 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   isSaving: false,
   error: null,
   successMessage: null,
+
+  reset: () => {
+    set({
+      settings: DEFAULT_FSRS_SETTINGS,
+      isLoading: false,
+      isSaving: false,
+      error: null,
+      successMessage: null,
+    });
+  },
 
   fetchSettings: async () => {
     set({ isLoading: true, error: null, successMessage: null });

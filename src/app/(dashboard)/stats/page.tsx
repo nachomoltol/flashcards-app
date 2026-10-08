@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
+import { useAuthStore } from '@/stores';
 import type { Database } from '@/types/database';
 
 type CardItem = Database['public']['Tables']['cards']['Row'];
@@ -10,6 +11,7 @@ type ReviewItem = Database['public']['Tables']['reviews']['Row'];
 type DeckItem = Database['public']['Tables']['decks']['Row'];
 
 export default function StatsPage() {
+  const { user, isLoading: authLoading } = useAuthStore();
   const [cards, setCards] = useState<CardItem[]>([]);
   const [reviews, setReviews] = useState<ReviewItem[]>([]);
   const [decks, setDecks] = useState<DeckItem[]>([]);
@@ -20,19 +22,63 @@ export default function StatsPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const [cardsRes, reviewsRes, decksRes] = await Promise.all([
-        supabase.from('cards').select('*'),
-        supabase.from('reviews').select('*').order('created_at', { ascending: false }),
-        supabase.from('decks').select('*'),
-      ]);
+      const {
+        data: { user: currentUser },
+      } = await supabase.auth.getUser();
 
-      if (cardsRes.error) throw cardsRes.error;
-      if (reviewsRes.error) throw reviewsRes.error;
-      if (decksRes.error) throw decksRes.error;
+      if (!currentUser) {
+        setCards([]);
+        setReviews([]);
+        setDecks([]);
+        setIsLoading(false);
+        return;
+      }
 
-      setCards(cardsRes.data || []);
-      setReviews(reviewsRes.data || []);
-      setDecks(decksRes.data || []);
+      // 1. Obtener los mazos del usuario actual
+      const { data: userDecks, error: decksErr } = await supabase
+        .from('decks')
+        .select('*')
+        .eq('user_id', currentUser.id);
+
+      if (decksErr) throw decksErr;
+      const loadedDecks = userDecks || [];
+      setDecks(loadedDecks);
+
+      if (loadedDecks.length === 0) {
+        // Si el usuario no tiene mazos, no tiene tarjetas ni repasos
+        setCards([]);
+        setReviews([]);
+        setIsLoading(false);
+        return;
+      }
+
+      // 2. Obtener solo las tarjetas pertenecientes a los mazos del usuario
+      const deckIds = loadedDecks.map((d) => d.id);
+      const { data: userCards, error: cardsErr } = await supabase
+        .from('cards')
+        .select('*')
+        .in('deck_id', deckIds);
+
+      if (cardsErr) throw cardsErr;
+      const loadedCards = userCards || [];
+      setCards(loadedCards);
+
+      if (loadedCards.length === 0) {
+        setReviews([]);
+        setIsLoading(false);
+        return;
+      }
+
+      // 3. Obtener solo los repasos pertenecientes a las tarjetas del usuario
+      const cardIds = loadedCards.map((c) => c.id);
+      const { data: userReviews, error: reviewsErr } = await supabase
+        .from('reviews')
+        .select('*')
+        .in('card_id', cardIds)
+        .order('created_at', { ascending: false });
+
+      if (reviewsErr) throw reviewsErr;
+      setReviews(userReviews || []);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error al cargar las estadísticas';
       console.error('Error fetching stats:', err);
@@ -43,8 +89,10 @@ export default function StatsPage() {
   }, []);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (!authLoading) {
+      fetchData();
+    }
+  }, [authLoading, user?.id, fetchData]);
 
   // Cálculos de métricas FSRS
   const totalCards = cards.length;
