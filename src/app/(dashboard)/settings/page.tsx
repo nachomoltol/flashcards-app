@@ -1,0 +1,384 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useAuthStore, useSettingsStore, DEFAULT_FSRS_SETTINGS } from '@/stores';
+
+export default function SettingsPage() {
+  const { user } = useAuthStore();
+  const {
+    settings,
+    isLoading,
+    isSaving,
+    error,
+    successMessage,
+    fetchSettings,
+    updateSettings,
+    resetToDefaults,
+  } = useSettingsStore();
+
+  // Estado local del formulario
+  const [retention, setRetention] = useState<number>(0.90);
+  const [maxInterval, setMaxInterval] = useState<number>(365);
+  const [fuzz, setFuzz] = useState<boolean>(true);
+  const [fullName, setFullName] = useState<string>('');
+  const [username, setUsername] = useState<string>('');
+  const [hasChanges, setHasChanges] = useState<boolean>(false);
+
+  // Cargar configuración desde Supabase
+  useEffect(() => {
+    fetchSettings().then((loaded) => {
+      if (loaded) {
+        setRetention(loaded.request_retention);
+        setMaxInterval(loaded.maximum_interval);
+        setFuzz(loaded.enable_fuzz);
+        setFullName(loaded.full_name);
+        setUsername(loaded.username);
+      }
+    });
+  }, [fetchSettings]);
+
+  // Actualizar estado local cuando cargue el store
+  useEffect(() => {
+    if (!isLoading) {
+      setRetention(settings.request_retention);
+      setMaxInterval(settings.maximum_interval);
+      setFuzz(settings.enable_fuzz);
+      setFullName(settings.full_name);
+      setUsername(settings.username);
+    }
+  }, [settings, isLoading]);
+
+  // Detección de cambios sin guardar
+  useEffect(() => {
+    const isDifferent =
+      retention !== settings.request_retention ||
+      maxInterval !== settings.maximum_interval ||
+      fuzz !== settings.enable_fuzz ||
+      fullName !== settings.full_name ||
+      username !== settings.username;
+
+    setHasChanges(isDifferent);
+  }, [retention, maxInterval, fuzz, fullName, username, settings]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await updateSettings({
+      request_retention: Number(retention),
+      maximum_interval: Number(maxInterval),
+      enable_fuzz: fuzz,
+      full_name: fullName.trim(),
+      username: username.trim(),
+    });
+  };
+
+  const handleReset = async () => {
+    if (confirm('¿Restablecer los parámetros FSRS a los valores recomendados por defecto (90% de retención, 365 días de intervalo máximo)?')) {
+      await resetToDefaults();
+      setRetention(DEFAULT_FSRS_SETTINGS.request_retention);
+      setMaxInterval(DEFAULT_FSRS_SETTINGS.maximum_interval);
+      setFuzz(DEFAULT_FSRS_SETTINGS.enable_fuzz);
+    }
+  };
+
+  const retentionPercentage = Math.round(retention * 100);
+
+  return (
+    <div className="space-y-8 animate-in fade-in duration-300 max-w-4xl">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-neutral-800/80">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white flex items-center gap-3">
+            <span>Configuración y Preferencias FSRS</span>
+            <span className="text-xs px-2.5 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 font-mono font-medium">
+              Persistencia Supabase
+            </span>
+          </h1>
+          <p className="text-sm text-neutral-400 mt-1">
+            Personaliza el algoritmo de repetición espaciada y los parámetros de tu perfil de usuario.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleReset}
+          disabled={isSaving || isLoading}
+          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-neutral-900 border border-neutral-800 hover:border-neutral-700 text-neutral-400 hover:text-white text-xs font-medium transition active:scale-95 shrink-0 disabled:opacity-50"
+        >
+          <svg className="w-3.5 h-3.5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          <span>Restablecer FSRS</span>
+        </button>
+      </div>
+
+      {/* Notificaciones de Éxito / Error */}
+      {successMessage && (
+        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2.5 animate-in fade-in">
+          <svg className="w-4 h-4 text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+          </svg>
+          <span className="font-medium">{successMessage}</span>
+        </div>
+      )}
+
+      {error && (
+        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2.5 animate-in fade-in">
+          <svg className="w-4 h-4 text-rose-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <span className="font-medium">{error}</span>
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-8">
+        {/* Sección 1: Parámetros del Algoritmo FSRS */}
+        <div className="p-6 rounded-2xl bg-neutral-900/60 border border-neutral-800 space-y-6">
+          <div className="border-b border-neutral-800/80 pb-4">
+            <h2 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
+              <svg className="w-4 h-4 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              <span>Parámetros del Motor FSRS (Free Spaced Repetition Scheduler)</span>
+            </h2>
+            <p className="text-xs text-neutral-400 mt-1">
+              FSRS modela la estabilidad y dificultad de cada tarjeta para programar intervalos óptimos según tus metas de retención.
+            </p>
+          </div>
+
+          {/* Parámetro 1: Retención Deseada */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <label htmlFor="retention-slider" className="block text-xs font-semibold uppercase tracking-wider text-neutral-200">
+                  Retención Deseada (Request Retention)
+                </label>
+                <p className="text-xs text-neutral-400 mt-0.5">
+                  Probabilidad objetivo de recordar la tarjeta en el momento exacto del repaso.
+                </p>
+              </div>
+
+              {/* Dynamic Badge */}
+              <div className="flex items-center gap-2">
+                <span className={`text-xs font-mono font-bold px-2.5 py-1 rounded-lg border ${
+                  retentionPercentage === 90
+                    ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+                    : retentionPercentage > 90
+                    ? 'bg-indigo-500/15 border-indigo-500/30 text-indigo-400'
+                    : 'bg-amber-500/15 border-amber-500/30 text-amber-400'
+                }`}>
+                  {retentionPercentage}% {retentionPercentage === 90 && '• Recomendado'}
+                </span>
+              </div>
+            </div>
+
+            {/* Slider */}
+            <div className="pt-2">
+              <input
+                id="retention-slider"
+                type="range"
+                min="0.70"
+                max="0.99"
+                step="0.01"
+                value={retention}
+                onChange={(e) => setRetention(parseFloat(e.target.value))}
+                className="w-full h-2 bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+              />
+              <div className="flex justify-between text-[11px] text-neutral-500 font-mono mt-1">
+                <span>70% (Menos repasos)</span>
+                <span className="text-emerald-400 font-bold">90% (Óptimo)</span>
+                <span>99% (Máxima retención)</span>
+              </div>
+            </div>
+
+            {/* Guía contextual */}
+            <div className="p-3 rounded-xl bg-neutral-950/60 border border-neutral-800/80 text-xs leading-relaxed text-neutral-400">
+              {retentionPercentage < 85 && (
+                <span className="text-amber-400">
+                  ⚠️ <strong>Carga de estudio ligera:</strong> Ahorrarás tiempo diario de estudio, pero olvidarás aproximadamente entre un 15% y 30% de tus tarjetas.
+                </span>
+              )}
+              {retentionPercentage >= 85 && retentionPercentage <= 92 && (
+                <span className="text-emerald-400">
+                  ✨ <strong>Equilibrio recomendado por FSRS:</strong> Maximiza la eficiencia cognitiva con una excelente tasa de retención a largo plazo sin sobrecarga de repasos.
+                </span>
+              )}
+              {retentionPercentage > 92 && (
+                <span className="text-indigo-400">
+                  🔥 <strong>Alta exigencia:</strong> Ideal para exámenes de alta densidad o certificaciones inmediatas. El número de repasos diarios aumentará significativamente.
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Parámetro 2: Intervalo Máximo */}
+          <div className="space-y-3 pt-3 border-t border-neutral-800/60">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div>
+                <label htmlFor="max-interval" className="block text-xs font-semibold uppercase tracking-wider text-neutral-200">
+                  Intervalo Máximo (Días)
+                </label>
+                <p className="text-xs text-neutral-400 mt-0.5">
+                  El número máximo de días que FSRS puede espaciar una tarjeta hacia el futuro.
+                </p>
+              </div>
+
+              {/* Input Numérico */}
+              <div className="flex items-center gap-2">
+                <input
+                  id="max-interval"
+                  type="number"
+                  min="1"
+                  max="36500"
+                  value={maxInterval}
+                  onChange={(e) => setMaxInterval(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="w-28 text-xs font-mono font-bold px-3 py-1.5 rounded-lg bg-neutral-950 border border-neutral-800 text-white focus:outline-none focus:border-indigo-500 text-right"
+                />
+                <span className="text-xs text-neutral-400 font-mono">días</span>
+              </div>
+            </div>
+
+            {/* Presets Rápidos */}
+            <div className="flex flex-wrap gap-2 pt-1">
+              {[
+                { label: '6 meses (180d)', value: 180 },
+                { label: '1 año (365d)', value: 365 },
+                { label: '3 años (1095d)', value: 1095 },
+                { label: '10 años (3650d)', value: 3650 },
+                { label: 'Sin límite (36500d)', value: 36500 },
+              ].map((preset) => (
+                <button
+                  key={preset.value}
+                  type="button"
+                  onClick={() => setMaxInterval(preset.value)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-mono transition ${
+                    maxInterval === preset.value
+                      ? 'bg-indigo-600/25 text-indigo-300 border border-indigo-500/40'
+                      : 'bg-neutral-800/80 text-neutral-400 hover:text-white hover:bg-neutral-700'
+                  }`}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Parámetro 3: Dispersión Anti-Clustering (Fuzz) */}
+          <div className="pt-3 border-t border-neutral-800/60 flex items-center justify-between gap-4">
+            <div>
+              <label htmlFor="fuzz-toggle" className="block text-xs font-semibold uppercase tracking-wider text-neutral-200">
+                Aleatoriedad Anti-Acumulación (FSRS Fuzz)
+              </label>
+              <p className="text-xs text-neutral-400 mt-0.5">
+                Añade una pequeña variación aleatoria a los intervalos para evitar que cientos de tarjetas se acumulen en el mismo día.
+              </p>
+            </div>
+
+            <button
+              id="fuzz-toggle"
+              type="button"
+              onClick={() => setFuzz(!fuzz)}
+              className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors duration-200 ease-in-out shrink-0 ${
+                fuzz ? 'bg-indigo-600' : 'bg-neutral-800'
+              }`}
+            >
+              <div
+                className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200 ease-in-out ${
+                  fuzz ? 'translate-x-6' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+        </div>
+
+        {/* Sección 2: Perfil del Usuario en Supabase */}
+        <div className="p-6 rounded-2xl bg-neutral-900/60 border border-neutral-800 space-y-5">
+          <div className="border-b border-neutral-800/80 pb-4">
+            <h2 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
+              <svg className="w-4 h-4 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              <span>Datos del Perfil</span>
+            </h2>
+            <p className="text-xs text-neutral-400 mt-1">
+              Vinculados a tu identificador único de usuario en Supabase con políticas RLS de seguridad.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-300 mb-1.5">
+                Nombre Completo
+              </label>
+              <input
+                type="text"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="Tu nombre y apellido..."
+                className="w-full text-xs px-3.5 py-2.5 rounded-xl bg-neutral-950 border border-neutral-800 text-white placeholder-neutral-500 focus:outline-none focus:border-indigo-500 transition"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-300 mb-1.5">
+                Nombre de Usuario
+              </label>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="usuario123"
+                className="w-full text-xs px-3.5 py-2.5 rounded-xl bg-neutral-950 border border-neutral-800 text-white placeholder-neutral-500 focus:outline-none focus:border-indigo-500 transition"
+              />
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-1.5">
+                Correo Electrónico (Auth)
+              </label>
+              <input
+                type="email"
+                disabled
+                value={user?.email || 'usuario@supabase.com'}
+                className="w-full text-xs px-3.5 py-2.5 rounded-xl bg-neutral-950/40 border border-neutral-800/60 text-neutral-500 cursor-not-allowed font-mono"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Barra de Acciones */}
+        <div className="flex items-center justify-between pt-2">
+          <div className="text-xs text-neutral-400">
+            {hasChanges ? (
+              <span className="text-amber-400 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                Tienes cambios sin guardar
+              </span>
+            ) : (
+              <span className="text-neutral-500">Ajustes sincronizados con Supabase</span>
+            )}
+          </div>
+
+          <button
+            type="submit"
+            disabled={isSaving || !hasChanges}
+            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 disabled:opacity-50 text-white font-medium text-xs sm:text-sm transition-all duration-150 shadow-lg shadow-indigo-600/25 active:scale-95 cursor-pointer disabled:cursor-not-allowed"
+          >
+            {isSaving ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white/80 border-t-transparent rounded-full animate-spin" />
+                <span>Guardando cambios...</span>
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <span>Guardar Configuración FSRS</span>
+              </>
+            )}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
