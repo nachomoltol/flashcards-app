@@ -1,9 +1,10 @@
 'use client';
+/* eslint-disable @next/next/no-img-element */
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useAuthStore } from '@/stores';
+import { useAuthStore, useProfileStore } from '@/stores';
 import { supabase } from '@/lib/supabase';
 import {
   User as UserIcon,
@@ -12,8 +13,10 @@ import {
   HelpCircle,
   LogOut,
   ChevronsUpDown,
+  ChevronRight,
 } from 'lucide-react';
 import { WelcomeTutorial } from '@/components/onboarding/WelcomeTutorial';
+import { ProModal } from '@/components/subscription/ProModal';
 
 interface NavItem {
   name: string;
@@ -82,15 +85,29 @@ export default function DashboardLayout({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isMobileUserMenuOpen, setIsMobileUserMenuOpen] = useState(false);
+  const [isProModalOpen, setIsProModalOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const mobileUserMenuRef = useRef<HTMLDivElement>(null);
   const { user, initialize, signOut, isLoading } = useAuthStore();
+  const { profile, fetchProfile } = useProfileStore();
+  const [avatarError, setAvatarError] = useState(false);
+
+  useEffect(() => {
+    setAvatarError(false);
+  }, [profile.avatar_url]);
 
   useEffect(() => {
     setIsMounted(true);
     initialize();
   }, [initialize]);
+
+  // Sincronizar perfil global al detectar usuario autenticado
+  useEffect(() => {
+    if (user?.id) {
+      fetchProfile(user.id);
+    }
+  }, [user?.id, fetchProfile]);
 
   // Si finalizó de verificar la autenticación y no hay sesión activa, redirigir a /login
   useEffect(() => {
@@ -144,12 +161,42 @@ export default function DashboardLayout({
     }
   };
 
-  const userInitial = isMounted && user?.email ? user.email.charAt(0).toUpperCase() : 'U';
-  const userName =
-    isMounted && user?.email
-      ? user?.user_metadata?.full_name || (user?.email === 'demo@flashcards.app' ? 'Usuario Demo' : user?.email)
-      : 'Usuario';
+  const handleNavigateToProfile = () => {
+    setIsUserMenuOpen(false);
+    setIsMobileUserMenuOpen(false);
+    setMobileMenuOpen(false);
+
+    if (pathname === '/settings') {
+      const el = document.getElementById('profile-section');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const input = document.getElementById('full-name-input') as HTMLInputElement | null;
+        if (input) {
+          input.focus();
+        }
+      }
+    } else {
+      router.push('/settings#profile-section');
+    }
+  };
+
+  const displayName = isMounted
+    ? profile.full_name?.trim() ||
+      profile.username?.trim() ||
+      user?.user_metadata?.full_name ||
+      user?.email ||
+      'Usuario'
+    : 'Usuario';
+
+  const userInitial = isMounted
+    ? (profile.full_name?.trim()?.charAt(0) ||
+       profile.username?.trim()?.charAt(0) ||
+       user?.email?.charAt(0) ||
+       'U').toUpperCase()
+    : 'U';
+
   const userEmail = isMounted && user?.email ? user.email : '';
+  const hasAvatar = Boolean(isMounted && profile.avatar_url && !avatarError);
   const isStudyPage = pathname?.startsWith('/study');
 
   return (
@@ -175,9 +222,18 @@ export default function DashboardLayout({
               aria-label="Abrir menú de usuario"
               aria-expanded={isMobileUserMenuOpen}
               aria-haspopup="true"
-              className="w-8 h-8 rounded-full bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 hover:border-indigo-400/60 hover:bg-indigo-500/30 flex items-center justify-center font-medium text-xs transition cursor-pointer"
+              className="w-8 h-8 rounded-full bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 hover:border-indigo-400/60 hover:bg-indigo-500/30 flex items-center justify-center font-medium text-xs transition cursor-pointer overflow-hidden"
             >
-              {userInitial}
+              {hasAvatar ? (
+                <img
+                  src={profile.avatar_url}
+                  alt={displayName}
+                  className="w-full h-full object-cover rounded-full"
+                  onError={() => setAvatarError(true)}
+                />
+              ) : (
+                userInitial
+              )}
             </button>
 
             {/* Mobile Dropdown Popover (Drops Downwards) */}
@@ -188,24 +244,37 @@ export default function DashboardLayout({
                 aria-orientation="vertical"
               >
                 {/* Header Info */}
-                <div className="px-2.5 py-2 mb-1 border-b border-neutral-800/80">
-                  <p className="text-xs font-semibold text-white truncate">{userName}</p>
-                  <p className="text-[11px] text-neutral-400 truncate">{userEmail}</p>
+                <div className="px-2.5 py-2 mb-1 border-b border-neutral-800/80 flex items-center gap-2.5">
+                  <div className="w-7 h-7 rounded-full bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center font-medium text-[11px] shrink-0 overflow-hidden">
+                    {hasAvatar ? (
+                      <img
+                        src={profile.avatar_url}
+                        alt={displayName}
+                        className="w-full h-full object-cover rounded-full"
+                        onError={() => setAvatarError(true)}
+                      />
+                    ) : (
+                      userInitial
+                    )}
+                  </div>
+                  <div className="min-w-0 truncate">
+                    <p className="text-xs font-semibold text-white truncate">{displayName}</p>
+                    <p className="text-[11px] text-neutral-400 truncate">{userEmail}</p>
+                  </div>
                 </div>
 
-                {/* 1. Mi Perfil (Inactivo) */}
+                {/* 1. Mi Perfil (Habilitado -> redirige a /settings#profile-section) */}
                 <button
                   type="button"
-                  disabled
-                  className="w-full flex items-center justify-between px-2.5 py-2 text-xs font-medium rounded-xl text-neutral-400 hover:text-neutral-300 hover:bg-neutral-800/50 transition-colors cursor-not-allowed select-none group text-left"
+                  onClick={handleNavigateToProfile}
+                  className="w-full flex items-center justify-between px-2.5 py-2 text-xs font-medium rounded-xl text-neutral-300 hover:text-white hover:bg-neutral-800/70 transition-colors cursor-pointer group text-left"
+                  role="menuitem"
                 >
                   <span className="flex items-center gap-2.5">
-                    <UserIcon className="w-4 h-4 text-neutral-500 group-hover:text-neutral-400" />
+                    <UserIcon className="w-4 h-4 text-neutral-400 group-hover:text-indigo-400 transition-colors" />
                     <span>Mi Perfil</span>
                   </span>
-                  <span className="text-[10px] text-neutral-500 bg-neutral-800/80 px-1.5 py-0.5 rounded font-mono">
-                    Pronto
-                  </span>
+                  <ChevronRight className="w-3.5 h-3.5 text-neutral-500 group-hover:text-neutral-300 transition-colors" />
                 </button>
 
                 {/* 2. Apariencia (Inactivo) */}
@@ -223,17 +292,21 @@ export default function DashboardLayout({
                   </span>
                 </button>
 
-                {/* 3. Suscripción (Inactivo con destacado PRO) */}
+                {/* 3. Suscripción (PRO) */}
                 <button
                   type="button"
-                  disabled
-                  className="w-full flex items-center justify-between px-2.5 py-2 text-xs font-medium rounded-xl bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/20 text-neutral-300 hover:border-amber-500/30 transition-colors cursor-not-allowed select-none group text-left"
+                  onClick={() => {
+                    setIsMobileUserMenuOpen(false);
+                    setIsProModalOpen(true);
+                  }}
+                  className="w-full flex items-center justify-between px-2.5 py-2 text-xs font-medium rounded-xl bg-gradient-to-r from-purple-500/15 via-violet-500/10 to-transparent border border-purple-500/30 text-purple-100 hover:border-purple-400/50 hover:bg-purple-500/20 transition-all cursor-pointer select-none group text-left active:scale-[0.98]"
+                  role="menuitem"
                 >
                   <span className="flex items-center gap-2.5">
-                    <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
-                    <span className="font-semibold text-amber-200/90">Suscripción</span>
+                    <Sparkles className="w-4 h-4 text-purple-400 group-hover:text-purple-300 transition-colors shrink-0" />
+                    <span className="font-semibold text-purple-200 group-hover:text-white transition-colors">Suscripción</span>
                   </span>
-                  <span className="text-[10px] font-bold text-amber-400 bg-amber-500/20 border border-amber-500/30 px-1.5 py-0.5 rounded-full shadow-sm shadow-amber-500/10">
+                  <span className="text-[10px] font-bold text-purple-300 bg-purple-500/25 border border-purple-500/40 px-2 py-0.5 rounded-full shadow-sm shadow-purple-500/20">
                     PRO
                   </span>
                 </button>
@@ -321,28 +394,38 @@ export default function DashboardLayout({
           {/* User profile & full options in mobile drawer */}
           <div className="pt-3 border-t border-neutral-800/80 space-y-1">
             <div className="flex items-center gap-2.5 px-2.5 py-2 mb-1">
-              <div className="w-7 h-7 rounded-full bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center font-medium text-xs shrink-0">
-                {userInitial}
+              <div className="w-7 h-7 rounded-full bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center font-medium text-xs shrink-0 overflow-hidden">
+                {hasAvatar ? (
+                  <img
+                    src={profile.avatar_url}
+                    alt={displayName}
+                    className="w-full h-full object-cover rounded-full"
+                    onError={() => setAvatarError(true)}
+                  />
+                ) : (
+                  userInitial
+                )}
               </div>
               <div className="truncate">
-                <p className="text-xs font-medium text-neutral-200 truncate">{userName}</p>
-                <p className="text-[10px] text-neutral-500 truncate">{userEmail}</p>
+                <p className="text-xs font-medium text-neutral-200 truncate">{displayName}</p>
+                <p className="text-[10px] text-neutral-500 truncate">
+                  {profile.username ? `@${profile.username}` : (userEmail || 'Estudiante')}
+                </p>
               </div>
             </div>
 
-            {/* 1. Mi Perfil (Inactivo) */}
+            {/* 1. Mi Perfil (Habilitado -> redirige a /settings#profile-section) */}
             <button
               type="button"
-              disabled
-              className="w-full flex items-center justify-between px-2.5 py-2 text-xs font-medium rounded-xl text-neutral-400 cursor-not-allowed select-none text-left"
+              onClick={handleNavigateToProfile}
+              className="w-full flex items-center justify-between px-2.5 py-2 text-xs font-medium rounded-xl text-neutral-300 hover:text-white hover:bg-neutral-800/70 transition-colors cursor-pointer group text-left"
+              role="menuitem"
             >
               <span className="flex items-center gap-2.5">
-                <UserIcon className="w-4 h-4 text-neutral-500" />
+                <UserIcon className="w-4 h-4 text-neutral-400 group-hover:text-indigo-400 transition-colors" />
                 <span>Mi Perfil</span>
               </span>
-              <span className="text-[10px] text-neutral-500 bg-neutral-800/80 px-1.5 py-0.5 rounded font-mono">
-                Pronto
-              </span>
+              <ChevronRight className="w-3.5 h-3.5 text-neutral-500 group-hover:text-neutral-300 transition-colors" />
             </button>
 
             {/* 2. Apariencia (Inactivo) */}
@@ -360,17 +443,21 @@ export default function DashboardLayout({
               </span>
             </button>
 
-            {/* 3. Suscripción */}
+            {/* 3. Suscripción (PRO) */}
             <button
               type="button"
-              disabled
-              className="w-full flex items-center justify-between px-2.5 py-2 text-xs font-medium rounded-xl bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/20 text-neutral-300 cursor-not-allowed select-none text-left"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                setIsProModalOpen(true);
+              }}
+              className="w-full flex items-center justify-between px-2.5 py-2 text-xs font-medium rounded-xl bg-gradient-to-r from-purple-500/15 via-violet-500/10 to-transparent border border-purple-500/30 text-purple-100 hover:border-purple-400/50 hover:bg-purple-500/20 transition-all cursor-pointer select-none group text-left active:scale-[0.98]"
+              role="menuitem"
             >
               <span className="flex items-center gap-2.5">
-                <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
-                <span className="font-semibold text-amber-200/90">Suscripción</span>
+                <Sparkles className="w-4 h-4 text-purple-400 group-hover:text-purple-300 transition-colors shrink-0" />
+                <span className="font-semibold text-purple-200 group-hover:text-white transition-colors">Suscripción</span>
               </span>
-              <span className="text-[10px] font-bold text-amber-400 bg-amber-500/20 border border-amber-500/30 px-1.5 py-0.5 rounded-full shadow-sm shadow-amber-500/10">
+              <span className="text-[10px] font-bold text-purple-300 bg-purple-500/25 border border-purple-500/40 px-2 py-0.5 rounded-full shadow-sm shadow-purple-500/20">
                 PRO
               </span>
             </button>
@@ -457,24 +544,37 @@ export default function DashboardLayout({
               aria-orientation="vertical"
             >
               {/* Header Info */}
-              <div className="px-2.5 py-2 mb-1 border-b border-neutral-800/80">
-                <p className="text-xs font-semibold text-white truncate">{userName}</p>
-                <p className="text-[11px] text-neutral-400 truncate">{userEmail}</p>
+              <div className="px-2.5 py-2 mb-1 border-b border-neutral-800/80 flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-full bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center font-medium text-[11px] shrink-0 overflow-hidden">
+                  {hasAvatar ? (
+                    <img
+                      src={profile.avatar_url}
+                      alt={displayName}
+                      className="w-full h-full object-cover rounded-full"
+                      onError={() => setAvatarError(true)}
+                    />
+                  ) : (
+                    userInitial
+                  )}
+                </div>
+                <div className="min-w-0 truncate">
+                  <p className="text-xs font-semibold text-white truncate">{displayName}</p>
+                  <p className="text-[11px] text-neutral-400 truncate">{userEmail}</p>
+                </div>
               </div>
 
-              {/* 1. Mi Perfil (Inactivo) */}
+              {/* 1. Mi Perfil (Habilitado -> redirige a /settings#profile-section) */}
               <button
                 type="button"
-                disabled
-                className="w-full flex items-center justify-between px-2.5 py-2 text-xs font-medium rounded-xl text-neutral-400 hover:text-neutral-300 hover:bg-neutral-800/50 transition-colors cursor-not-allowed select-none group text-left"
+                onClick={handleNavigateToProfile}
+                className="w-full flex items-center justify-between px-2.5 py-2 text-xs font-medium rounded-xl text-neutral-300 hover:text-white hover:bg-neutral-800/70 transition-colors cursor-pointer group text-left"
+                role="menuitem"
               >
                 <span className="flex items-center gap-2.5">
-                  <UserIcon className="w-4 h-4 text-neutral-500 group-hover:text-neutral-400" />
+                  <UserIcon className="w-4 h-4 text-neutral-400 group-hover:text-indigo-400 transition-colors" />
                   <span>Mi Perfil</span>
                 </span>
-                <span className="text-[10px] text-neutral-500 bg-neutral-800/80 px-1.5 py-0.5 rounded font-mono">
-                  Pronto
-                </span>
+                <ChevronRight className="w-3.5 h-3.5 text-neutral-500 group-hover:text-neutral-300 transition-colors" />
               </button>
 
               {/* 2. Apariencia (Inactivo con icono de luna/sol) */}
@@ -492,17 +592,21 @@ export default function DashboardLayout({
                 </span>
               </button>
 
-              {/* 3. Suscripción (Inactivo, sutilmente destacado con icono de estrella/chispa y acento) */}
+              {/* 3. Suscripción (PRO) */}
               <button
                 type="button"
-                disabled
-                className="w-full flex items-center justify-between px-2.5 py-2 text-xs font-medium rounded-xl bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/20 text-neutral-300 hover:border-amber-500/30 transition-colors cursor-not-allowed select-none group text-left"
+                onClick={() => {
+                  setIsUserMenuOpen(false);
+                  setIsProModalOpen(true);
+                }}
+                className="w-full flex items-center justify-between px-2.5 py-2 text-xs font-medium rounded-xl bg-gradient-to-r from-purple-500/15 via-violet-500/10 to-transparent border border-purple-500/30 text-purple-100 hover:border-purple-400/50 hover:bg-purple-500/20 transition-all cursor-pointer select-none group text-left active:scale-[0.98]"
+                role="menuitem"
               >
                 <span className="flex items-center gap-2.5">
-                  <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
-                  <span className="font-semibold text-amber-200/90">Suscripción</span>
+                  <Sparkles className="w-4 h-4 text-purple-400 group-hover:text-purple-300 transition-colors shrink-0" />
+                  <span className="font-semibold text-purple-200 group-hover:text-white transition-colors">Suscripción</span>
                 </span>
-                <span className="text-[10px] font-bold text-amber-400 bg-amber-500/20 border border-amber-500/30 px-1.5 py-0.5 rounded-full shadow-sm shadow-amber-500/10">
+                <span className="text-[10px] font-bold text-purple-300 bg-purple-500/25 border border-purple-500/40 px-2 py-0.5 rounded-full shadow-sm shadow-purple-500/20">
                   PRO
                 </span>
               </button>
@@ -544,14 +648,25 @@ export default function DashboardLayout({
             className="w-full flex items-center justify-between p-2 rounded-xl bg-neutral-900/60 hover:bg-neutral-800/70 border border-neutral-800 hover:border-neutral-700/80 transition-all duration-150 text-left group cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
           >
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-full bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center font-medium text-xs shrink-0 group-hover:border-indigo-400/50 transition-colors">
-                {userInitial}
+              <div className="w-8 h-8 rounded-full bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center font-medium text-xs shrink-0 group-hover:border-indigo-400/50 transition-colors overflow-hidden">
+                {hasAvatar ? (
+                  <img
+                    src={profile.avatar_url}
+                    alt={displayName}
+                    className="w-full h-full object-cover rounded-full"
+                    onError={() => setAvatarError(true)}
+                  />
+                ) : (
+                  userInitial
+                )}
               </div>
               <div className="truncate min-w-0">
                 <p className="text-xs font-medium text-neutral-200 truncate group-hover:text-white transition-colors">
-                  {userName}
+                  {displayName}
                 </p>
-                <p className="text-[10px] text-neutral-500 truncate">Supabase RLS Activo</p>
+                <p className="text-[10px] text-neutral-500 truncate">
+                  {profile.username ? `@${profile.username}` : (userEmail || 'Estudiante')}
+                </p>
               </div>
             </div>
             <ChevronsUpDown className="w-4 h-4 text-neutral-500 group-hover:text-neutral-300 transition-colors shrink-0 ml-1" />
@@ -574,6 +689,9 @@ export default function DashboardLayout({
 
       {/* Modal de Bienvenida Onboarding */}
       <WelcomeTutorial />
+
+      {/* Modal de Suscripción PRO */}
+      <ProModal isOpen={isProModalOpen} onClose={() => setIsProModalOpen(false)} />
     </div>
   );
 }

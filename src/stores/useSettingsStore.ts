@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/types/database';
+import { useProfileStore } from './useProfileStore';
 
 export type ProfileRow = Database['public']['Tables']['profiles']['Row'];
 
@@ -80,8 +81,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
         await supabase.from('profiles').insert({
           id: user.id,
-          full_name: initialProfile.full_name,
-          username: initialProfile.username,
+          full_name: initialProfile.full_name || null,
+          username: initialProfile.username || null,
           request_retention: initialProfile.request_retention,
           maximum_interval: initialProfile.maximum_interval,
           enable_fuzz: initialProfile.enable_fuzz,
@@ -105,8 +106,12 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       set({ settings: loadedSettings, isLoading: false });
       return loadedSettings;
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Error al cargar los ajustes de usuario';
-      console.error('Error fetching settings:', err);
+      const message =
+        (err && typeof err === 'object' && 'message' in err && typeof (err as { message?: unknown }).message === 'string'
+          ? (err as { message: string }).message
+          : null) ||
+        (err instanceof Error ? err.message : 'Error al cargar los ajustes de usuario');
+      console.error('Error fetching settings:', message, err);
       set({ error: message, isLoading: false });
       return null;
     }
@@ -117,10 +122,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     try {
       const {
         data: { user },
+        error: authErr,
       } = await supabase.auth.getUser();
 
-      if (!user) {
-        throw new Error('Debes iniciar sesión para guardar tus preferencias.');
+      if (authErr || !user) {
+        throw new Error(authErr?.message || 'Debes iniciar sesión para guardar tus preferencias.');
       }
 
       const merged: FSRSSettings = {
@@ -128,31 +134,79 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         ...newSettings,
       };
 
-      const { error } = await supabase
+      const fullNameVal = merged.full_name !== undefined ? merged.full_name.trim() : null;
+      const usernameVal = merged.username !== undefined && merged.username.trim() !== '' ? merged.username.trim() : null;
+
+      // 1. Ejecutar UPDATE sobre la tabla profiles en Supabase filtrando por el ID
+      const { data: updateData, error: updateError } = await supabase
         .from('profiles')
-        .upsert({
-          id: user.id,
-          full_name: merged.full_name,
-          username: merged.username,
+        .update({
+          full_name: fullNameVal,
+          username: usernameVal,
           request_retention: merged.request_retention,
           maximum_interval: merged.maximum_interval,
           enable_fuzz: merged.enable_fuzz,
           updated_at: new Date().toISOString(),
-        });
+        })
+        .eq('id', user.id)
+        .select();
 
-      if (error) throw error;
+      if (updateError) throw updateError;
 
+      // 2. Si la fila no existía previamente, realizar insert
+      if (!updateData || updateData.length === 0) {
+        const { error: insertError } = await supabase
+          .from('profiles')
+          .insert({
+            id: user.id,
+            full_name: fullNameVal,
+            username: usernameVal,
+            request_retention: merged.request_retention,
+            maximum_interval: merged.maximum_interval,
+            enable_fuzz: merged.enable_fuzz,
+            updated_at: new Date().toISOString(),
+          });
+
+        if (insertError) throw insertError;
+      }
+
+      // 3. Sincronizar inmediatamente el store global useProfileStore para reflejar cambios en tiempo real
+      useProfileStore.getState().setProfile({
+        full_name: fullNameVal || '',
+        username: usernameVal || '',
+      });
+
+      // 4. Actualizar estado local del settings store
       set({
-        settings: merged,
+        settings: {
+          ...merged,
+          full_name: fullNameVal || '',
+          username: usernameVal || '',
+        },
         isSaving: false,
-        successMessage: '¡Configuración FSRS guardada permanentemente en Supabase!',
+        successMessage: '¡Cambios guardados correctamente en tu perfil y configuración!',
       });
 
       return true;
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Error al guardar la configuración';
-      console.error('Error saving settings:', err);
-      set({ error: message, isSaving: false });
+      let errorMessage =
+        (err && typeof err === 'object' && 'message' in err && typeof (err as { message?: unknown }).message === 'string'
+          ? (err as { message: string }).message
+          : null) ||
+        (err && typeof err === 'object' && 'details' in err && typeof (err as { details?: unknown }).details === 'string'
+          ? (err as { details: string }).details
+          : null) ||
+        (err instanceof Error ? err.message : 'Error al guardar la configuración');
+
+      if (
+        errorMessage.includes('profiles_username_key') ||
+        (typeof err === 'object' && err !== null && (err as { code?: string }).code === '23505')
+      ) {
+        errorMessage = 'Este nombre de usuario ya está en uso. Por favor, elige otro.';
+      }
+
+      console.error('Error saving settings:', errorMessage, err);
+      set({ error: errorMessage, isSaving: false });
       return false;
     }
   },

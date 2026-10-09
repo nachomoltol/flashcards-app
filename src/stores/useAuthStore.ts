@@ -4,6 +4,7 @@ import type { User, Session } from '@supabase/supabase-js';
 import { useDeckStore } from './useDeckStore';
 import { useCardStore } from './useCardStore';
 import { useSettingsStore } from './useSettingsStore';
+import { useProfileStore } from './useProfileStore';
 
 interface AuthState {
   user: User | null;
@@ -39,6 +40,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           useDeckStore.getState().reset();
           useCardStore.getState().reset();
           useSettingsStore.getState().reset();
+          useProfileStore.getState().reset();
         }
         set({ session: updatedSession, user: updatedSession?.user ?? null, isLoading: false });
       });
@@ -55,6 +57,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       useDeckStore.getState().reset();
       useCardStore.getState().reset();
       useSettingsStore.getState().reset();
+      useProfileStore.getState().reset();
     }
     set({ session, user: session?.user ?? null, isLoading: false });
   },
@@ -70,5 +73,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     useDeckStore.getState().reset();
     useCardStore.getState().reset();
     useSettingsStore.getState().reset();
+    useProfileStore.getState().reset();
   },
 }));

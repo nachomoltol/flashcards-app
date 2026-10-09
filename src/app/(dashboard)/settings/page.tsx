@@ -61,6 +61,29 @@ export default function SettingsPage() {
     setHasChanges(isDifferent);
   }, [retention, maxInterval, fuzz, fullName, username, settings]);
 
+  // Scroll y foco automático en la sección Datos del Perfil al acceder con hash
+  useEffect(() => {
+    const handleHash = () => {
+      if (typeof window !== 'undefined' && window.location.hash === '#profile-section') {
+        const timer = setTimeout(() => {
+          const el = document.getElementById('profile-section');
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            const input = document.getElementById('full-name-input') as HTMLInputElement | null;
+            if (input) {
+              input.focus();
+            }
+          }
+        }, 150);
+        return () => clearTimeout(timer);
+      }
+    };
+
+    handleHash();
+    window.addEventListener('hashchange', handleHash);
+    return () => window.removeEventListener('hashchange', handleHash);
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     await updateSettings({
@@ -292,7 +315,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Sección 2: Perfil del Usuario en Supabase */}
-        <div className="p-6 rounded-2xl bg-neutral-900/60 border border-neutral-800 space-y-5">
+        <div id="profile-section" className="p-6 rounded-2xl bg-neutral-900/60 border border-neutral-800 space-y-5 scroll-mt-6 transition-all">
           <div className="border-b border-neutral-800/80 pb-4">
             <h2 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
               <svg className="w-4 h-4 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -307,10 +330,11 @@ export default function SettingsPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-300 mb-1.5">
+              <label htmlFor="full-name-input" className="block text-xs font-semibold uppercase tracking-wider text-neutral-300 mb-1.5">
                 Nombre Completo
               </label>
               <input
+                id="full-name-input"
                 type="text"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
@@ -320,10 +344,11 @@ export default function SettingsPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-300 mb-1.5">
+              <label htmlFor="username-input" className="block text-xs font-semibold uppercase tracking-wider text-neutral-300 mb-1.5">
                 Nombre de Usuario
               </label>
               <input
+                id="username-input"
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
@@ -403,7 +428,7 @@ export default function SettingsPage() {
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
-                <span>Guardar Configuración FSRS</span>
+                <span>Guardar Cambios</span>
               </>
             )}
           </button>
