@@ -62,7 +62,7 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
     try {
       setErrorMessage(null);
       setStatus('analyzing');
-      setStatusStep(isYouTube ? 'Obteniendo transcripción y subtítulos de YouTube...' : 'Analizando contenido web y extrayendo texto...');
+      setStatusStep(isYouTube ? 'Analizando vídeo de YouTube directamente con Gemini...' : 'Analizando contenido web y extrayendo texto...');
 
       const existingFronts = cards && cards.length > 0 ? cards.map((c) => c.front) : [];
 
@@ -310,7 +310,7 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
             {isYouTube && (
               <div className="p-2 rounded-lg bg-rose-500/10 border border-rose-500/25 text-rose-300 text-[11px] flex items-center gap-2">
                 <span className="font-bold text-rose-400 text-xs">▶ YouTube</span>
-                <span>Vídeo detectado: se extraerán los subtítulos y la transcripción oficial para crear las tarjetas.</span>
+                <span>Vídeo detectado: Gemini analizará el contenido del vídeo directamente en la nube de Google para generar las tarjetas.</span>
               </div>
             )}
 

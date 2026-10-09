@@ -536,8 +536,27 @@ function extractTextFromHtml(html: string): string {
 }
 
 /**
- * Server Action que procesa una URL web o vídeo de YouTube,
- * extrae su texto o transcripción de subtítulos, y genera tarjetas con Gemini 3.8 Flash.
+ * Extrae el identificador de un vídeo de YouTube a partir de cualquier formato de URL:
+ * - https://www.youtube.com/watch?v=ID
+ * - https://youtu.be/ID
+ * - https://www.youtube.com/embed/ID
+ * - https://www.youtube.com/shorts/ID
+ * - https://www.youtube.com/live/ID
+ */
+export function extractYouTubeVideoId(url: string): string | null {
+  if (!url) return null;
+  const match = url.match(
+    /(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/|v\/|live\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i
+  );
+  return match ? match[1] : null;
+}
+
+/**
+ * Server Action para procesar URLs de YouTube y artículos web en entornos Serverless (Vercel).
+ * Para YouTube: Utiliza la integración nativa directa de Gemini con URLs de YouTube
+ * (procesamiento directo en la nube de Google, evitando por completo los bloqueos IP 429/403 de Vercel)
+ * con fallback resiliente mediante múltiples mecanismos de extracción de subtítulos.
+ * Para páginas web: Descarga y limpia el contenido textual con fallback a proxy si la web bloquea peticiones de servidor.
  */
 export async function generateCardsFromUrlAction(
   input: UrlCardInput
@@ -580,87 +599,9 @@ export async function generateCardsFromUrlAction(
   const targetCount = Math.max(1, Math.min(30, cardCount || 10));
 
   try {
-    let extractedText = '';
-    const isYouTube =
-      parsedUrl.hostname.includes('youtube.com') ||
-      parsedUrl.hostname.includes('youtu.be');
-
-    if (isYouTube) {
-      try {
-        const transcriptItems = await YoutubeTranscript.fetchTranscript(parsedUrl.href);
-        if (!transcriptItems || transcriptItems.length === 0) {
-          throw new Error('No se encontraron subtítulos');
-        }
-        extractedText = transcriptItems
-          .map((item) => item.text)
-          .join(' ')
-          .replace(/\s+/g, ' ')
-          .trim();
-      } catch (ytError: unknown) {
-        console.warn('Fallo al obtener subtítulos de YouTube:', ytError);
-        const errMsg = ytError instanceof Error ? ytError.message : String(ytError);
-        if (
-          errMsg.includes('disabled') ||
-          errMsg.includes('not available') ||
-          errMsg.includes('Transcript is disabled') ||
-          errMsg.includes('subtítulos')
-        ) {
-          return {
-            success: false,
-            error:
-              'Este vídeo de YouTube no cuenta con subtítulos o transcripción pública activada. Para vídeos sin subtítulos, puedes extraer el audio y subirlo en formato .mp3 en la pestaña "Subir Documento".',
-          };
-        }
-        return {
-          success: false,
-          error:
-            'No se pudo extraer la transcripción del vídeo de YouTube. Asegúrate de que el vídeo sea público y cuente con subtítulos habilitados.',
-        };
-      }
-    } else {
-      // Extracción de contenido de artículo o página web estándar
-      try {
-        const response = await fetch(parsedUrl.href, {
-          headers: {
-            'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          },
-          signal: AbortSignal.timeout(12000),
-        });
-
-        if (!response.ok) {
-          return {
-            success: false,
-            error: `Error al acceder a la página web (${response.status}: ${response.statusText}). Verifica que el enlace sea accesible públicamente.`,
-          };
-        }
-
-        const html = await response.text();
-        extractedText = extractTextFromHtml(html);
-      } catch (fetchErr: unknown) {
-        console.warn('Error al obtener URL web:', fetchErr);
-        return {
-          success: false,
-          error:
-            'No se pudo conectar con la página web especificada. Comprueba la conexión o que la URL esté activa.',
-        };
-      }
-    }
-
-    if (!extractedText || extractedText.length < 50) {
-      return {
-        success: false,
-        error:
-          'No se encontró suficiente texto legible en el enlace para generar tarjetas de estudio.',
-      };
-    }
-
-    // Limitar longitud del texto para evitar saturación innecesaria (máx ~80,000 caracteres)
-    const truncatedText =
-      extractedText.length > 80000
-        ? extractedText.slice(0, 80000) + '... [contenido truncado para límite de tokens]'
-        : extractedText;
+    const youtubeVideoId = extractYouTubeVideoId(parsedUrl.href);
+    const isYouTube = Boolean(youtubeVideoId);
+    const canonicalYouTubeUrl = youtubeVideoId ? `https://www.youtube.com/watch?v=${youtubeVideoId}` : '';
 
     // 1. Consultar historial de tarjetas existentes en este mazo para la Memoria Anti-Duplicados
     const existingFronts =
@@ -677,16 +618,15 @@ El usuario ha indicado la siguiente instrucción de enfoque: "${focusInstruction
 REGLA ESTRICTA: Debes ignorar el resto del contenido y extraer la información EXCLUSIVAMENTE de los conceptos relacionados con la instrucción solicitada.`
       : '';
 
+    const sourceLabel = isYouTube ? 'Vídeo de YouTube' : 'Enlace Web';
+    const sourceRef = isYouTube ? canonicalYouTubeUrl : parsedUrl.href;
+
     const coverageText = focusInstruction
       ? `Debes analizar el contenido dando PRIORIDAD ABSOLUTA a la sección solicitada ("${focusInstruction}") y generar EXACTAMENTE ${targetCount} tarjetas extraídas EXCLUSIVAMENTE de esa parte.`
       : `Debes analizar el contenido completo y generar EXACTAMENTE ${targetCount} tarjetas cubriendo los conceptos clave de forma equitativa desde el principio hasta el final del contenido.`;
 
-    // 3. Preparar llamada a Gemini 3.8 Flash
-    const ai = new GoogleGenAI({ apiKey });
-
-    const sourceLabel = isYouTube ? 'Vídeo de YouTube' : 'Enlace Web';
     const promptText = `Eres un pedagogo experto en diseño pedagógico y repetición espaciada (algoritmo FSRS).
-${coverageText} Fuente: ${sourceLabel} ("${parsedUrl.href}").
+${coverageText} Fuente: ${sourceLabel} ("${sourceRef}").
 
 ${focusRuleSection ? `${focusRuleSection}\n\n` : ''}${GLOBAL_RULES}
 
@@ -697,24 +637,154 @@ ${RADAR_DIRECTIVE}
 ${antiDuplicatePrompt ? `${antiDuplicatePrompt}\n\n` : ''}REGLA CRÍTICA DE INTEGRIDAD:
 La integridad estructural del JSON es prioridad absoluta y DEBES devolver un objeto con "core_exhausted" (booleano) y "cards" (array con exactamente ${targetCount} tarjetas del formato "${cardFormat}"). Para garantizar que quepan las ${targetCount} tarjetas dentro del límite de tokens sin que el JSON se corte, mantén cada pregunta, opción y respuesta rigurosa pero concisa y directa.`;
 
-    const contents = [
-      {
-        text: `${promptText}\n\nCONTENIDO EXTRAÍDO DE ${sourceLabel.toUpperCase()}:\n=========================================\n${truncatedText}\n=========================================`,
-      },
-    ];
+    const ai = new GoogleGenAI({ apiKey });
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
-      contents,
-      config: {
-        responseMimeType: 'application/json',
-        responseJsonSchema: flashcardSchema,
-        maxOutputTokens: 8192,
-      },
-    });
+    let responseText: string | undefined;
 
-    const text = response.text;
-    if (!text) {
+    // =========================================================================
+    // ESTRATEGIA PARA YOUTUBE:
+    // 1. Primaria: Integración nativa de Gemini con fileUri de YouTube (100% inmune a bloqueos IP de Vercel)
+    // 2. Secundaria (Fallback): Extracción de subtítulos vía youtube-transcript
+    // =========================================================================
+    if (isYouTube) {
+      let nativeError: unknown = null;
+      try {
+        const nativeResponse = await ai.models.generateContent({
+          model: 'gemini-3.8-flash',
+          contents: [
+            {
+              fileData: {
+                fileUri: canonicalYouTubeUrl,
+              },
+            },
+            {
+              text: promptText,
+            },
+          ],
+          config: {
+            responseMimeType: 'application/json',
+            responseJsonSchema: flashcardSchema,
+            maxOutputTokens: 8192,
+          },
+        });
+        responseText = nativeResponse.text;
+      } catch (err: unknown) {
+        nativeError = err;
+        console.warn('Advertencia en integración nativa Gemini YouTube, probando estrategia fallback de transcripción:', err);
+      }
+
+      // Si la llamada nativa falló por alguna razón (ej. restricciones del vídeo o API preview), probamos fallback de transcripción
+      if (!responseText) {
+        let fallbackTranscript = '';
+        try {
+          const transcriptItems = await YoutubeTranscript.fetchTranscript(canonicalYouTubeUrl);
+          if (transcriptItems && transcriptItems.length > 0) {
+            fallbackTranscript = transcriptItems
+              .map((t) => t.text)
+              .join(' ')
+              .replace(/\s+/g, ' ')
+              .trim();
+          }
+        } catch (subErr) {
+          console.warn('Fallback youtube-transcript falló también:', subErr);
+        }
+
+        if (fallbackTranscript && fallbackTranscript.length >= 50) {
+          const truncatedTranscript =
+            fallbackTranscript.length > 80000
+              ? fallbackTranscript.slice(0, 80000) + '... [truncado por límite]'
+              : fallbackTranscript;
+
+          const fallbackResponse = await ai.models.generateContent({
+            model: 'gemini-3.8-flash',
+            contents: [
+              {
+                text: `${promptText}\n\nTRANSCRIPCIÓN DEL VÍDEO DE YOUTUBE:\n=========================================\n${truncatedTranscript}\n=========================================`,
+              },
+            ],
+            config: {
+              responseMimeType: 'application/json',
+              responseJsonSchema: flashcardSchema,
+              maxOutputTokens: 8192,
+            },
+          });
+          responseText = fallbackResponse.text;
+        } else {
+          // Si ni nativo ni fallback pudieron procesar el vídeo
+          const nativeMsg = nativeError instanceof Error ? nativeError.message : String(nativeError || '');
+          return {
+            success: false,
+            error: `No se pudo procesar el vídeo de YouTube (${canonicalYouTubeUrl}). Asegúrate de que sea público y accesible. Detalle: ${nativeMsg || 'Vídeo restringido o no disponible para la IA'}. Recuerda que también puedes subir el audio en formato .mp3 en la pestaña "Subir Documento".`,
+          };
+        }
+      }
+    } else {
+      // =========================================================================
+      // ESTRATEGIA PARA ENLACES WEB GENERALES (Artículos, Documentación):
+      // Descarga directa con User-Agent y fallback a proxy público si el servidor es bloqueado
+      // =========================================================================
+      let extractedWebText = '';
+      try {
+        const res = await fetch(parsedUrl.href, {
+          headers: {
+            'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          },
+          signal: AbortSignal.timeout(12000),
+        });
+        if (res.ok) {
+          const html = await res.text();
+          extractedWebText = extractTextFromHtml(html);
+        }
+      } catch (directErr) {
+        console.warn('Fallo al obtener URL web de forma directa, intentando proxy:', directErr);
+      }
+
+      // Fallback a proxy si la descarga directa fue bloqueada o vacía
+      if (!extractedWebText || extractedWebText.length < 50) {
+        try {
+          const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(parsedUrl.href)}`;
+          const proxyRes = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
+          if (proxyRes.ok) {
+            const html = await proxyRes.text();
+            extractedWebText = extractTextFromHtml(html);
+          }
+        } catch (proxyErr) {
+          console.warn('Fallback de proxy falló:', proxyErr);
+        }
+      }
+
+      if (!extractedWebText || extractedWebText.length < 50) {
+        return {
+          success: false,
+          error:
+            'No se pudo extraer suficiente contenido de texto legible de la página web proporcionada. Verifica que el enlace sea público y accesible.',
+        };
+      }
+
+      const truncatedWebText =
+        extractedWebText.length > 80000
+          ? extractedWebText.slice(0, 80000) + '... [contenido truncado]'
+          : extractedWebText;
+
+      const webResponse = await ai.models.generateContent({
+        model: 'gemini-3.8-flash',
+        contents: [
+          {
+            text: `${promptText}\n\nCONTENIDO EXTRAÍDO DEL ENLACE WEB:\n=========================================\n${truncatedWebText}\n=========================================`,
+          },
+        ],
+        config: {
+          responseMimeType: 'application/json',
+          responseJsonSchema: flashcardSchema,
+          maxOutputTokens: 8192,
+        },
+      });
+      responseText = webResponse.text;
+    }
+
+    if (!responseText) {
       return { success: false, error: 'Gemini no devolvió contenido de texto para el enlace.' };
     }
 
@@ -722,7 +792,7 @@ La integridad estructural del JSON es prioridad absoluta y DEBES devolver un obj
     let coreExhausted = false;
 
     try {
-      const parsedData = JSON.parse(text) as
+      const parsedData = JSON.parse(responseText) as
         | { core_exhausted?: boolean; cards?: GeneratedCard[] }
         | GeneratedCard[];
 
