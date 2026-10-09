@@ -29,3 +29,14 @@ export interface MultimodalDocumentInput {
   existingQuestions?: string[];
 }
 
+export interface UrlCardInput {
+  url: string;
+  deckId?: string;
+  customPrompt?: string;
+  focusInstruction?: string;
+  cardFormat?: CardFormat;
+  cardCount?: number;
+  existingQuestions?: string[];
+}
+
+

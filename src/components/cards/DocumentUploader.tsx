@@ -11,9 +11,10 @@ interface DocumentUploaderProps {
   deckId: string;
   onSuccess?: (cardsCount: number) => void;
   onCancel?: () => void;
+  onSwitchToUrl?: () => void;
 }
 
-type FileTypeCategory = 'pdf' | 'docx' | 'video' | 'audio' | 'text';
+type FileTypeCategory = 'pdf' | 'docx' | 'audio' | 'text';
 
 interface FileTypeInfo {
   category: FileTypeCategory;
@@ -25,7 +26,7 @@ interface FileTypeInfo {
   mime: string;
 }
 
-const SUPPORTED_EXTENSIONS = ['.pdf', '.docx', '.doc', '.mp4', '.mp3', '.wav', '.txt'];
+const SUPPORTED_EXTENSIONS = ['.pdf', '.docx', '.doc', '.mp3', '.wav', '.txt'];
 const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50MB matching Supabase bucket limit
 
 // Helper para identificar la categoría visual del archivo
@@ -59,17 +60,6 @@ function getFileTypeInfo(file: File): FileTypeInfo {
       mime: isLegacy
         ? 'application/msword'
         : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    };
-  }
-  if (ext === '.mp4' || file.type.startsWith('video/')) {
-    return {
-      category: 'video',
-      label: 'Video MP4',
-      badgeBg: 'bg-purple-500/15',
-      badgeText: 'text-purple-400',
-      borderCol: 'border-purple-500/30',
-      iconBg: 'bg-purple-500/20 text-purple-300',
-      mime: 'video/mp4',
     };
   }
   if (ext === '.mp3' || ext === '.wav' || file.type.startsWith('audio/')) {
@@ -107,7 +97,6 @@ function validateFile(file: File): string | null {
     file.type === 'application/pdf' ||
     file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
     file.type === 'application/msword' ||
-    file.type === 'video/mp4' ||
     file.type === 'audio/mpeg' ||
     file.type === 'audio/mp3' ||
     file.type === 'audio/wav' ||
@@ -115,7 +104,7 @@ function validateFile(file: File): string | null {
     file.type === 'text/plain';
 
   if (!isSupportedExt && !isSupportedMime) {
-    return `Tipo de archivo no soportado. Formatos admitidos: PDF, Word (.docx, .doc), MP4, MP3 y TXT.`;
+    return `Tipo de archivo no soportado. Formatos admitidos: PDF, Word (.docx, .doc), Audio (.mp3, .wav) y TXT.`;
   }
 
   if (file.size > MAX_FILE_SIZE_BYTES) {
@@ -125,7 +114,12 @@ function validateFile(file: File): string | null {
   return null;
 }
 
-export function DocumentUploader({ deckId, onSuccess, onCancel }: DocumentUploaderProps) {
+export function DocumentUploader({
+  deckId,
+  onSuccess,
+  onCancel,
+  onSwitchToUrl,
+}: DocumentUploaderProps) {
   const { user } = useAuthStore();
   const { cards, createCard, fetchCardsByDeck } = useCardStore();
   const { fetchDeckById } = useDeckStore();
@@ -529,7 +523,7 @@ export function DocumentUploader({ deckId, onSuccess, onCancel }: DocumentUpload
           <input
             ref={fileInputRef}
             type="file"
-            accept=".pdf,.docx,.doc,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,video/mp4,audio/mpeg,audio/mp3,audio/wav,text/plain"
+            accept=".pdf,.docx,.doc,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,audio/mpeg,audio/mp3,audio/wav,audio/x-wav,text/plain"
             className="hidden"
             onChange={(e) => {
               if (e.target.files && e.target.files.length > 0) {
@@ -589,9 +583,6 @@ export function DocumentUploader({ deckId, onSuccess, onCancel }: DocumentUpload
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/25 text-blue-300">
                     Word (.docx, .doc)
                   </span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-purple-500/10 border border-purple-500/25 text-purple-300">
-                    Video (.mp4)
-                  </span>
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/25 text-emerald-300">
                     Audio (.mp3, .wav)
                   </span>
@@ -600,9 +591,32 @@ export function DocumentUploader({ deckId, onSuccess, onCancel }: DocumentUpload
                   </span>
                 </div>
 
-                <span className="text-[10px] text-neutral-500 block pt-1">
-                  Tamaño máximo por archivo: 50 MB • Almacenamiento privado seguro con Supabase RLS
-                </span>
+                <div className="space-y-1.5 pt-1">
+                  <span className="text-[10px] text-neutral-500 block">
+                    Tamaño máximo por archivo: 50 MB • Almacenamiento privado seguro con Supabase RLS
+                  </span>
+                  <p className="text-[11px] text-amber-300/95 font-medium flex items-center justify-center gap-1.5">
+                    <span>💡</span>
+                    <span>
+                      Para vídeos o clases grabadas,{' '}
+                      {onSwitchToUrl ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSwitchToUrl();
+                          }}
+                          className="underline hover:text-amber-100 font-semibold transition"
+                        >
+                          pega el enlace web
+                        </button>
+                      ) : (
+                        'pega el enlace web'
+                      )}{' '}
+                      o sube el archivo de audio en .mp3
+                    </span>
+                  </p>
+                </div>
               </div>
             </div>
           ) : (
@@ -625,11 +639,6 @@ export function DocumentUploader({ deckId, onSuccess, onCancel }: DocumentUpload
                           {info.category === 'docx' && (
                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                          )}
-                          {info.category === 'video' && (
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                             </svg>
                           )}
                           {info.category === 'audio' && (

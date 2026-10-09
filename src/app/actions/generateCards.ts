@@ -2,6 +2,7 @@
 
 import { GoogleGenAI, Type } from '@google/genai';
 import mammoth from 'mammoth';
+import { YoutubeTranscript } from 'youtube-transcript';
 import { supabase } from '@/lib/supabase';
 import { randomizeMultipleChoiceCard } from '@/lib/cardUtils';
 import type {
@@ -9,6 +10,7 @@ import type {
   GeneratedCard,
   GenerateCardsResult,
   MultimodalDocumentInput,
+  UrlCardInput,
 } from '@/types/cards';
 
 const flashcardSchema = {
@@ -338,7 +340,6 @@ export async function generateCardsFromDocumentAction(
       if (ext === 'pdf') normalizedMime = 'application/pdf';
       else if (ext === 'docx') normalizedMime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
       else if (ext === 'doc') normalizedMime = 'application/msword';
-      else if (ext === 'mp4') normalizedMime = 'video/mp4';
       else if (ext === 'mp3') normalizedMime = 'audio/mpeg';
       else if (ext === 'wav') normalizedMime = 'audio/wav';
       else if (ext === 'txt') normalizedMime = 'text/plain';
@@ -505,6 +506,269 @@ La integridad estructural del JSON es prioridad absoluta y DEBES devolver un obj
     return {
       success: false,
       error: `Error al procesar el archivo multimodal con Gemini: ${message}`,
+    };
+  }
+}
+
+/**
+ * Limpia y extrae el texto legible de un documento HTML estándar
+ */
+function extractTextFromHtml(html: string): string {
+  return html
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ' ')
+    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, ' ')
+    .replace(/<noscript\b[^<]*(?:(?!<\/noscript>)<[^<]*)*<\/noscript>/gi, ' ')
+    .replace(/<svg\b[^<]*(?:(?!<\/svg>)<[^<]*)*<\/svg>/gi, ' ')
+    .replace(/<nav\b[^<]*(?:(?!<\/nav>)<[^<]*)*<\/nav>/gi, ' ')
+    .replace(/<footer\b[^<]*(?:(?!<\/footer>)<[^<]*)*<\/footer>/gi, ' ')
+    .replace(/<header\b[^<]*(?:(?!<\/header>)<[^<]*)*<\/header>/gi, ' ')
+    .replace(/<aside\b[^<]*(?:(?!<\/aside>)<[^<]*)*<\/aside>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&#x27;/gi, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Server Action que procesa una URL web o vídeo de YouTube,
+ * extrae su texto o transcripción de subtítulos, y genera tarjetas con Gemini 3.8 Flash.
+ */
+export async function generateCardsFromUrlAction(
+  input: UrlCardInput
+): Promise<GenerateCardsResult> {
+  const {
+    url,
+    deckId,
+    customPrompt,
+    focusInstruction: rawFocus,
+    cardFormat = 'basic',
+    cardCount = 10,
+    existingQuestions,
+  } = input;
+
+  const cleanUrl = (url || '').trim();
+  if (!cleanUrl) {
+    return { success: false, error: 'Por favor introduce una URL válida.' };
+  }
+
+  // Validar formato de URL
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(cleanUrl.startsWith('http') ? cleanUrl : `https://${cleanUrl}`);
+  } catch {
+    return {
+      success: false,
+      error: 'La URL proporcionada no tiene un formato válido (ej. https://www.youtube.com/watch?v=...)',
+    };
+  }
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    return {
+      success: false,
+      error:
+        'Clave GEMINI_API_KEY no configurada. Por favor define GEMINI_API_KEY en tu archivo .env.local para usar la generación automática.',
+    };
+  }
+
+  const targetCount = Math.max(1, Math.min(30, cardCount || 10));
+
+  try {
+    let extractedText = '';
+    const isYouTube =
+      parsedUrl.hostname.includes('youtube.com') ||
+      parsedUrl.hostname.includes('youtu.be');
+
+    if (isYouTube) {
+      try {
+        const transcriptItems = await YoutubeTranscript.fetchTranscript(parsedUrl.href);
+        if (!transcriptItems || transcriptItems.length === 0) {
+          throw new Error('No se encontraron subtítulos');
+        }
+        extractedText = transcriptItems
+          .map((item) => item.text)
+          .join(' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+      } catch (ytError: unknown) {
+        console.warn('Fallo al obtener subtítulos de YouTube:', ytError);
+        const errMsg = ytError instanceof Error ? ytError.message : String(ytError);
+        if (
+          errMsg.includes('disabled') ||
+          errMsg.includes('not available') ||
+          errMsg.includes('Transcript is disabled') ||
+          errMsg.includes('subtítulos')
+        ) {
+          return {
+            success: false,
+            error:
+              'Este vídeo de YouTube no cuenta con subtítulos o transcripción pública activada. Para vídeos sin subtítulos, puedes extraer el audio y subirlo en formato .mp3 en la pestaña "Subir Documento".',
+          };
+        }
+        return {
+          success: false,
+          error:
+            'No se pudo extraer la transcripción del vídeo de YouTube. Asegúrate de que el vídeo sea público y cuente con subtítulos habilitados.',
+        };
+      }
+    } else {
+      // Extracción de contenido de artículo o página web estándar
+      try {
+        const response = await fetch(parsedUrl.href, {
+          headers: {
+            'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          },
+          signal: AbortSignal.timeout(12000),
+        });
+
+        if (!response.ok) {
+          return {
+            success: false,
+            error: `Error al acceder a la página web (${response.status}: ${response.statusText}). Verifica que el enlace sea accesible públicamente.`,
+          };
+        }
+
+        const html = await response.text();
+        extractedText = extractTextFromHtml(html);
+      } catch (fetchErr: unknown) {
+        console.warn('Error al obtener URL web:', fetchErr);
+        return {
+          success: false,
+          error:
+            'No se pudo conectar con la página web especificada. Comprueba la conexión o que la URL esté activa.',
+        };
+      }
+    }
+
+    if (!extractedText || extractedText.length < 50) {
+      return {
+        success: false,
+        error:
+          'No se encontró suficiente texto legible en el enlace para generar tarjetas de estudio.',
+      };
+    }
+
+    // Limitar longitud del texto para evitar saturación innecesaria (máx ~80,000 caracteres)
+    const truncatedText =
+      extractedText.length > 80000
+        ? extractedText.slice(0, 80000) + '... [contenido truncado para límite de tokens]'
+        : extractedText;
+
+    // 1. Consultar historial de tarjetas existentes en este mazo para la Memoria Anti-Duplicados
+    const existingFronts =
+      existingQuestions && existingQuestions.length > 0
+        ? existingQuestions
+        : await fetchExistingCardFronts(deckId);
+    const antiDuplicatePrompt = buildAntiDuplicateSection(existingFronts, true);
+
+    // 2. Procesar instrucción de enfoque
+    const focusInstruction = (rawFocus || customPrompt || '').trim();
+    const focusRuleSection = focusInstruction
+      ? `🚨 REGLA DE ENFOQUE CRÍTICA (PRIORIDAD ABSOLUTA):
+El usuario ha indicado la siguiente instrucción de enfoque: "${focusInstruction}".
+REGLA ESTRICTA: Debes ignorar el resto del contenido y extraer la información EXCLUSIVAMENTE de los conceptos relacionados con la instrucción solicitada.`
+      : '';
+
+    const coverageText = focusInstruction
+      ? `Debes analizar el contenido dando PRIORIDAD ABSOLUTA a la sección solicitada ("${focusInstruction}") y generar EXACTAMENTE ${targetCount} tarjetas extraídas EXCLUSIVAMENTE de esa parte.`
+      : `Debes analizar el contenido completo y generar EXACTAMENTE ${targetCount} tarjetas cubriendo los conceptos clave de forma equitativa desde el principio hasta el final del contenido.`;
+
+    // 3. Preparar llamada a Gemini 3.8 Flash
+    const ai = new GoogleGenAI({ apiKey });
+
+    const sourceLabel = isYouTube ? 'Vídeo de YouTube' : 'Enlace Web';
+    const promptText = `Eres un pedagogo experto en diseño pedagógico y repetición espaciada (algoritmo FSRS).
+${coverageText} Fuente: ${sourceLabel} ("${parsedUrl.href}").
+
+${focusRuleSection ? `${focusRuleSection}\n\n` : ''}${GLOBAL_RULES}
+
+${getFormatInstructions(cardFormat)}
+
+${RADAR_DIRECTIVE}
+
+${antiDuplicatePrompt ? `${antiDuplicatePrompt}\n\n` : ''}REGLA CRÍTICA DE INTEGRIDAD:
+La integridad estructural del JSON es prioridad absoluta y DEBES devolver un objeto con "core_exhausted" (booleano) y "cards" (array con exactamente ${targetCount} tarjetas del formato "${cardFormat}"). Para garantizar que quepan las ${targetCount} tarjetas dentro del límite de tokens sin que el JSON se corte, mantén cada pregunta, opción y respuesta rigurosa pero concisa y directa.`;
+
+    const contents = [
+      {
+        text: `${promptText}\n\nCONTENIDO EXTRAÍDO DE ${sourceLabel.toUpperCase()}:\n=========================================\n${truncatedText}\n=========================================`,
+      },
+    ];
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.8-flash',
+      contents,
+      config: {
+        responseMimeType: 'application/json',
+        responseJsonSchema: flashcardSchema,
+        maxOutputTokens: 8192,
+      },
+    });
+
+    const text = response.text;
+    if (!text) {
+      return { success: false, error: 'Gemini no devolvió contenido de texto para el enlace.' };
+    }
+
+    let parsedCards: GeneratedCard[] = [];
+    let coreExhausted = false;
+
+    try {
+      const parsedData = JSON.parse(text) as
+        | { core_exhausted?: boolean; cards?: GeneratedCard[] }
+        | GeneratedCard[];
+
+      if (Array.isArray(parsedData)) {
+        parsedCards = parsedData;
+        coreExhausted = false;
+      } else if (parsedData && Array.isArray(parsedData.cards)) {
+        parsedCards = parsedData.cards;
+        coreExhausted = Boolean(parsedData.core_exhausted);
+      } else {
+        throw new Error('El JSON devuelto no contiene un array de tarjetas válido.');
+      }
+
+      if (parsedCards.length === 0) {
+        throw new Error('El array de tarjetas está vacío.');
+      }
+    } catch (parseError: unknown) {
+      console.warn('Fallo al parsear JSON de Gemini en generateCardsFromUrlAction:', parseError);
+      const suggestedCount = targetCount >= 20 ? 10 : 5;
+      const formatSuffix = cardFormat === 'multiple_choice' ? ' tipo test' : '';
+      return {
+        success: false,
+        error: `El contenido del enlace es demasiado denso para ${targetCount} tarjetas${formatSuffix}. Por favor, intenta generar ${suggestedCount}.`,
+      };
+    }
+
+    // Aplicar aleatorización Fisher-Yates a las opciones de preguntas test
+    return {
+      success: true,
+      core_exhausted: coreExhausted,
+      cards: parsedCards.slice(0, targetCount).map((card) => {
+        const cleaned: GeneratedCard = {
+          front: card.front.trim(),
+          back: card.back.trim(),
+          cardFormat: (card.cardFormat as CardFormat) || cardFormat,
+          cardType: card.cardFormat === 'cloze' ? 'cloze' : 'basic',
+        };
+        return randomizeMultipleChoiceCard(cleaned);
+      }),
+    };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Error desconocido al procesar el enlace';
+    console.error('Error in generateCardsFromUrlAction:', err);
+    return {
+      success: false,
+      error: `Error al procesar el enlace con Gemini: ${message}`,
     };
   }
 }

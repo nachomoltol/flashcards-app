@@ -3,7 +3,7 @@
 import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useDeckStore, useCardStore } from '@/stores';
-import { CardEditor, DocumentUploader, FormattedCardView } from '@/components/cards';
+import { CardEditor, DocumentUploader, FormattedCardView, UrlCardGenerator } from '@/components/cards';
 import { ShareDeckModal } from '@/components/decks';
 import { generateCardsAction } from '@/app/actions/generateCards';
 import type { CardFormat } from '@/types/database';
@@ -21,7 +21,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
 
   // Estado para el modal de Generación con IA (Gemini Flash)
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
-  const [aiMode, setAiMode] = useState<'multimodal' | 'topic'>('multimodal');
+  const [aiMode, setAiMode] = useState<'multimodal' | 'url' | 'topic'>('multimodal');
   const [aiTopic, setAiTopic] = useState('');
   const [aiCardFormat, setAiCardFormat] = useState<CardFormat>('basic');
   const [aiCardCount, setAiCardCount] = useState<number>(10);
@@ -263,7 +263,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                   No hay tarjetas guardadas en este mazo
                 </h3>
                 <p className="text-xs text-neutral-400 max-w-sm mx-auto leading-relaxed">
-                  Usa el editor dinámico o sube un documento (PDF, MP4, MP3, TXT) para que Gemini Flash genere tarjetas en el formato que prefieras.
+                  Usa el editor dinámico, sube un documento (PDF, Word, Audio, TXT) o pega un enlace web (YouTube) para que Gemini genere tarjetas automáticamente.
                 </p>
               </div>
 
@@ -401,7 +401,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
             )}
 
             {/* Mode Tabs */}
-            <div className="flex items-center p-1 rounded-xl bg-neutral-950 border border-neutral-800 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 p-1 rounded-xl bg-neutral-950 border border-neutral-800 text-xs">
               <button
                 type="button"
                 onClick={() => {
@@ -409,16 +409,35 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                   setAiError(null);
                   setAiSuccessMessage(null);
                 }}
-                className={`flex-1 py-2 px-3 rounded-lg font-medium transition flex items-center justify-center gap-2 ${
+                className={`py-2 px-3 rounded-lg font-medium transition flex items-center justify-center gap-2 ${
                   aiMode === 'multimodal'
                     ? 'bg-neutral-800 text-white shadow-sm'
                     : 'text-neutral-400 hover:text-neutral-200'
                 }`}
               >
-                <svg className="w-4 h-4 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-4 h-4 text-violet-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
-                <span>Subir Documento (PDF, MP4, MP3, TXT)</span>
+                <span>Subir Documento</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAiMode('url');
+                  setAiError(null);
+                  setAiSuccessMessage(null);
+                  setAiCoreExhausted(false);
+                }}
+                className={`py-2 px-3 rounded-lg font-medium transition flex items-center justify-center gap-2 ${
+                  aiMode === 'url'
+                    ? 'bg-neutral-800 text-white shadow-sm'
+                    : 'text-neutral-400 hover:text-neutral-200'
+                }`}
+              >
+                <svg className="w-4 h-4 text-rose-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                </svg>
+                <span>Enlace Web / YouTube</span>
               </button>
               <button
                 type="button"
@@ -428,22 +447,31 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                   setAiSuccessMessage(null);
                   setAiCoreExhausted(false);
                 }}
-                className={`flex-1 py-2 px-3 rounded-lg font-medium transition flex items-center justify-center gap-2 ${
+                className={`py-2 px-3 rounded-lg font-medium transition flex items-center justify-center gap-2 ${
                   aiMode === 'topic'
                     ? 'bg-neutral-800 text-white shadow-sm'
                     : 'text-neutral-400 hover:text-neutral-200'
                 }`}
               >
-                <svg className="w-4 h-4 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-4 h-4 text-indigo-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                 </svg>
                 <span>Por Tema o Prompt</span>
               </button>
             </div>
 
-            {/* Multimodal Mode Content */}
+            {/* Mode Content */}
             {aiMode === 'multimodal' ? (
               <DocumentUploader
+                deckId={id}
+                onSuccess={() => {
+                  fetchDeckById(id);
+                }}
+                onCancel={() => setIsAiModalOpen(false)}
+                onSwitchToUrl={() => setAiMode('url')}
+              />
+            ) : aiMode === 'url' ? (
+              <UrlCardGenerator
                 deckId={id}
                 onSuccess={() => {
                   fetchDeckById(id);
