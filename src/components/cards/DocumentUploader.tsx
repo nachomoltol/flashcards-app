@@ -124,7 +124,7 @@ export function DocumentUploader({
   const { cards, createCard, fetchCardsByDeck } = useCardStore();
   const { fetchDeckById } = useDeckStore();
   const { openProModal } = useProModalStore();
-  const { language } = useLanguageStore();
+  const { language, t } = useLanguageStore();
 
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -365,7 +365,7 @@ export function DocumentUploader({
 
           <div>
             <h3 className="text-base font-bold text-white tracking-tight">
-              ¡{successCount} Tarjetas Generadas y Guardadas!
+              {t('ai_uploader.success_title', '¡{count} Tarjetas Generadas y Guardadas!').replace('{count}', String(successCount))}
             </h3>
 
             {/* Banner de Feedback de Continuidad / Radar de Profundidad */}
@@ -373,20 +373,20 @@ export function DocumentUploader({
               <div className="mt-3 p-3.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-200 text-xs text-left flex items-start gap-2.5 max-w-md mx-auto shadow-sm">
                 <span className="text-base shrink-0">🎯</span>
                 <p className="leading-relaxed">
-                  <strong className="font-semibold text-amber-300">Teoría principal cubierta.</strong> Se han extraído los conceptos troncales. Si continúas generando, la IA rebuscará detalles minuciosos, datos estadísticos y excepciones del texto para un estudio de máxima profundidad.
+                  <strong className="font-semibold text-amber-300">{t('deck_detail.theory_covered_title', 'Teoría principal cubierta.')}</strong> {t('deck_detail.theory_covered_desc', 'Se han extraído los conceptos troncales. Si continúas generando, la IA rebuscará detalles minuciosos, datos estadísticos y excepciones del texto para un estudio de máxima profundidad.')}
                 </p>
               </div>
             ) : (
               <div className="mt-3 p-3.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-200 text-xs text-left flex items-start gap-2.5 max-w-md mx-auto shadow-sm">
                 <span className="text-base shrink-0">✅</span>
                 <p className="leading-relaxed">
-                  <strong className="font-semibold text-emerald-300">Tarjetas añadidas con éxito.</strong> ¿El temario es largo? Dale a generar de nuevo para extraer el siguiente bloque de conocimientos.
+                  <strong className="font-semibold text-emerald-300">{t('deck_detail.cards_added_title', 'Tarjetas añadidas con éxito.')}</strong> {t('deck_detail.cards_added_desc', '¿El temario es largo? Dale a generar de nuevo para extraer el siguiente bloque de conocimientos.')}
                 </p>
               </div>
             )}
 
             <p className="text-[11px] text-neutral-400 mt-2 max-w-sm mx-auto">
-              Documento: &ldquo;{selectedFile?.name}&rdquo; ({cardFormat}) • Memoria Anti-Duplicados activa para los siguientes bloques.
+              {t('ai_uploader.document_label', 'Documento:')} &ldquo;{selectedFile?.name}&rdquo; ({cardFormat}) • {t('ai_uploader.anti_duplicate_active', 'Memoria Anti-Duplicados activa para los siguientes bloques.')}
             </p>
           </div>
 
@@ -419,20 +419,20 @@ export function DocumentUploader({
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
-              <span>Generar siguiente bloque ({cardCount} tarjetas)</span>
+              <span>{t('ai_uploader.next_block_btn', 'Generar siguiente bloque ({count} tarjetas)').replace('{count}', String(cardCount))}</span>
             </button>
             <button
               onClick={handleReset}
               className="px-3.5 py-2.5 text-xs rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white font-medium transition"
             >
-              Procesar otro documento
+              {t('ai_uploader.process_another_btn', 'Procesar otro documento')}
             </button>
             {onCancel && (
               <button
                 onClick={onCancel}
                 className="px-3.5 py-2.5 text-xs rounded-xl border border-neutral-700 bg-neutral-900/80 hover:bg-neutral-800 text-neutral-400 hover:text-white font-medium transition"
               >
-                Cerrar ventana
+                {t('ai_uploader.close_btn', 'Cerrar ventana')}
               </button>
             )}
           </div>
@@ -449,7 +449,7 @@ export function DocumentUploader({
                   <svg className="w-3.5 h-3.5 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
                   </svg>
-                  Formato de Tarjetas
+                  {t('ai_uploader.card_format_label', 'Formato de Tarjetas')}
                 </span>
                 <span className="text-[10px] font-mono text-violet-400 uppercase">{cardFormat}</span>
               </label>
@@ -461,10 +461,10 @@ export function DocumentUploader({
                   onChange={(e) => setCardFormat(e.target.value as CardFormat)}
                   className="w-full text-xs font-medium px-3.5 py-2.5 rounded-xl bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition appearance-none cursor-pointer disabled:opacity-50 pr-10"
                 >
-                  <option value="basic">🃏 Básica — Pregunta y Respuesta</option>
-                  <option value="multiple_choice">📝 Opción Múltiple — Test (a, b, c, d)</option>
-                  <option value="cloze">🧩 Cloze — Palabra clave [...]</option>
-                  <option value="true_false">⚖️ Verdadero o Falso — Afirmación</option>
+                  <option value="basic">🃏 {t('card_editor.format_basic', 'Básica')} — {t('url_generator.format_basic_desc', 'Pregunta directa y respuesta concisa')}</option>
+                  <option value="multiple_choice">📝 {t('card_editor.format_test', 'Opción Múltiple')} — {t('url_generator.format_mc_desc', 'Pregunta test con 4 alternativas y solución')}</option>
+                  <option value="cloze">🧩 {t('card_editor.format_cloze', 'Cloze')} — {t('url_generator.format_cloze_desc', 'Completar conceptos clave entre corchetes')}</option>
+                  <option value="true_false">⚖️ {t('card_editor.format_tf', 'Verdadero o Falso')}</option>
                 </select>
                 <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-neutral-400">
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -474,10 +474,10 @@ export function DocumentUploader({
               </div>
 
               <p className="text-[11px] text-neutral-400 pt-0.5">
-                {cardFormat === 'basic' && 'Preguntas directas con respuestas rigurosas.'}
-                {cardFormat === 'multiple_choice' && 'Preguntas test con 4 opciones plausibles.'}
-                {cardFormat === 'cloze' && 'Oculta conceptos clave con [...].'}
-                {cardFormat === 'true_false' && 'Afirmaciones con justificación estricta.'}
+                {cardFormat === 'basic' && (language === 'en' ? 'Direct questions with rigorous answers.' : 'Preguntas directas con respuestas rigurosas.')}
+                {cardFormat === 'multiple_choice' && (language === 'en' ? 'Quiz questions with 4 plausible options.' : 'Preguntas test con 4 opciones plausibles.')}
+                {cardFormat === 'cloze' && (language === 'en' ? 'Hide key concepts with [...].' : 'Oculta conceptos clave con [...].')}
+                {cardFormat === 'true_false' && (language === 'en' ? 'Statements with strict justifications.' : 'Afirmaciones con justificación estricta.')}
               </p>
             </div>
 
@@ -488,7 +488,7 @@ export function DocumentUploader({
                   <svg className="w-3.5 h-3.5 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                   </svg>
-                  Cantidad de Tarjetas
+                  {t('ai_uploader.card_count_label', 'Cantidad de Tarjetas')}
                 </span>
                 <span className="text-[10px] font-mono text-violet-400 font-bold">{cardCount} / 30 MÁX</span>
               </label>
@@ -522,7 +522,7 @@ export function DocumentUploader({
               <div className="p-2.5 rounded-lg bg-violet-500/10 border border-violet-500/20 text-[11px] text-violet-200/90 flex items-start gap-2 leading-relaxed">
                 <span className="shrink-0 text-sm">💡</span>
                 <span>
-                  Generamos por lotes para evitar saturación. Puedes pedir varios lotes seguidos del mismo documento: nuestra IA analiza tu mazo y extraerá conceptos 100% nuevos sin repetir preguntas anteriores.
+                  {t('deck_detail.batch_hint', 'Generamos por lotes para evitar saturación. Puedes pedir varios lotes seguidos del mismo documento: nuestra IA analiza tu mazo y extraerá conceptos 100% nuevos sin repetir preguntas anteriores.')}
                 </span>
               </div>
             </div>
@@ -576,10 +576,10 @@ export function DocumentUploader({
 
                 <div>
                   <h4 className="text-sm font-semibold text-white tracking-tight">
-                    Arrastra y suelta tu archivo aquí
+                    {t('ai_uploader.drag_drop_title', 'Arrastra y suelta tu archivo aquí')}
                   </h4>
                   <p className="text-xs text-neutral-400 mt-1">
-                    o haz clic para explorar en tu dispositivo
+                    {t('ai_uploader.drag_drop_subtitle', 'o haz clic para explorar en tu dispositivo')}
                   </p>
                 </div>
 
@@ -601,12 +601,12 @@ export function DocumentUploader({
 
                 <div className="space-y-1.5 pt-1">
                   <span className="text-[10px] text-neutral-500 block">
-                    Tamaño máximo por archivo: 50 MB • Almacenamiento privado seguro con Supabase RLS
+                    {t('ai_uploader.max_file_size', 'Tamaño máximo por archivo: 50 MB • Almacenamiento privado seguro con Supabase RLS')}
                   </span>
                   <p className="text-[11px] text-amber-300/95 font-medium flex items-center justify-center gap-1.5">
                     <span>💡</span>
                     <span>
-                      Para vídeos o clases grabadas,{' '}
+                      {t('ai_uploader.video_hint', 'Para vídeos o clases grabadas,')}{' '}
                       {onSwitchToUrl ? (
                         <button
                           type="button"
@@ -616,12 +616,12 @@ export function DocumentUploader({
                           }}
                           className="underline hover:text-amber-100 font-semibold transition"
                         >
-                          pega el enlace web
+                          {t('ai_uploader.video_hint_link', 'pega el enlace web')}
                         </button>
                       ) : (
-                        'pega el enlace web'
+                        t('ai_uploader.video_hint_link', 'pega el enlace web')
                       )}{' '}
-                      o sube el archivo de audio en .mp3
+                      {t('ai_uploader.video_hint_audio', 'o sube el archivo de audio en .mp3')}
                     </span>
                   </p>
                 </div>
@@ -698,9 +698,9 @@ export function DocumentUploader({
                         <div className="flex items-center justify-between text-xs">
                           <span className="text-neutral-300 font-medium flex items-center gap-2">
                             <div className="w-3.5 h-3.5 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
-                            {status === 'uploading' && '1/3 Subiendo archivo a Supabase Storage...'}
-                            {status === 'analyzing' && `2/3 Gemini Flash generando ${cardCount} tarjetas (${cardFormat})...`}
-                            {status === 'saving' && '3/3 Guardando tarjetas generadas en Supabase...'}
+                            {status === 'uploading' && t('ai_uploader.status_uploading', '1/3 Subiendo archivo a Supabase Storage...')}
+                            {status === 'analyzing' && t('ai_uploader.status_analyzing', '2/3 Gemini Flash generando {count} tarjetas ({format})...').replace('{count}', String(cardCount)).replace('{format}', cardFormat)}
+                            {status === 'saving' && t('ai_uploader.status_saving', '3/3 Guardando tarjetas generadas en Supabase...')}
                           </span>
                           <span className="text-[11px] text-violet-400 font-mono uppercase">
                             {status === 'uploading' && 'Storage'}
@@ -728,15 +728,15 @@ export function DocumentUploader({
               {/* Optional Custom Instructions / Focus Instruction */}
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-300 mb-1.5 flex items-center justify-between">
-                  <span>Instrucción de Enfoque Focalizado</span>
-                  <span className="text-neutral-500 text-[10px] normal-case">(opcional - ej. Capítulo 3, o Páginas 10-25)</span>
+                  <span>{t('ai_uploader.custom_prompt_label', 'Instrucción de Enfoque Focalizado')}</span>
+                  <span className="text-neutral-500 text-[10px] normal-case">{t('ai_uploader.custom_prompt_sub', '(opcional - ej. Capítulo 3, o Páginas 10-25)')}</span>
                 </label>
                 <input
                   type="text"
                   disabled={isBusy}
                   value={customPrompt}
                   onChange={(e) => setCustomPrompt(e.target.value)}
-                  placeholder="ej. Extraer información EXCLUSIVAMENTE del Capítulo 2 o sección de conceptos clave..."
+                  placeholder={t('ai_uploader.custom_prompt_placeholder', 'ej. Extraer información EXCLUSIVAMENTE del Capítulo 2 o sección de conceptos clave...')}
                   className="w-full text-xs px-3.5 py-2.5 rounded-xl bg-neutral-950 border border-neutral-800 text-white placeholder-neutral-500 focus:outline-none focus:border-violet-500 transition disabled:opacity-50"
                 />
               </div>
@@ -750,7 +750,7 @@ export function DocumentUploader({
                     onClick={onCancel}
                     className="px-4 py-2 text-xs text-neutral-400 hover:text-white rounded-xl hover:bg-neutral-800 transition disabled:opacity-50"
                   >
-                    Cancelar
+                    {t('common.cancel', 'Cancelar')}
                   </button>
                 )}
 
@@ -763,14 +763,14 @@ export function DocumentUploader({
                   {isBusy ? (
                     <>
                       <div className="w-4 h-4 border-2 border-white/80 border-t-transparent rounded-full animate-spin" />
-                      <span>Procesando archivo...</span>
+                      <span>{t('ai_uploader.processing_file', 'Procesando archivo...')}</span>
                     </>
                   ) : (
                     <>
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                       </svg>
-                      <span>Generar {cardCount} Tarjetas ({cardFormat})</span>
+                      <span>{t('ai_uploader.process_file', 'Generar {count} Tarjetas ({format})').replace('{count}', String(cardCount)).replace('{format}', cardFormat)}</span>
                     </>
                   )}
                 </button>

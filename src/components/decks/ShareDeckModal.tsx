@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useDeckStore, type DeckWithStats } from '@/stores';
+import { useDeckStore, useLanguageStore, type DeckWithStats } from '@/stores';
 import type { DeckRow } from '@/stores/useDeckStore';
 
 interface ShareDeckModalProps {
@@ -12,6 +12,7 @@ interface ShareDeckModalProps {
 
 export function ShareDeckModal({ isOpen, onClose, deck }: ShareDeckModalProps) {
   const { shareDeck } = useDeckStore();
+  const { t } = useLanguageStore();
   const [shareId, setShareId] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -70,10 +71,10 @@ export function ShareDeckModal({ isOpen, onClose, deck }: ShareDeckModalProps) {
             </div>
             <div>
               <h3 className="text-base font-bold text-white tracking-tight">
-                Compartir Mazo de Estudio
+                {t('share_modal.title')}
               </h3>
               <p className="text-xs text-neutral-400">
-                Enlace público para duplicar e importar
+                {t('share_modal.subtitle')}
               </p>
             </div>
           </div>
@@ -99,25 +100,25 @@ export function ShareDeckModal({ isOpen, onClose, deck }: ShareDeckModalProps) {
               {deck.title}
             </p>
             <p className="text-xs text-neutral-400 truncate">
-              {deck.description || 'Sin descripción'}
+              {deck.description || t('share_modal.no_desc')}
             </p>
           </div>
           <span className="shrink-0 text-[11px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-            Público
+            {t('share_modal.public_badge')}
           </span>
         </div>
 
         {/* Share Link Area */}
         <div className="space-y-2">
           <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-300">
-            Enlace de Acceso Público
+            {t('share_modal.link_label')}
           </label>
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
               <input
                 type="text"
                 readOnly
-                value={isGenerating ? 'Generando identificador único...' : shareUrl}
+                value={isGenerating ? t('share_modal.generating_link') : shareUrl}
                 className="w-full text-xs font-mono px-3.5 py-2.5 rounded-xl bg-neutral-950 border border-neutral-800 text-neutral-300 focus:outline-none focus:border-indigo-500 transition select-all pr-8"
               />
             </div>
@@ -136,14 +137,14 @@ export function ShareDeckModal({ isOpen, onClose, deck }: ShareDeckModalProps) {
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                   </svg>
-                  <span>¡Copiado!</span>
+                  <span>{t('share_modal.copied')}</span>
                 </>
               ) : (
                 <>
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                   </svg>
-                  <span>Copiar</span>
+                  <span>{t('share_modal.copy')}</span>
                 </>
               )}
             </button>
@@ -154,7 +155,7 @@ export function ShareDeckModal({ isOpen, onClose, deck }: ShareDeckModalProps) {
         <div className="p-3 rounded-xl bg-indigo-950/30 border border-indigo-500/20 text-[11px] text-indigo-200/90 leading-relaxed flex items-start gap-2">
           <span className="text-base shrink-0">💡</span>
           <div>
-            Cualquier persona con este enlace podrá previsualizar las preguntas e importar el mazo completo a su cuenta. Al importarse, las tarjetas iniciarán completamente vírgenes (desde cero en FSRS).
+            {t('share_modal.note')}
           </div>
         </div>
 
@@ -167,7 +168,7 @@ export function ShareDeckModal({ isOpen, onClose, deck }: ShareDeckModalProps) {
               rel="noopener noreferrer"
               className="text-xs text-indigo-400 hover:text-indigo-300 font-medium inline-flex items-center gap-1 transition hover:underline"
             >
-              <span>Ver página pública</span>
+              <span>{t('share_modal.view_public_page')}</span>
               <span>↗</span>
             </a>
           ) : (
@@ -179,7 +180,7 @@ export function ShareDeckModal({ isOpen, onClose, deck }: ShareDeckModalProps) {
             onClick={onClose}
             className="px-4 py-2 text-xs font-medium text-neutral-300 hover:text-white rounded-xl hover:bg-neutral-800 transition"
           >
-            Listo
+            {t('share_modal.done')}
           </button>
         </div>
       </div>

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import type { CardFormat } from '@/types/database';
+import { useLanguageStore } from '@/stores';
 
 export interface FormattedCardViewProps {
   front: string;
@@ -182,6 +183,7 @@ export function FormattedCardView({
   interactive = true,
   className = '',
 }: FormattedCardViewProps) {
+  const { t, language } = useLanguageStore();
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
 
   // Reiniciar selección al cambiar de tarjeta o anverso
@@ -249,7 +251,7 @@ export function FormattedCardView({
             .replace(/\{\{c\d+::(.*?)\}\}/g, '$1');
 
     const utterance = new SpeechSynthesisUtterance(textToRead);
-    utterance.lang = 'es-ES';
+    utterance.lang = language === 'en' ? 'en-US' : 'es-ES';
     utterance.rate = 0.95;
     utterance.onend = () => setIsSpeaking(false);
     utterance.onerror = () => setIsSpeaking(false);
@@ -266,25 +268,25 @@ export function FormattedCardView({
           {resolvedFormat === 'multiple_choice' && (
             <span className="text-[11px] px-2.5 py-0.5 rounded-full font-semibold uppercase tracking-wider bg-purple-500/15 text-purple-300 border border-purple-500/30 flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-purple-400" />
-              Opción Múltiple (Test)
+              {t('card_editor.format_test', 'Opción Múltiple (Test)')}
             </span>
           )}
           {resolvedFormat === 'cloze' && (
             <span className="text-[11px] px-2.5 py-0.5 rounded-full font-semibold uppercase tracking-wider bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
-              Texto Cloze [...]
+              {t('card_editor.format_cloze', 'Texto Cloze [...]')}
             </span>
           )}
           {resolvedFormat === 'true_false' && (
             <span className="text-[11px] px-2.5 py-0.5 rounded-full font-semibold uppercase tracking-wider bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-              Verdadero o Falso
+              {t('card_editor.format_tf', 'Verdadero o Falso')}
             </span>
           )}
           {resolvedFormat === 'basic' && (
             <span className="text-[11px] px-2.5 py-0.5 rounded-full font-semibold uppercase tracking-wider bg-blue-500/15 text-blue-300 border border-blue-500/30 flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
-              Pregunta Directa
+              {t('card_editor.format_basic', 'Pregunta Directa')}
             </span>
           )}
         </div>
@@ -293,8 +295,8 @@ export function FormattedCardView({
         <button
           type="button"
           onClick={handleSpeak}
-          aria-label={isSpeaking ? 'Detener lectura en voz alta' : 'Leer pregunta en voz alta'}
-          title={isSpeaking ? 'Detener audio' : 'Leer pregunta en voz alta'}
+          aria-label={isSpeaking ? (language === 'en' ? 'Stop audio' : 'Detener lectura en voz alta') : (language === 'en' ? 'Read aloud' : 'Leer pregunta en voz alta')}
+          title={isSpeaking ? (language === 'en' ? 'Stop audio' : 'Detener audio') : (language === 'en' ? 'Read aloud' : 'Leer pregunta en voz alta')}
           className={`px-2.5 py-1 rounded-xl border text-xs transition-all duration-150 flex items-center gap-1.5 shrink-0 ${
             isSpeaking
               ? 'bg-indigo-600/30 text-indigo-200 border-indigo-500/50 ring-1 ring-indigo-500/40 animate-pulse'
@@ -311,7 +313,7 @@ export function FormattedCardView({
             </svg>
           )}
           <span className="text-[11px] font-medium hidden sm:inline">
-            {isSpeaking ? 'Leyendo...' : 'Escuchar'}
+            {isSpeaking ? t('formatted_card.reading', 'Leyendo...') : t('formatted_card.listen', 'Escuchar')}
           </span>
         </button>
       </div>
@@ -415,7 +417,7 @@ export function FormattedCardView({
               <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
-              <span>Verdadero</span>
+              <span>{t('formatted_card.true_btn', 'Verdadero')}</span>
             </button>
 
             <button
@@ -438,7 +440,7 @@ export function FormattedCardView({
               <svg className="w-4 h-4 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
-              <span>Falso</span>
+              <span>{t('formatted_card.false_btn', 'Falso')}</span>
             </button>
           </div>
         )}
@@ -450,12 +452,12 @@ export function FormattedCardView({
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              Respuesta / Justificación
+              {t('formatted_card.answer_heading', 'Respuesta / Justificación')}
             </span>
 
             {resolvedFormat === 'multiple_choice' && correctKey && (
               <span className="text-xs font-mono px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 uppercase">
-                Opción Correcta: ({correctKey})
+                {t('formatted_card.correct_option', 'Opción Correcta: ({key})').replace('{key}', correctKey)}
               </span>
             )}
           </div>

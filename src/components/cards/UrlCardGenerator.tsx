@@ -17,7 +17,7 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
   const { cards, createCard, fetchCardsByDeck } = useCardStore();
   const { fetchDeckById } = useDeckStore();
   const { openProModal } = useProModalStore();
-  const { language } = useLanguageStore();
+  const { language, t } = useLanguageStore();
 
   const [url, setUrl] = useState('');
   const [cardFormat, setCardFormat] = useState<CardFormat>('basic');
@@ -52,85 +52,91 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!url.trim()) {
-      setErrorMessage('Por favor introduce un enlace web o de YouTube.');
+      setErrorMessage(t('url_generator.notice_title', 'Aviso al procesar enlace:'));
       return;
     }
 
     if (!user) {
-      setErrorMessage('Debes iniciar sesión para guardar tarjetas en tu mazo.');
+      setErrorMessage(language === 'en' ? 'You must be logged in to save cards to your deck.' : 'Debes iniciar sesión para guardar tarjetas en tu mazo.');
       return;
     }
 
     try {
       setErrorMessage(null);
       setStatus('analyzing');
-      setStatusStep(isYouTube ? 'Analizando vídeo de YouTube directamente con Gemini...' : 'Analizando contenido web y extrayendo texto...');
+      setStatusStep(language === 'en' ? 'Analyzing web link and extracting content with Gemini...' : 'Analizando enlace web y extrayendo contenido con Gemini...');
 
-      const existingFronts = cards && cards.length > 0 ? cards.map((c) => c.front) : [];
+      // Consultar historial de tarjetas existentes para Memoria Anti-Duplicados
+      const existingCardsInDeck = cards.map((c) => c.front);
 
+      // Llamar al Server Action con el idioma activo
       const result = await generateCardsFromUrlAction({
         url: url.trim(),
         deckId,
-        userId: user?.id,
-        customPrompt: customPrompt.trim() || undefined,
-        focusInstruction: customPrompt.trim() || undefined,
         cardFormat,
         cardCount,
-        existingQuestions: existingFronts,
+        customPrompt: customPrompt.trim() ? customPrompt.trim() : undefined,
+        existingQuestions: existingCardsInDeck,
         language,
       });
 
-      if (!result.success || !result.cards || result.cards.length === 0) {
-        setStatus('idle');
+      if (!result.success || !result.cards) {
         if (result.error === 'LIMIT_REACHED') {
           openProModal(true);
-          return;
         }
-        const errorDetail =
-          result.error ||
-          `El contenido es demasiado denso para generar ${cardCount} tarjetas en este lote. Por favor, intenta generar una cantidad menor (ej. 10 tarjetas).`;
-        setErrorMessage(errorDetail);
+        setStatus('error');
+        setErrorMessage(result.error || (language === 'en' ? 'Could not generate cards from this link.' : 'No se pudieron generar tarjetas a partir de este enlace.'));
         return;
       }
 
-      // Guardar en Supabase / Zustand con FSRS
-      setStatus('saving');
-      setStatusStep('Guardando tarjetas con algoritmo FSRS...');
-      const generatedCards = result.cards;
-      setGeneratedCardsPreview(generatedCards);
+      setCoreExhausted(Boolean(result.core_exhausted));
+      setGeneratedCardsPreview(result.cards);
 
-      for (const card of generatedCards) {
-        await createCard(
+      // Guardar secuencialmente en Supabase mediante Zustand
+      setStatus('saving');
+      setStatusStep(language === 'en' ? `Saving ${result.cards.length} cards to Supabase...` : `Guardando ${result.cards.length} tarjetas en Supabase...`);
+
+      let savedCount = 0;
+      for (const card of result.cards) {
+        const backValue =
+          card.cardFormat === 'cloze' && !card.back ? card.front : card.back;
+
+        const created = await createCard(
           deckId,
           card.front,
-          card.back,
+          backValue,
           card.cardFormat === 'cloze' ? 'cloze' : 'basic',
           card.cardFormat
         );
+
+        if (created) {
+          savedCount++;
+        }
       }
 
-      // Sincronizar datos del mazo en local
-      await fetchCardsByDeck(deckId);
-      await fetchDeckById(deckId);
-
-      setSuccessCount(generatedCards.length);
-      setCoreExhausted(Boolean(result.core_exhausted));
+      setSuccessCount(savedCount);
       setStatus('success');
 
+      // Actualizar mazo y llamar callback
+      await fetchDeckById(deckId);
+      await fetchCardsByDeck(deckId);
+
       if (onSuccess) {
-        onSuccess(generatedCards.length);
+        onSuccess(savedCount);
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Error inesperado al procesar el enlace';
-      console.error('Error in UrlCardGenerator:', err);
-      setErrorMessage(msg);
-      setStatus('idle');
+      console.error('Error generating cards from url:', err);
+      setStatus('error');
+      setErrorMessage(err instanceof Error ? err.message : (language === 'en' ? 'Unexpected error processing link.' : 'Error inesperado al procesar el enlace.'));
     }
   };
 
   const handleReset = () => {
+    setUrl('');
+    setCustomPrompt('');
     setStatus('idle');
     setErrorMessage(null);
+    setSuccessCount(0);
     setCoreExhausted(false);
     setGeneratedCardsPreview([]);
   };
@@ -147,7 +153,7 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
             <div className="leading-relaxed">
-              <strong className="font-semibold block text-rose-200 mb-0.5">Aviso al procesar enlace:</strong>
+              <strong className="font-semibold block text-rose-200 mb-0.5">{t('url_generator.notice_title', 'Aviso al procesar enlace:')}</strong>
               {errorMessage}
             </div>
           </div>
@@ -160,7 +166,7 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
               }}
               className="shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 transition border border-rose-500/30"
             >
-              Probar con 10 tarjetas
+              {t('url_generator.try_with_10', 'Probar con 10 tarjetas')}
             </button>
           )}
         </div>
@@ -178,10 +184,10 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
               </div>
               <div>
                 <h4 className="text-sm font-semibold text-white">
-                  ¡{successCount} tarjetas creadas y guardadas con éxito!
+                  {t('url_generator.success_title', '¡{count} tarjetas creadas y guardadas con éxito!').replace('{count}', String(successCount))}
                 </h4>
                 <p className="text-xs text-neutral-400 mt-0.5">
-                  Las tarjetas han sido agregadas a tu mazo y están listas para estudiar con FSRS.
+                  {t('url_generator.success_desc', 'Las tarjetas han sido agregadas a tu mazo y están listas para estudiar con FSRS.')}
                 </p>
               </div>
             </div>
@@ -190,7 +196,7 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
               onClick={handleReset}
               className="text-xs font-medium px-3 py-1.5 rounded-lg bg-neutral-900 border border-neutral-800 text-neutral-300 hover:text-white hover:bg-neutral-800 transition"
             >
-              Generar otro lote
+              {t('url_generator.generate_another_batch', 'Generar otro lote')}
             </button>
           </div>
 
@@ -200,10 +206,10 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
               <span className="text-xl shrink-0 mt-0.5">🎯</span>
               <div className="space-y-1">
                 <h5 className="font-semibold text-amber-300">
-                  Conceptos troncales principales cubiertos
+                  {t('url_generator.core_covered_title', 'Conceptos troncales principales cubiertos')}
                 </h5>
                 <p className="text-neutral-300 text-xs leading-relaxed">
-                  Gemini ha cubierto las ideas y conceptos esenciales de este enlace. Si solicitas otro lote, la IA profundizará en detalles secundarios, matices avanzados y casos específicos.
+                  {t('url_generator.core_covered_desc', 'Gemini ha cubierto las ideas y conceptos esenciales de este enlace. Si solicitas otro lote, la IA profundizará en detalles secundarios, matices avanzados y casos específicos.')}
                 </p>
               </div>
             </div>
@@ -214,12 +220,12 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <h5 className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
-                  Vista previa de tarjetas generadas ({generatedCardsPreview.length})
+                  {t('url_generator.preview_title', 'Vista previa de tarjetas generadas ({count})').replace('{count}', String(generatedCardsPreview.length))}
                 </h5>
                 <span className="text-[11px] text-neutral-500">
-                  {cardFormat === 'basic' && 'Formato: Básica'}
-                  {cardFormat === 'cloze' && 'Formato: Huecos (Cloze)'}
-                  {cardFormat === 'multiple_choice' && 'Formato: Opción Múltiple (Test)'}
+                  {cardFormat === 'basic' && `${t('url_generator.format_pedagogical', 'Formato')}: ${t('url_generator.format_basic', 'Básica')}`}
+                  {cardFormat === 'cloze' && `${t('url_generator.format_pedagogical', 'Formato')}: ${t('url_generator.format_cloze', 'Huecos (Cloze)')}`}
+                  {cardFormat === 'multiple_choice' && `${t('url_generator.format_pedagogical', 'Formato')}: ${t('url_generator.format_mc', 'Opción Múltiple (Test)')}`}
                 </span>
               </div>
               <div className="max-h-72 overflow-y-auto space-y-2.5 pr-1 custom-scrollbar">
@@ -247,7 +253,7 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
               onClick={onCancel}
               className="px-4 py-2 rounded-xl text-xs font-semibold bg-neutral-900 hover:bg-neutral-800 text-white transition border border-neutral-800"
             >
-              Cerrar
+              {t('common.close', 'Cerrar')}
             </button>
           </div>
         </div>
@@ -261,7 +267,7 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
                 <svg className="w-4 h-4 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                 </svg>
-                <span>Enlace Web o Vídeo de YouTube</span>
+                <span>{t('url_generator.url_label', 'Enlace Web o Vídeo de YouTube')}</span>
               </label>
 
               <button
@@ -273,7 +279,7 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
                 <svg className="w-3.5 h-3.5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                 </svg>
-                <span>Pegar del portapapeles</span>
+                <span>{t('url_generator.paste_clipboard', 'Pegar del portapapeles')}</span>
               </button>
             </div>
 
@@ -297,7 +303,7 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
                   setUrl(e.target.value);
                   setErrorMessage(null);
                 }}
-                placeholder="https://www.youtube.com/watch?v=... o https://es.wikipedia.org/..."
+                placeholder={t('url_generator.url_placeholder', 'https://www.youtube.com/watch?v=... o https://es.wikipedia.org/...')}
                 className="w-full text-xs sm:text-sm pl-10 pr-9 py-3 rounded-xl bg-neutral-950 border border-neutral-800 text-white placeholder-neutral-500 focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition disabled:opacity-50"
               />
 
@@ -318,14 +324,14 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
             {isYouTube && (
               <div className="p-2 rounded-lg bg-rose-500/10 border border-rose-500/25 text-rose-300 text-[11px] flex items-center gap-2">
                 <span className="font-bold text-rose-400 text-xs">▶ YouTube</span>
-                <span>Vídeo detectado: Gemini analizará el contenido del vídeo directamente en la nube de Google para generar las tarjetas.</span>
+                <span>{t('url_generator.youtube_detected', 'Vídeo detectado: Gemini analizará el contenido del vídeo directamente en la nube de Google para generar las tarjetas.')}</span>
               </div>
             )}
 
             {!isYouTube && isWebUrl && (
               <div className="p-2 rounded-lg bg-sky-500/10 border border-sky-500/25 text-sky-300 text-[11px] flex items-center gap-2">
-                <span className="font-bold text-sky-400 text-xs">🌐 Enlace Web</span>
-                <span>Página detectada: se extraerá el artículo o texto principal para generar el material de estudio.</span>
+                <span className="font-bold text-sky-400 text-xs">🌐 {t('deck_detail.tab_url', 'Enlace Web')}</span>
+                <span>{t('url_generator.web_detected', 'Página detectada: se extraerá el artículo o texto principal para generar el material de estudio.')}</span>
               </div>
             )}
           </div>
@@ -333,7 +339,7 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
           {/* Formato de Tarjetas */}
           <div className="space-y-2">
             <label className="text-xs font-semibold text-neutral-300">
-              Formato Pedagógico
+              {t('url_generator.format_pedagogical', 'Formato Pedagógico')}
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <button
@@ -347,11 +353,11 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
                 }`}
               >
                 <div className="font-semibold text-xs flex items-center justify-between">
-                  <span>Básicas</span>
+                  <span>{t('url_generator.format_basic', 'Básicas')}</span>
                   {cardFormat === 'basic' && <span className="text-rose-400 text-xs">●</span>}
                 </div>
                 <p className="text-[11px] text-neutral-400 mt-1 leading-snug">
-                  Pregunta directa y respuesta concisa
+                  {t('url_generator.format_basic_desc', 'Pregunta directa y respuesta concisa')}
                 </p>
               </button>
 
@@ -366,11 +372,11 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
                 }`}
               >
                 <div className="font-semibold text-xs flex items-center justify-between">
-                  <span>Huecos (Cloze)</span>
+                  <span>{t('url_generator.format_cloze', 'Huecos (Cloze)')}</span>
                   {cardFormat === 'cloze' && <span className="text-emerald-400 text-xs">●</span>}
                 </div>
                 <p className="text-[11px] text-neutral-400 mt-1 leading-snug">
-                  Completar conceptos clave entre corchetes
+                  {t('url_generator.format_cloze_desc', 'Completar conceptos clave entre corchetes')}
                 </p>
               </button>
 
@@ -385,11 +391,11 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
                 }`}
               >
                 <div className="font-semibold text-xs flex items-center justify-between">
-                  <span>Opción Múltiple</span>
+                  <span>{t('url_generator.format_mc', 'Opción Múltiple')}</span>
                   {cardFormat === 'multiple_choice' && <span className="text-indigo-400 text-xs">●</span>}
                 </div>
                 <p className="text-[11px] text-neutral-400 mt-1 leading-snug">
-                  Pregunta test con 4 alternativas y solución
+                  {t('url_generator.format_mc_desc', 'Pregunta test con 4 alternativas y solución')}
                 </p>
               </button>
             </div>
@@ -399,8 +405,8 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-neutral-300 flex items-center justify-between">
-                <span>Cantidad por Lote (Máx. 30)</span>
-                <span className="text-neutral-500 text-[11px] font-normal">Recomendado: 10</span>
+                <span>{t('url_generator.count_batch_label', 'Cantidad por Lote (Máx. 30)')}</span>
+                <span className="text-neutral-500 text-[11px] font-normal">{t('url_generator.count_recommended', 'Recomendado: 10')}</span>
               </label>
               <div className="flex items-center gap-2">
                 <input
@@ -444,14 +450,14 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
 
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-neutral-300">
-                Instrucción de Enfoque (Opcional)
+                {t('url_generator.focus_label', 'Instrucción de Enfoque (Opcional)')}
               </label>
               <input
                 type="text"
                 disabled={isBusy}
                 value={customPrompt}
                 onChange={(e) => setCustomPrompt(e.target.value)}
-                placeholder="Ej. Centrarse en la conclusión, fórmulas o minuto 5 al 12"
+                placeholder={t('url_generator.focus_placeholder', 'Ej. Centrarse en la conclusión, fórmulas o minuto 5 al 12')}
                 className="w-full text-xs px-3.5 py-2.5 rounded-xl bg-neutral-950 border border-neutral-800 text-white placeholder-neutral-500 focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition disabled:opacity-50"
               />
             </div>
@@ -481,7 +487,7 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
                 disabled={isBusy}
                 className="px-4 py-2.5 rounded-xl text-xs font-semibold bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white transition border border-neutral-800 disabled:opacity-50"
               >
-                Cancelar
+                {t('common.cancel', 'Cancelar')}
               </button>
             )}
 
@@ -493,14 +499,14 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
               {isBusy ? (
                 <>
                   <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  <span>Procesando...</span>
+                  <span>{t('url_generator.processing_btn', 'Procesando...')}</span>
                 </>
               ) : (
                 <>
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                   </svg>
-                  <span>Generar {cardCount} Tarjetas desde Enlace</span>
+                  <span>{t('url_generator.generate_btn', 'Generar {count} Tarjetas desde Enlace').replace('{count}', String(cardCount))}</span>
                 </>
               )}
             </button>

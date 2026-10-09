@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useCardStore, type CardRow } from '@/stores';
+import { useCardStore, useLanguageStore, type CardRow } from '@/stores';
 import type { CardFormat } from '@/types/database';
 import { FormattedCardView } from './FormattedCardView';
 
@@ -13,6 +13,7 @@ interface CardEditorProps {
 
 export function CardEditor({ deckId, onCardCreated, className = '' }: CardEditorProps) {
   const { createCard } = useCardStore();
+  const { t } = useLanguageStore();
   const [cardFormat, setCardFormat] = useState<CardFormat>('basic');
   const [front, setFront] = useState('');
   const [back, setBack] = useState('');
@@ -26,7 +27,7 @@ export function CardEditor({ deckId, onCardCreated, className = '' }: CardEditor
     if (!front.trim()) return;
 
     if (cardFormat === 'basic' && !back.trim()) {
-      setErrorMessage('La respuesta del reverso es obligatoria para tarjetas básicas.');
+      setErrorMessage(t('card_editor.error_back_required', 'La respuesta del reverso es obligatoria para tarjetas básicas.'));
       return;
     }
 
@@ -55,7 +56,7 @@ export function CardEditor({ deckId, onCardCreated, className = '' }: CardEditor
       setSuccessMessage(true);
       setTimeout(() => setSuccessMessage(false), 2500);
     } else {
-      setErrorMessage('No se pudo guardar la tarjeta en Supabase. Verifica tu conexión.');
+      setErrorMessage(t('card_editor.error_save_failed', 'No se pudo guardar la tarjeta en Supabase. Verifica tu conexión.'));
     }
   };
 
@@ -101,10 +102,10 @@ d) Cuarta opción plausible`;
         <div>
           <h3 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-            Editor de Tarjetas Dinámico
+            {t('card_editor.title', 'Editor de Tarjetas Dinámico')}
           </h3>
           <p className="text-xs text-neutral-400 mt-0.5">
-            Soporta formatos Básica, Opción Múltiple (Test), Cloze y Verdadero/Falso con FSRS.
+            {t('card_editor.subtitle', 'Soporta formatos Básica, Opción Múltiple (Test), Cloze y Verdadero/Falso con FSRS.')}
           </p>
         </div>
 
@@ -119,7 +120,7 @@ d) Cuarta opción plausible`;
                 : 'text-neutral-400 hover:text-neutral-200'
             }`}
           >
-            Básica
+            {t('card_editor.format_basic', 'Básica')}
           </button>
           <button
             type="button"
@@ -130,7 +131,7 @@ d) Cuarta opción plausible`;
                 : 'text-neutral-400 hover:text-neutral-200'
             }`}
           >
-            Test (4 Opcs)
+            {t('card_editor.format_test', 'Test (4 Opcs)')}
           </button>
           <button
             type="button"
@@ -141,7 +142,7 @@ d) Cuarta opción plausible`;
                 : 'text-neutral-400 hover:text-neutral-200'
             }`}
           >
-            Cloze
+            {t('card_editor.format_cloze', 'Cloze')}
           </button>
           <button
             type="button"
@@ -152,7 +153,7 @@ d) Cuarta opción plausible`;
                 : 'text-neutral-400 hover:text-neutral-200'
             }`}
           >
-            V / F
+            {t('card_editor.format_tf', 'V / F')}
           </button>
         </div>
       </div>
@@ -172,10 +173,10 @@ d) Cuarta opción plausible`;
               className="text-xs font-semibold uppercase tracking-wider text-neutral-300 flex items-center gap-1.5"
             >
               <span>
-                {cardFormat === 'basic' && 'Front (Pregunta)'}
-                {cardFormat === 'multiple_choice' && 'Front (Pregunta y Opciones a, b, c, d)'}
-                {cardFormat === 'cloze' && 'Front (Texto con espacio [...])'}
-                {cardFormat === 'true_false' && 'Front (Afirmación rotunda)'}
+                {cardFormat === 'basic' && t('card_editor.front_basic', 'Front (Pregunta)')}
+                {cardFormat === 'multiple_choice' && t('card_editor.front_mc', 'Front (Pregunta y Opciones a, b, c, d)')}
+                {cardFormat === 'cloze' && t('card_editor.front_cloze', 'Front (Texto con espacio [...])')}
+                {cardFormat === 'true_false' && t('card_editor.front_tf', 'Front (Afirmación rotunda)')}
               </span>
               <span className="text-indigo-400">*</span>
             </label>
@@ -189,7 +190,7 @@ d) Cuarta opción plausible`;
                   className="text-[11px] font-medium text-indigo-400 hover:text-indigo-300 transition flex items-center gap-1 bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20"
                   title="Inserta [...] o {{c1::palabra}}"
                 >
-                  Insertar [...]
+                  {t('card_editor.insert_cloze', 'Insertar [...]')}
                 </button>
               )}
               {cardFormat === 'multiple_choice' && (
@@ -199,7 +200,7 @@ d) Cuarta opción plausible`;
                   className="text-[11px] font-medium text-purple-400 hover:text-purple-300 transition flex items-center gap-1 bg-purple-500/10 px-2 py-0.5 rounded-md border border-purple-500/20"
                   title="Cargar plantilla con pregunta y 4 opciones"
                 >
-                  Cargar plantilla a,b,c,d
+                  {t('card_editor.load_template', 'Cargar plantilla a,b,c,d')}
                 </button>
               )}
             </div>
@@ -231,10 +232,10 @@ d) Cuarta opción plausible`;
               htmlFor="card-back-input"
               className="text-xs font-semibold uppercase tracking-wider text-neutral-300"
             >
-              {cardFormat === 'basic' && 'Back (Respuesta o Reverso)'}
-              {cardFormat === 'multiple_choice' && 'Back (Solo la opción correcta)'}
-              {cardFormat === 'cloze' && 'Back (Texto completo con palabra revelada)'}
-              {cardFormat === 'true_false' && 'Back (Verdadero / Falso + Justificación)'}
+              {cardFormat === 'basic' && t('card_editor.back_basic', 'Back (Respuesta o Reverso)')}
+              {cardFormat === 'multiple_choice' && t('card_editor.back_mc', 'Back (Solo la opción correcta)')}
+              {cardFormat === 'cloze' && t('card_editor.back_cloze', 'Back (Texto completo con palabra revelada)')}
+              {cardFormat === 'true_false' && t('card_editor.back_tf', 'Back (Verdadero / Falso + Justificación)')}
               {cardFormat !== 'cloze' && <span className="text-indigo-400 ml-1">*</span>}
             </label>
 
@@ -245,14 +246,14 @@ d) Cuarta opción plausible`;
                   onClick={() => setTrueFalseAnswer(true)}
                   className="text-[11px] font-medium text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20"
                 >
-                  + Verdadero
+                  {t('card_editor.add_true', '+ Verdadero')}
                 </button>
                 <button
                   type="button"
                   onClick={() => setTrueFalseAnswer(false)}
                   className="text-[11px] font-medium text-rose-400 hover:text-rose-300 bg-rose-500/10 px-2 py-0.5 rounded-md border border-rose-500/20"
                 >
-                  + Falso
+                  {t('card_editor.add_false', '+ Falso')}
                 </button>
               </div>
             )}
@@ -283,14 +284,14 @@ d) Cuarta opción plausible`;
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400 flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-violet-400" />
-                Renderizado Visual en Vivo
+                {t('card_editor.live_preview', 'Renderizado Visual en Vivo')}
               </span>
               <button
                 type="button"
                 onClick={() => setShowPreview(!showPreview)}
                 className="text-[11px] text-neutral-500 hover:text-neutral-300"
               >
-                {showPreview ? 'Ocultar' : 'Mostrar'}
+                {showPreview ? t('card_editor.hide', 'Ocultar') : t('card_editor.show', 'Mostrar')}
               </button>
             </div>
 
@@ -314,7 +315,7 @@ d) Cuarta opción plausible`;
             {successMessage && (
               <span className="text-emerald-400 font-medium flex items-center gap-1.5 animate-in fade-in">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
-                ¡Tarjeta ({cardFormat}) guardada en Supabase!
+                {t('card_editor.card_saved_supabase', '¡Tarjeta ({format}) guardada en Supabase!').replace('{format}', cardFormat)}
               </span>
             )}
           </div>
@@ -329,7 +330,7 @@ d) Cuarta opción plausible`;
                 }}
                 className="px-3.5 py-2 text-xs text-neutral-400 hover:text-white transition"
               >
-                Limpiar
+                {t('card_editor.clear', 'Limpiar')}
               </button>
             )}
 
@@ -341,7 +342,9 @@ d) Cuarta opción plausible`;
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M12 4v16m8-8H4" />
               </svg>
-              {isSubmitting ? 'Guardando...' : `Añadir (${cardFormat})`}
+              {isSubmitting
+                ? t('card_editor.adding_card', 'Guardando...')
+                : `${t('card_editor.add_card', 'Añadir ({format})').replace('{format}', cardFormat)}`}
             </button>
           </div>
         </div>

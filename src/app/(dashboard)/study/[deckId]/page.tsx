@@ -3,7 +3,7 @@
 import { use, useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
-import { useDeckStore, useCardStore, useSettingsStore, type CardRow } from '@/stores';
+import { useDeckStore, useCardStore, useSettingsStore, useLanguageStore, type CardRow } from '@/stores';
 import {
   previewNextIntervals,
   type FSRSRating,
@@ -36,6 +36,7 @@ export default function StudyPage({ params }: StudyPageProps) {
   const { currentDeck, fetchDeckById } = useDeckStore();
   const { cards: allCards, isLoading, fetchCardsByDeck, recordReview } = useCardStore();
   const { settings, fetchSettings } = useSettingsStore();
+  const { t } = useLanguageStore();
 
   const [queue, setQueue] = useState<CardRow[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -198,7 +199,7 @@ export default function StudyPage({ params }: StudyPageProps) {
     return (
       <div className="p-16 text-center text-neutral-400 text-sm">
         <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-        Cargando tarjetas del mazo desde Supabase...
+        {t('study.loading_cards')}
       </div>
     );
   }
@@ -213,16 +214,16 @@ export default function StudyPage({ params }: StudyPageProps) {
           </svg>
         </div>
         <div>
-          <h2 className="text-xl font-bold text-white tracking-tight">El mazo está vacío</h2>
+          <h2 className="text-xl font-bold text-white tracking-tight">{t('study.empty_deck_title')}</h2>
           <p className="text-sm text-neutral-400 mt-1">
-            No hay tarjetas registradas en este mazo en Supabase. Añade tarjetas para empezar tu sesión de estudio.
+            {t('study.empty_deck_desc')}
           </p>
         </div>
         <Link
           href={`/decks/${deckId}`}
           className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm transition shadow-lg shadow-indigo-600/25"
         >
-          Ir al editor de tarjetas
+          {t('study.go_to_editor')}
         </Link>
       </div>
     );
@@ -256,15 +257,15 @@ export default function StudyPage({ params }: StudyPageProps) {
         <div className="space-y-2">
           <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 shadow-sm">
             <span>🎉</span>
-            <span>¡Zero Inbox Alcanzado!</span>
+            <span>{t('study.zero_inbox_badge')}</span>
             <span>✨</span>
           </div>
 
           <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
-            Has completado todas las tarjetas pendientes
+            {t('study.zero_inbox_title')}
           </h1>
           <p className="mt-2 text-sm text-neutral-300 max-w-lg mx-auto leading-relaxed">
-            ¡Excelente trabajo! No tienes más repasos pendientes por hoy en este mazo. El algoritmo FSRS ha guardado tus nuevas fechas de retención óptima.
+            {t('study.zero_inbox_desc')}
           </p>
         </div>
 
@@ -276,13 +277,13 @@ export default function StudyPage({ params }: StudyPageProps) {
             </div>
             <div>
               <span className="text-[11px] font-semibold uppercase tracking-wider text-indigo-300 block">
-                Resumen de Repaso Diario
+                {t('study.daily_summary')}
               </span>
               <p className="text-sm sm:text-base font-bold text-white">
-                Tarjetas repasadas hoy en este mazo
+                {t('study.cards_reviewed_today')}
               </p>
               <span className="text-xs text-neutral-400">
-                {sessionReviews.length} {sessionReviews.length === 1 ? 'repaso' : 'repasos'} en esta sesión
+                {t('study.reviews_in_session', { count: sessionReviews.length, unit: sessionReviews.length === 1 ? t('study.review_singular') : t('study.review_plural') })}
               </span>
             </div>
           </div>
@@ -292,7 +293,7 @@ export default function StudyPage({ params }: StudyPageProps) {
               <span className="text-2xl sm:text-3xl font-extrabold text-emerald-400 font-mono">
                 {cardsReviewedTodayTotal}
               </span>
-              <span className="text-xs font-semibold text-emerald-300">tarjetas</span>
+              <span className="text-xs font-semibold text-emerald-300">{t('study.cards_unit')}</span>
             </div>
           </div>
         </div>
@@ -301,25 +302,25 @@ export default function StudyPage({ params }: StudyPageProps) {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 rounded-2xl bg-neutral-900/50 border border-neutral-800 text-left">
           <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20">
             <span className="text-[11px] font-semibold text-rose-400 uppercase tracking-wider block">
-              1. Again (Fallo)
+              {t('study.rating_again_sub')}
             </span>
             <span className="text-2xl font-bold text-white mt-1 block">{counts.again}</span>
           </div>
           <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
             <span className="text-[11px] font-semibold text-amber-400 uppercase tracking-wider block">
-              2. Hard (Difícil)
+              {t('study.rating_hard_sub')}
             </span>
             <span className="text-2xl font-bold text-white mt-1 block">{counts.hard}</span>
           </div>
           <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
             <span className="text-[11px] font-semibold text-emerald-400 uppercase tracking-wider block">
-              3. Good (Correcto)
+              {t('study.rating_good_sub')}
             </span>
             <span className="text-2xl font-bold text-white mt-1 block">{counts.good}</span>
           </div>
           <div className="p-3 rounded-xl bg-sky-500/10 border border-sky-500/20">
             <span className="text-[11px] font-semibold text-sky-400 uppercase tracking-wider block">
-              4. Easy (Fácil)
+              {t('study.rating_easy_sub')}
             </span>
             <span className="text-2xl font-bold text-white mt-1 block">{counts.easy}</span>
           </div>
@@ -336,19 +337,19 @@ export default function StudyPage({ params }: StudyPageProps) {
             }}
             className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white font-medium text-sm border border-neutral-700 transition"
           >
-            Repasar todo de nuevo
+            {t('study.review_again_btn')}
           </button>
           <Link
             href={`/decks/${deckId}`}
             className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-300 font-medium text-sm border border-neutral-800 transition"
           >
-            Ver Mazo
+            {t('study.view_deck_btn')}
           </Link>
           <Link
             href="/"
             className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm transition shadow-lg shadow-indigo-600/25"
           >
-            Volver al Dashboard
+            {t('study.back_to_dashboard')}
           </Link>
         </div>
       </div>
@@ -359,7 +360,12 @@ export default function StudyPage({ params }: StudyPageProps) {
   const remainingCount = queue.length - currentIndex;
   const progressPercent = Math.round((currentIndex / queue.length) * 100);
 
-  const stateLabels = ['Nueva', 'Aprendizaje', 'Repaso', 'Reaprendizaje'];
+  const stateLabels = [
+    t('study.state_new'),
+    t('study.state_learning'),
+    t('study.state_review'),
+    t('study.state_relearning'),
+  ];
   const stateBadgeStyles = [
     'bg-blue-500/10 text-blue-400 border-blue-500/20',
     'bg-amber-500/10 text-amber-400 border-amber-500/20',
@@ -385,21 +391,21 @@ export default function StudyPage({ params }: StudyPageProps) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
             <span className="truncate max-w-[170px] sm:max-w-none">
-              {currentDeck?.title ? `Salir de ${currentDeck.title}` : 'Salir de la sesión'}
+              {currentDeck?.title ? t('study.exit_deck', { deck: currentDeck.title }) : t('study.exit_session')}
             </span>
           </Link>
 
           {/* Counter of Remaining Cards */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <div className="flex items-center gap-1 text-[11px] sm:text-xs">
-              <span className="text-neutral-400 hidden sm:inline">Progreso:</span>
+              <span className="text-neutral-400 hidden sm:inline">{t('study.progress_label')}</span>
               <span className="font-semibold text-white">
                 {currentIndex + 1} / {queue.length}
               </span>
             </div>
 
             <span className="text-[10px] sm:text-xs px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-              {remainingCount} {remainingCount === 1 ? 'restante' : 'restantes'}
+              {remainingCount} {remainingCount === 1 ? t('study.remaining_singular') : t('study.remaining_plural')}
             </span>
           </div>
         </div>
@@ -431,10 +437,10 @@ export default function StudyPage({ params }: StudyPageProps) {
                 currentCard?.card_format ||
                 (currentCard?.card_type === 'cloze' ? 'cloze' : 'basic');
               const badges: Record<string, { label: string; style: string }> = {
-                basic: { label: 'Básica', style: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
-                multiple_choice: { label: 'Opción Múltiple', style: 'bg-purple-500/10 text-purple-400 border-purple-500/20' },
-                cloze: { label: 'Cloze [...]', style: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' },
-                true_false: { label: 'V / F', style: 'bg-amber-500/10 text-amber-400 border-amber-500/20' },
+                basic: { label: t('study.badge_basic'), style: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
+                multiple_choice: { label: t('study.badge_mc'), style: 'bg-purple-500/10 text-purple-400 border-purple-500/20' },
+                cloze: { label: t('study.badge_cloze'), style: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' },
+                true_false: { label: t('study.badge_tf'), style: 'bg-amber-500/10 text-amber-400 border-amber-500/20' },
               };
               const item = badges[fmt] || { label: fmt, style: 'bg-neutral-800 text-neutral-400 border-neutral-700' };
               return (
@@ -470,7 +476,7 @@ export default function StudyPage({ params }: StudyPageProps) {
         {!isAnswerRevealed && (
           <div className="shrink-0 text-center py-1 hidden sm:block">
             <p className="text-xs text-neutral-500">
-              Pulsa <kbd className="px-1.5 py-0.5 rounded bg-neutral-800 text-neutral-300 font-mono text-[10px]">Espacio</kbd> o el botón inferior para ver la respuesta.
+              {t('study.press_space_hint', { key: t('study.space_key') })}
             </p>
           </div>
         )}
@@ -485,11 +491,11 @@ export default function StudyPage({ params }: StudyPageProps) {
                 (e.currentTarget as HTMLElement)?.blur();
                 setIsAnswerRevealed(true);
               }}
-              className="w-full py-3 sm:py-3.5 px-4 min-h-[46px] sm:min-h-[52px] rounded-xl sm:rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm sm:text-base transition-all duration-150 shadow-xl shadow-indigo-600/25 active:scale-[0.99] flex items-center justify-center gap-2 group cursor-pointer"
+              className="w-full py-3 sm:py-3.5 px-4 min-h-[46px] sm:min-h-[52px] rounded-xl sm:rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm sm:base transition-all duration-150 shadow-xl shadow-indigo-600/25 active:scale-[0.99] flex items-center justify-center gap-2 group cursor-pointer"
             >
-              <span>Mostrar respuesta</span>
+              <span>{t('study.show_answer')}</span>
               <kbd className="hidden sm:inline-block px-2 py-0.5 rounded-md bg-indigo-700 text-indigo-200 text-xs font-mono font-normal">
-                Espacio
+                {t('study.space_key')}
               </kbd>
             </button>
           ) : (
@@ -509,7 +515,7 @@ export default function StudyPage({ params }: StudyPageProps) {
                     {nextIntervals ? formatInterval(nextIntervals[1].due) : '10m'}
                   </span>
                   <span className="font-semibold text-[11px] sm:text-xs md:text-sm text-white text-center leading-tight">
-                    1. Again
+                    {t('study.rating_again')}
                   </span>
                 </button>
 
@@ -526,7 +532,7 @@ export default function StudyPage({ params }: StudyPageProps) {
                     {nextIntervals ? formatInterval(nextIntervals[2].due) : '3h'}
                   </span>
                   <span className="font-semibold text-[11px] sm:text-xs md:text-sm text-white text-center leading-tight">
-                    2. Hard
+                    {t('study.rating_hard')}
                   </span>
                 </button>
 
@@ -543,7 +549,7 @@ export default function StudyPage({ params }: StudyPageProps) {
                     {nextIntervals ? formatInterval(nextIntervals[3].due) : '1d'}
                   </span>
                   <span className="font-semibold text-[11px] sm:text-xs md:text-sm text-white text-center leading-tight">
-                    3. Good
+                    {t('study.rating_good')}
                   </span>
                 </button>
 
@@ -560,13 +566,13 @@ export default function StudyPage({ params }: StudyPageProps) {
                     {nextIntervals ? formatInterval(nextIntervals[4].due) : '4d'}
                   </span>
                   <span className="font-semibold text-[11px] sm:text-xs md:text-sm text-white text-center leading-tight">
-                    4. Easy
+                    {t('study.rating_easy')}
                   </span>
                 </button>
               </div>
 
               <div className="hidden sm:block text-center text-[11px] text-neutral-500 pt-1">
-                Presiona las teclas <kbd className="text-neutral-400 font-mono">1</kbd>, <kbd className="text-neutral-400 font-mono">2</kbd>, <kbd className="text-neutral-400 font-mono">3</kbd> o <kbd className="text-neutral-400 font-mono">4</kbd> para calificar rápidamente.
+                {t('study.rating_keys_hint')}
               </div>
             </div>
           )}

@@ -12,10 +12,12 @@ const translations: Record<Language, TranslationDict> = {
   en: enDict as TranslationDict,
 };
 
+export type TranslationParams = Record<string, string | number>;
+
 interface LanguageState {
   language: Language;
   setLanguage: (lang: Language) => void;
-  t: (key: string, fallback?: string) => string;
+  t: (key: string, paramsOrFallback?: string | TranslationParams, fallback?: string) => string;
 }
 
 interface NavigatorWithUserLanguage extends Navigator {
@@ -39,7 +41,7 @@ export const useLanguageStore = create<LanguageState>()(
           document.documentElement.lang = lang;
         }
       },
-      t: (key: string, fallback?: string): string => {
+      t: (key: string, paramsOrFallback?: string | TranslationParams, fallback?: string): string => {
         const lang = get().language || 'es';
         const dict = translations[lang] || translations.es;
         const keys = key.split('.');
@@ -48,10 +50,24 @@ export const useLanguageStore = create<LanguageState>()(
           if (current && typeof current === 'object' && k in (current as Record<string, unknown>)) {
             current = (current as Record<string, unknown>)[k];
           } else {
-            return fallback || key;
+            current = undefined;
+            break;
           }
         }
-        return typeof current === 'string' ? current : fallback || key;
+
+        const defaultString =
+          typeof paramsOrFallback === 'string'
+            ? paramsOrFallback
+            : fallback || key;
+        let result = typeof current === 'string' ? current : defaultString;
+
+        if (paramsOrFallback && typeof paramsOrFallback === 'object') {
+          Object.entries(paramsOrFallback).forEach(([paramKey, paramVal]) => {
+            result = result.replace(new RegExp(`\\{${paramKey}\\}`, 'g'), String(paramVal));
+          });
+        }
+
+        return result;
       },
     }),
     {

@@ -20,7 +20,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
     useCardStore();
   const { openProModal } = useProModalStore();
   const { user } = useAuthStore();
-  const { language } = useLanguageStore();
+  const { language, t } = useLanguageStore();
 
   // Estado para el modal de Generación con IA (Gemini Flash)
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
@@ -42,7 +42,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
   }, [id, fetchDeckById, fetchCardsByDeck]);
 
   const handleDeleteCard = async (cardId: string) => {
-    if (confirm('¿Eliminar esta tarjeta permanentemente de Supabase?')) {
+    if (confirm(t('deck_detail.confirm_delete_card'))) {
       await deleteCard(cardId);
       fetchDeckById(id);
     }
@@ -78,7 +78,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
         openProModal(true);
         return;
       }
-      setAiError(result.error || 'Ocurrió un error inesperado al generar las tarjetas.');
+      setAiError(result.error || t('deck_detail.unexpected_error'));
       return;
     }
 
@@ -100,23 +100,24 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
       const isExhausted = Boolean(result.core_exhausted);
       setAiCoreExhausted(isExhausted);
       if (isExhausted) {
-        setAiSuccessMessage(
-          '🎯 Teoría principal cubierta. Se han extraído los conceptos troncales. Si continúas generando, la IA rebuscará detalles minuciosos, datos estadísticos y excepciones del texto para un estudio de máxima profundidad.'
-        );
+        setAiSuccessMessage(t('deck_detail.theory_covered_desc'));
       } else {
-        setAiSuccessMessage(
-          '✅ Tarjetas añadidas con éxito. ¿El temario es largo? Dale a generar de nuevo para extraer el siguiente bloque de conocimientos.'
-        );
+        setAiSuccessMessage(t('deck_detail.cards_added_desc'));
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Error al guardar las tarjetas generadas en Supabase';
+      const msg = err instanceof Error ? err.message : t('deck_detail.save_error');
       setAiError(msg);
     } finally {
       setIsGenerating(false);
     }
   };
 
-  const stateLabels = ['Nueva', 'Aprendizaje', 'Repaso', 'Reaprendizaje'];
+  const stateLabels = [
+    t('deck_detail.state_new'),
+    t('deck_detail.state_learning'),
+    t('deck_detail.state_review'),
+    t('deck_detail.state_relearning'),
+  ];
   const stateBadgeStyles = [
     'bg-blue-500/10 text-blue-400 border-blue-500/20',
     'bg-amber-500/10 text-amber-400 border-amber-500/20',
@@ -125,10 +126,10 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
   ];
 
   const formatBadges: Record<string, { label: string; style: string }> = {
-    basic: { label: 'Básica', style: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
-    multiple_choice: { label: 'Opción Múltiple (Test)', style: 'bg-purple-500/10 text-purple-400 border-purple-500/20' },
-    cloze: { label: 'Cloze [...]', style: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' },
-    true_false: { label: 'Verdadero / Falso', style: 'bg-amber-500/10 text-amber-400 border-amber-500/20' },
+    basic: { label: t('deck_detail.badge_basic'), style: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
+    multiple_choice: { label: t('deck_detail.badge_mc'), style: 'bg-purple-500/10 text-purple-400 border-purple-500/20' },
+    cloze: { label: t('deck_detail.badge_cloze'), style: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' },
+    true_false: { label: t('deck_detail.badge_tf'), style: 'bg-amber-500/10 text-amber-400 border-amber-500/20' },
   };
 
   return (
@@ -147,7 +148,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
           >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
-          Volver al Dashboard
+          {t('deck_detail.back_to_dashboard')}
         </Link>
 
         {/* Deck Header */}
@@ -163,10 +164,10 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
               </span>
             </div>
             <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-white">
-              {deckLoading && !currentDeck ? 'Cargando mazo...' : currentDeck?.title || 'Mazo sin título'}
+              {deckLoading && !currentDeck ? t('deck_detail.loading_deck') : currentDeck?.title || t('deck_detail.untitled_deck')}
             </h1>
             <p className="text-sm text-neutral-400 mt-1">
-              {currentDeck?.description || `${cards.length} tarjetas registradas en Supabase.`}
+              {currentDeck?.description || t('deck_detail.cards_registered', { count: cards.length })}
             </p>
           </div>
 
@@ -190,9 +191,9 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                   d="M13 10V3L4 14h7v7l9-11h-7z"
                 />
               </svg>
-              <span>Generar con IA</span>
+              <span>{t('deck_detail.generate_ai')}</span>
               <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-white/15 text-white font-mono tracking-tight">
-                Multimodal
+                {t('deck_detail.multimodal_badge')}
               </span>
             </button>
 
@@ -214,7 +215,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                 />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <span>Estudiar Mazo {currentDeck && currentDeck.dueCount > 0 ? `(${currentDeck.dueCount})` : ''}</span>
+              <span>{t('deck_detail.study_deck')}{currentDeck && currentDeck.dueCount > 0 ? ` (${currentDeck.dueCount})` : ''}</span>
             </Link>
 
             {/* Botón: Compartir Mazo */}
@@ -225,7 +226,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
               <svg className="w-4 h-4 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
               </svg>
-              <span>Compartir</span>
+              <span>{t('deck_detail.share')}</span>
             </button>
           </div>
         </div>
@@ -248,7 +249,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
         <div className="lg:col-span-6 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
-              Tarjetas en Supabase
+              {t('deck_detail.cards_in_db')}
               <span className="text-xs px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-300 font-normal">
                 {cards.length}
               </span>
@@ -258,7 +259,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
           {cardsLoading && cards.length === 0 ? (
             <div className="p-12 text-center text-neutral-400 text-xs">
               <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-              Cargando tarjetas desde Supabase...
+              {t('deck_detail.loading_cards')}
             </div>
           ) : cards.length === 0 ? (
             /* Empty State */
@@ -275,10 +276,10 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
               </div>
               <div className="space-y-1">
                 <h3 className="text-base font-semibold text-white">
-                  No hay tarjetas guardadas en este mazo
+                  {t('deck_detail.empty_title')}
                 </h3>
                 <p className="text-xs text-neutral-400 max-w-sm mx-auto leading-relaxed">
-                  Usa el editor dinámico, sube un documento (PDF, Word, Audio, TXT) o pega un enlace web (YouTube) para que Gemini genere tarjetas automáticamente.
+                  {t('deck_detail.empty_desc')}
                 </p>
               </div>
 
@@ -292,7 +293,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                 <svg className="w-4 h-4 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
-                Subir Documento Multimodal
+                {t('deck_detail.upload_multimodal_btn')}
               </button>
             </div>
           ) : (
@@ -327,7 +328,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                         </span>
                         <button
                           onClick={() => handleDeleteCard(card.id)}
-                          title="Eliminar tarjeta de Supabase"
+                          title={t('deck_detail.delete_card_title')}
                           className="text-neutral-500 hover:text-rose-400 p-1 rounded transition opacity-60 group-hover:opacity-100"
                         >
                           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -354,9 +355,9 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                     </div>
 
                     <div className="flex items-center gap-3 pt-2 text-[10px] text-neutral-500 font-mono border-t border-neutral-800/40">
-                      <span>Reps: {card.reps}</span>
-                      <span>Lapsos: {card.lapses}</span>
-                      <span>Estabilidad: {card.stability.toFixed(2)}</span>
+                      <span>{t('deck_detail.reps')} {card.reps}</span>
+                      <span>{t('deck_detail.lapses')} {card.lapses}</span>
+                      <span>{t('deck_detail.stability')} {card.stability.toFixed(2)}</span>
                     </div>
                   </div>
                 );
@@ -385,10 +386,10 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-white tracking-tight">
-                    Generar Tarjetas con IA
+                    {t('deck_detail.modal_ai_title')}
                   </h3>
                   <span className="text-[11px] text-violet-400 font-mono">
-                    Gemini 3.8 Flash • Multimodal & Múltiples Formatos
+                    {t('deck_detail.modal_ai_sub')}
                   </span>
                 </div>
               </div>
@@ -409,7 +410,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                 <span className="text-xl shrink-0 mt-0.5">💡</span>
                 <div className="flex-1">
                   <p className="font-medium text-white leading-relaxed">
-                    Para añadir más tarjetas al mazo, vuelve a subir el documento que usaste para crear las preguntas. La IA revisará las {cards.length || currentDeck?.cardsCount || 0} tarjetas existentes en este mazo para generar contenido nuevo sin repetir.
+                    {t('deck_detail.modal_ai_existing_hint', { count: cards.length || currentDeck?.cardsCount || 0 })}
                   </p>
                 </div>
               </div>
@@ -433,7 +434,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                 <svg className="w-4 h-4 text-violet-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
-                <span>Subir Documento</span>
+                <span>{t('deck_detail.tab_upload')}</span>
               </button>
               <button
                 type="button"
@@ -452,7 +453,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                 <svg className="w-4 h-4 text-rose-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                 </svg>
-                <span>Enlace Web / YouTube</span>
+                <span>{t('deck_detail.tab_url')}</span>
               </button>
               <button
                 type="button"
@@ -471,7 +472,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                 <svg className="w-4 h-4 text-indigo-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                 </svg>
-                <span>Por Tema o Prompt</span>
+                <span>{t('deck_detail.tab_topic')}</span>
               </button>
             </div>
 
@@ -497,7 +498,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
               /* Topic Prompt Mode Content */
               <div className="space-y-4">
                 <p className="text-xs text-neutral-400 leading-relaxed">
-                  Introduce el tema o concepto y selecciona el formato y cantidad deseada. Gemini generará {aiCardCount} tarjetas de estudio de alta precisión cubriendo los conceptos clave de forma equitativa y las guardará automáticamente en este mazo con FSRS.
+                  {t('deck_detail.topic_desc', { count: aiCardCount })}
                 </p>
 
                 {aiError && (
@@ -512,7 +513,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                       <span className="text-base shrink-0">🎯</span>
                       <div className="flex-1">
                         <p className="leading-relaxed">
-                          <strong className="font-semibold text-amber-300">Teoría principal cubierta.</strong> Se han extraído los conceptos troncales. Si continúas generando, la IA rebuscará detalles minuciosos, datos estadísticos y excepciones del texto para un estudio de máxima profundidad.
+                          <strong className="font-semibold text-amber-300">{t('deck_detail.theory_covered_title')}</strong> {t('deck_detail.theory_covered_desc')}
                         </p>
                       </div>
                     </div>
@@ -521,7 +522,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                       <span className="text-base shrink-0">✅</span>
                       <div className="flex-1">
                         <p className="leading-relaxed">
-                          <strong className="font-semibold text-emerald-300">Tarjetas añadidas con éxito.</strong> ¿El temario es largo? Dale a generar de nuevo para extraer el siguiente bloque de conocimientos.
+                          <strong className="font-semibold text-emerald-300">{t('deck_detail.cards_added_title')}</strong> {t('deck_detail.cards_added_desc')}
                         </p>
                       </div>
                     </div>
@@ -534,7 +535,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                     {/* Card Format Selector Dropdown */}
                     <div>
                       <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-300 mb-1.5 flex items-center justify-between">
-                        <span>Formato de Tarjetas</span>
+                        <span>{t('deck_detail.card_format_label')}</span>
                         <span className="text-violet-400 font-mono text-[10px] lowercase">{aiCardFormat}</span>
                       </label>
                       <div className="relative">
@@ -544,10 +545,10 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                           onChange={(e) => setAiCardFormat(e.target.value as CardFormat)}
                           className="w-full text-xs font-medium px-3.5 py-2.5 rounded-xl bg-neutral-950 border border-neutral-800 text-white focus:outline-none focus:border-violet-500 transition appearance-none cursor-pointer disabled:opacity-50 pr-10"
                         >
-                          <option value="basic">🃏 Básica — Pregunta y Respuesta</option>
-                          <option value="multiple_choice">📝 Opción Múltiple — Test (a, b, c, d)</option>
-                          <option value="cloze">🧩 Cloze — Texto con espacio [...]</option>
-                          <option value="true_false">⚖️ Verdadero o Falso — Afirmación</option>
+                          <option value="basic">{t('deck_detail.format_opt_basic')}</option>
+                          <option value="multiple_choice">{t('deck_detail.format_opt_mc')}</option>
+                          <option value="cloze">{t('deck_detail.format_opt_cloze')}</option>
+                          <option value="true_false">{t('deck_detail.format_opt_tf')}</option>
                         </select>
                         <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-neutral-400">
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -560,8 +561,8 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                     {/* Card Count Numeric Input con Límite Seguro */}
                     <div>
                       <label htmlFor="topicCardCount" className="block text-xs font-semibold uppercase tracking-wider text-neutral-300 mb-1.5 flex items-center justify-between">
-                        <span>Cantidad de Tarjetas</span>
-                        <span className="text-violet-400 font-mono text-[10px] font-bold">{aiCardCount} / 30 MÁX</span>
+                        <span>{t('deck_detail.card_count_label')}</span>
+                        <span className="text-violet-400 font-mono text-[10px] font-bold">{t('deck_detail.card_count_max', { count: aiCardCount })}</span>
                       </label>
                       <div className="relative">
                         <input
@@ -584,7 +585,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                             }
                           }}
                           className="w-full text-xs font-semibold px-3.5 py-2.5 rounded-xl bg-neutral-950 border border-neutral-800 text-white focus:outline-none focus:border-violet-500 transition disabled:opacity-50"
-                          placeholder="1 a 30 tarjetas"
+                          placeholder={t('deck_detail.card_count_placeholder')}
                         />
                       </div>
                     </div>
@@ -594,13 +595,13 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                   <div className="p-2.5 rounded-lg bg-violet-500/10 border border-violet-500/20 text-[11px] text-violet-200/90 flex items-start gap-2 leading-relaxed">
                     <span className="shrink-0 text-sm">💡</span>
                     <span>
-                      Generamos por lotes para evitar saturación. Puedes pedir varios lotes seguidos del mismo documento: nuestra IA analiza tu mazo y extraerá conceptos 100% nuevos sin repetir preguntas anteriores.
+                      {t('deck_detail.batch_hint')}
                     </span>
                   </div>
 
                   <div>
                     <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-300 mb-1.5">
-                      Tema o Concepto a estudiar <span className="text-violet-400">*</span>
+                      {t('deck_detail.topic_label')} <span className="text-violet-400">*</span>
                     </label>
                     <input
                       type="text"
@@ -608,7 +609,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                       disabled={isGenerating}
                       value={aiTopic}
                       onChange={(e) => setAiTopic(e.target.value)}
-                      placeholder="ej. Táctica del Ajax de 1971 a 1973, Ciclo de Krebs, Reacciones Redox..."
+                      placeholder={t('deck_detail.topic_placeholder')}
                       className="w-full text-sm px-3.5 py-2.5 rounded-xl bg-neutral-950 border border-neutral-800 text-white placeholder-neutral-500 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition disabled:opacity-50"
                     />
                   </div>
@@ -620,7 +621,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                       onClick={() => setIsAiModalOpen(false)}
                       className="px-4 py-2 text-xs sm:text-sm text-neutral-400 hover:text-white rounded-xl hover:bg-neutral-800 transition disabled:opacity-50"
                     >
-                      Cancelar
+                      {t('deck_detail.cancel')}
                     </button>
                     <button
                       type="submit"
@@ -630,14 +631,14 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                       {isGenerating ? (
                         <>
                           <div className="w-4 h-4 border-2 border-white/80 border-t-transparent rounded-full animate-spin" />
-                          <span>Generando con Gemini...</span>
+                          <span>{t('deck_detail.generating_btn')}</span>
                         </>
                       ) : (
                         <>
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                           </svg>
-                          <span>Generar {aiCardCount} Tarjetas ({aiCardFormat})</span>
+                          <span>{t('deck_detail.generate_btn', { count: aiCardCount, format: aiCardFormat })}</span>
                         </>
                       )}
                     </button>

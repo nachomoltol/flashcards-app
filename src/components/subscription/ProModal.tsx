@@ -247,7 +247,9 @@ export function ProModal({
                     <span className="text-2xl font-extrabold text-white">49.99€</span>
                     <span className="text-xs text-neutral-400">/año</span>
                   </div>
-                  <p className="text-[10px] text-purple-300 font-medium">Equivale a solo ~4.16€/mes</p>
+                  <p className="text-[10px] text-purple-300 font-medium">
+                    {t('pro_modal.annual_equiv', 'Equivale a solo ~4.16€/mes')}
+                  </p>
                 </div>
 
                 <p className="text-[11px] text-neutral-400 mt-2 leading-snug">
@@ -304,7 +306,7 @@ export function ProModal({
                 {isSubscribing ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white/80 border-t-transparent rounded-full animate-spin" />
-                    <span>Conectando con pasarela segura...</span>
+                    <span>{t('pro_modal.connecting_gateway', 'Conectando con pasarela segura...')}</span>
                   </>
                 ) : (
                   <>
@@ -389,7 +391,7 @@ export function ProModal({
                     <p className="font-semibold">{redeemStatus.message}</p>
                     {redeemStatus.tier && (
                       <p className="text-[11px] opacity-90 mt-0.5">
-                        Nivel activo: <span className="uppercase font-bold tracking-wider">{redeemStatus.tier}</span> (Generaciones ilimitadas)
+                        {t('pro_modal.active_tier', 'Nivel activo:')} <span className="uppercase font-bold tracking-wider">{redeemStatus.tier}</span> {t('pro_modal.unlimited_gens', '(Generaciones ilimitadas)')}
                       </p>
                     )}
                   </div>
@@ -401,7 +403,7 @@ export function ProModal({
           {/* Tarjeta de Beneficios Destacados */}
           <div className="space-y-2">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-purple-300/80">
-              {t('pro_modal.benefits_title', 'Lo que incluye el plan PRO:')}
+              {t('pro_modal.benefits_title', 'LO QUE INCLUYE EL PLAN PRO')}
             </p>
 
             <div className="grid grid-cols-1 gap-2">
@@ -452,13 +454,17 @@ export function ProModal({
 
         {/* Footer / Botones de Cierre */}
         <div className="pt-5 border-t border-neutral-800/80 mt-5 flex items-center justify-between">
-          <span className="text-[11px] text-neutral-500">Cancela en cualquier momento</span>
+          <span className="text-[11px] text-neutral-500">
+            {t('pro_modal.cancel_anytime', 'Cancela en cualquier momento')}
+          </span>
           <button
             type="button"
             onClick={handleClose}
             className="text-xs text-neutral-400 hover:text-white transition cursor-pointer py-1 px-2"
           >
-            {isLimitReached && !redeemStatus?.tier ? 'Cerrar' : 'Volver a repasar'}
+            {isLimitReached && !redeemStatus?.tier
+              ? t('pro_modal.close_btn', 'Cerrar')
+              : t('pro_modal.back_to_review', 'Volver a repasar')}
           </button>
         </div>
       </div>
