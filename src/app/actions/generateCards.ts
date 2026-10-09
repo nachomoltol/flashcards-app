@@ -95,63 +95,99 @@ REGLAS CRÍTICAS PARA "front":
 }
 
 const RADAR_DIRECTIVE = `RADAR DE PROFUNDIDAD DE CONTENIDO (RADAR, NO FRENO):
-Analiza el historial de tarjetas frente al texto. Si consideras que la teoría troncal y los conceptos principales ya han sido extraídos en lotes anteriores, marca core_exhausted: true y CONTINÚA generando el número de tarjetas solicitado buscando detalles minuciosos, excepciones, datos muy específicos o notas al pie. Si aún queda información troncal, marca false.`;
+Analiza el historial de tarjetas existentes frente al texto proporcionado. Si consideras que la teoría troncal y los conceptos principales del texto ya han sido extraídos en lotes anteriores, marca core_exhausted: true y CONTINÚA generando el número de tarjetas solicitado buscando detalles minuciosos, excepciones, datos muy específicos o notas al pie dentro del texto. Si aún queda información troncal por cubrir, marca false.`;
 
-const GLOBAL_RULES = `REGLAS GLOBALES ESTRICTAS:
-1. Extrae información EXCLUSIVAMENTE del contenido/documento proporcionado. Jamás inventes datos ni asumas conocimientos no contenidos en la fuente.
-2. Los distractores (en preguntas de opción múltiple) deben ser técnicamente plausibles y basados estrictamente en el temario.
-3. Todo acrónimo debe ir acompañado obligatoriamente de su nombre completo (ejemplo: "ARN (Ácido Ribonucleico)", "TCP (Transmission Control Protocol)").
-4. INTEGRIDAD ESTRUCTURAL DEL JSON (PRIORIDAD ABSOLUTA): La integridad estructural del JSON es prioridad absoluta y debes devolver un objeto JSON válido con los campos "core_exhausted" (booleano) y "cards" (array). Para garantizar que el JSON no se trunque por el límite de tokens, sé sintético, directo y conciso en el texto de las preguntas, opciones y respuestas, sin rodeos ni explicaciones excesivas.`;
+/**
+ * System Prompt de Restricción Estricta (Grounding) y Extracción de Contenido.
+ * Obliga a Gemini a actuar exclusivamente como un extractor fidedigno, prohibiendo el conocimiento externo.
+ */
+const SYSTEM_INSTRUCTION_GROUNDING = `Eres un sistema pedagógico experto en ciencias cognitivas, extracción estricta de contenidos y diseño de flashcards para el algoritmo de repetición espaciada FSRS.
+
+REGLAS INQUEBRANTABLES DE EXTRACCIÓN Y RESTRICCIÓN DE CONTEXTO (GROUNDING ESTRICTO):
+1. TU ÚNICA FUENTE DE VERDAD ES EL TEXTO PROPORCIONADO: Toda la información de las tarjetas DEBE extraerse EXCLUSIVA Y ESTRICTAMENTE de este texto.
+2. PROHIBICIÓN TERMINANTE DE CONOCIMIENTO EXTERNO: Tienes TERMINANTEMENTE PROHIBIDO utilizar tu conocimiento externo, asunciones no fundadas o datos que no aparezcan en la fuente proporcionada.
+3. SI UN CONCEPTO O DETALLE NO SE EXPLICA EXPLÍCITAMENTE EN EL DOCUMENTO, NO PUEDES GENERAR UNA TARJETA SOBRE ÉL: Actúa únicamente y exclusivamente como un extractor fidedigno. Si un dato no figura de forma explícita en el material de origen, para ti no existe y bajo ningún concepto debes inventarlo, completarlo o extrapolarlo.
+4. DISTRACTORES BASADOS EN EL TEXTO: En preguntas de opción múltiple (test), todos los distractores incorrectos deben ser técnicamente plausibles pero fundamentados en términos y conceptos del propio texto fuente, sin introducir elementos externos.
+5. OBJETIVIDAD Y RIGOR CIENTÍFICO: Las preguntas y respuestas deben reflejar exactamente la definición, clasificación o dato que el autor o texto expone sin divagar.`;
+
+const GLOBAL_RULES = `REGLAS GLOBALES INQUEBRANTABLES DE GROUNDING Y EXTRACCIÓN:
+1. RESTRICCIÓN ESTRICTA DE CONTEXTO: Tu única fuente de verdad es el texto proporcionado. Toda la información de las tarjetas DEBE extraerse EXCLUSIVA Y ESTRICTAMENTE de este texto. Tienes TERMINANTEMENTE PROHIBIDO utilizar tu conocimiento externo. Si un concepto o detalle no se explica explícitamente en el documento, NO puedes generar una tarjeta sobre él.
+2. DISTRACTORES BASADOS EN EL TEMARIO: Los distractores (en preguntas de opción múltiple) deben ser técnicamente plausibles y basados estrictamente en el texto fuente.
+3. ACRÓNIMOS: Todo acrónimo debe ir acompañado obligatoriamente de su nombre completo si figura en la fuente (ejemplo: "ARN (Ácido Ribonucleico)", "TCP (Transmission Control Protocol)").
+4. INTEGRIDAD ESTRUCTURAL DEL JSON (PRIORIDAD ABSOLUTA): Debes devolver un objeto JSON válido con los campos "core_exhausted" (booleano) y "cards" (array). Sé sintético, directo y conciso en el texto de las preguntas, opciones y respuestas, sin rodeos innecesarios.`;
 
 /**
  * Recupera de forma segura el texto del front de todas las tarjetas ya existentes en el mazo.
- * Si es la primera vez que se generan tarjetas en el mazo o hay un error, devuelve un array vacío.
+ * Si se pasa deckId, consulta la base de datos Supabase para obtener las preguntas reales actuales
+ * y las fusiona con cualquier pregunta adicional provista por el cliente, devolviendo un conjunto deduplicado.
  */
-async function fetchExistingCardFronts(deckId?: string): Promise<string[]> {
-  if (!deckId) return [];
+async function fetchExistingCardFronts(
+  deckId?: string,
+  clientProvided: string[] = []
+): Promise<string[]> {
+  const questionsMap = new Map<string, string>();
 
-  try {
-    const { data, error } = await supabase
-      .from('cards')
-      .select('front')
-      .eq('deck_id', deckId);
-
-    if (error || !data) {
-      console.warn('Advertencia al consultar tarjetas existentes del mazo en Supabase:', error);
-      return [];
+  // 1. Incorporar preguntas pasadas por el cliente
+  for (const q of clientProvided) {
+    if (q && typeof q === 'string' && q.trim()) {
+      const normalized = q.trim();
+      questionsMap.set(normalized.toLowerCase(), normalized);
     }
-
-    return data
-      .map((row) => row.front?.trim())
-      .filter((front): front is string => Boolean(front && front.length > 0));
-  } catch (err: unknown) {
-    console.warn('Error no bloqueante al consultar el historial de tarjetas en Supabase:', err);
-    return [];
   }
+
+  // 2. Si se proporciona deckId, recuperar siempre las preguntas actuales de la base de datos Supabase
+  if (deckId) {
+    try {
+      const { data, error } = await supabase
+        .from('cards')
+        .select('front')
+        .eq('deck_id', deckId);
+
+      if (error) {
+        console.warn('Advertencia al consultar tarjetas existentes del mazo en Supabase:', error);
+      } else if (data && data.length > 0) {
+        for (const row of data) {
+          if (row.front && typeof row.front === 'string' && row.front.trim()) {
+            const normalized = row.front.trim();
+            questionsMap.set(normalized.toLowerCase(), normalized);
+          }
+        }
+      }
+    } catch (err: unknown) {
+      console.warn('Error no bloqueante al consultar el historial de tarjetas en Supabase:', err);
+    }
+  }
+
+  return Array.from(questionsMap.values());
 }
 
 /**
- * Construye la sección del prompt de Memoria Anti-Duplicados según las instrucciones estrictas.
+ * Construye la sección del prompt de Memoria Anti-Duplicados según las directivas estrictas de la Fase 20.
  */
-function buildAntiDuplicateSection(existingFronts: string[], isDocument = true): string {
+function buildAntiDuplicateSection(existingFronts: string[]): string {
   if (!existingFronts || existingFronts.length === 0) {
     return '';
   }
 
   // Extraemos la pregunta limpia de cada tarjeta existente (tomando la primera línea para descartar opciones de multiple_choice)
-  const frontsList = existingFronts
-    .map((f, i) => {
-      const cleanFront = f.split('\n')[0].trim();
-      return `${i + 1}. "${cleanFront}"`;
-    })
+  const cleanQuestions = existingFronts
+    .map((f) => f.split('\n')[0].replace(/^\d+[\.\)]\s*/, '').trim())
+    .filter((f) => f.length > 3);
+
+  const uniqueQuestions = Array.from(new Set(cleanQuestions));
+  if (uniqueQuestions.length === 0) return '';
+
+  const frontsList = uniqueQuestions
+    .map((f, i) => `${i + 1}. "${f}"`)
     .join('\n');
 
-  const sourceContext = isDocument ? 'en el documento' : 'en el tema';
-
-  return `HISTORIAL DE TARJETAS EXISTENTES (CONTEXTO A EVITAR):
+  return `🚨 FILTRO ANTI-DUPLICADOS CONTEXTUAL (PROHIBICIÓN ESTRICTA):
+Aquí tienes una lista de preguntas que ya existen en este mazo:
+==================================================
 ${frontsList}
-
-REGLA CRÍTICA ANTI-DUPLICADOS (CONTEXTO A EVITAR): Tienes estrictamente prohibido generar preguntas que cubran los mismos conceptos o se solapen con las tarjetas de este historial. Debes buscar información y conceptos nuevos ${sourceContext} que no se hayan tocado aún.`;
+==================================================
+DIRECTIVA OBLIGATORIA: Aquí tienes una lista de preguntas que ya existen. Tienes PROHIBIDO generar tarjetas sobre estos mismos conceptos o hacer preguntas similares.
+Toda nueva tarjeta que generes DEBE evaluar aspectos, conceptos, detalles, relaciones o datos complementarios del material que NO hayan sido cubiertos en las preguntas anteriores.`;
 }
 
 /**
@@ -183,10 +219,8 @@ export async function generateCardsAction(
 
   try {
     // 1. Consultar historial de tarjetas existentes en este mazo para la Memoria Anti-Duplicados
-    const existingFronts = (existingQuestions && existingQuestions.length > 0)
-      ? existingQuestions
-      : await fetchExistingCardFronts(deckId);
-    const antiDuplicatePrompt = buildAntiDuplicateSection(existingFronts, false);
+    const existingFronts = await fetchExistingCardFronts(deckId, existingQuestions);
+    const antiDuplicatePrompt = buildAntiDuplicateSection(existingFronts);
 
     const ai = new GoogleGenAI({ apiKey });
 
@@ -206,6 +240,7 @@ La integridad estructural del JSON es prioridad absoluta y DEBES devolver un obj
       model: 'gemini-3.8-flash',
       contents: prompt,
       config: {
+        systemInstruction: SYSTEM_INSTRUCTION_GROUNDING,
         responseMimeType: 'application/json',
         responseJsonSchema: flashcardSchema,
         maxOutputTokens: 8192,
@@ -388,10 +423,8 @@ export async function generateCardsFromDocumentAction(
     }
 
     // 3. Consultar historial de tarjetas existentes en este mazo para la Memoria Anti-Duplicados
-    const existingFronts = (existingQuestions && existingQuestions.length > 0)
-      ? existingQuestions
-      : await fetchExistingCardFronts(deckId);
-    const antiDuplicatePrompt = buildAntiDuplicateSection(existingFronts, true);
+    const existingFronts = await fetchExistingCardFronts(deckId, existingQuestions);
+    const antiDuplicatePrompt = buildAntiDuplicateSection(existingFronts);
 
     // 4. Procesar instrucción de enfoque (focusInstruction) con prioridad absoluta
     const focusInstruction = (rawFocus || customPrompt || '').trim();
@@ -444,6 +477,7 @@ La integridad estructural del JSON es prioridad absoluta y DEBES devolver un obj
       model: 'gemini-3.8-flash',
       contents,
       config: {
+        systemInstruction: SYSTEM_INSTRUCTION_GROUNDING,
         responseMimeType: 'application/json',
         responseJsonSchema: flashcardSchema,
         maxOutputTokens: 8192,
@@ -604,11 +638,8 @@ export async function generateCardsFromUrlAction(
     const canonicalYouTubeUrl = youtubeVideoId ? `https://www.youtube.com/watch?v=${youtubeVideoId}` : '';
 
     // 1. Consultar historial de tarjetas existentes en este mazo para la Memoria Anti-Duplicados
-    const existingFronts =
-      existingQuestions && existingQuestions.length > 0
-        ? existingQuestions
-        : await fetchExistingCardFronts(deckId);
-    const antiDuplicatePrompt = buildAntiDuplicateSection(existingFronts, true);
+    const existingFronts = await fetchExistingCardFronts(deckId, existingQuestions);
+    const antiDuplicatePrompt = buildAntiDuplicateSection(existingFronts);
 
     // 2. Procesar instrucción de enfoque
     const focusInstruction = (rawFocus || customPrompt || '').trim();
@@ -662,6 +693,7 @@ La integridad estructural del JSON es prioridad absoluta y DEBES devolver un obj
             },
           ],
           config: {
+            systemInstruction: SYSTEM_INSTRUCTION_GROUNDING,
             responseMimeType: 'application/json',
             responseJsonSchema: flashcardSchema,
             maxOutputTokens: 8192,
@@ -703,6 +735,7 @@ La integridad estructural del JSON es prioridad absoluta y DEBES devolver un obj
               },
             ],
             config: {
+              systemInstruction: SYSTEM_INSTRUCTION_GROUNDING,
               responseMimeType: 'application/json',
               responseJsonSchema: flashcardSchema,
               maxOutputTokens: 8192,
@@ -776,6 +809,7 @@ La integridad estructural del JSON es prioridad absoluta y DEBES devolver un obj
           },
         ],
         config: {
+          systemInstruction: SYSTEM_INSTRUCTION_GROUNDING,
           responseMimeType: 'application/json',
           responseJsonSchema: flashcardSchema,
           maxOutputTokens: 8192,
