@@ -156,8 +156,13 @@ export const useCardStore = create<CardState>((set) => ({
       if (updateErr) throw updateErr;
 
       // 2. Insertar log de revisión en Supabase
+      const {
+        data: { user: currentUser },
+      } = await supabase.auth.getUser();
+
       const { error: reviewErr } = await supabase.from('reviews').insert({
         card_id: card.id,
+        user_id: currentUser?.id,
         rating: reviewLog.rating,
         state: reviewLog.state,
         stability: reviewLog.stability,

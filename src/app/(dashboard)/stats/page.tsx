@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores';
+import { calculateStreak } from '@/lib/stats/streak';
 import type { Database } from '@/types/database';
 
 type CardItem = Database['public']['Tables']['cards']['Row'];
@@ -96,15 +96,6 @@ export default function StatsPage() {
 
   // Cálculos de métricas FSRS
   const totalCards = cards.length;
-  const cardsStudied = useMemo(
-    () => cards.filter((c) => (c.reps ?? 0) > 0 || c.last_review !== null).length,
-    [cards]
-  );
-
-  const dueCardsCount = useMemo(() => {
-    const now = new Date();
-    return cards.filter((c) => new Date(c.due) <= now).length;
-  }, [cards]);
 
   // Estados FSRS:
   // 0 = New (Nuevas)
@@ -131,37 +122,48 @@ export default function StatsPage() {
     };
   }, [cards]);
 
-  // Porcentaje de retención estimado
-  // En FSRS se calcula a partir de los repasos exitosos (ratings 2, 3, 4 vs rating 1 Again)
-  const retentionStats = useMemo(() => {
+  // Cálculo de Racha Activa y Racha Máxima
+  const streak = useMemo(() => {
+    const timestamps = reviews.map((r) => r.created_at);
+    cards.forEach((c) => {
+      if (c.last_review) timestamps.push(c.last_review);
+    });
+    return calculateStreak(timestamps);
+  }, [reviews, cards]);
+
+  // Tasa de Aciertos limpia (Good/Easy vs Again/Hard)
+  const accuracyStats = useMemo(() => {
     if (reviews.length === 0) {
-      // Si no hay reviews aún, estimar basado en tarjetas sin lapsos o meta predeterminada (90%)
       return {
-        retentionRate: 90.0,
-        totalReviews: 0,
-        successfulReviews: 0,
-        failedReviews: 0,
-        isEstimated: true,
+        accuracyRate: 100,
+        goodOrEasyCount: 0,
+        againOrHardCount: 0,
+        total: 0,
+        hasData: false,
       };
     }
 
-    let success = 0;
-    let fail = 0;
+    let goodOrEasy = 0;
+    let againOrHard = 0;
 
     reviews.forEach((r) => {
-      if (r.rating === 1) fail++;
-      else success++;
+      // Calificaciones FSRS: 1=Again, 2=Hard, 3=Good, 4=Easy
+      if (r.rating === 3 || r.rating === 4) {
+        goodOrEasy++;
+      } else {
+        againOrHard++;
+      }
     });
 
-    const total = success + fail;
-    const rate = total > 0 ? (success / total) * 100 : 90.0;
+    const total = goodOrEasy + againOrHard;
+    const accuracyRate = total > 0 ? Math.round((goodOrEasy / total) * 100) : 100;
 
     return {
-      retentionRate: Number(rate.toFixed(1)),
-      totalReviews: total,
-      successfulReviews: success,
-      failedReviews: fail,
-      isEstimated: false,
+      accuracyRate,
+      goodOrEasyCount: goodOrEasy,
+      againOrHardCount: againOrHard,
+      total,
+      hasData: true,
     };
   }, [reviews]);
 
@@ -265,44 +267,97 @@ export default function StatsPage() {
         </div>
       )}
 
-      {/* KPI Cards: Métricas Principales */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* KPI 1: Tarjetas Estudiadas */}
-        <div className="p-5 rounded-2xl bg-neutral-900/50 border border-neutral-800/80 backdrop-blur-sm relative overflow-hidden group hover:border-neutral-700/80 transition-all duration-200">
+      {/* KPI Cards: 3 Métricas Clave (Responsivo: 1 columna en móvil, 3 en tablet/PC) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Recuadro 1: Tarjetas Consolidadas (Estado Maduras / A Revisar) */}
+        <div className="p-5 rounded-2xl bg-neutral-900/50 border border-neutral-800/80 backdrop-blur-sm relative overflow-hidden group hover:border-emerald-500/40 transition-all duration-200">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">
-              Tarjetas Estudiadas
+              Tarjetas Consolidadas
             </span>
-            <div className="w-8 h-8 rounded-lg bg-indigo-500/15 text-indigo-400 border border-indigo-500/30 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
               </svg>
             </div>
           </div>
           <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-white">{cardsStudied}</span>
-            <span className="text-xs text-neutral-500">de {totalCards} tarjetas</span>
+            <span className="text-3xl font-extrabold text-white">
+              {stateCounts.reviewCards}
+            </span>
+            <span className="text-xs text-neutral-500">maduras (A Revisar)</span>
           </div>
-          <div className="mt-2 text-xs text-neutral-400 flex items-center justify-between font-medium">
-            <span>{totalCards > 0 ? Math.round((cardsStudied / totalCards) * 100) : 0}% de tu biblioteca</span>
-            <span className="text-indigo-400 font-mono text-[11px]">{reviews.length} sesiones</span>
+          <div className="mt-2 text-xs flex items-center justify-between font-medium">
+            <span className="text-emerald-400">
+              {totalCards > 0 ? Math.round((stateCounts.reviewCards / totalCards) * 100) : 0}% de tu temario
+            </span>
+            <span className="text-neutral-500 font-mono text-[11px]">
+              FSRS State 2
+            </span>
           </div>
           {/* Progress bar */}
           <div className="mt-2.5 h-1.5 w-full bg-neutral-800 rounded-full overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-full transition-all duration-500"
-              style={{ width: `${totalCards > 0 ? Math.round((cardsStudied / totalCards) * 100) : 0}%` }}
+              className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-500"
+              style={{
+                width: `${totalCards > 0 ? Math.round((stateCounts.reviewCards / totalCards) * 100) : 0}%`,
+              }}
             />
           </div>
         </div>
 
-        {/* KPI 2: Retención Estimada */}
-        <div className="p-5 rounded-2xl bg-neutral-900/50 border border-neutral-800/80 backdrop-blur-sm relative overflow-hidden group hover:border-neutral-700/80 transition-all duration-200">
+        {/* Recuadro 2: Racha Activa (Días consecutivos y racha máxima) */}
+        <div className="p-5 rounded-2xl bg-neutral-900/50 border border-neutral-800/80 backdrop-blur-sm relative overflow-hidden group hover:border-amber-500/40 transition-all duration-200">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider flex items-center gap-1.5">
+              <span>🔥 Racha Activa</span>
+            </span>
+            <div className="w-8 h-8 rounded-lg bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z" />
+              </svg>
+            </div>
+          </div>
+          <div className="mt-3 flex items-baseline gap-2">
+            <span className="text-3xl font-extrabold text-white">
+              {streak.current}
+            </span>
+            <span className="text-xs text-neutral-500">
+              {streak.current === 1 ? 'día consecutivo' : 'días consecutivos'}
+            </span>
+          </div>
+          <div className="mt-2 text-xs flex items-center justify-between font-medium">
+            <span className={streak.studiedToday ? 'text-amber-400' : 'text-neutral-400'}>
+              {streak.studiedToday ? '🔥 Racha activa hoy' : '⏳ Repasa hoy para sumar'}
+            </span>
+            <span className="text-neutral-400 font-mono text-[11px] bg-neutral-800/80 px-2 py-0.5 rounded-md">
+              Racha máx: <strong className="text-amber-400">{streak.max}d</strong>
+            </span>
+          </div>
+          {/* Visual Streak Mini Dots */}
+          <div className="mt-2.5 flex items-center gap-1.5">
+            {[...Array(7)].map((_, idx) => {
+              const active = idx < Math.min(streak.current, 7);
+              return (
+                <div
+                  key={idx}
+                  className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${
+                    active ? 'bg-amber-500 shadow-sm shadow-amber-500/50' : 'bg-neutral-800'
+                  }`}
+                />
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Recuadro 3: Tasa de Aciertos (Good/Easy vs Again/Hard) */}
+        <div className="p-5 rounded-2xl bg-neutral-900/50 border border-neutral-800/80 backdrop-blur-sm relative overflow-hidden group hover:border-indigo-500/40 transition-all duration-200">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">
-              Retención Estimada
+              Tasa de Aciertos
             </span>
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-indigo-500/15 text-indigo-400 border border-indigo-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
@@ -310,75 +365,28 @@ export default function StatsPage() {
           </div>
           <div className="mt-3 flex items-baseline gap-2">
             <span className="text-3xl font-extrabold text-white">
-              {retentionStats.retentionRate}%
+              {accuracyStats.accuracyRate}%
             </span>
             <span className="text-xs text-neutral-500">
-              {retentionStats.isEstimated ? 'meta' : 'observada'}
+              {accuracyStats.hasData ? 'respuestas acertadas' : 'sin repasos'}
             </span>
           </div>
           <div className="mt-2 text-xs flex items-center justify-between font-medium">
-            <span className={retentionStats.retentionRate >= 85 ? 'text-emerald-400' : 'text-amber-400'}>
-              {retentionStats.retentionRate >= 90 ? '🌟 Excelente retención' : '👍 Nivel adecuado'}
+            <span className="text-indigo-400">
+              {accuracyStats.goodOrEasyCount} aciertos (Good/Easy)
             </span>
-            <span className="text-neutral-500 text-[11px] font-mono">Meta: 90%</span>
+            <span className="text-neutral-500 font-mono text-[11px]">
+              {accuracyStats.againOrHardCount} fallos (Again/Hard)
+            </span>
           </div>
+          {/* Progress bar */}
           <div className="mt-2.5 h-1.5 w-full bg-neutral-800 rounded-full overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-500"
-              style={{ width: `${Math.min(100, retentionStats.retentionRate)}%` }}
+              className="h-full bg-gradient-to-r from-indigo-500 via-violet-500 to-emerald-400 rounded-full transition-all duration-500"
+              style={{
+                width: `${accuracyStats.accuracyRate}%`,
+              }}
             />
-          </div>
-        </div>
-
-        {/* KPI 3: Pendientes Hoy */}
-        <div className="p-5 rounded-2xl bg-neutral-900/50 border border-neutral-800/80 backdrop-blur-sm relative overflow-hidden group hover:border-neutral-700/80 transition-all duration-200">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">
-              Pendientes Hoy
-            </span>
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-              dueCardsCount > 0
-                ? 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
-                : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-            }`}>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-white">{dueCardsCount}</span>
-            <span className="text-xs text-neutral-500">listas para repasar</span>
-          </div>
-          <div className="mt-2 text-xs flex items-center justify-between font-medium">
-            <span className={dueCardsCount > 0 ? 'text-rose-400' : 'text-emerald-400'}>
-              {dueCardsCount > 0 ? `${dueCardsCount} para consolidar hoy` : 'Al día con tus repasos'}
-            </span>
-            <Link href="/" className="text-xs text-indigo-400 hover:text-indigo-300 transition">
-              Repasar →
-            </Link>
-          </div>
-        </div>
-
-        {/* KPI 4: Total de Repasos Realizados */}
-        <div className="p-5 rounded-2xl bg-neutral-900/50 border border-neutral-800/80 backdrop-blur-sm relative overflow-hidden group hover:border-neutral-700/80 transition-all duration-200">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">
-              Total de Repasos
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center justify-center">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-white">{reviews.length}</span>
-            <span className="text-xs text-neutral-500">evaluaciones</span>
-          </div>
-          <div className="mt-2 text-xs text-neutral-400 flex items-center justify-between font-medium">
-            <span>{retentionStats.successfulReviews} aciertos</span>
-            <span className="text-rose-400 font-mono text-[11px]">{retentionStats.failedReviews} fallos</span>
           </div>
         </div>
       </div>
