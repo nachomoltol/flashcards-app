@@ -238,7 +238,7 @@ export default function StudyPage({ params }: StudyPageProps) {
     };
 
     return (
-      <div className="max-w-2xl mx-auto py-10 px-4 text-center space-y-7 animate-in fade-in duration-300">
+      <div className="max-w-2xl mx-auto py-6 sm:py-10 px-4 text-center space-y-6 sm:space-y-7 animate-in fade-in duration-300 overflow-y-auto max-h-[100dvh]">
         {/* Animated Trophy & Emojis Header */}
         <div className="relative inline-block mx-auto">
           {/* Floating celebratory emojis */}
@@ -368,54 +368,58 @@ export default function StudyPage({ params }: StudyPageProps) {
   ];
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6 animate-in fade-in duration-200">
+    <div className="w-full max-w-3xl mx-auto h-[100dvh] md:h-full max-h-[100dvh] flex flex-col justify-between p-2.5 sm:p-4 md:p-6 overflow-hidden animate-in fade-in duration-200">
       {/* Top Header & Session Counters */}
-      <div className="flex items-center justify-between gap-4 pb-4 border-b border-neutral-800/80">
-        <Link
-          href={`/decks/${deckId}`}
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-neutral-400 hover:text-white transition group"
-        >
-          <svg
-            className="w-4 h-4 transition-transform group-hover:-translate-x-1"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
+      <div className="shrink-0 space-y-2 pb-2">
+        <div className="flex items-center justify-between gap-3">
+          <Link
+            href={`/decks/${deckId}`}
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-neutral-400 hover:text-white transition group py-1"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-          {currentDeck?.title ? `Salir de ${currentDeck.title}` : 'Salir de la sesión'}
-        </Link>
+            <svg
+              className="w-4 h-4 transition-transform group-hover:-translate-x-1"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            <span className="truncate max-w-[170px] sm:max-w-none">
+              {currentDeck?.title ? `Salir de ${currentDeck.title}` : 'Salir de la sesión'}
+            </span>
+          </Link>
 
-        {/* Counter of Remaining Cards */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-neutral-400">Progreso:</span>
-            <span className="text-xs font-semibold text-white">
-              {currentIndex + 1} / {queue.length}
+          {/* Counter of Remaining Cards */}
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            <div className="flex items-center gap-1 text-[11px] sm:text-xs">
+              <span className="text-neutral-400 hidden sm:inline">Progreso:</span>
+              <span className="font-semibold text-white">
+                {currentIndex + 1} / {queue.length}
+              </span>
+            </div>
+
+            <span className="text-[10px] sm:text-xs px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+              {remainingCount} {remainingCount === 1 ? 'restante' : 'restantes'}
             </span>
           </div>
+        </div>
 
-          <span className="text-xs px-2.5 py-1 rounded-full font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-            {remainingCount} {remainingCount === 1 ? 'restante' : 'restantes'}
-          </span>
+        {/* Progress Bar */}
+        <div className="w-full bg-neutral-900 rounded-full h-1 sm:h-1.5 overflow-hidden">
+          <div
+            className="bg-gradient-to-r from-indigo-500 to-violet-500 h-full rounded-full transition-all duration-300"
+            style={{ width: `${progressPercent}%` }}
+          />
         </div>
       </div>
 
-      {/* Progress Bar */}
-      <div className="w-full bg-neutral-900 rounded-full h-1.5 overflow-hidden">
-        <div
-          className="bg-gradient-to-r from-indigo-500 to-violet-500 h-1.5 rounded-full transition-all duration-300"
-          style={{ width: `${progressPercent}%` }}
-        />
-      </div>
-
       {/* Main Isolated Card Container */}
-      <div className="rounded-3xl border border-neutral-800 bg-neutral-900/60 backdrop-blur-xl p-8 sm:p-12 shadow-2xl space-y-8 min-h-[380px] flex flex-col justify-between transition-all">
+      <div className="flex-1 min-h-0 flex flex-col justify-between rounded-2xl sm:rounded-3xl border border-neutral-800 bg-neutral-900/60 backdrop-blur-xl p-3.5 sm:p-6 md:p-8 shadow-2xl overflow-hidden transition-all my-1.5 sm:my-3">
         {/* Card Header Information */}
-        <div className="flex items-center justify-between pb-4 border-b border-neutral-800/60">
-          <div className="flex items-center gap-2">
+        <div className="shrink-0 flex items-center justify-between pb-2 sm:pb-3 border-b border-neutral-800/60">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             <span
-              className={`text-[10px] px-2.5 py-1 rounded-md uppercase tracking-wider font-semibold border ${
+              className={`text-[9px] sm:text-[10px] px-2 py-0.5 rounded-md uppercase tracking-wider font-semibold border ${
                 stateBadgeStyles[currentCard?.state ?? 0]
               }`}
             >
@@ -428,27 +432,27 @@ export default function StudyPage({ params }: StudyPageProps) {
                 (currentCard?.card_type === 'cloze' ? 'cloze' : 'basic');
               const badges: Record<string, { label: string; style: string }> = {
                 basic: { label: 'Básica', style: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
-                multiple_choice: { label: 'Opción Múltiple (Test)', style: 'bg-purple-500/10 text-purple-400 border-purple-500/20' },
+                multiple_choice: { label: 'Opción Múltiple', style: 'bg-purple-500/10 text-purple-400 border-purple-500/20' },
                 cloze: { label: 'Cloze [...]', style: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' },
-                true_false: { label: 'Verdadero / Falso', style: 'bg-amber-500/10 text-amber-400 border-amber-500/20' },
+                true_false: { label: 'V / F', style: 'bg-amber-500/10 text-amber-400 border-amber-500/20' },
               };
               const item = badges[fmt] || { label: fmt, style: 'bg-neutral-800 text-neutral-400 border-neutral-700' };
               return (
-                <span className={`text-[10px] px-2.5 py-1 rounded-md uppercase tracking-wider font-medium border ${item.style}`}>
+                <span className={`text-[9px] sm:text-[10px] px-2 py-0.5 rounded-md uppercase tracking-wider font-medium border ${item.style}`}>
                   {item.label}
                 </span>
               );
             })()}
           </div>
 
-          <div className="text-[11px] text-neutral-500 font-mono">
-            Reps: {currentCard?.reps ?? 0} | Lapsos: {currentCard?.lapses ?? 0} | Estabilidad: {currentCard?.stability?.toFixed(1) ?? '0.0'}
+          <div className="text-[10px] sm:text-[11px] text-neutral-500 font-mono">
+            Reps: {currentCard?.reps ?? 0} | Lapsos: {currentCard?.lapses ?? 0} | Est.: {currentCard?.stability?.toFixed(1) ?? '0.0'}
           </div>
         </div>
 
-        {/* Dynamic Card Content Rendered according to Format */}
+        {/* Dynamic Card Content Rendered according to Format - Internal Scroll for Long Content */}
         {currentCard && (
-          <div className="py-2">
+          <div className="flex-1 min-h-0 overflow-y-auto pr-1 py-1.5 overscroll-contain">
             <FormattedCardView
               front={currentCard.front}
               back={currentCard.back}
@@ -464,7 +468,7 @@ export default function StudyPage({ params }: StudyPageProps) {
         )}
 
         {!isAnswerRevealed && (
-          <div className="text-center py-2">
+          <div className="shrink-0 text-center py-1 hidden sm:block">
             <p className="text-xs text-neutral-500">
               Pulsa <kbd className="px-1.5 py-0.5 rounded bg-neutral-800 text-neutral-300 font-mono text-[10px]">Espacio</kbd> o el botón inferior para ver la respuesta.
             </p>
@@ -472,7 +476,7 @@ export default function StudyPage({ params }: StudyPageProps) {
         )}
 
         {/* Bottom Actions Bar */}
-        <div className="pt-4 border-t border-neutral-800/60">
+        <div className="shrink-0 pt-2 sm:pt-3 border-t border-neutral-800/60">
           {!isAnswerRevealed ? (
             /* Button: Mostrar respuesta */
             <button
@@ -481,7 +485,7 @@ export default function StudyPage({ params }: StudyPageProps) {
                 (e.currentTarget as HTMLElement)?.blur();
                 setIsAnswerRevealed(true);
               }}
-              className="w-full py-4 px-6 min-h-[54px] sm:min-h-[58px] rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-base transition-all duration-150 shadow-xl shadow-indigo-600/25 active:scale-[0.99] flex items-center justify-center gap-2 group"
+              className="w-full py-3 sm:py-3.5 px-4 min-h-[46px] sm:min-h-[52px] rounded-xl sm:rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm sm:text-base transition-all duration-150 shadow-xl shadow-indigo-600/25 active:scale-[0.99] flex items-center justify-center gap-2 group cursor-pointer"
             >
               <span>Mostrar respuesta</span>
               <kbd className="hidden sm:inline-block px-2 py-0.5 rounded-md bg-indigo-700 text-indigo-200 text-xs font-mono font-normal">
@@ -490,8 +494,8 @@ export default function StudyPage({ params }: StudyPageProps) {
             </button>
           ) : (
             /* FSRS 4 Rating Buttons */
-            <div className="space-y-3 animate-in fade-in duration-200">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+            <div className="space-y-1.5 sm:space-y-2 animate-in fade-in duration-200">
+              <div className="grid grid-cols-4 gap-1.5 sm:gap-2.5">
                 {/* 1 = Again (Fallo) */}
                 <button
                   type="button"
@@ -499,13 +503,13 @@ export default function StudyPage({ params }: StudyPageProps) {
                     (e.currentTarget as HTMLElement)?.blur();
                     handleRate(1);
                   }}
-                  className="p-3 sm:p-4 min-h-[74px] sm:min-h-[82px] rounded-2xl bg-rose-500/10 hover:bg-rose-500/20 active:bg-rose-500/30 text-rose-300 border border-rose-500/30 hover:border-rose-500/50 transition-all duration-150 flex flex-col items-center justify-center gap-1.5 group active:scale-95 shadow-sm"
+                  className="p-1 sm:p-2.5 min-h-[52px] sm:min-h-[70px] rounded-xl sm:rounded-2xl bg-rose-500/10 hover:bg-rose-500/20 active:bg-rose-500/30 text-rose-300 border border-rose-500/30 hover:border-rose-500/50 transition-all duration-150 flex flex-col items-center justify-center gap-0.5 sm:gap-1.5 group active:scale-95 shadow-sm cursor-pointer"
                 >
-                  <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 group-hover:scale-105 transition-transform">
+                  <span className="text-[10px] sm:text-xs font-mono font-bold px-1.5 sm:px-2 py-0 sm:py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">
                     {nextIntervals ? formatInterval(nextIntervals[1].due) : '10m'}
                   </span>
-                  <span className="font-semibold text-xs sm:text-sm text-white text-center leading-snug">
-                    1. Again (Fallo)
+                  <span className="font-semibold text-[11px] sm:text-xs md:text-sm text-white text-center leading-tight">
+                    1. Again
                   </span>
                 </button>
 
@@ -516,13 +520,13 @@ export default function StudyPage({ params }: StudyPageProps) {
                     (e.currentTarget as HTMLElement)?.blur();
                     handleRate(2);
                   }}
-                  className="p-3 sm:p-4 min-h-[74px] sm:min-h-[82px] rounded-2xl bg-amber-500/10 hover:bg-amber-500/20 active:bg-amber-500/30 text-amber-300 border border-amber-500/30 hover:border-amber-500/50 transition-all duration-150 flex flex-col items-center justify-center gap-1.5 group active:scale-95 shadow-sm"
+                  className="p-1 sm:p-2.5 min-h-[52px] sm:min-h-[70px] rounded-xl sm:rounded-2xl bg-amber-500/10 hover:bg-amber-500/20 active:bg-amber-500/30 text-amber-300 border border-amber-500/30 hover:border-amber-500/50 transition-all duration-150 flex flex-col items-center justify-center gap-0.5 sm:gap-1.5 group active:scale-95 shadow-sm cursor-pointer"
                 >
-                  <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 group-hover:scale-105 transition-transform">
+                  <span className="text-[10px] sm:text-xs font-mono font-bold px-1.5 sm:px-2 py-0 sm:py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
                     {nextIntervals ? formatInterval(nextIntervals[2].due) : '3h'}
                   </span>
-                  <span className="font-semibold text-xs sm:text-sm text-white text-center leading-snug">
-                    2. Hard (Difícil)
+                  <span className="font-semibold text-[11px] sm:text-xs md:text-sm text-white text-center leading-tight">
+                    2. Hard
                   </span>
                 </button>
 
@@ -533,13 +537,13 @@ export default function StudyPage({ params }: StudyPageProps) {
                     (e.currentTarget as HTMLElement)?.blur();
                     handleRate(3);
                   }}
-                  className="p-3 sm:p-4 min-h-[74px] sm:min-h-[82px] rounded-2xl bg-emerald-500/10 hover:bg-emerald-500/20 active:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 hover:border-emerald-500/50 transition-all duration-150 flex flex-col items-center justify-center gap-1.5 group active:scale-95 shadow-sm"
+                  className="p-1 sm:p-2.5 min-h-[52px] sm:min-h-[70px] rounded-xl sm:rounded-2xl bg-emerald-500/10 hover:bg-emerald-500/20 active:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 hover:border-emerald-500/50 transition-all duration-150 flex flex-col items-center justify-center gap-0.5 sm:gap-1.5 group active:scale-95 shadow-sm cursor-pointer"
                 >
-                  <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 group-hover:scale-105 transition-transform">
+                  <span className="text-[10px] sm:text-xs font-mono font-bold px-1.5 sm:px-2 py-0 sm:py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                     {nextIntervals ? formatInterval(nextIntervals[3].due) : '1d'}
                   </span>
-                  <span className="font-semibold text-xs sm:text-sm text-white text-center leading-snug">
-                    3. Good (Correcto)
+                  <span className="font-semibold text-[11px] sm:text-xs md:text-sm text-white text-center leading-tight">
+                    3. Good
                   </span>
                 </button>
 
@@ -550,18 +554,18 @@ export default function StudyPage({ params }: StudyPageProps) {
                     (e.currentTarget as HTMLElement)?.blur();
                     handleRate(4);
                   }}
-                  className="p-3 sm:p-4 min-h-[74px] sm:min-h-[82px] rounded-2xl bg-sky-500/10 hover:bg-sky-500/20 active:bg-sky-500/30 text-sky-300 border border-sky-500/30 hover:border-sky-500/50 transition-all duration-150 flex flex-col items-center justify-center gap-1.5 group active:scale-95 shadow-sm"
+                  className="p-1 sm:p-2.5 min-h-[52px] sm:min-h-[70px] rounded-xl sm:rounded-2xl bg-sky-500/10 hover:bg-sky-500/20 active:bg-sky-500/30 text-sky-300 border border-sky-500/30 hover:border-sky-500/50 transition-all duration-150 flex flex-col items-center justify-center gap-0.5 sm:gap-1.5 group active:scale-95 shadow-sm cursor-pointer"
                 >
-                  <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30 group-hover:scale-105 transition-transform">
+                  <span className="text-[10px] sm:text-xs font-mono font-bold px-1.5 sm:px-2 py-0 sm:py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30">
                     {nextIntervals ? formatInterval(nextIntervals[4].due) : '4d'}
                   </span>
-                  <span className="font-semibold text-xs sm:text-sm text-white text-center leading-snug">
-                    4. Easy (Fácil)
+                  <span className="font-semibold text-[11px] sm:text-xs md:text-sm text-white text-center leading-tight">
+                    4. Easy
                   </span>
                 </button>
               </div>
 
-              <div className="text-center text-[11px] text-neutral-500 pt-1">
+              <div className="hidden sm:block text-center text-[11px] text-neutral-500 pt-1">
                 Presiona las teclas <kbd className="text-neutral-400 font-mono">1</kbd>, <kbd className="text-neutral-400 font-mono">2</kbd>, <kbd className="text-neutral-400 font-mono">3</kbd> o <kbd className="text-neutral-400 font-mono">4</kbd> para calificar rápidamente.
               </div>
             </div>

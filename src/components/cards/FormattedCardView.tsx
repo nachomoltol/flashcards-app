@@ -259,7 +259,7 @@ export function FormattedCardView({
   };
 
   return (
-    <div className={`space-y-6 ${className}`}>
+    <div className={`space-y-3.5 sm:space-y-6 ${className || ''}`}>
       {/* Visual Header Badge for Format & TTS Speaker Button */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 flex-wrap">
@@ -317,9 +317,9 @@ export function FormattedCardView({
       </div>
 
       {/* ANVERSO (FRONT) */}
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
         {/* Pregunta principal */}
-        <div className="text-xl sm:text-2xl font-semibold text-white leading-relaxed">
+        <div className="text-lg sm:text-xl md:text-2xl font-semibold text-white leading-snug sm:leading-relaxed">
           {resolvedFormat === 'cloze' ? (
             renderClozeContent(question, isRevealed)
           ) : (
@@ -446,7 +446,7 @@ export function FormattedCardView({
 
       {/* REVERSO (BACK) */}
       {isRevealed && (
-        <div className="pt-6 border-t border-neutral-800/80 space-y-3 animate-in fade-in slide-in-from-top-3 duration-300">
+        <div className="pt-3 sm:pt-6 border-t border-neutral-800/80 space-y-2 sm:space-y-3 animate-in fade-in slide-in-from-top-3 duration-300">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
@@ -460,7 +460,7 @@ export function FormattedCardView({
             )}
           </div>
 
-          <div className="text-base sm:text-lg text-neutral-200 leading-relaxed whitespace-pre-wrap bg-neutral-950/60 p-4 rounded-2xl border border-neutral-800/90 shadow-inner">
+          <div className="text-sm sm:text-base md:text-lg text-neutral-200 leading-relaxed whitespace-pre-wrap bg-neutral-950/60 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-neutral-800/90 shadow-inner">
             {renderMarkdownBold(back)}
           </div>
         </div>

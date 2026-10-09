@@ -406,9 +406,9 @@ function DecksViewContent() {
   };
 
   return (
-    <div className="space-y-7 animate-in fade-in duration-300">
+    <div className="flex flex-col gap-6 animate-in fade-in duration-300">
       {/* Top Welcome & Actions Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-neutral-800/80">
+      <div className="order-1 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-neutral-800/80">
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white flex items-center gap-2.5">
@@ -542,7 +542,7 @@ function DecksViewContent() {
       </div>
 
       {error && (
-        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center justify-between animate-in fade-in">
+        <div className="order-2 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center justify-between animate-in fade-in">
           <span>{error}</span>
           <button onClick={() => fetchDecks()} className="underline hover:text-rose-300 font-medium ml-2">
             Reintentar
@@ -553,7 +553,7 @@ function DecksViewContent() {
       {/* Migas de pan (Breadcrumbs) Dinámicas y Discretas */}
       <nav
         aria-label="Migas de pan"
-        className="flex items-center gap-1 p-1.5 px-3 rounded-xl bg-neutral-900/70 border border-neutral-800/90 text-xs overflow-x-auto shadow-sm"
+        className="order-2 flex items-center gap-1 p-1.5 px-3 rounded-xl bg-neutral-900/70 border border-neutral-800/90 text-xs overflow-x-auto shadow-sm"
       >
         <span className="text-neutral-500 font-mono text-[11px] uppercase mr-1.5 flex items-center gap-1 shrink-0">
           <svg className="w-3.5 h-3.5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -594,111 +594,113 @@ function DecksViewContent() {
         })}
       </nav>
 
-      {/* Metrics Row: 4 Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Stat 1: Tarjetas a Repasar Hoy */}
-        <div className="p-5 rounded-2xl bg-neutral-900/50 border border-neutral-800/80 backdrop-blur-sm relative overflow-hidden group hover:border-neutral-700/80 transition-all duration-200">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">
-              Repasos para Hoy
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center justify-center">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-white">{dueCardsTotal}</span>
-            <span className="text-xs text-neutral-500">tarjetas debidas</span>
-          </div>
-          <div className="mt-2 text-xs text-neutral-400 font-medium">
-            {dueCardsTotal > 0 ? (
-              <span className="text-rose-400 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
-                Pendientes de estudio
+      {/* Metrics Row: 4 Metric Cards (Solo visible en la raíz, al final en móvil y arriba en escritorio) */}
+      {!currentFolder && (
+        <div className="order-5 md:order-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Stat 1: Tarjetas a Repasar Hoy */}
+          <div className="p-5 rounded-2xl bg-neutral-900/50 border border-neutral-800/80 backdrop-blur-sm relative overflow-hidden group hover:border-neutral-700/80 transition-all duration-200">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">
+                Repasos para Hoy
               </span>
-            ) : (
-              <span className="text-emerald-400">Todo al día</span>
-            )}
-          </div>
-        </div>
-
-        {/* Stat 2: Total de Tarjetas Registradas */}
-        <div className="p-5 rounded-2xl bg-neutral-900/50 border border-neutral-800/80 backdrop-blur-sm relative overflow-hidden group hover:border-neutral-700/80 transition-all duration-200">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">
-              Total Tarjetas
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 flex items-center justify-center">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-              </svg>
+              <div className="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center justify-center">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+            </div>
+            <div className="mt-3 flex items-baseline gap-2">
+              <span className="text-3xl font-extrabold text-white">{dueCardsTotal}</span>
+              <span className="text-xs text-neutral-500">tarjetas debidas</span>
+            </div>
+            <div className="mt-2 text-xs text-neutral-400 font-medium">
+              {dueCardsTotal > 0 ? (
+                <span className="text-rose-400 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                  Pendientes de estudio
+                </span>
+              ) : (
+                <span className="text-emerald-400">Todo al día</span>
+              )}
             </div>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-white">{totalCards}</span>
-            <span className="text-xs text-neutral-500">en mazos de estudio</span>
-          </div>
-          <div className="mt-2 text-xs text-neutral-400 font-medium">
-            Almacenadas en PostgreSQL
-          </div>
-        </div>
 
-        {/* Stat 3: Organización Actual */}
-        <div className="p-5 rounded-2xl bg-neutral-900/50 border border-neutral-800/80 backdrop-blur-sm relative overflow-hidden group hover:border-neutral-700/80 transition-all duration-200">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">
-              {currentFolder ? 'En esta Carpeta' : 'Estructura Global'}
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-              </svg>
+          {/* Stat 2: Total de Tarjetas Registradas */}
+          <div className="p-5 rounded-2xl bg-neutral-900/50 border border-neutral-800/80 backdrop-blur-sm relative overflow-hidden group hover:border-neutral-700/80 transition-all duration-200">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">
+                Total Tarjetas
+              </span>
+              <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 flex items-center justify-center">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+              </div>
+            </div>
+            <div className="mt-3 flex items-baseline gap-2">
+              <span className="text-3xl font-extrabold text-white">{totalCards}</span>
+              <span className="text-xs text-neutral-500">en mazos de estudio</span>
+            </div>
+            <div className="mt-2 text-xs text-neutral-400 font-medium">
+              Almacenadas en PostgreSQL
             </div>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-white">
-              {currentFolder ? currentLevelDecks.length : decks.length}
-            </span>
-            <span className="text-xs text-neutral-500">
-              {currentFolder ? 'elementos aquí' : 'elementos en total'}
-            </span>
-          </div>
-          <div className="mt-2 text-xs text-amber-400 font-medium">
-            {currentFolder
-              ? `${foldersInLevel} carpetas • ${decksInLevel} mazos`
-              : `${totalFolders} carpetas • ${totalStudyDecks} mazos`}
-          </div>
-        </div>
 
-        {/* Stat 4: Acceso a Estadísticas */}
-        <Link
-          href="/stats"
-          className="p-5 rounded-2xl bg-gradient-to-br from-neutral-900/80 to-indigo-950/20 border border-neutral-800/80 backdrop-blur-sm relative overflow-hidden group hover:border-indigo-500/50 transition-all duration-200 block"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider group-hover:text-indigo-300 transition">
-              Panel Estadísticas
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
+          {/* Stat 3: Organización Actual */}
+          <div className="p-5 rounded-2xl bg-neutral-900/50 border border-neutral-800/80 backdrop-blur-sm relative overflow-hidden group hover:border-neutral-700/80 transition-all duration-200">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">
+                {currentFolder ? 'En esta Carpeta' : 'Estructura Global'}
+              </span>
+              <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                </svg>
+              </div>
+            </div>
+            <div className="mt-3 flex items-baseline gap-2">
+              <span className="text-3xl font-extrabold text-white">
+                {currentFolder ? currentLevelDecks.length : decks.length}
+              </span>
+              <span className="text-xs text-neutral-500">
+                {currentFolder ? 'elementos aquí' : 'elementos en total'}
+              </span>
+            </div>
+            <div className="mt-2 text-xs text-amber-400 font-medium">
+              {currentFolder
+                ? `${foldersInLevel} carpetas • ${decksInLevel} mazos`
+                : `${totalFolders} carpetas • ${totalStudyDecks} mazos`}
             </div>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-white group-hover:text-indigo-300 transition">Ver Métricas</span>
-            <span className="text-xs text-neutral-500">→</span>
-          </div>
-          <div className="mt-2 text-xs text-indigo-400 font-medium flex items-center gap-1">
-            <span>Retención, curvas y estados FSRS</span>
-          </div>
-        </Link>
-      </div>
+
+          {/* Stat 4: Acceso a Estadísticas */}
+          <Link
+            href="/stats"
+            className="p-5 rounded-2xl bg-gradient-to-br from-neutral-900/80 to-indigo-950/20 border border-neutral-800/80 backdrop-blur-sm relative overflow-hidden group hover:border-indigo-500/50 transition-all duration-200 block"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider group-hover:text-indigo-300 transition">
+                Panel Estadísticas
+              </span>
+              <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+              </div>
+            </div>
+            <div className="mt-3 flex items-baseline gap-2">
+              <span className="text-2xl font-bold text-white group-hover:text-indigo-300 transition">Ver Métricas</span>
+              <span className="text-xs text-neutral-500">→</span>
+            </div>
+            <div className="mt-2 text-xs text-indigo-400 font-medium flex items-center gap-1">
+              <span>Retención, curvas y estados FSRS</span>
+            </div>
+          </Link>
+        </div>
+      )}
 
       {/* Controls Bar: Search & Filters */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
+      <div className="order-3 md:order-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
         {/* Search Input */}
         <div className="relative flex-1 max-w-md">
           <input
@@ -774,7 +776,7 @@ function DecksViewContent() {
       </div>
 
       {/* Grid de Elementos (Carpetas y Mazos) */}
-      <section className="space-y-4">
+      <section className="order-4 md:order-5 space-y-4">
         {isLoading && decks.length === 0 ? (
           <div className="p-16 text-center text-neutral-400 text-sm">
             <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />

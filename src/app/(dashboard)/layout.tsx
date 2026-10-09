@@ -149,20 +149,22 @@ export default function DashboardLayout({
       ? user?.user_metadata?.full_name || (user?.email === 'demo@flashcards.app' ? 'Usuario Demo' : user?.email)
       : 'Usuario';
   const userEmail = isMounted && user?.email ? user.email : '';
+  const isStudyPage = pathname?.startsWith('/study');
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col md:flex-row">
-      {/* Mobile Top Bar */}
-      <header className="md:hidden flex items-center justify-between px-4 py-3 border-b border-neutral-800/80 bg-neutral-900/50 backdrop-blur sticky top-0 z-40">
-        <Link href="/" className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-            <span className="font-bold text-white text-base">F</span>
-          </div>
-          <span className="font-semibold text-white tracking-tight">Flashcards</span>
-        </Link>
+    <div className={isStudyPage ? "h-[100dvh] md:min-h-screen bg-neutral-950 text-neutral-100 flex flex-col md:flex-row overflow-hidden" : "min-h-screen bg-neutral-950 text-neutral-100 flex flex-col md:flex-row"}>
+      {/* Mobile Top Bar (Oculto en Modo Estudio para permitir pantalla completa real) */}
+      {!isStudyPage && (
+        <header className="md:hidden flex items-center justify-between px-4 py-3 border-b border-neutral-800/80 bg-neutral-900/50 backdrop-blur sticky top-0 z-40">
+          <Link href="/" className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+              <span className="font-bold text-white text-base">F</span>
+            </div>
+            <span className="font-semibold text-white tracking-tight">Flashcards</span>
+          </Link>
 
-        <div className="flex items-center gap-2">
-          {/* Mobile User Profile Avatar & Dropdown */}
+          <div className="flex items-center gap-2">
+            {/* Mobile User Profile Avatar & Dropdown */}
           <div className="relative" ref={mobileUserMenuRef}>
             <button
               onClick={() => {
@@ -285,9 +287,10 @@ export default function DashboardLayout({
           </button>
         </div>
       </header>
+      )}
 
       {/* Mobile Menu Drawer */}
-      {mobileMenuOpen && (
+      {!isStudyPage && mobileMenuOpen && (
         <div className="md:hidden border-b border-neutral-800 bg-neutral-900/95 backdrop-blur px-4 py-3 space-y-3 z-30">
           <div className="space-y-1">
             {navItems.map((item) => {
@@ -399,8 +402,8 @@ export default function DashboardLayout({
         </div>
       )}
 
-      {/* Desktop Sidebar */}
-      <aside className="hidden md:flex flex-col w-64 border-r border-neutral-800/70 bg-neutral-900/30 backdrop-blur-xl shrink-0 p-4 justify-between h-screen sticky top-0">
+      {/* Desktop Sidebar (Oculto en Modo Estudio para inmersión total) */}
+      <aside className={isStudyPage ? "hidden" : "hidden md:flex flex-col w-64 border-r border-neutral-800/70 bg-neutral-900/30 backdrop-blur-xl shrink-0 p-4 justify-between h-screen sticky top-0"}>
         <div className="space-y-6">
           {/* Logo / Brand */}
           <Link href="/" className="flex items-center gap-3 px-2 py-2 group">
@@ -556,8 +559,14 @@ export default function DashboardLayout({
       </aside>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
-        <main className="flex-1 p-4 sm:p-8 md:p-10 max-w-6xl w-full mx-auto">
+      <div className={isStudyPage ? "flex-1 flex flex-col min-w-0 h-[100dvh] overflow-hidden" : "flex-1 flex flex-col min-w-0"}>
+        <main
+          className={
+            isStudyPage
+              ? "flex-1 w-full mx-auto h-full flex flex-col p-2 sm:p-4 max-w-4xl overflow-hidden"
+              : "flex-1 p-4 sm:p-8 md:p-10 max-w-6xl w-full mx-auto"
+          }
+        >
           {children}
         </main>
       </div>
