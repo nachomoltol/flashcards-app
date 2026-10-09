@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { useAuthStore, useCardStore, useDeckStore, useProModalStore } from '@/stores';
+import { useAuthStore, useCardStore, useDeckStore, useProModalStore, useLanguageStore } from '@/stores';
 import { generateCardsFromDocumentAction } from '@/app/actions/generateCards';
 import type { CardFormat, GeneratedCard } from '@/types/cards';
 import { FormattedCardView } from './FormattedCardView';
@@ -124,6 +124,7 @@ export function DocumentUploader({
   const { cards, createCard, fetchCardsByDeck } = useCardStore();
   const { fetchDeckById } = useDeckStore();
   const { openProModal } = useProModalStore();
+  const { language } = useLanguageStore();
 
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -247,6 +248,7 @@ export function DocumentUploader({
           cardFormat,
           cardCount,
           existingQuestions: existingFronts,
+          language,
         });
       } catch (actionErr: unknown) {
         const actionErrMsg =

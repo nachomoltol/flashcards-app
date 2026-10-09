@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useDeckStore, useCardStore, useProModalStore, useAuthStore } from '@/stores';
+import { useDeckStore, useCardStore, useProModalStore, useAuthStore, useLanguageStore } from '@/stores';
 import { CardEditor, DocumentUploader, FormattedCardView, UrlCardGenerator } from '@/components/cards';
 import { ShareDeckModal } from '@/components/decks';
 import { generateCardsAction } from '@/app/actions/generateCards';
@@ -20,6 +20,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
     useCardStore();
   const { openProModal } = useProModalStore();
   const { user } = useAuthStore();
+  const { language } = useLanguageStore();
 
   // Estado para el modal de Generación con IA (Gemini Flash)
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
@@ -67,7 +68,8 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
       aiCardCount,
       id,
       existingFronts,
-      user?.id
+      user?.id,
+      language
     );
 
     if (!result.success || !result.cards) {

@@ -28,6 +28,7 @@ export interface MultimodalDocumentInput {
   cardFormat?: CardFormat;
   cardCount?: number;
   existingQuestions?: string[];
+  language?: string;
 }
 
 export interface UrlCardInput {
@@ -39,6 +40,7 @@ export interface UrlCardInput {
   cardFormat?: CardFormat;
   cardCount?: number;
   existingQuestions?: string[];
+  language?: string;
 }
 
 

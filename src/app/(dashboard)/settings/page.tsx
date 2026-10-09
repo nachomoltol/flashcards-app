@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Ticket, CheckCircle2, AlertCircle } from 'lucide-react';
-import { useAuthStore, useSettingsStore, useTutorialStore, DEFAULT_FSRS_SETTINGS } from '@/stores';
+import { Ticket, CheckCircle2, AlertCircle, Languages } from 'lucide-react';
+import { useAuthStore, useSettingsStore, useTutorialStore, useLanguageStore, DEFAULT_FSRS_SETTINGS } from '@/stores';
 import { redeemPromoCodeAction } from '@/app/actions/redeemPromoCode';
 
 export default function SettingsPage() {
   const { user } = useAuthStore();
+  const { language, setLanguage, t } = useLanguageStore();
   const {
     settings,
     isLoading,
@@ -207,6 +208,58 @@ export default function SettingsPage() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-8">
+        {/* Sección: Idioma de la Aplicación (i18n) */}
+        <div className="p-6 rounded-2xl bg-neutral-900/60 border border-neutral-800 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h2 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
+                <Languages className="w-4 h-4 text-sky-400" />
+                <span>{t('settings.language_section_title', 'Idioma de la Aplicación')}</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-sky-500/20 text-sky-300 border border-sky-500/30">
+                  i18n
+                </span>
+              </h2>
+              <p className="text-xs text-neutral-400 mt-1">
+                {t('settings.language_section_desc', 'Elige el idioma de la interfaz y de las flashcards generadas por la inteligencia artificial.')}
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-md pt-1">
+            <button
+              type="button"
+              onClick={() => setLanguage('es')}
+              className={`p-3.5 rounded-xl border text-left transition cursor-pointer flex items-center gap-3 ${
+                language === 'es'
+                  ? 'bg-sky-500/15 border-sky-500 text-white shadow-md shadow-sky-500/20 ring-1 ring-sky-500/40'
+                  : 'bg-neutral-950/60 border-neutral-800 text-neutral-400 hover:text-white hover:border-neutral-700'
+              }`}
+            >
+              <span className="text-2xl">🇪🇸</span>
+              <div>
+                <p className="text-xs font-semibold text-white">{t('settings.lang_es', 'Español (ES)')}</p>
+                <p className="text-[10px] text-neutral-400">Español nativo</p>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setLanguage('en')}
+              className={`p-3.5 rounded-xl border text-left transition cursor-pointer flex items-center gap-3 ${
+                language === 'en'
+                  ? 'bg-sky-500/15 border-sky-500 text-white shadow-md shadow-sky-500/20 ring-1 ring-sky-500/40'
+                  : 'bg-neutral-950/60 border-neutral-800 text-neutral-400 hover:text-white hover:border-neutral-700'
+              }`}
+            >
+              <span className="text-2xl">🇬🇧</span>
+              <div>
+                <p className="text-xs font-semibold text-white">{t('settings.lang_en', 'English (EN)')}</p>
+                <p className="text-[10px] text-neutral-400">International English</p>
+              </div>
+            </button>
+          </div>
+        </div>
+
         {/* Sección 1: Parámetros del Algoritmo FSRS */}
         <div className="p-6 rounded-2xl bg-neutral-900/60 border border-neutral-800 space-y-6">
           <div className="border-b border-neutral-800/80 pb-4">

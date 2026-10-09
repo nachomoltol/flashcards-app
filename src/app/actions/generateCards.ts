@@ -191,6 +191,22 @@ Toda nueva tarjeta que generes DEBE evaluar aspectos, conceptos, detalles, relac
 }
 
 /**
+ * Modelo global de Google Gemini unificado para rentabilidad y generaciones ilimitadas sostenibles.
+ */
+const GEMINI_MODEL = 'gemini-2.5-flash-lite';
+
+/**
+ * Inyecta la directiva estricta de idioma según las especificaciones de la Fase 25:
+ * "GENERA ABSOLUTAMENTE TODO EL CONTENIDO (preguntas, respuestas, opciones y explicaciones) EXCLUSIVAMENTE EN IDIOMA [Idioma del Usuario], ignorando el idioma original de la fuente."
+ */
+function buildLanguageDirective(lang?: string): string {
+  const normalized = (lang || 'es').toLowerCase();
+  const targetLanguage = normalized.startsWith('en') ? 'Inglés (English)' : 'Español';
+  return `\n\n🚨 DIRECTIVA OBLIGATORIA DE IDIOMA (PRIORIDAD ABSOLUTA):
+GENERA ABSOLUTAMENTE TODO EL CONTENIDO (preguntas, respuestas, opciones y explicaciones) EXCLUSIVAMENTE EN IDIOMA ${targetLanguage}, ignorando el idioma original de la fuente.`;
+}
+
+/**
  * Intenta resolver el ID de usuario activo mediante varias vías robustas:
  * 1. Parámetro explícito userId pasado por el cliente
  * 2. ID del creador del mazo (consultando la tabla decks si se pasa deckId)
@@ -378,7 +394,8 @@ export async function generateCardsAction(
   cardCount: number = 10,
   deckId?: string,
   existingQuestions?: string[],
-  userId?: string
+  userId?: string,
+  language: string = 'es'
 ): Promise<GenerateCardsResult> {
   const cleanTopic = topic.trim();
   if (!cleanTopic) {
@@ -414,6 +431,7 @@ export async function generateCardsAction(
     // 1. Consultar historial de tarjetas existentes en este mazo para la Memoria Anti-Duplicados
     const existingFronts = await fetchExistingCardFronts(deckId, existingQuestions);
     const antiDuplicatePrompt = buildAntiDuplicateSection(existingFronts);
+    const languageDirective = buildLanguageDirective(language);
 
     const ai = new GoogleGenAI({ apiKey });
 
@@ -427,10 +445,12 @@ ${getFormatInstructions(cardFormat)}
 ${RADAR_DIRECTIVE}
 
 ${antiDuplicatePrompt ? `${antiDuplicatePrompt}\n\n` : ''}REGLA CRÍTICA DE INTEGRIDAD:
-La integridad estructural del JSON es prioridad absoluta y DEBES devolver un objeto con "core_exhausted" (booleano) y "cards" (array con exactamente ${targetCount} tarjetas del formato "${cardFormat}"). Para asegurar que las ${targetCount} tarjetas quepan dentro del límite sin truncarse, formula preguntas, opciones y respuestas directas y concisas.`;
+La integridad estructural del JSON es prioridad absoluta y DEBES devolver un objeto con "core_exhausted" (booleano) y "cards" (array con exactamente ${targetCount} tarjetas del formato "${cardFormat}"). Para asegurar que las ${targetCount} tarjetas quepan dentro del límite sin truncarse, formula preguntas, opciones y respuestas directas y concisas.
+
+${languageDirective}`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+      model: GEMINI_MODEL,
       contents: prompt,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION_GROUNDING,
@@ -525,6 +545,7 @@ export async function generateCardsFromDocumentAction(
     cardFormat = 'basic',
     cardCount = 10,
     existingQuestions,
+    language = 'es',
   } = input;
 
   if (!storagePath && !signedUrl) {
@@ -663,7 +684,9 @@ ${getFormatInstructions(cardFormat)}
 ${RADAR_DIRECTIVE}
 
 ${antiDuplicatePrompt ? `${antiDuplicatePrompt}\n\n` : ''}REGLA CRÍTICA DE INTEGRIDAD:
-La integridad estructural del JSON es prioridad absoluta y DEBES devolver un objeto con "core_exhausted" (booleano) y "cards" (array con exactamente ${targetCount} tarjetas del formato "${cardFormat}"). Para garantizar que quepan las ${targetCount} tarjetas dentro del límite de tokens sin que el JSON se corte, mantén cada pregunta, opción y respuesta rigurosa pero concisa y directa.`;
+La integridad estructural del JSON es prioridad absoluta y DEBES devolver un objeto con "core_exhausted" (booleano) y "cards" (array con exactamente ${targetCount} tarjetas del formato "${cardFormat}"). Para garantizar que quepan las ${targetCount} tarjetas dentro del límite de tokens sin que el JSON se corte, mantén cada pregunta, opción y respuesta rigurosa pero concisa y directa.
+
+${buildLanguageDirective(language)}`;
 
     // Si es un documento de Word, pasamos el texto extraído directamente para evitar fallos de decodificación zip
     const contents = isWordDocument
@@ -685,7 +708,7 @@ La integridad estructural del JSON es prioridad absoluta y DEBES devolver un obj
         ];
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+      model: GEMINI_MODEL,
       contents,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION_GROUNDING,
@@ -819,6 +842,7 @@ export async function generateCardsFromUrlAction(
     cardFormat = 'basic',
     cardCount = 10,
     existingQuestions,
+    language = 'es',
   } = input;
 
   const cleanUrl = (url || '').trim();
@@ -895,7 +919,9 @@ ${getFormatInstructions(cardFormat)}
 ${RADAR_DIRECTIVE}
 
 ${antiDuplicatePrompt ? `${antiDuplicatePrompt}\n\n` : ''}REGLA CRÍTICA DE INTEGRIDAD:
-La integridad estructural del JSON es prioridad absoluta y DEBES devolver un objeto con "core_exhausted" (booleano) y "cards" (array con exactamente ${targetCount} tarjetas del formato "${cardFormat}"). Para garantizar que quepan las ${targetCount} tarjetas dentro del límite de tokens sin que el JSON se corte, mantén cada pregunta, opción y respuesta rigurosa pero concisa y directa.`;
+La integridad estructural del JSON es prioridad absoluta y DEBES devolver un objeto con "core_exhausted" (booleano) y "cards" (array con exactamente ${targetCount} tarjetas del formato "${cardFormat}"). Para garantizar que quepan las ${targetCount} tarjetas dentro del límite de tokens sin que el JSON se corte, mantén cada pregunta, opción y respuesta rigurosa pero concisa y directa.
+
+${buildLanguageDirective(language)}`;
 
     const ai = new GoogleGenAI({ apiKey });
 
@@ -910,7 +936,7 @@ La integridad estructural del JSON es prioridad absoluta y DEBES devolver un obj
       let nativeError: unknown = null;
       try {
         const nativeResponse = await ai.models.generateContent({
-          model: 'gemini-3.8-flash',
+          model: GEMINI_MODEL,
           contents: [
             {
               fileData: {
@@ -957,7 +983,7 @@ La integridad estructural del JSON es prioridad absoluta y DEBES devolver un obj
               : fallbackTranscript;
 
           const fallbackResponse = await ai.models.generateContent({
-            model: 'gemini-3.8-flash',
+            model: GEMINI_MODEL,
             contents: [
               {
                 text: `${promptText}\n\nTRANSCRIPCIÓN DEL VÍDEO DE YOUTUBE:\n=========================================\n${truncatedTranscript}\n=========================================`,
@@ -1031,7 +1057,7 @@ La integridad estructural del JSON es prioridad absoluta y DEBES devolver un obj
           : extractedWebText;
 
       const webResponse = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+        model: GEMINI_MODEL,
         contents: [
           {
             text: `${promptText}\n\nCONTENIDO EXTRAÍDO DEL ENLACE WEB:\n=========================================\n${truncatedWebText}\n=========================================`,

@@ -4,7 +4,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useAuthStore, useProfileStore } from '@/stores';
+import { useAuthStore, useProfileStore, useLanguageStore } from '@/stores';
 import { supabase } from '@/lib/supabase';
 import {
   User as UserIcon,
@@ -92,7 +92,15 @@ export default function DashboardLayout({
   const mobileUserMenuRef = useRef<HTMLDivElement>(null);
   const { user, initialize, signOut, isLoading } = useAuthStore();
   const { profile, fetchProfile } = useProfileStore();
+  const { t } = useLanguageStore();
   const [avatarError, setAvatarError] = useState(false);
+
+  const getNavLabel = (item: NavItem) => {
+    if (item.href === '/') return t('nav.decks', 'Mazos');
+    if (item.href === '/stats') return t('nav.stats', 'Estadísticas');
+    if (item.href === '/settings') return t('nav.settings', 'Configuración');
+    return item.name;
+  };
 
   useEffect(() => {
     setAvatarError(false);
@@ -386,7 +394,7 @@ export default function DashboardLayout({
                   }`}
                 >
                   <Icon className="w-5 h-5" />
-                  {item.name}
+                  {getNavLabel(item)}
                 </Link>
               );
             })}
@@ -528,7 +536,7 @@ export default function DashboardLayout({
                   }`}
                 >
                   <Icon className={`w-5 h-5 ${isActive ? 'text-indigo-400' : 'text-neutral-400'}`} />
-                  {item.name}
+                  {getNavLabel(item)}
                 </Link>
               );
             })}

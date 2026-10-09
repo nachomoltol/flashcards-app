@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useAuthStore, useCardStore, useDeckStore, useProModalStore } from '@/stores';
+import { useAuthStore, useCardStore, useDeckStore, useProModalStore, useLanguageStore } from '@/stores';
 import { generateCardsFromUrlAction } from '@/app/actions/generateCards';
 import type { CardFormat, GeneratedCard } from '@/types/cards';
 import { FormattedCardView } from './FormattedCardView';
@@ -17,6 +17,7 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
   const { cards, createCard, fetchCardsByDeck } = useCardStore();
   const { fetchDeckById } = useDeckStore();
   const { openProModal } = useProModalStore();
+  const { language } = useLanguageStore();
 
   const [url, setUrl] = useState('');
   const [cardFormat, setCardFormat] = useState<CardFormat>('basic');
@@ -76,6 +77,7 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
         cardFormat,
         cardCount,
         existingQuestions: existingFronts,
+        language,
       });
 
       if (!result.success || !result.cards || result.cards.length === 0) {
