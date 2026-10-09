@@ -281,7 +281,7 @@ export default function DashboardLayout({
                 >
                   <span className="flex items-center gap-2.5">
                     <UserIcon className="w-4 h-4 text-neutral-400 group-hover:text-indigo-400 transition-colors" />
-                    <span>Mi Perfil</span>
+                    <span>{t('nav.my_profile', 'Mi Perfil')}</span>
                   </span>
                   <ChevronRight className="w-3.5 h-3.5 text-neutral-500 group-hover:text-neutral-300 transition-colors" />
                 </button>
@@ -294,10 +294,10 @@ export default function DashboardLayout({
                 >
                   <span className="flex items-center gap-2.5">
                     <Moon className="w-4 h-4 text-neutral-500 group-hover:text-neutral-400" />
-                    <span>Apariencia</span>
+                    <span>{t('nav.appearance', 'Apariencia')}</span>
                   </span>
                   <span className="text-[10px] text-neutral-400 bg-neutral-800/80 px-1.5 py-0.5 rounded font-medium">
-                    Oscuro
+                    {t('nav.dark_mode', 'Oscuro')}
                   </span>
                 </button>
 
@@ -313,7 +313,7 @@ export default function DashboardLayout({
                 >
                   <span className="flex items-center gap-2.5">
                     <Sparkles className="w-4 h-4 text-purple-400 group-hover:text-purple-300 transition-colors shrink-0" />
-                    <span className="font-semibold text-purple-200 group-hover:text-white transition-colors">Suscripción</span>
+                    <span className="font-semibold text-purple-200 group-hover:text-white transition-colors">{t('nav.subscription', 'Suscripción')}</span>
                   </span>
                   <span className="text-[10px] font-bold text-purple-300 bg-purple-500/25 border border-purple-500/40 px-2 py-0.5 rounded-full shadow-sm shadow-purple-500/20">
                     PRO
@@ -328,7 +328,7 @@ export default function DashboardLayout({
                 >
                   <span className="flex items-center gap-2.5">
                     <HelpCircle className="w-4 h-4 text-neutral-500 group-hover:text-neutral-400" />
-                    <span>Soporte y Feedback</span>
+                    <span>{t('nav.support_feedback', 'Soporte y Feedback')}</span>
                   </span>
                 </button>
 
@@ -343,7 +343,7 @@ export default function DashboardLayout({
                   role="menuitem"
                 >
                   <LogOut className="w-4 h-4 text-red-400 group-hover:text-red-300 transition-colors" />
-                  <span className="font-medium">Cerrar Sesión</span>
+                  <span className="font-medium">{t('nav.logout', 'Cerrar Sesión')}</span>
                 </button>
               </div>
             )}
@@ -581,7 +581,7 @@ export default function DashboardLayout({
               >
                 <span className="flex items-center gap-2.5">
                   <UserIcon className="w-4 h-4 text-neutral-400 group-hover:text-indigo-400 transition-colors" />
-                  <span>Mi Perfil</span>
+                  <span>{t('nav.my_profile', 'Mi Perfil')}</span>
                 </span>
                 <ChevronRight className="w-3.5 h-3.5 text-neutral-500 group-hover:text-neutral-300 transition-colors" />
               </button>
@@ -594,10 +594,10 @@ export default function DashboardLayout({
               >
                 <span className="flex items-center gap-2.5">
                   <Moon className="w-4 h-4 text-neutral-500 group-hover:text-neutral-400" />
-                  <span>Apariencia</span>
+                  <span>{t('nav.appearance', 'Apariencia')}</span>
                 </span>
                 <span className="text-[10px] text-neutral-400 bg-neutral-800/80 px-1.5 py-0.5 rounded font-medium">
-                  Oscuro
+                  {t('nav.dark_mode', 'Oscuro')}
                 </span>
               </button>
 
@@ -613,7 +613,7 @@ export default function DashboardLayout({
               >
                 <span className="flex items-center gap-2.5">
                   <Sparkles className="w-4 h-4 text-purple-400 group-hover:text-purple-300 transition-colors shrink-0" />
-                  <span className="font-semibold text-purple-200 group-hover:text-white transition-colors">Suscripción</span>
+                  <span className="font-semibold text-purple-200 group-hover:text-white transition-colors">{t('nav.subscription', 'Suscripción')}</span>
                 </span>
                 <span className="text-[10px] font-bold text-purple-300 bg-purple-500/25 border border-purple-500/40 px-2 py-0.5 rounded-full shadow-sm shadow-purple-500/20">
                   PRO
@@ -628,7 +628,7 @@ export default function DashboardLayout({
               >
                 <span className="flex items-center gap-2.5">
                   <HelpCircle className="w-4 h-4 text-neutral-500 group-hover:text-neutral-400" />
-                  <span>Soporte y Feedback</span>
+                  <span>{t('nav.support_feedback', 'Soporte y Feedback')}</span>
                 </span>
               </button>
 
@@ -643,7 +643,7 @@ export default function DashboardLayout({
                 role="menuitem"
               >
                 <LogOut className="w-4 h-4 text-red-400 group-hover:text-red-300 transition-colors" />
-                <span className="font-medium">Cerrar Sesión</span>
+                <span className="font-medium">{t('nav.logout', 'Cerrar Sesión')}</span>
               </button>
             </div>
           )}

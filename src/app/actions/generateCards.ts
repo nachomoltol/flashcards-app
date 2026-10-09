@@ -193,7 +193,7 @@ Toda nueva tarjeta que generes DEBE evaluar aspectos, conceptos, detalles, relac
 /**
  * Modelo global de Google Gemini unificado para rentabilidad y generaciones ilimitadas sostenibles.
  */
-const GEMINI_MODEL = 'gemini-2.5-flash-lite';
+const GEMINI_MODEL = 'gemini-3.5-flash-lite';
 
 /**
  * Inyecta la directiva estricta de idioma según las especificaciones de la Fase 25:

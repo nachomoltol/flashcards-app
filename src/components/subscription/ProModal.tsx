@@ -355,7 +355,7 @@ export function ProModal({
                     setPromoCode(e.target.value.toUpperCase());
                     if (redeemStatus) setRedeemStatus(null);
                   }}
-                  placeholder={t('pro_modal.promo_placeholder', 'EJ: NACHOVIP')}
+                  placeholder={t('pro_modal.promo_placeholder', 'EJ: ESTUDIANTE2026')}
                   className="flex-1 bg-neutral-900 border border-neutral-700 focus:border-purple-500 rounded-xl px-3.5 py-2 text-xs text-white placeholder-neutral-500 focus:outline-none uppercase tracking-wider font-mono transition"
                   disabled={isRedeeming}
                 />

@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { useDeckStore, useAuthStore, useStreakStore, type DeckWithStats } from '@/stores';
+import { useDeckStore, useAuthStore, useStreakStore, useLanguageStore, type DeckWithStats } from '@/stores';
 import { ShareDeckModal } from './ShareDeckModal';
 
 const COLOR_PALETTE = [
@@ -92,6 +92,7 @@ function DecksViewContent() {
   const { user, isLoading: authLoading } = useAuthStore();
   const { decks, isLoading, error, fetchDecks, createDeck, deleteDeck, updateDeck, moveDeck } = useDeckStore();
   const { streak, fetchStreak } = useStreakStore();
+  const { t } = useLanguageStore();
 
   // Navegación jerárquica por carpetas (Adjacency List)
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(() => {
@@ -423,7 +424,7 @@ function DecksViewContent() {
                 </>
               ) : (
                 <>
-                  <span>Tus Mazos y Carpetas</span>
+                  <span>{t('dashboard.title', 'Tus Mazos y Carpetas')}</span>
                 </>
               )}
             </h1>
@@ -433,8 +434,8 @@ function DecksViewContent() {
           </div>
           <p className="text-sm text-neutral-400 mt-1">
             {currentFolder
-              ? `Explorando carpeta actual • ${foldersInLevel} subcarpetas y ${decksInLevel} mazos contenidos.`
-              : 'Estructura tu temario en Asignaturas > Temas > Mazos y repasa con repetición espaciada.'}
+              ? `${t('dashboard.folder_title_prefix', 'Explorando carpeta actual')} • ${foldersInLevel} ${foldersInLevel === 1 ? t('dashboard.item_singular', 'subcarpeta') : 'subcarpetas'} y ${decksInLevel} ${decksInLevel === 1 ? t('dashboard.cards_count_singular', 'mazo') : 'mazos'}.`
+              : t('dashboard.subtitle', 'Estructura tu temario en Asignaturas > Temas > Mazos y repasa con repetición espaciada.')}
           </p>
         </div>
 
@@ -450,7 +451,7 @@ function DecksViewContent() {
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
-              <span>Subir nivel</span>
+              <span>{t('dashboard.up_level', 'Subir nivel')}</span>
             </button>
           )}
 
@@ -467,7 +468,7 @@ function DecksViewContent() {
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
               </svg>
-              <span>+ Nuevo</span>
+              <span>{t('dashboard.new_button', '+ Nuevo')}</span>
               <svg
                 className={`w-3.5 h-3.5 transition-transform duration-200 ${
                   isNewDropdownOpen ? 'rotate-180' : ''
@@ -504,10 +505,10 @@ function DecksViewContent() {
                     </div>
                     <div>
                       <div className="text-xs font-bold text-white group-hover:text-amber-300 transition">
-                        Nueva Carpeta
+                        {t('dashboard.new_folder', 'Nueva Carpeta')}
                       </div>
                       <div className="text-[11px] text-neutral-400 leading-tight mt-0.5">
-                        Agrupa asignaturas o temas
+                        {t('dashboard.new_folder_desc', 'Agrupa asignaturas o temas')}
                       </div>
                     </div>
                   </button>
@@ -531,10 +532,10 @@ function DecksViewContent() {
                     </div>
                     <div>
                       <div className="text-xs font-bold text-white group-hover:text-indigo-300 transition">
-                        Nuevo Mazo de Estudio
+                        {t('dashboard.new_deck', 'Nuevo Mazo de Estudio')}
                       </div>
                       <div className="text-[11px] text-neutral-400 leading-tight mt-0.5">
-                        Crea tarjetas con repaso FSRS
+                        {t('dashboard.new_deck_desc', 'Crea tarjetas con repaso FSRS')}
                       </div>
                     </div>
                   </button>
@@ -549,7 +550,7 @@ function DecksViewContent() {
         <div className="order-2 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center justify-between animate-in fade-in">
           <span>{error}</span>
           <button onClick={() => fetchDecks()} className="underline hover:text-rose-300 font-medium ml-2">
-            Reintentar
+            {t('common.retry', 'Reintentar')}
           </button>
         </div>
       )}
@@ -563,7 +564,7 @@ function DecksViewContent() {
           <svg className="w-3.5 h-3.5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
           </svg>
-          Ubicación:
+          {t('dashboard.location', 'Ubicación:')}
         </span>
 
         {breadcrumbs.map((crumb, idx) => {
@@ -584,7 +585,7 @@ function DecksViewContent() {
                 {crumb.id === null ? (
                   <>
                     <span>🏠</span>
-                    <span>Inicio</span>
+                    <span>{t('dashboard.home', 'Inicio')}</span>
                   </>
                 ) : (
                   <>
@@ -605,7 +606,7 @@ function DecksViewContent() {
           <div className="p-5 rounded-2xl bg-neutral-900/50 border border-neutral-800/80 backdrop-blur-sm relative overflow-hidden group hover:border-neutral-700/80 transition-all duration-200">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">
-                Repasos para Hoy
+                {t('dashboard.stats_due', 'Repasos para Hoy')}
               </span>
               <div className="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center justify-center">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -615,16 +616,16 @@ function DecksViewContent() {
             </div>
             <div className="mt-3 flex items-baseline gap-2">
               <span className="text-3xl font-extrabold text-white">{dueCardsTotal}</span>
-              <span className="text-xs text-neutral-500">tarjetas debidas</span>
+              <span className="text-xs text-neutral-500">{t('dashboard.stats_due_sub', 'tarjetas debidas')}</span>
             </div>
             <div className="mt-2 text-xs text-neutral-400 font-medium">
               {dueCardsTotal > 0 ? (
                 <span className="text-rose-400 flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
-                  Pendientes de estudio
+                  {t('dashboard.stats_due_pending', 'Pendientes de estudio')}
                 </span>
               ) : (
-                <span className="text-emerald-400">Todo al día</span>
+                <span className="text-emerald-400">{t('dashboard.stats_due_all_done', 'Todo al día')}</span>
               )}
             </div>
           </div>
@@ -633,7 +634,7 @@ function DecksViewContent() {
           <div className="p-5 rounded-2xl bg-neutral-900/50 border border-neutral-800/80 backdrop-blur-sm relative overflow-hidden group hover:border-neutral-700/80 transition-all duration-200">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">
-                Total Tarjetas
+                {t('dashboard.stats_total_cards', 'Total Tarjetas')}
               </span>
               <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 flex items-center justify-center">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -643,10 +644,10 @@ function DecksViewContent() {
             </div>
             <div className="mt-3 flex items-baseline gap-2">
               <span className="text-3xl font-extrabold text-white">{totalCards}</span>
-              <span className="text-xs text-neutral-500">en mazos de estudio</span>
+              <span className="text-xs text-neutral-500">{t('dashboard.stats_total_cards_sub', 'en mazos de estudio')}</span>
             </div>
             <div className="mt-2 text-xs text-neutral-400 font-medium">
-              Almacenadas en PostgreSQL
+              {t('dashboard.stats_total_cards_note', 'Almacenadas en PostgreSQL')}
             </div>
           </div>
 
@@ -654,7 +655,7 @@ function DecksViewContent() {
           <div className="p-5 rounded-2xl bg-neutral-900/50 border border-neutral-800/80 backdrop-blur-sm relative overflow-hidden group hover:border-neutral-700/80 transition-all duration-200">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">
-                {currentFolder ? 'En esta Carpeta' : 'Estructura Global'}
+                {currentFolder ? t('dashboard.stats_structure_folder', 'En esta Carpeta') : t('dashboard.stats_structure_global', 'Estructura Global')}
               </span>
               <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -667,13 +668,13 @@ function DecksViewContent() {
                 {currentFolder ? currentLevelDecks.length : decks.length}
               </span>
               <span className="text-xs text-neutral-500">
-                {currentFolder ? 'elementos aquí' : 'elementos en total'}
+                {currentFolder ? t('dashboard.stats_items_here', 'elementos aquí') : t('dashboard.stats_items_total', 'elementos en total')}
               </span>
             </div>
             <div className="mt-2 text-xs text-amber-400 font-medium">
               {currentFolder
-                ? `${foldersInLevel} carpetas • ${decksInLevel} mazos`
-                : `${totalFolders} carpetas • ${totalStudyDecks} mazos`}
+                ? `${foldersInLevel} ${t('dashboard.filter_folders', 'carpetas').toLowerCase()} • ${decksInLevel} ${t('nav.decks', 'mazos').toLowerCase()}`
+                : `${totalFolders} ${t('dashboard.filter_folders', 'carpetas').toLowerCase()} • ${totalStudyDecks} ${t('nav.decks', 'mazos').toLowerCase()}`}
             </div>
           </div>
 
@@ -685,11 +686,11 @@ function DecksViewContent() {
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider group-hover:text-amber-300 transition flex items-center gap-1.5">
                 <span>🔥</span>
-                <span>Racha Activa</span>
+                <span>{t('dashboard.stats_streak', 'Racha Activa')}</span>
               </span>
               <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z" />
                 </svg>
               </div>
@@ -699,20 +700,20 @@ function DecksViewContent() {
                 {streak.current}
               </span>
               <span className="text-xs text-neutral-400 font-medium">
-                {streak.current === 1 ? 'día' : 'días'} consecutivos
+                {streak.current === 1 ? t('dashboard.stats_streak_day', 'día consecutivo') : t('dashboard.stats_streak_days', 'días consecutivos')}
               </span>
             </div>
             <div className="mt-2 text-xs font-medium flex items-center justify-between">
               <span className={streak.studiedToday ? 'text-amber-400 font-medium' : 'text-neutral-400'}>
                 {streak.studiedToday
-                  ? '🔥 Racha activa hoy'
+                  ? t('dashboard.stats_streak_active_today', '🔥 Racha activa hoy')
                   : streak.current > 0
-                  ? '⚡ Estudia hoy para mantenerla'
-                  : '¡Repasa hoy para encenderla!'}
+                  ? t('dashboard.stats_streak_study_today', '⚡ Estudia hoy para mantenerla')
+                  : t('dashboard.stats_streak_ignite', '¡Repasa hoy para encenderla!')}
               </span>
               {streak.max > 0 && (
                 <span className="text-[11px] font-mono text-neutral-500">
-                  Récord: {streak.max}d
+                  {t('dashboard.stats_streak_record', 'Récord:')} {streak.max}d
                 </span>
               )}
             </div>
@@ -730,8 +731,8 @@ function DecksViewContent() {
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={
               currentFolder
-                ? `Buscar en "${currentFolder.title}"...`
-                : 'Buscar por título o descripción...'
+                ? t('dashboard.search_placeholder_folder', `Buscar en "${currentFolder.title}"...`).replace('{folder}', currentFolder.title)
+                : t('dashboard.search_placeholder_root', 'Buscar por título o descripción...')
             }
             className="w-full text-xs font-medium pl-9 pr-4 py-2.5 rounded-xl bg-neutral-900/80 border border-neutral-800 text-white placeholder-neutral-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
           />
@@ -760,7 +761,7 @@ function DecksViewContent() {
                 : 'text-neutral-400 hover:text-white'
             }`}
           >
-            Todos ({currentLevelDecks.length})
+            {t('dashboard.filter_all', 'Todos')} ({currentLevelDecks.length})
           </button>
           <button
             onClick={() => setFilterMode('folders')}
@@ -770,7 +771,7 @@ function DecksViewContent() {
                 : 'text-neutral-400 hover:text-white'
             }`}
           >
-            <span>📁 Carpetas ({foldersInLevel})</span>
+            <span>📁 {t('dashboard.filter_folders', 'Carpetas')} ({foldersInLevel})</span>
           </button>
           <button
             onClick={() => setFilterMode('due')}
@@ -781,7 +782,7 @@ function DecksViewContent() {
             }`}
           >
             <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
-            Pendientes ({currentLevelDecks.filter((d) => !d.is_folder && d.dueCount > 0).length})
+            {t('dashboard.filter_due', 'Pendientes')} ({currentLevelDecks.filter((d) => !d.is_folder && d.dueCount > 0).length})
           </button>
           <button
             onClick={() => setFilterMode('empty')}
@@ -791,7 +792,7 @@ function DecksViewContent() {
                 : 'text-neutral-400 hover:text-white'
             }`}
           >
-            Vacíos ({currentLevelDecks.filter((d) => !d.is_folder && d.cardsCount === 0).length})
+            {t('dashboard.filter_empty', 'Vacíos')} ({currentLevelDecks.filter((d) => !d.is_folder && d.cardsCount === 0).length})
           </button>
         </div>
       </div>
@@ -801,7 +802,7 @@ function DecksViewContent() {
         {isLoading && decks.length === 0 ? (
           <div className="p-16 text-center text-neutral-400 text-sm">
             <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-            Cargando tus elementos desde Supabase...
+            {t('dashboard.loading_supabase', 'Cargando tus elementos desde Supabase...')}
           </div>
         ) : filteredDecks.length === 0 ? (
           /* Empty State */
@@ -812,17 +813,17 @@ function DecksViewContent() {
             <div>
               <h3 className="text-base font-semibold text-white">
                 {searchQuery || filterMode !== 'all'
-                  ? 'No se encontraron elementos con los filtros actuales'
+                  ? t('dashboard.empty_search_title', 'No se encontraron elementos con los filtros actuales')
                   : currentFolder
-                  ? `La carpeta "${currentFolder.title}" está vacía`
-                  : 'No tienes elementos creados en el nivel raíz'}
+                  ? t('dashboard.empty_folder_title', `La carpeta "${currentFolder.title}" está vacía`).replace('{folder}', currentFolder.title)
+                  : t('dashboard.empty_root_title', 'No tienes elementos creados en el nivel raíz')}
               </h3>
               <p className="mt-1 text-xs text-neutral-400 max-w-sm mx-auto leading-relaxed">
                 {searchQuery || filterMode !== 'all'
-                  ? 'Prueba a cambiar tu búsqueda o selecciona otro filtro.'
+                  ? t('dashboard.empty_search_desc', 'Prueba a cambiar tu búsqueda o selecciona otro filtro.')
                   : currentFolder
-                  ? 'Organiza esta sección añadiendo subcarpetas (ej. temas) o mazos de estudio con tarjetas.'
-                  : 'Crea tu primera asignatura o mazo de estudio para comenzar.'}
+                  ? t('dashboard.empty_folder_desc', 'Organiza esta sección añadiendo subcarpetas (ej. temas) o mazos de estudio con tarjetas.')
+                  : t('dashboard.empty_root_desc', 'Crea tu primera asignatura o mazo de estudio para comenzar.')}
               </p>
             </div>
 
@@ -839,7 +840,7 @@ function DecksViewContent() {
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-amber-300 font-medium text-xs transition active:scale-95 border border-neutral-700/80 shadow-sm"
                 >
                   <span>📁</span>
-                  <span>{currentFolder ? 'Crear Subcarpeta' : 'Crear Carpeta'}</span>
+                  <span>{currentFolder ? t('dashboard.create_subfolder', 'Crear Subcarpeta') : t('dashboard.create_folder', 'Crear Carpeta')}</span>
                 </button>
                 <button
                   onClick={() => {
@@ -852,7 +853,7 @@ function DecksViewContent() {
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-medium text-xs shadow-lg shadow-indigo-600/25 transition active:scale-95"
                 >
                   <span>🃏</span>
-                  <span>{currentFolder ? 'Crear Mazo aquí' : 'Crear Mazo de Estudio'}</span>
+                  <span>{currentFolder ? t('dashboard.create_deck_here', 'Crear Mazo aquí') : t('dashboard.create_deck', 'Crear Mazo de Estudio')}</span>
                 </button>
               </div>
             )}
@@ -889,7 +890,7 @@ function DecksViewContent() {
                             📁
                           </div>
                           <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-300 font-mono font-medium border border-amber-500/25">
-                            Carpeta
+                            {t('dashboard.folder_badge', 'Carpeta')}
                           </span>
                         </div>
 
@@ -902,7 +903,7 @@ function DecksViewContent() {
                               e.stopPropagation();
                               setActiveDropdownDeckId(activeDropdownDeckId === deck.id ? null : deck.id);
                             }}
-                            title="Opciones de la carpeta"
+                            title={t('dashboard.options_folder', 'Opciones de la carpeta')}
                             className="w-7 h-7 rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-800 transition flex items-center justify-center font-bold text-sm tracking-wider"
                           >
                             ⋮
@@ -924,7 +925,7 @@ function DecksViewContent() {
                                 className="w-full text-left px-3 py-2 rounded-lg text-neutral-300 hover:text-white hover:bg-neutral-800 flex items-center gap-2 transition"
                               >
                                 <span className="text-sm">📁</span>
-                                <span>Mover a...</span>
+                                <span>{t('dashboard.move_to', 'Mover a...')}</span>
                               </button>
                               <button
                                 type="button"
@@ -937,7 +938,7 @@ function DecksViewContent() {
                                 className="w-full text-left px-3 py-2 rounded-lg text-neutral-300 hover:text-white hover:bg-neutral-800 flex items-center gap-2 transition"
                               >
                                 <span className="text-sm">✏️</span>
-                                <span>Editar nombre</span>
+                                <span>{t('dashboard.edit_name', 'Editar nombre')}</span>
                               </button>
                               <div className="my-1 border-t border-neutral-800/80" />
                               <button
@@ -951,7 +952,7 @@ function DecksViewContent() {
                                 className="w-full text-left px-3 py-2 rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 flex items-center gap-2 transition"
                               >
                                 <span className="text-sm">🗑️</span>
-                                <span>Eliminar carpeta</span>
+                                <span>{t('dashboard.delete_folder', 'Eliminar carpeta')}</span>
                               </button>
                             </div>
                           )}
@@ -969,11 +970,11 @@ function DecksViewContent() {
                       {/* Recuento de Elementos Contenidos */}
                       <div className="mt-3.5 pt-3 border-t border-neutral-800/60">
                         <div className="flex items-center justify-between text-xs">
-                          <span className="text-neutral-400 font-medium">Contenido:</span>
+                          <span className="text-neutral-400 font-medium">{t('dashboard.folder_content', 'Contenido:')}</span>
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-neutral-800 text-neutral-300 font-medium text-xs border border-neutral-700/50">
                             <span>📁</span>
                             <span>
-                              {deck.childrenCount ?? 0} {deck.childrenCount === 1 ? 'elemento' : 'elementos'}
+                              {deck.childrenCount ?? 0} {deck.childrenCount === 1 ? t('dashboard.item_singular', 'elemento') : t('dashboard.item_plural', 'elementos')}
                             </span>
                           </span>
                         </div>
@@ -987,7 +988,7 @@ function DecksViewContent() {
                         onClick={() => navigateToFolder(deck.id)}
                         className="inline-flex items-center justify-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 transition-all duration-150 active:scale-95"
                       >
-                        <span>Abrir Carpeta</span>
+                        <span>{t('dashboard.open_folder', 'Abrir Carpeta')}</span>
                         <span>→</span>
                       </button>
                       <button
@@ -995,7 +996,7 @@ function DecksViewContent() {
                         onClick={(e) => handleOpenEdit(e, deck)}
                         className="text-xs font-medium text-neutral-400 hover:text-white px-3 py-2 rounded-xl hover:bg-neutral-800 transition flex items-center gap-1"
                       >
-                        <span>Gestionar</span>
+                        <span>{t('dashboard.manage', 'Gestionar')}</span>
                         <span>→</span>
                       </button>
                     </div>
@@ -1018,7 +1019,7 @@ function DecksViewContent() {
                           style={{ backgroundColor: accentColor }}
                         />
                         <span className="text-xs px-2.5 py-0.5 rounded-full bg-neutral-800/80 text-neutral-300 font-mono font-medium border border-neutral-700/40">
-                          {deck.cardsCount} {deck.cardsCount === 1 ? 'tarjeta' : 'tarjetas'}
+                          {deck.cardsCount} {deck.cardsCount === 1 ? t('dashboard.cards_count_singular', 'tarjeta') : t('dashboard.cards_count_plural', 'tarjetas')}
                         </span>
                       </div>
 
@@ -1031,7 +1032,7 @@ function DecksViewContent() {
                             e.stopPropagation();
                             setActiveDropdownDeckId(activeDropdownDeckId === deck.id ? null : deck.id);
                           }}
-                          title="Opciones del mazo"
+                          title={t('dashboard.options_deck', 'Opciones del mazo')}
                           className="w-7 h-7 rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-800 transition flex items-center justify-center font-bold text-sm tracking-wider"
                         >
                           ⋮
@@ -1053,7 +1054,7 @@ function DecksViewContent() {
                               className="w-full text-left px-3 py-2 rounded-lg text-neutral-300 hover:text-white hover:bg-neutral-800 flex items-center gap-2 transition"
                             >
                               <span className="text-sm">🔗</span>
-                              <span>Compartir Mazo</span>
+                              <span>{t('dashboard.share_deck', 'Compartir Mazo')}</span>
                             </button>
                             <button
                               type="button"
@@ -1066,7 +1067,7 @@ function DecksViewContent() {
                               className="w-full text-left px-3 py-2 rounded-lg text-neutral-300 hover:text-white hover:bg-neutral-800 flex items-center gap-2 transition"
                             >
                               <span className="text-sm">📁</span>
-                              <span>Mover a...</span>
+                              <span>{t('dashboard.move_to', 'Mover a...')}</span>
                             </button>
                             <button
                               type="button"
@@ -1079,7 +1080,7 @@ function DecksViewContent() {
                               className="w-full text-left px-3 py-2 rounded-lg text-neutral-300 hover:text-white hover:bg-neutral-800 flex items-center gap-2 transition"
                             >
                               <span className="text-sm">✏️</span>
-                              <span>Editar Mazo</span>
+                              <span>{t('dashboard.edit_deck', 'Editar Mazo')}</span>
                             </button>
                             <div className="my-1 border-t border-neutral-800/80" />
                             <button
@@ -1093,7 +1094,7 @@ function DecksViewContent() {
                               className="w-full text-left px-3 py-2 rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 flex items-center gap-2 transition"
                             >
                               <span className="text-sm">🗑️</span>
-                              <span>Eliminar Mazo</span>
+                              <span>{t('dashboard.delete_deck', 'Eliminar Mazo')}</span>
                             </button>
                           </div>
                         )}
@@ -1113,22 +1114,22 @@ function DecksViewContent() {
                     {/* Indicador Numérico de Tarjetas a Repasar Hoy (FSRS due_date) */}
                     <div className="mt-3.5 pt-3 border-t border-neutral-800/60">
                       <div className="flex items-center justify-between text-xs">
-                        <span className="text-neutral-400 font-medium">Repaso FSRS:</span>
+                        <span className="text-neutral-400 font-medium">{t('dashboard.fsrs_review', 'Repaso FSRS:')}</span>
                         {hasDue ? (
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-300 font-semibold text-xs animate-in fade-in">
                             <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse" />
-                            {deck.dueCount} para repasar hoy
+                            {deck.dueCount} {t('dashboard.due_today', 'para repasar hoy')}
                           </span>
                         ) : hasCards ? (
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 font-medium text-xs">
                             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                             </svg>
-                            Al día (0 pendientes)
+                            {t('dashboard.all_caught_up', 'Al día (0 pendientes)')}
                           </span>
                         ) : (
                           <span className="text-neutral-500 text-xs font-mono">
-                            Mazo sin tarjetas
+                            {t('dashboard.no_cards', 'Mazo sin tarjetas')}
                           </span>
                         )}
                       </div>
@@ -1151,14 +1152,14 @@ function DecksViewContent() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
-                      <span>Estudiar {hasDue ? `(${deck.dueCount})` : ''}</span>
+                      <span>{t('dashboard.study_button', 'Estudiar')} {hasDue ? `(${deck.dueCount})` : ''}</span>
                     </Link>
 
                     <Link
                       href={`/decks/${deck.id}`}
                       className="text-xs font-medium text-neutral-400 hover:text-white px-3 py-2 rounded-xl hover:bg-neutral-800 transition flex items-center gap-1 shrink-0"
                     >
-                      <span>Gestionar</span>
+                      <span>{t('dashboard.manage', 'Gestionar')}</span>
                       <span>→</span>
                     </Link>
                   </div>
@@ -1175,7 +1176,7 @@ function DecksViewContent() {
           <div className="w-full max-w-md rounded-2xl border border-neutral-800 bg-neutral-900 p-6 shadow-2xl relative space-y-5">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
-                <span>{createType === 'folder' ? '📁 Crear Nueva Carpeta' : '🃏 Crear Mazo de Estudio'}</span>
+                <span>{createType === 'folder' ? t('dashboard.modal_create_folder_title', '📁 Crear Nueva Carpeta') : t('dashboard.modal_create_deck_title', '🃏 Crear Mazo de Estudio')}</span>
               </h3>
               <button
                 onClick={() => setIsCreateModalOpen(false)}
@@ -1222,9 +1223,9 @@ function DecksViewContent() {
                       )}
                     </span>
                   </div>
-                  <div className="font-bold text-white text-sm">📁 Crear Carpeta</div>
+                  <div className="font-bold text-white text-sm">{t('dashboard.modal_create_folder_title', '📁 Crear Carpeta')}</div>
                   <div className="text-[11px] text-neutral-400 mt-1 leading-snug">
-                    Organiza asignaturas o temas
+                    {t('dashboard.new_folder_desc', 'Agrupa asignaturas o temas')}
                   </div>
                 </button>
 
@@ -1256,16 +1257,16 @@ function DecksViewContent() {
                       )}
                     </span>
                   </div>
-                  <div className="font-bold text-white text-sm">🃏 Crear Mazo</div>
+                  <div className="font-bold text-white text-sm">{t('dashboard.modal_create_deck_title', '🃏 Crear Mazo')}</div>
                   <div className="text-[11px] text-neutral-400 mt-1 leading-snug">
-                    Tarjetas con repasos FSRS
+                    {t('dashboard.new_deck_desc', 'Tarjetas con repasos FSRS')}
                   </div>
                 </button>
               </div>
 
               {/* Banner de Ubicación Contextual */}
               <div className="flex items-center justify-between p-2.5 rounded-xl bg-neutral-950/80 border border-neutral-800 text-xs">
-                <span className="text-neutral-400">📍 Ubicación de destino:</span>
+                <span className="text-neutral-400">{t('dashboard.modal_dest_location', '📍 Ubicación de destino:')}</span>
                 <span className="font-semibold text-white flex items-center gap-1.5">
                   {currentFolder ? (
                     <>
@@ -1275,7 +1276,7 @@ function DecksViewContent() {
                   ) : (
                     <>
                       <span>🏠</span>
-                      <span>Nivel raíz (Inicio)</span>
+                      <span>{t('dashboard.modal_dest_root', 'Nivel raíz (Inicio)')}</span>
                     </>
                   )}
                 </span>
@@ -1283,8 +1284,8 @@ function DecksViewContent() {
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-300 mb-1.5">
                   {createType === 'folder'
-                    ? 'Nombre de la Carpeta o Asignatura'
-                    : 'Título del Mazo'}{' '}
+                    ? t('dashboard.modal_folder_name_label', 'Nombre de la Carpeta o Asignatura')
+                    : t('dashboard.modal_deck_name_label', 'Título del Mazo')}{' '}
                   <span className={createType === 'folder' ? 'text-amber-400' : 'text-indigo-400'}>*</span>
                 </label>
                 <input
@@ -1294,8 +1295,8 @@ function DecksViewContent() {
                   onChange={(e) => setNewTitle(e.target.value)}
                   placeholder={
                     createType === 'folder'
-                      ? 'ej. Biología, Derecho Constitucional, Tema 1...'
-                      : 'ej. Mitosis y Meiosis, Artículos 1 al 10...'
+                      ? t('dashboard.modal_folder_placeholder', 'ej. Biología, Derecho Constitucional, Tema 1...')
+                      : t('dashboard.modal_deck_placeholder', 'ej. Mitosis y Meiosis, Artículos 1 al 10...')
                   }
                   className={`w-full text-sm px-3.5 py-2.5 rounded-xl bg-neutral-950 border border-neutral-800 text-white placeholder-neutral-500 focus:outline-none transition ${
                     createType === 'folder'
@@ -1309,13 +1310,13 @@ function DecksViewContent() {
               {createType === 'deck' && (
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-300 mb-1.5">
-                    Descripción del Mazo (Opcional)
+                    {t('dashboard.modal_deck_desc_label', 'Descripción del Mazo (Opcional)')}
                   </label>
                   <textarea
                     rows={2}
                     value={newDescription}
                     onChange={(e) => setNewDescription(e.target.value)}
-                    placeholder="Objetivos o temario de este mazo..."
+                    placeholder={t('dashboard.modal_deck_desc_placeholder', 'Objetivos o temario de este mazo...')}
                     className="w-full text-xs px-3.5 py-2.5 rounded-xl bg-neutral-950 border border-neutral-800 text-white placeholder-neutral-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition resize-none"
                   />
                 </div>
@@ -1324,7 +1325,7 @@ function DecksViewContent() {
               {/* Selector de Color */}
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-300 mb-2">
-                  Color Distintivo
+                  {t('dashboard.modal_color_label', 'Color Distintivo')}
                 </label>
                 <div className="flex items-center gap-3">
                   {COLOR_PALETTE.map((c) => (
@@ -1350,7 +1351,7 @@ function DecksViewContent() {
                   onClick={() => setIsCreateModalOpen(false)}
                   className="px-4 py-2 text-xs text-neutral-400 hover:text-white rounded-xl hover:bg-neutral-800 transition"
                 >
-                  Cancelar
+                  {t('common.cancel', 'Cancelar')}
                 </button>
                 <button
                   type="submit"
@@ -1362,10 +1363,10 @@ function DecksViewContent() {
                   }`}
                 >
                   {isCreating
-                    ? 'Creando...'
+                    ? t('dashboard.modal_creating', 'Creando...')
                     : createType === 'folder'
-                    ? '📁 Crear Carpeta'
-                    : '🃏 Crear Mazo de Estudio'}
+                    ? t('dashboard.create_folder', '📁 Crear Carpeta')
+                    : t('dashboard.create_deck', '🃏 Crear Mazo de Estudio')}
                 </button>
               </div>
             </form>
@@ -1379,7 +1380,7 @@ function DecksViewContent() {
           <div className="w-full max-w-md rounded-2xl border border-neutral-800 bg-neutral-900 p-6 shadow-2xl relative space-y-5">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
-                <span>{editingDeck.is_folder ? 'Editar Carpeta' : 'Editar Mazo'}</span>
+                <span>{editingDeck.is_folder ? t('dashboard.modal_edit_folder_title', 'Editar Carpeta') : t('dashboard.modal_edit_deck_title', 'Editar Mazo')}</span>
               </h3>
               <button
                 onClick={() => setEditingDeck(null)}
@@ -1394,7 +1395,7 @@ function DecksViewContent() {
             <form onSubmit={handleSaveEdit} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-300 mb-1.5">
-                  {editingDeck.is_folder ? 'Nombre de la Carpeta' : 'Título del Mazo'}{' '}
+                  {editingDeck.is_folder ? t('dashboard.modal_folder_name_label', 'Nombre de la Carpeta') : t('dashboard.modal_deck_name_label', 'Título del Mazo')}{' '}
                   <span className="text-indigo-400">*</span>
                 </label>
                 <input
@@ -1408,13 +1409,13 @@ function DecksViewContent() {
 
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-300 mb-1.5">
-                  Descripción
+                  {t('dashboard.modal_edit_desc_label', 'Descripción')}
                 </label>
                 <textarea
                   rows={2}
                   value={editDescription}
                   onChange={(e) => setEditDescription(e.target.value)}
-                  placeholder="Detalles sobre este elemento..."
+                  placeholder={t('dashboard.modal_edit_desc_placeholder', 'Detalles sobre este elemento...')}
                   className="w-full text-xs px-3.5 py-2.5 rounded-xl bg-neutral-950 border border-neutral-800 text-white placeholder-neutral-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition resize-none"
                 />
               </div>
@@ -1422,7 +1423,7 @@ function DecksViewContent() {
               {/* Selector de Color */}
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-300 mb-2">
-                  Color Distintivo
+                  {t('dashboard.modal_color_label', 'Color Distintivo')}
                 </label>
                 <div className="flex items-center gap-3">
                   {COLOR_PALETTE.map((c) => (
@@ -1448,14 +1449,14 @@ function DecksViewContent() {
                   onClick={() => setEditingDeck(null)}
                   className="px-4 py-2 text-xs text-neutral-400 hover:text-white rounded-xl hover:bg-neutral-800 transition"
                 >
-                  Cancelar
+                  {t('common.cancel', 'Cancelar')}
                 </button>
                 <button
                   type="submit"
                   disabled={isUpdating || !editTitle.trim()}
                   className="px-5 py-2.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 rounded-xl transition shadow-lg shadow-indigo-600/25 active:scale-95"
                 >
-                  {isUpdating ? 'Guardando...' : 'Guardar Cambios'}
+                  {isUpdating ? t('settings.saving', 'Guardando...') : t('common.save', 'Guardar Cambios')}
                 </button>
               </div>
             </form>
@@ -1473,12 +1474,12 @@ function DecksViewContent() {
 
             <div className="text-center space-y-1.5">
               <h3 className="text-base font-bold text-white">
-                ¿Eliminar {deletingDeck.is_folder ? 'carpeta' : 'mazo'} &ldquo;{deletingDeck.title}&rdquo;?
+                {deletingDeck.is_folder ? t('dashboard.modal_delete_folder_title', '¿Eliminar carpeta') : t('dashboard.modal_delete_deck_title', '¿Eliminar mazo')} &ldquo;{deletingDeck.title}&rdquo;?
               </h3>
               <p className="text-xs text-neutral-400 leading-relaxed">
                 {deletingDeck.is_folder
-                  ? `Esta carpeta contiene ${deletingDeck.childrenCount || 0} elemento(s). Si la eliminas, todos sus mazos, subcarpetas y tarjetas asociadas se eliminarán permanentemente en Supabase (borrado en cascada).`
-                  : `Esta acción eliminará el mazo permanentemente junto con sus ${deletingDeck.cardsCount} tarjetas en Supabase.`}
+                  ? t('dashboard.modal_delete_folder_warning', 'Esta carpeta contiene {count} elemento(s). Si la eliminas, todos sus mazos, subcarpetas y tarjetas asociadas se eliminarán permanentemente en Supabase (borrado en cascada).').replace('{count}', String(deletingDeck.childrenCount || 0))
+                  : t('dashboard.modal_delete_deck_warning', 'Esta acción eliminará el mazo permanentemente junto con sus {count} tarjetas en Supabase.').replace('{count}', String(deletingDeck.cardsCount))}
               </p>
             </div>
 
@@ -1488,7 +1489,7 @@ function DecksViewContent() {
                 onClick={() => setDeletingDeck(null)}
                 className="px-4 py-2 text-xs font-medium text-neutral-300 hover:text-white rounded-xl hover:bg-neutral-800 transition"
               >
-                Cancelar
+                {t('common.cancel', 'Cancelar')}
               </button>
               <button
                 type="button"
@@ -1497,10 +1498,10 @@ function DecksViewContent() {
                 className="px-4 py-2 text-xs font-medium text-white bg-rose-600 hover:bg-rose-500 disabled:opacity-50 rounded-xl transition shadow-lg shadow-rose-600/25 active:scale-95"
               >
                 {isDeleting
-                  ? 'Eliminando...'
+                  ? t('dashboard.modal_deleting', 'Eliminando...')
                   : deletingDeck.is_folder
-                  ? 'Sí, eliminar carpeta'
-                  : 'Sí, eliminar mazo'}
+                  ? t('dashboard.modal_confirm_delete_folder', 'Sí, eliminar carpeta')
+                  : t('dashboard.modal_confirm_delete_deck', 'Sí, eliminar mazo')}
               </button>
             </div>
           </div>
@@ -1518,10 +1519,10 @@ function DecksViewContent() {
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-white tracking-tight">
-                    Mover a...
+                    {t('dashboard.modal_move_title', 'Mover a...')}
                   </h3>
                   <p className="text-xs text-neutral-400 line-clamp-1">
-                    {movingDeck.is_folder ? 'Carpeta:' : 'Mazo:'} &ldquo;{movingDeck.title}&rdquo;
+                    {movingDeck.is_folder ? `${t('dashboard.folder_badge', 'Carpeta')}:` : `${t('nav.decks', 'Mazo')}:`} &ldquo;{movingDeck.title}&rdquo;
                   </p>
                 </div>
               </div>
@@ -1542,7 +1543,7 @@ function DecksViewContent() {
                   htmlFor="target-folder-select"
                   className="block text-xs font-semibold uppercase tracking-wider text-neutral-300 mb-2"
                 >
-                  Seleccionar Carpeta de Destino
+                  {t('dashboard.modal_move_target_label', 'Seleccionar Carpeta de Destino')}
                 </label>
                 <div className="relative">
                   <select
@@ -1551,7 +1552,7 @@ function DecksViewContent() {
                     onChange={(e) => setTargetFolderId(e.target.value)}
                     className="w-full text-sm px-3.5 py-2.5 rounded-xl bg-neutral-950 border border-neutral-800 text-white focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition appearance-none cursor-pointer pr-10"
                   >
-                    <option value="">🏠 Nivel Raíz (Inicio)</option>
+                    <option value="">🏠 {t('dashboard.modal_dest_root', 'Nivel Raíz (Inicio)')}</option>
                     {availableFoldersForMove.map((folder) => {
                       const path = getFolderPath(folder.id);
                       return (
@@ -1569,8 +1570,8 @@ function DecksViewContent() {
                 </div>
                 <p className="text-[11px] text-neutral-500 mt-2">
                   {movingDeck.is_folder
-                    ? 'La carpeta y todos sus contenidos se trasladarán a la ubicación seleccionada.'
-                    : 'El mazo se reubicará inmediatamente en la carpeta seleccionada.'}
+                    ? t('dashboard.modal_move_folder_desc', 'La carpeta y todos sus contenidos se trasladarán a la ubicación seleccionada.')
+                    : t('dashboard.modal_move_deck_desc', 'El mazo se reubicará inmediatamente en la carpeta seleccionada.')}
                 </p>
               </div>
 
@@ -1581,7 +1582,7 @@ function DecksViewContent() {
                   onClick={() => setMovingDeck(null)}
                   className="px-4 py-2 text-xs font-medium text-neutral-400 hover:text-white rounded-xl hover:bg-neutral-800 transition"
                 >
-                  Cancelar
+                  {t('common.cancel', 'Cancelar')}
                 </button>
                 <button
                   type="submit"
@@ -1591,12 +1592,12 @@ function DecksViewContent() {
                   {isMoving ? (
                     <>
                       <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      <span>Moviendo...</span>
+                      <span>{t('dashboard.modal_moving', 'Moviendo...')}</span>
                     </>
                   ) : (
                     <>
                       <span>📁</span>
-                      <span>Mover a este destino</span>
+                      <span>{t('dashboard.modal_move_button', 'Mover a este destino')}</span>
                     </>
                   )}
                 </button>

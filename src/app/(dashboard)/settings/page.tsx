@@ -165,13 +165,13 @@ export default function SettingsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-neutral-800/80">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white flex items-center gap-3">
-            <span>Configuración y Preferencias FSRS</span>
+            <span>{t('settings.title', 'Configuración de Algoritmo y Perfil')}</span>
             <span className="text-xs px-2.5 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 font-mono font-medium">
               Persistencia Supabase
             </span>
           </h1>
           <p className="text-sm text-neutral-400 mt-1">
-            Personaliza el algoritmo de repetición espaciada y los parámetros de tu perfil de usuario.
+            {t('settings.subtitle', 'Personaliza tus parámetros del motor FSRS v5, gestiona tu identidad de usuario y sincroniza tu progreso en Supabase.')}
           </p>
         </div>
 
@@ -184,7 +184,7 @@ export default function SettingsPage() {
           <svg className="w-3.5 h-3.5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
           </svg>
-          <span>Restablecer FSRS</span>
+          <span>{t('common.reset', 'Restablecer FSRS')}</span>
         </button>
       </div>
 
@@ -238,7 +238,7 @@ export default function SettingsPage() {
               <span className="text-2xl">🇪🇸</span>
               <div>
                 <p className="text-xs font-semibold text-white">{t('settings.lang_es', 'Español (ES)')}</p>
-                <p className="text-[10px] text-neutral-400">Español nativo</p>
+                <p className="text-[10px] text-neutral-400">{t('settings.lang_es_sub', 'Español nativo')}</p>
               </div>
             </button>
 
@@ -254,7 +254,7 @@ export default function SettingsPage() {
               <span className="text-2xl">🇬🇧</span>
               <div>
                 <p className="text-xs font-semibold text-white">{t('settings.lang_en', 'English (EN)')}</p>
-                <p className="text-[10px] text-neutral-400">International English</p>
+                <p className="text-[10px] text-neutral-400">{t('settings.lang_en_sub', 'International English')}</p>
               </div>
             </button>
           </div>
@@ -267,10 +267,10 @@ export default function SettingsPage() {
               <svg className="w-4 h-4 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
               </svg>
-              <span>Parámetros del Motor FSRS (Free Spaced Repetition Scheduler)</span>
+              <span>{t('settings.fsrs_section_title', 'Parámetros del Motor FSRS (Free Spaced Repetition Scheduler)')}</span>
             </h2>
             <p className="text-xs text-neutral-400 mt-1">
-              FSRS modela la estabilidad y dificultad de cada tarjeta para programar intervalos óptimos según tus metas de retención.
+              {t('settings.fsrs_section_desc', 'FSRS modela la estabilidad y dificultad de cada tarjeta para programar intervalos óptimos según tus metas de retención.')}
             </p>
           </div>
 
@@ -279,10 +279,10 @@ export default function SettingsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <label htmlFor="retention-slider" className="block text-xs font-semibold uppercase tracking-wider text-neutral-200">
-                  Retención Deseada (Request Retention)
+                  {t('settings.retention_label', 'Retención Deseada (Request Retention)')}
                 </label>
                 <p className="text-xs text-neutral-400 mt-0.5">
-                  Probabilidad objetivo de recordar la tarjeta en el momento exacto del repaso.
+                  {t('settings.retention_desc', 'Probabilidad objetivo de recordar la tarjeta en el momento exacto del repaso.')}
                 </p>
               </div>
 
@@ -295,7 +295,7 @@ export default function SettingsPage() {
                     ? 'bg-indigo-500/15 border-indigo-500/30 text-indigo-400'
                     : 'bg-amber-500/15 border-amber-500/30 text-amber-400'
                 }`}>
-                  {retentionPercentage}% {retentionPercentage === 90 && '• Recomendado'}
+                  {retentionPercentage}% {retentionPercentage === 90 && ` ${t('settings.retention_recommended', '• Recomendado')}`}
                 </span>
               </div>
             </div>
@@ -313,9 +313,9 @@ export default function SettingsPage() {
                 className="w-full h-2 bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
               />
               <div className="flex justify-between text-[11px] text-neutral-500 font-mono mt-1">
-                <span>70% (Menos repasos)</span>
-                <span className="text-emerald-400 font-bold">90% (Óptimo)</span>
-                <span>99% (Máxima retención)</span>
+                <span>{t('settings.retention_low', '70% (Menos repasos)')}</span>
+                <span className="text-emerald-400 font-bold">{t('settings.retention_opt', '90% (Óptimo)')}</span>
+                <span>{t('settings.retention_high', '99% (Máxima retención)')}</span>
               </div>
             </div>
 
@@ -323,17 +323,17 @@ export default function SettingsPage() {
             <div className="p-3 rounded-xl bg-neutral-950/60 border border-neutral-800/80 text-xs leading-relaxed text-neutral-400">
               {retentionPercentage < 85 && (
                 <span className="text-amber-400">
-                  ⚠️ <strong>Carga de estudio ligera:</strong> Ahorrarás tiempo diario de estudio, pero olvidarás aproximadamente entre un 15% y 30% de tus tarjetas.
+                  ⚠️ <strong>{t('settings.retention_guide_light', 'Carga de estudio ligera: Ahorrarás tiempo diario de estudio, pero olvidarás aproximadamente entre un 15% y 30% de tus tarjetas.')}</strong>
                 </span>
               )}
               {retentionPercentage >= 85 && retentionPercentage <= 92 && (
                 <span className="text-emerald-400">
-                  ✨ <strong>Equilibrio recomendado por FSRS:</strong> Maximiza la eficiencia cognitiva con una excelente tasa de retención a largo plazo sin sobrecarga de repasos.
+                  ✨ <strong>{t('settings.retention_guide_balanced', 'Equilibrio recomendado por FSRS: Maximiza la eficiencia cognitiva con una excelente tasa de retención a largo plazo sin sobrecarga de repasos.')}</strong>
                 </span>
               )}
               {retentionPercentage > 92 && (
                 <span className="text-indigo-400">
-                  🔥 <strong>Alta exigencia:</strong> Ideal para exámenes de alta densidad o certificaciones inmediatas. El número de repasos diarios aumentará significativamente.
+                  🔥 <strong>{t('settings.retention_guide_demanding', 'Alta exigencia: Ideal para exámenes de alta densidad o certificaciones inmediatas. El número de repasos diarios aumentará significativamente.')}</strong>
                 </span>
               )}
             </div>
@@ -344,10 +344,10 @@ export default function SettingsPage() {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div>
                 <label htmlFor="max-interval" className="block text-xs font-semibold uppercase tracking-wider text-neutral-200">
-                  Intervalo Máximo (Días)
+                  {t('settings.max_interval_label', 'Intervalo Máximo (Días)')}
                 </label>
                 <p className="text-xs text-neutral-400 mt-0.5">
-                  El número máximo de días que FSRS puede espaciar una tarjeta hacia el futuro.
+                  {t('settings.max_interval_desc', 'El número máximo de días que FSRS puede espaciar una tarjeta hacia el futuro.')}
                 </p>
               </div>
 
@@ -362,7 +362,7 @@ export default function SettingsPage() {
                   onChange={(e) => setMaxInterval(Math.max(1, parseInt(e.target.value) || 1))}
                   className="w-28 text-xs font-mono font-bold px-3 py-1.5 rounded-lg bg-neutral-950 border border-neutral-800 text-white focus:outline-none focus:border-indigo-500 text-right"
                 />
-                <span className="text-xs text-neutral-400 font-mono">días</span>
+                <span className="text-xs text-neutral-400 font-mono">{t('settings.days_unit', 'días')}</span>
               </div>
             </div>
 
@@ -395,10 +395,10 @@ export default function SettingsPage() {
           <div className="pt-3 border-t border-neutral-800/60 flex items-center justify-between gap-4">
             <div>
               <label htmlFor="fuzz-toggle" className="block text-xs font-semibold uppercase tracking-wider text-neutral-200">
-                Aleatoriedad Anti-Acumulación (FSRS Fuzz)
+                {t('settings.fuzz_label', 'Aleatoriedad Anti-Acumulación (FSRS Fuzz)')}
               </label>
               <p className="text-xs text-neutral-400 mt-0.5">
-                Añade una pequeña variación aleatoria a los intervalos para evitar que cientos de tarjetas se acumulen en el mismo día.
+                {t('settings.fuzz_desc', 'Añade una pequeña variación aleatoria a los intervalos para evitar que cientos de tarjetas se acumulen en el mismo día.')}
               </p>
             </div>
 
@@ -426,33 +426,35 @@ export default function SettingsPage() {
               <svg className="w-4 h-4 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
-              <span>Datos del Perfil</span>
+              <span>{t('settings.profile_section_title', 'Datos del Perfil')}</span>
             </h2>
             <p className="text-xs text-neutral-400 mt-1">
-              Vinculados a tu identificador único de usuario en Supabase con políticas RLS de seguridad.
+              {t('settings.profile_section_desc', 'Vinculados a tu identificador único de usuario en Supabase con políticas RLS de seguridad.')}
             </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label htmlFor="full-name-input" className="block text-xs font-semibold uppercase tracking-wider text-neutral-300 mb-1.5">
-                Nombre Completo
+                {t('settings.full_name_label', 'Nombre Completo')}
               </label>
               <input
                 id="full-name-input"
                 type="text"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                placeholder="Tu nombre y apellido..."
+                placeholder={t('settings.full_name_placeholder', 'Tu nombre y apellido...')}
                 className="w-full text-xs px-3.5 py-2.5 rounded-xl bg-neutral-950 border border-neutral-800 text-white placeholder-neutral-500 focus:outline-none focus:border-indigo-500 transition"
               />
             </div>
 
             <div>
               <label htmlFor="username-input" className="block text-xs font-semibold uppercase tracking-wider text-neutral-300 mb-1.5 flex items-center justify-between">
-                <span>Nombre de Usuario</span>
+                <span>{t('settings.username_label', 'Nombre de Usuario')}</span>
                 {hasUsernameConflict && (
-                  <span className="text-[10px] text-rose-400 font-medium lowercase">No disponible</span>
+                  <span className="text-[10px] text-rose-400 font-medium lowercase">
+                    {t('settings.username_not_available', 'No disponible')}
+                  </span>
                 )}
               </label>
               <input
@@ -463,7 +465,7 @@ export default function SettingsPage() {
                   setUsername(e.target.value);
                   if (hasUsernameConflict) clearErrors();
                 }}
-                placeholder="usuario123"
+                placeholder={t('settings.username_placeholder', 'usuario123')}
                 className={`w-full text-xs px-3.5 py-2.5 rounded-xl bg-neutral-950 border text-white placeholder-neutral-500 focus:outline-none transition ${
                   hasUsernameConflict
                     ? 'border-rose-500 focus:border-rose-500 focus:ring-1 focus:ring-rose-500/50 bg-rose-950/20 shadow-sm shadow-rose-950/30'
@@ -477,14 +479,14 @@ export default function SettingsPage() {
                   <svg className="w-3.5 h-3.5 text-rose-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <span>Este nombre de usuario ya está en uso. Por favor, elige otro.</span>
+                  <span>{t('settings.username_conflict_error', 'Este nombre de usuario ya está en uso. Por favor, elige otro.')}</span>
                 </p>
               )}
             </div>
 
             <div className="sm:col-span-2">
               <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-1.5">
-                Correo Electrónico (Auth)
+                {t('settings.email_label', 'Correo Electrónico (Auth)')}
               </label>
               <input
                 type="email"
@@ -502,13 +504,13 @@ export default function SettingsPage() {
             <div>
               <h2 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
                 <Ticket className="w-4 h-4 text-purple-400" />
-                <span>Suscripción y Bonos Promocionales</span>
+                <span>{t('settings.promo_section_title', 'Suscripción y Bonos Promocionales')}</span>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-500/20 text-purple-300 border border-purple-500/30">
                   PRO & VIP
                 </span>
               </h2>
               <p className="text-xs text-neutral-400 mt-1">
-                Canjea un código promocional o bono VIP (ej. <span className="text-purple-300 font-mono font-semibold">NACHOVIP</span>) para desbloquear generaciones ilimitadas sin restricciones.
+                {t('settings.promo_section_desc', 'Canjea un código promocional o bono VIP (ej. PROMO50) para desbloquear generaciones ilimitadas sin restricciones.')}
               </p>
             </div>
           </div>
@@ -522,7 +524,7 @@ export default function SettingsPage() {
                   setPromoCode(e.target.value.toUpperCase());
                   if (promoResult) setPromoResult(null);
                 }}
-                placeholder="EJ: NACHOVIP"
+                placeholder={t('settings.promo_placeholder', 'EJ: ESTUDIANTE2026')}
                 className="flex-1 bg-neutral-950/80 border border-neutral-700 focus:border-purple-500 rounded-xl px-3.5 py-2 text-xs sm:text-sm text-white placeholder-neutral-500 focus:outline-none uppercase tracking-wider font-mono transition"
                 disabled={isRedeeming}
               />
@@ -535,7 +537,7 @@ export default function SettingsPage() {
                 {isRedeeming ? (
                   <div className="w-4 h-4 border-2 border-white/80 border-t-transparent rounded-full animate-spin" />
                 ) : (
-                  <span>Canjear Bono</span>
+                  <span>{t('settings.redeem_button', 'Canjear Bono')}</span>
                 )}
               </button>
             </div>
@@ -557,7 +559,7 @@ export default function SettingsPage() {
                   <p className="font-semibold">{promoResult.message}</p>
                   {promoResult.tier && (
                     <p className="text-[11px] opacity-90 mt-0.5">
-                      Nivel activo: <span className="uppercase font-bold tracking-wider">{promoResult.tier}</span> (Generaciones ilimitadas)
+                      {t('settings.tier_active', 'Nivel activo:')} <span className="uppercase font-bold tracking-wider">{promoResult.tier}</span> {t('settings.tier_unlimited', '(Generaciones ilimitadas)')}
                     </p>
                   )}
                 </div>
@@ -574,10 +576,10 @@ export default function SettingsPage() {
                 <svg className="w-4 h-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                 </svg>
-                <span>Tutorial y Guía de Bienvenida</span>
+                <span>{t('settings.tutorial_section_title', 'Tutorial y Guía de Bienvenida')}</span>
               </h2>
               <p className="text-xs text-neutral-400 mt-1">
-                ¿Quieres repasar el flujo de carpetas, generación de tarjetas con IA y el algoritmo de repaso espaciado?
+                {t('settings.tutorial_section_desc', '¿Quieres repasar el flujo de carpetas, generación de tarjetas con IA y el algoritmo de repaso espaciado?')}
               </p>
             </div>
 
@@ -590,7 +592,7 @@ export default function SettingsPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <span>Volver a ver el tutorial de bienvenida</span>
+              <span>{t('settings.tutorial_button', 'Volver a ver el tutorial de bienvenida')}</span>
             </button>
           </div>
         </div>
@@ -601,10 +603,10 @@ export default function SettingsPage() {
             {hasChanges ? (
               <span className="text-amber-400 flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-                Tienes cambios sin guardar
+                {t('settings.changes_pending', 'Tienes cambios sin guardar')}
               </span>
             ) : (
-              <span className="text-neutral-500">Ajustes sincronizados con Supabase</span>
+              <span className="text-neutral-500">{t('settings.synced', 'Ajustes sincronizados con Supabase')}</span>
             )}
           </div>
 
@@ -616,14 +618,14 @@ export default function SettingsPage() {
             {isSaving ? (
               <>
                 <div className="w-4 h-4 border-2 border-white/80 border-t-transparent rounded-full animate-spin" />
-                <span>Guardando cambios...</span>
+                <span>{t('settings.saving', 'Guardando cambios...')}</span>
               </>
             ) : (
               <>
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
-                <span>Guardar Cambios</span>
+                <span>{t('settings.save_button', 'Guardar Cambios')}</span>
               </>
             )}
           </button>
