@@ -13,6 +13,7 @@ import {
   LogOut,
   ChevronsUpDown,
 } from 'lucide-react';
+import { WelcomeTutorial } from '@/components/onboarding/WelcomeTutorial';
 
 interface NavItem {
   name: string;
@@ -570,6 +571,9 @@ export default function DashboardLayout({
           {children}
         </main>
       </div>
+
+      {/* Modal de Bienvenida Onboarding */}
+      <WelcomeTutorial />
     </div>
   );
 }

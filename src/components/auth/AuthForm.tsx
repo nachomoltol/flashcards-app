@@ -16,6 +16,7 @@ import {
   CheckCircle2,
   Sparkles,
 } from 'lucide-react';
+import { ensureQuickGuideDeck } from '@/lib/onboarding/seedGuideDeck';
 
 interface AuthFormProps {
   initialMode?: 'signin' | 'signup';
@@ -96,6 +97,11 @@ export function AuthForm({ initialMode = 'signin' }: AuthFormProps) {
         }
 
         if (data?.session) {
+          try {
+            await ensureQuickGuideDeck(data.session.user.id);
+          } catch (seedErr) {
+            console.warn('Error inicializando mazo demo:', seedErr);
+          }
           useAuthStore.getState().setSession(data.session);
           router.push('/');
         } else {
@@ -114,6 +120,11 @@ export function AuthForm({ initialMode = 'signin' }: AuthFormProps) {
         }
 
         if (data?.session) {
+          try {
+            await ensureQuickGuideDeck(data.session.user.id);
+          } catch (seedErr) {
+            console.warn('Error inicializando mazo demo:', seedErr);
+          }
           useAuthStore.getState().setSession(data.session);
           router.push('/');
         } else {
@@ -150,6 +161,11 @@ export function AuthForm({ initialMode = 'signin' }: AuthFormProps) {
       }
 
       if (data?.session) {
+        try {
+          await ensureQuickGuideDeck(data.session.user.id);
+        } catch (seedErr) {
+          console.warn('Error inicializando mazo demo:', seedErr);
+        }
         useAuthStore.getState().setSession(data.session);
         router.push('/');
       } else {

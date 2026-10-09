@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAuthStore, useSettingsStore, DEFAULT_FSRS_SETTINGS } from '@/stores';
+import { useAuthStore, useSettingsStore, useTutorialStore, DEFAULT_FSRS_SETTINGS } from '@/stores';
 
 export default function SettingsPage() {
   const { user } = useAuthStore();
@@ -15,6 +15,7 @@ export default function SettingsPage() {
     updateSettings,
     resetToDefaults,
   } = useSettingsStore();
+  const { openTutorial } = useTutorialStore();
 
   // Estado local del formulario
   const [retention, setRetention] = useState<number>(0.90);
@@ -342,6 +343,35 @@ export default function SettingsPage() {
                 className="w-full text-xs px-3.5 py-2.5 rounded-xl bg-neutral-950/40 border border-neutral-800/60 text-neutral-500 cursor-not-allowed font-mono"
               />
             </div>
+          </div>
+        </div>
+
+        {/* Sección 3: Tutorial y Guía de Bienvenida */}
+        <div className="p-6 rounded-2xl bg-neutral-900/60 border border-neutral-800 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h2 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
+                <svg className="w-4 h-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                </svg>
+                <span>Tutorial y Guía de Bienvenida</span>
+              </h2>
+              <p className="text-xs text-neutral-400 mt-1">
+                ¿Quieres repasar el flujo de carpetas, generación de tarjetas con IA y el algoritmo de repaso espaciado?
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => openTutorial(0)}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-700/80 hover:border-neutral-600 text-neutral-200 hover:text-white text-xs sm:text-sm font-medium transition active:scale-95 shrink-0 cursor-pointer shadow-sm group"
+            >
+              <svg className="w-4 h-4 text-indigo-400 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>Volver a ver el tutorial de bienvenida</span>
+            </button>
           </div>
         </div>
 
