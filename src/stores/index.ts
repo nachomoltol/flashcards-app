@@ -5,3 +5,4 @@ export * from './useSettingsStore';
 export * from './useTutorialStore';
 export * from './useStreakStore';
 export * from './useProfileStore';
+export * from './useProModalStore';

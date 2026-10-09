@@ -191,6 +191,185 @@ Toda nueva tarjeta que generes DEBE evaluar aspectos, conceptos, detalles, relac
 }
 
 /**
+ * Intenta resolver el ID de usuario activo mediante varias vías robustas:
+ * 1. Parámetro explícito userId pasado por el cliente
+ * 2. ID del creador del mazo (consultando la tabla decks si se pasa deckId)
+ * 3. Sesión activa en supabase.auth.getUser()
+ */
+async function resolveUserId(deckId?: string, explicitUserId?: string): Promise<string | null> {
+  if (explicitUserId && explicitUserId.trim()) {
+    return explicitUserId.trim();
+  }
+
+  // 1. Propietario del mazo mediante RPC SECURITY DEFINER (omite bloqueos RLS del cliente anónimo)
+  if (deckId) {
+    try {
+      const { data, error } = await supabase.rpc('get_deck_owner', {
+        p_deck_id: deckId,
+      });
+      if (!error && data) {
+        return data;
+      }
+    } catch (err) {
+      console.warn('Advertencia al consultar get_deck_owner:', err);
+    }
+  }
+
+  // 2. Intentar sesión activa de Supabase
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user?.id) return user.id;
+  } catch {
+    // Continuar con resolución por mazo
+  }
+
+  // 3. Fallback select en tabla decks
+  if (deckId) {
+    try {
+      const { data, error } = await supabase
+        .from('decks')
+        .select('user_id')
+        .eq('id', deckId)
+        .single();
+      if (!error && data?.user_id) {
+        return data.user_id;
+      }
+    } catch (err) {
+      console.warn('Advertencia no bloqueante al resolver user_id desde deck:', err);
+    }
+  }
+
+  return null;
+}
+
+interface ApiLimitCheck {
+  allowed: boolean;
+  tier: 'free' | 'pro' | 'vip';
+  currentCount: number;
+  userId: string;
+}
+
+/**
+ * Valida la cuota de generación del usuario en api_limits antes de llamar a Gemini:
+ * - Si tier es 'pro' o 'vip': omite límites (bypass).
+ * - Si tier es 'free': verifica si last_generation_date es de hoy. Si es anterior o null,
+ *   reinicia el conteo a 0. Si es de hoy y count >= 5, aborta devolviendo { error: 'LIMIT_REACHED' }.
+ */
+async function enforceApiLimit(
+  userId: string
+): Promise<{ check: ApiLimitCheck } | { error: 'LIMIT_REACHED' }> {
+  try {
+    // Consultar y validar cuota atómicamente mediante RPC SECURITY DEFINER
+    const { data: rpcData, error: rpcError } = await supabase.rpc('check_api_limit', {
+      p_user_id: userId,
+    });
+
+    if (!rpcError && rpcData) {
+      const res = rpcData as {
+        allowed?: boolean;
+        tier?: 'free' | 'pro' | 'vip';
+        count?: number;
+        error?: string;
+      };
+
+      if (res.allowed === false || res.error === 'LIMIT_REACHED') {
+        return { error: 'LIMIT_REACHED' };
+      }
+
+      return {
+        check: {
+          allowed: true,
+          tier: res.tier || 'free',
+          currentCount: typeof res.count === 'number' ? res.count : 0,
+          userId,
+        },
+      };
+    }
+
+    if (rpcError) {
+      console.error('Error al invocar check_api_limit RPC en Supabase:', rpcError);
+    }
+
+    // Fallback a select directo solo si falla el RPC
+    const { data: directData } = await supabase
+      .from('api_limits')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (directData) {
+      const tier = (directData.tier as 'free' | 'pro' | 'vip') || 'free';
+      const generationsCount =
+        typeof directData.generations_count === 'number' ? directData.generations_count : 0;
+      const lastDate = directData.last_generation_date
+        ? String(directData.last_generation_date).slice(0, 10)
+        : null;
+
+      if (tier === 'pro' || tier === 'vip') {
+        return {
+          check: {
+            allowed: true,
+            tier,
+            currentCount: generationsCount,
+            userId,
+          },
+        };
+      }
+
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const isToday = lastDate === todayStr;
+      const count = isToday ? generationsCount : 0;
+
+      if (isToday && count >= 5) {
+        return { error: 'LIMIT_REACHED' };
+      }
+
+      return {
+        check: {
+          allowed: true,
+          tier: 'free',
+          currentCount: count,
+          userId,
+        },
+      };
+    }
+
+    // Si no se encuentra registro en api_limits y falló el RPC, bloquear por seguridad
+    return { error: 'LIMIT_REACHED' };
+  } catch (err) {
+    console.error('Error crítico al validar api_limits en Supabase:', err);
+    return { error: 'LIMIT_REACHED' };
+  }
+}
+
+/**
+ * Incrementa el uso en api_limits tras completarse la generación con la IA mediante RPC atómico.
+ */
+async function recordApiUsage(userId: string) {
+  try {
+    const { error: rpcErr } = await supabase.rpc('increment_api_generation', {
+      p_user_id: userId,
+    });
+
+    if (rpcErr) {
+      console.error('Advertencia al invocar increment_api_generation RPC:', rpcErr);
+      const todayStr = new Date().toISOString().slice(0, 10);
+      await supabase.from('api_limits').upsert({
+        user_id: userId,
+        generations_count: 1,
+        last_generation_date: todayStr,
+        tier: 'free',
+        updated_at: new Date().toISOString(),
+      });
+    }
+  } catch (err) {
+    console.warn('Advertencia no bloqueante al actualizar api_limits:', err);
+  }
+}
+
+/**
  * Server Action que genera tarjetas a partir de un tema de texto usando Gemini 3.8 Flash.
  */
 export async function generateCardsAction(
@@ -198,7 +377,8 @@ export async function generateCardsAction(
   cardFormat: CardFormat = 'basic',
   cardCount: number = 10,
   deckId?: string,
-  existingQuestions?: string[]
+  existingQuestions?: string[],
+  userId?: string
 ): Promise<GenerateCardsResult> {
   const cleanTopic = topic.trim();
   if (!cleanTopic) {
@@ -213,6 +393,19 @@ export async function generateCardsAction(
         'Clave GEMINI_API_KEY no configurada. Por favor define GEMINI_API_KEY en tu archivo .env.local para usar la generación automática.',
     };
   }
+
+  // 0. Protección estricta de Cuotas API / Bypass VIP (sin bypass si no hay usuario resoluble)
+  const resolvedUserId = await resolveUserId(deckId, userId);
+  if (!resolvedUserId) {
+    console.warn('No se pudo resolver user_id para control de cuota. Bloqueo de seguridad activado.');
+    return { success: false, error: 'LIMIT_REACHED' };
+  }
+
+  const checkResult = await enforceApiLimit(resolvedUserId);
+  if ('error' in checkResult) {
+    return { success: false, error: 'LIMIT_REACHED' };
+  }
+  const apiCheck = checkResult.check;
 
   // Límite seguro de 30 tarjetas por petición para evitar saturación y truncamientos
   const targetCount = Math.max(1, Math.min(30, cardCount || 10));
@@ -283,6 +476,11 @@ La integridad estructural del JSON es prioridad absoluta y DEBES devolver un obj
       };
     }
 
+    // Registrar uso en api_limits tras generación exitosa
+    if (apiCheck) {
+      await recordApiUsage(apiCheck.userId);
+    }
+
     // Aplicar aleatorización Fisher-Yates a las opciones de preguntas test antes de retornar y guardar
     return {
       success: true,
@@ -341,6 +539,19 @@ export async function generateCardsFromDocumentAction(
         'Clave GEMINI_API_KEY no configurada. Por favor define GEMINI_API_KEY en tu archivo .env.local para usar la generación multimodal.',
     };
   }
+
+  // 0. Protección estricta de Cuotas API / Bypass VIP (sin bypass si no hay usuario resoluble)
+  const resolvedUserId = await resolveUserId(input.deckId, input.userId);
+  if (!resolvedUserId) {
+    console.warn('No se pudo resolver user_id para control de cuota en documento. Bloqueo de seguridad activado.');
+    return { success: false, error: 'LIMIT_REACHED' };
+  }
+
+  const checkResult = await enforceApiLimit(resolvedUserId);
+  if ('error' in checkResult) {
+    return { success: false, error: 'LIMIT_REACHED' };
+  }
+  const apiCheck = checkResult.check;
 
   // Límite seguro de 30 tarjetas por petición para evitar saturación y truncamientos
   const targetCount = Math.max(1, Math.min(30, cardCount || 10));
@@ -520,6 +731,11 @@ La integridad estructural del JSON es prioridad absoluta y DEBES devolver un obj
       };
     }
 
+    // Registrar uso en api_limits tras generación exitosa
+    if (apiCheck) {
+      await recordApiUsage(apiCheck.userId);
+    }
+
     // Aplicar aleatorización Fisher-Yates a las opciones de preguntas test antes de retornar y guardar
     return {
       success: true,
@@ -629,6 +845,19 @@ export async function generateCardsFromUrlAction(
         'Clave GEMINI_API_KEY no configurada. Por favor define GEMINI_API_KEY en tu archivo .env.local para usar la generación automática.',
     };
   }
+
+  // 0. Protección estricta de Cuotas API / Bypass VIP (sin bypass si no hay usuario resoluble)
+  const resolvedUserId = await resolveUserId(input.deckId, input.userId);
+  if (!resolvedUserId) {
+    console.warn('No se pudo resolver user_id para control de cuota en URL. Bloqueo de seguridad activado.');
+    return { success: false, error: 'LIMIT_REACHED' };
+  }
+
+  const checkResult = await enforceApiLimit(resolvedUserId);
+  if ('error' in checkResult) {
+    return { success: false, error: 'LIMIT_REACHED' };
+  }
+  const apiCheck = checkResult.check;
 
   const targetCount = Math.max(1, Math.min(30, cardCount || 10));
 
@@ -851,6 +1080,11 @@ La integridad estructural del JSON es prioridad absoluta y DEBES devolver un obj
         success: false,
         error: `El contenido del enlace es demasiado denso para ${targetCount} tarjetas${formatSuffix}. Por favor, intenta generar ${suggestedCount}.`,
       };
+    }
+
+    // Registrar uso en api_limits tras generación exitosa
+    if (apiCheck) {
+      await recordApiUsage(apiCheck.userId);
     }
 
     // Aplicar aleatorización Fisher-Yates a las opciones de preguntas test

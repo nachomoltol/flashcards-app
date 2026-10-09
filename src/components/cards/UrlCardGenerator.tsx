@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useAuthStore, useCardStore, useDeckStore } from '@/stores';
+import { useAuthStore, useCardStore, useDeckStore, useProModalStore } from '@/stores';
 import { generateCardsFromUrlAction } from '@/app/actions/generateCards';
 import type { CardFormat, GeneratedCard } from '@/types/cards';
 import { FormattedCardView } from './FormattedCardView';
@@ -16,6 +16,7 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
   const { user } = useAuthStore();
   const { cards, createCard, fetchCardsByDeck } = useCardStore();
   const { fetchDeckById } = useDeckStore();
+  const { openProModal } = useProModalStore();
 
   const [url, setUrl] = useState('');
   const [cardFormat, setCardFormat] = useState<CardFormat>('basic');
@@ -69,6 +70,7 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
       const result = await generateCardsFromUrlAction({
         url: url.trim(),
         deckId,
+        userId: user?.id,
         customPrompt: customPrompt.trim() || undefined,
         focusInstruction: customPrompt.trim() || undefined,
         cardFormat,
@@ -77,11 +79,15 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
       });
 
       if (!result.success || !result.cards || result.cards.length === 0) {
+        setStatus('idle');
+        if (result.error === 'LIMIT_REACHED') {
+          openProModal(true);
+          return;
+        }
         const errorDetail =
           result.error ||
           `El contenido es demasiado denso para generar ${cardCount} tarjetas en este lote. Por favor, intenta generar una cantidad menor (ej. 10 tarjetas).`;
         setErrorMessage(errorDetail);
-        setStatus('idle');
         return;
       }
 

@@ -18,6 +18,7 @@ export interface GenerateCardsResult {
 
 export interface MultimodalDocumentInput {
   deckId?: string;
+  userId?: string;
   storagePath: string;
   signedUrl?: string;
   mimeType: string;
@@ -32,6 +33,7 @@ export interface MultimodalDocumentInput {
 export interface UrlCardInput {
   url: string;
   deckId?: string;
+  userId?: string;
   customPrompt?: string;
   focusInstruction?: string;
   cardFormat?: CardFormat;

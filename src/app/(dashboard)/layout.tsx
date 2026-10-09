@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { WelcomeTutorial } from '@/components/onboarding/WelcomeTutorial';
 import { ProModal } from '@/components/subscription/ProModal';
+import { useProModalStore } from '@/stores/useProModalStore';
 
 interface NavItem {
   name: string;
@@ -85,7 +86,7 @@ export default function DashboardLayout({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isMobileUserMenuOpen, setIsMobileUserMenuOpen] = useState(false);
-  const [isProModalOpen, setIsProModalOpen] = useState(false);
+  const { openProModal } = useProModalStore();
   const [isMounted, setIsMounted] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const mobileUserMenuRef = useRef<HTMLDivElement>(null);
@@ -297,7 +298,7 @@ export default function DashboardLayout({
                   type="button"
                   onClick={() => {
                     setIsMobileUserMenuOpen(false);
-                    setIsProModalOpen(true);
+                    openProModal();
                   }}
                   className="w-full flex items-center justify-between px-2.5 py-2 text-xs font-medium rounded-xl bg-gradient-to-r from-purple-500/15 via-violet-500/10 to-transparent border border-purple-500/30 text-purple-100 hover:border-purple-400/50 hover:bg-purple-500/20 transition-all cursor-pointer select-none group text-left active:scale-[0.98]"
                   role="menuitem"
@@ -448,7 +449,7 @@ export default function DashboardLayout({
               type="button"
               onClick={() => {
                 setMobileMenuOpen(false);
-                setIsProModalOpen(true);
+                openProModal();
               }}
               className="w-full flex items-center justify-between px-2.5 py-2 text-xs font-medium rounded-xl bg-gradient-to-r from-purple-500/15 via-violet-500/10 to-transparent border border-purple-500/30 text-purple-100 hover:border-purple-400/50 hover:bg-purple-500/20 transition-all cursor-pointer select-none group text-left active:scale-[0.98]"
               role="menuitem"
@@ -597,7 +598,7 @@ export default function DashboardLayout({
                 type="button"
                 onClick={() => {
                   setIsUserMenuOpen(false);
-                  setIsProModalOpen(true);
+                  openProModal();
                 }}
                 className="w-full flex items-center justify-between px-2.5 py-2 text-xs font-medium rounded-xl bg-gradient-to-r from-purple-500/15 via-violet-500/10 to-transparent border border-purple-500/30 text-purple-100 hover:border-purple-400/50 hover:bg-purple-500/20 transition-all cursor-pointer select-none group text-left active:scale-[0.98]"
                 role="menuitem"
@@ -691,7 +692,7 @@ export default function DashboardLayout({
       <WelcomeTutorial />
 
       {/* Modal de Suscripción PRO */}
-      <ProModal isOpen={isProModalOpen} onClose={() => setIsProModalOpen(false)} />
+      <ProModal />
     </div>
   );
 }

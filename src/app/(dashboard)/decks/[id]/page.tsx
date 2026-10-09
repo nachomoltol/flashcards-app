@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useDeckStore, useCardStore } from '@/stores';
+import { useDeckStore, useCardStore, useProModalStore, useAuthStore } from '@/stores';
 import { CardEditor, DocumentUploader, FormattedCardView, UrlCardGenerator } from '@/components/cards';
 import { ShareDeckModal } from '@/components/decks';
 import { generateCardsAction } from '@/app/actions/generateCards';
@@ -18,6 +18,8 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
   const { currentDeck, isLoading: deckLoading, fetchDeckById } = useDeckStore();
   const { cards, isLoading: cardsLoading, error, fetchCardsByDeck, createCard, deleteCard } =
     useCardStore();
+  const { openProModal } = useProModalStore();
+  const { user } = useAuthStore();
 
   // Estado para el modal de Generación con IA (Gemini Flash)
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
@@ -59,11 +61,22 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
     setAiSuccessMessage(null);
 
     const existingFronts = cards && cards.length > 0 ? cards.map((c) => c.front) : [];
-    const result = await generateCardsAction(aiTopic.trim(), aiCardFormat, aiCardCount, id, existingFronts);
+    const result = await generateCardsAction(
+      aiTopic.trim(),
+      aiCardFormat,
+      aiCardCount,
+      id,
+      existingFronts,
+      user?.id
+    );
 
     if (!result.success || !result.cards) {
-      setAiError(result.error || 'Ocurrió un error inesperado al generar las tarjetas.');
       setIsGenerating(false);
+      if (result.error === 'LIMIT_REACHED') {
+        openProModal(true);
+        return;
+      }
+      setAiError(result.error || 'Ocurrió un error inesperado al generar las tarjetas.');
       return;
     }
 

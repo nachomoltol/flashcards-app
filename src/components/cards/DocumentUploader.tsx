@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { useAuthStore, useCardStore, useDeckStore } from '@/stores';
+import { useAuthStore, useCardStore, useDeckStore, useProModalStore } from '@/stores';
 import { generateCardsFromDocumentAction } from '@/app/actions/generateCards';
 import type { CardFormat, GeneratedCard } from '@/types/cards';
 import { FormattedCardView } from './FormattedCardView';
@@ -123,6 +123,7 @@ export function DocumentUploader({
   const { user } = useAuthStore();
   const { cards, createCard, fetchCardsByDeck } = useCardStore();
   const { fetchDeckById } = useDeckStore();
+  const { openProModal } = useProModalStore();
 
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -236,6 +237,7 @@ export function DocumentUploader({
       try {
         result = await generateCardsFromDocumentAction({
           deckId,
+          userId: user?.id,
           storagePath,
           signedUrl,
           mimeType: fileInfo.mime,
@@ -261,11 +263,15 @@ export function DocumentUploader({
 
       // Validar resultado de la IA sin lanzar errores fatales (throw new Error)
       if (!result.success || !result.cards || result.cards.length === 0) {
+        setStatus('idle');
+        if (result.error === 'LIMIT_REACHED') {
+          openProModal(true);
+          return;
+        }
         const errorDetail =
           result.error ||
           `El documento es demasiado denso para generar ${cardCount} tarjetas en este lote. Por favor, intenta generar una cantidad menor (ej. 10 tarjetas) para evitar sobrecargar la respuesta.`;
         setErrorMessage(errorDetail);
-        setStatus('idle');
         return;
       }
 

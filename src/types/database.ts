@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      api_limits: {
+        Row: {
+          user_id: string
+          generations_count: number
+          last_generation_date: string | null
+          tier: 'free' | 'pro' | 'vip'
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          user_id: string
+          generations_count?: number
+          last_generation_date?: string | null
+          tier?: 'free' | 'pro' | 'vip'
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          user_id?: string
+          generations_count?: number
+          last_generation_date?: string | null
+          tier?: 'free' | 'pro' | 'vip'
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       cards: {
         Row: {
           back: string
@@ -265,6 +292,52 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_user_api_limits: {
+        Args: {
+          p_user_id: string
+        }
+        Returns: {
+          user_id: string
+          generations_count: number
+          last_generation_date: string | null
+          tier: string
+          created_at: string
+          updated_at: string
+        }[]
+      }
+      record_api_generation: {
+        Args: {
+          p_user_id: string
+          p_new_count: number
+          p_date: string
+        }
+        Returns: void
+      }
+      check_api_limit: {
+        Args: {
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      increment_api_generation: {
+        Args: {
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      get_deck_owner: {
+        Args: {
+          p_deck_id: string
+        }
+        Returns: string
+      }
+      redeem_promo_code: {
+        Args: {
+          p_code: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       import_shared_deck: {
         Args: {
           p_share_id: string
