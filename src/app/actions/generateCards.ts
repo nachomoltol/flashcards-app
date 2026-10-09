@@ -1,6 +1,7 @@
 'use server';
 
 import { GoogleGenAI, Type } from '@google/genai';
+import mammoth from 'mammoth';
 import { supabase } from '@/lib/supabase';
 import { randomizeMultipleChoiceCard } from '@/lib/cardUtils';
 import type {
@@ -336,10 +337,53 @@ export async function generateCardsFromDocumentAction(
       const ext = fileName.split('.').pop()?.toLowerCase();
       if (ext === 'pdf') normalizedMime = 'application/pdf';
       else if (ext === 'docx') normalizedMime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      else if (ext === 'doc') normalizedMime = 'application/msword';
       else if (ext === 'mp4') normalizedMime = 'video/mp4';
       else if (ext === 'mp3') normalizedMime = 'audio/mpeg';
       else if (ext === 'wav') normalizedMime = 'audio/wav';
       else if (ext === 'txt') normalizedMime = 'text/plain';
+    }
+
+    // Identificar si es un documento de Word (.docx o .doc)
+    const isWordDocument =
+      normalizedMime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+      normalizedMime === 'application/msword' ||
+      Boolean(fileName && /\.(docx|doc)$/i.test(fileName));
+
+    let extractedWordText = '';
+    if (isWordDocument) {
+      try {
+        const fileBuffer = Buffer.from(base64Data, 'base64');
+        const mammothResult = await mammoth.extractRawText({ buffer: fileBuffer });
+        extractedWordText = (mammothResult.value || '').trim();
+      } catch (docxErr) {
+        console.warn('Advertencia al extraer texto con mammoth de documento Word:', docxErr);
+      }
+
+      // Fallback para documentos Word binarios .doc o si mammoth no extrajo suficiente texto
+      if (!extractedWordText || extractedWordText.length < 20) {
+        try {
+          const rawBuffer = Buffer.from(base64Data, 'base64');
+          const rawString = rawBuffer.toString('utf-8');
+          const cleanedString = rawString
+            .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, ' ')
+            .replace(/\s{2,}/g, ' ')
+            .trim();
+
+          if (cleanedString.length > extractedWordText.length) {
+            extractedWordText = cleanedString;
+          }
+        } catch (rawErr) {
+          console.warn('Fallback de extracción binaria falló:', rawErr);
+        }
+      }
+
+      if (!extractedWordText || extractedWordText.length < 10) {
+        return {
+          success: false,
+          error: `No se pudo extraer texto legible del documento de Word "${fileName || 'documento'}". Asegúrate de que contenga texto y no esté protegido por contraseña.`,
+        };
+      }
     }
 
     // 3. Consultar historial de tarjetas existentes en este mazo para la Memoria Anti-Duplicados
@@ -361,7 +405,7 @@ REGLA ESTRICTA: Si el usuario proporciona una instrucción de enfoque (ej. un ca
       ? `Debes analizar el documento dando PRIORIDAD ABSOLUTA a la sección solicitada ("${focusInstruction}") y generar EXACTAMENTE ${targetCount} tarjetas extraídas EXCLUSIVAMENTE de esa parte del documento.`
       : `Debes analizar el documento completo y generar EXACTAMENTE ${targetCount} tarjetas cubriendo los conceptos clave de forma equitativa desde el principio hasta el final del texto.`;
 
-    // 5. Preparar llamada multimodal a Gemini 3.8 Flash con instrucciones de formato, cantidad, enfoque e historial
+    // 5. Preparar llamada a Gemini 3.8 Flash con instrucciones de formato, cantidad, enfoque e historial
     const ai = new GoogleGenAI({ apiKey });
 
     const promptText = `Eres un pedagogo experto en diseño pedagógico y repetición espaciada (algoritmo FSRS).
@@ -376,17 +420,24 @@ ${RADAR_DIRECTIVE}
 ${antiDuplicatePrompt ? `${antiDuplicatePrompt}\n\n` : ''}REGLA CRÍTICA DE INTEGRIDAD:
 La integridad estructural del JSON es prioridad absoluta y DEBES devolver un objeto con "core_exhausted" (booleano) y "cards" (array con exactamente ${targetCount} tarjetas del formato "${cardFormat}"). Para garantizar que quepan las ${targetCount} tarjetas dentro del límite de tokens sin que el JSON se corte, mantén cada pregunta, opción y respuesta rigurosa pero concisa y directa.`;
 
-    const contents = [
-      {
-        inlineData: {
-          mimeType: normalizedMime,
-          data: base64Data,
-        },
-      },
-      {
-        text: promptText,
-      },
-    ];
+    // Si es un documento de Word, pasamos el texto extraído directamente para evitar fallos de decodificación zip
+    const contents = isWordDocument
+      ? [
+          {
+            text: `${promptText}\n\nCONTENIDO DEL DOCUMENTO DE WORD:\n=========================================\n${extractedWordText}\n=========================================`,
+          },
+        ]
+      : [
+          {
+            inlineData: {
+              mimeType: normalizedMime,
+              data: base64Data,
+            },
+          },
+          {
+            text: promptText,
+          },
+        ];
 
     const response = await ai.models.generateContent({
       model: 'gemini-3.8-flash',

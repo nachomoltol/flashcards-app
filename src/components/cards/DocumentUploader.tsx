@@ -25,7 +25,7 @@ interface FileTypeInfo {
   mime: string;
 }
 
-const SUPPORTED_EXTENSIONS = ['.pdf', '.docx', '.mp4', '.mp3', '.wav', '.txt'];
+const SUPPORTED_EXTENSIONS = ['.pdf', '.docx', '.doc', '.mp4', '.mp3', '.wav', '.txt'];
 const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50MB matching Supabase bucket limit
 
 // Helper para identificar la categoría visual del archivo
@@ -44,16 +44,21 @@ function getFileTypeInfo(file: File): FileTypeInfo {
   }
   if (
     ext === '.docx' ||
-    file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    ext === '.doc' ||
+    file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+    file.type === 'application/msword'
   ) {
+    const isLegacy = ext === '.doc' || file.type === 'application/msword';
     return {
       category: 'docx',
-      label: 'Documento Word (.docx)',
+      label: isLegacy ? 'Documento Word (.doc)' : 'Documento Word (.docx)',
       badgeBg: 'bg-blue-500/15',
       badgeText: 'text-blue-400',
       borderCol: 'border-blue-500/30',
       iconBg: 'bg-blue-500/20 text-blue-300',
-      mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      mime: isLegacy
+        ? 'application/msword'
+        : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     };
   }
   if (ext === '.mp4' || file.type.startsWith('video/')) {
@@ -101,14 +106,16 @@ function validateFile(file: File): string | null {
   const isSupportedMime =
     file.type === 'application/pdf' ||
     file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+    file.type === 'application/msword' ||
     file.type === 'video/mp4' ||
     file.type === 'audio/mpeg' ||
     file.type === 'audio/mp3' ||
     file.type === 'audio/wav' ||
+    file.type === 'audio/x-wav' ||
     file.type === 'text/plain';
 
   if (!isSupportedExt && !isSupportedMime) {
-    return `Tipo de archivo no soportado. Formatos admitidos: PDF, Word (.docx), MP4, MP3 y TXT.`;
+    return `Tipo de archivo no soportado. Formatos admitidos: PDF, Word (.docx, .doc), MP4, MP3 y TXT.`;
   }
 
   if (file.size > MAX_FILE_SIZE_BYTES) {
@@ -193,10 +200,22 @@ export function DocumentUploader({ deckId, onSuccess, onCancel }: DocumentUpload
       const timestamp = Date.now();
       const storagePath = `${user.id}/${timestamp}-${sanitizedName}`;
 
+      // Resolver MIME type exacto para la subida a Supabase
+      const fileInfo = getFileTypeInfo(selectedFile);
+      let uploadContentType = selectedFile.type;
+      const fileExt = '.' + (selectedFile.name.split('.').pop()?.toLowerCase() || '');
+      if (fileExt === '.docx') {
+        uploadContentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      } else if (fileExt === '.doc') {
+        uploadContentType = 'application/msword';
+      } else if (!uploadContentType) {
+        uploadContentType = fileInfo.mime || 'application/octet-stream';
+      }
+
       const { error: uploadError } = await supabase.storage
         .from('user-documents')
         .upload(storagePath, selectedFile, {
-          contentType: selectedFile.type || 'application/octet-stream',
+          contentType: uploadContentType,
           upsert: false,
         });
 
@@ -216,7 +235,6 @@ export function DocumentUploader({ deckId, onSuccess, onCancel }: DocumentUpload
 
       // 3. Procesar archivo con Gemini 3.8 Flash nativo multimodal con el formato elegido
       setStatus('analyzing');
-      const fileInfo = getFileTypeInfo(selectedFile);
 
       const existingFronts = cards && cards.length > 0 ? cards.map((c) => c.front) : [];
 
@@ -511,7 +529,7 @@ export function DocumentUploader({ deckId, onSuccess, onCancel }: DocumentUpload
           <input
             ref={fileInputRef}
             type="file"
-            accept=".pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,video/mp4,audio/mpeg,audio/mp3,audio/wav,text/plain"
+            accept=".pdf,.docx,.doc,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,video/mp4,audio/mpeg,audio/mp3,audio/wav,text/plain"
             className="hidden"
             onChange={(e) => {
               if (e.target.files && e.target.files.length > 0) {
@@ -569,7 +587,7 @@ export function DocumentUploader({ deckId, onSuccess, onCancel }: DocumentUpload
                     PDF (.pdf)
                   </span>
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/25 text-blue-300">
-                    Word (.docx)
+                    Word (.docx, .doc)
                   </span>
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-purple-500/10 border border-purple-500/25 text-purple-300">
                     Video (.mp4)
