@@ -20,6 +20,8 @@ export type Database = {
           generations_count: number
           last_generation_date: string | null
           tier: 'free' | 'pro' | 'vip'
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           created_at: string
           updated_at: string
         }
@@ -28,6 +30,8 @@ export type Database = {
           generations_count?: number
           last_generation_date?: string | null
           tier?: 'free' | 'pro' | 'vip'
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -36,6 +40,8 @@ export type Database = {
           generations_count?: number
           last_generation_date?: string | null
           tier?: 'free' | 'pro' | 'vip'
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -344,6 +350,22 @@ export type Database = {
           p_target_user_id: string
         }
         Returns: string
+      }
+      set_user_tier: {
+        Args: {
+          p_user_id: string
+          p_tier: string
+          p_customer_id?: string | null
+          p_subscription_id?: string | null
+        }
+        Returns: void
+      }
+      downgrade_user_by_stripe: {
+        Args: {
+          p_subscription_id?: string | null
+          p_customer_id?: string | null
+        }
+        Returns: void
       }
     }
     Enums: {

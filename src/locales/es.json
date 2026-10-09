@@ -61,11 +61,15 @@
     "unlimited_gens": "(Generaciones ilimitadas)",
     "cancel_anytime": "Cancela en cualquier momento",
     "close_btn": "Cerrar",
-    "back_to_review": "Volver a repasar"
+    "back_to_review": "Volver a repasar",
+    "gateway_error": "No se pudo conectar con la pasarela de pago. Por favor intenta de nuevo más tarde."
   },
   "dashboard": {
     "title": "Tus Mazos y Carpetas",
     "subtitle": "Estructura tu temario en Asignaturas > Temas > Mazos y repasa con repetición espaciada.",
+    "stripe_success_title": "¡Suscripción PRO Activada con Éxito!",
+    "stripe_success_desc": "Tu cuenta ha sido ascendida al plan PRO. Ya tienes generaciones de tarjetas ilimitadas con IA y todas las ventajas activadas.",
+    "stripe_cancelled_msg": "Proceso de suscripción cancelado en Stripe. No se ha realizado ningún cobro.",
     "folder_title_prefix": "Explorando carpeta actual",
     "up_level": "Subir nivel",
     "new_button": "+ Nuevo",

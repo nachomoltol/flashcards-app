@@ -61,11 +61,15 @@
     "unlimited_gens": "(Unlimited generations)",
     "cancel_anytime": "Cancel anytime",
     "close_btn": "Close",
-    "back_to_review": "Back to study"
+    "back_to_review": "Back to study",
+    "gateway_error": "Could not connect to payment gateway. Please try again later."
   },
   "dashboard": {
     "title": "Your Decks & Folders",
     "subtitle": "Structure your syllabus into Subjects > Topics > Decks and review with spaced repetition.",
+    "stripe_success_title": "PRO Subscription Activated Successfully!",
+    "stripe_success_desc": "Your account has been upgraded to the PRO plan. You now have unlimited AI card generations and all premium features active.",
+    "stripe_cancelled_msg": "Subscription checkout was cancelled on Stripe. No charge was made.",
     "folder_title_prefix": "Browsing current folder",
     "up_level": "Go Up",
     "new_button": "+ New",

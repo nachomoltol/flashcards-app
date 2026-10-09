@@ -82,18 +82,49 @@ export function ProModal({
     };
   }, [isOpen, handleKeyDown]);
 
-  const handleSubscribe = () => {
+  const handleSubscribe = async () => {
     setIsSubscribing(true);
     setStripeNotice(null);
-    // Simulación de redirección a checkout Stripe
-    setTimeout(() => {
-      setIsSubscribing(false);
+
+    try {
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          plan: selectedPlan,
+          userId: user?.id,
+          email: user?.email,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.url) {
+        setStripeNotice(
+          data.error ||
+            t(
+              'pro_modal.gateway_error',
+              'No se pudo conectar con la pasarela de Stripe. Verifica la configuración.'
+            )
+        );
+        setIsSubscribing(false);
+        return;
+      }
+
+      // Redirigir a la pasarela de pago segura de Stripe
+      window.location.href = data.url;
+    } catch (err: unknown) {
+      console.error('Error al iniciar suscripción con Stripe:', err);
       setStripeNotice(
-        selectedPlan === 'annual'
-          ? 'Redirigiendo a pasarela segura de Stripe para el Plan Anual (49.99€/año)... Próximamente activo.'
-          : 'Redirigiendo a pasarela segura de Stripe para el Plan Mensual (4.99€/mes)... Próximamente activo.'
+        t(
+          'pro_modal.gateway_error',
+          'Error al conectar con la pasarela de pago segura de Stripe.'
+        )
       );
-    }, 600);
+      setIsSubscribing(false);
+    }
   };
 
   const handleRedeemCode = async (e: React.FormEvent) => {

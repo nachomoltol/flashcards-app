@@ -133,6 +133,18 @@ function DecksViewContent() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterMode, setFilterMode] = useState<'all' | 'due' | 'empty' | 'folders'>('all');
 
+  // Estado del banner de retorno de Stripe
+  const [stripeBanner, setStripeBanner] = useState<'success' | 'cancelled' | null>(null);
+
+  useEffect(() => {
+    const status = searchParams.get('stripe_status');
+    if (status === 'success') {
+      setStripeBanner('success');
+    } else if (status === 'cancelled') {
+      setStripeBanner('cancelled');
+    }
+  }, [searchParams]);
+
   useEffect(() => {
     setCurrentFolderId(searchParams.get('folder') || null);
   }, [searchParams]);
@@ -412,6 +424,60 @@ function DecksViewContent() {
 
   return (
     <div className="flex flex-col gap-6 animate-in fade-in duration-300">
+      {/* Banner de retorno de pasarela Stripe */}
+      {stripeBanner === 'success' && (
+        <div className="order-0 p-4 rounded-2xl bg-gradient-to-r from-emerald-950/60 via-purple-950/40 to-neutral-900 border border-emerald-500/40 text-white text-xs sm:text-sm flex items-center justify-between gap-3 shadow-lg shadow-emerald-950/30 animate-in fade-in">
+          <div className="flex items-center gap-3">
+            <span className="text-xl shrink-0">🎉</span>
+            <div>
+              <p className="font-bold text-emerald-300">
+                {t('dashboard.stripe_success_title', '¡Suscripción PRO Activada con Éxito!')}
+              </p>
+              <p className="text-neutral-300 text-xs mt-0.5">
+                {t(
+                  'dashboard.stripe_success_desc',
+                  'Tu cuenta ha sido ascendida al plan PRO. Ya tienes generaciones de tarjetas ilimitadas con IA y todas las ventajas activadas.'
+                )}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              setStripeBanner(null);
+              router.replace('/');
+            }}
+            className="p-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-800 transition cursor-pointer shrink-0"
+            title="Cerrar aviso"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {stripeBanner === 'cancelled' && (
+        <div className="order-0 p-3.5 rounded-2xl bg-neutral-900 border border-neutral-800 text-neutral-300 text-xs flex items-center justify-between gap-3 animate-in fade-in">
+          <div className="flex items-center gap-2.5">
+            <span className="text-base shrink-0">ℹ️</span>
+            <p>
+              {t(
+                'dashboard.stripe_cancelled_msg',
+                'Proceso de suscripción cancelado en Stripe. No se ha realizado ningún cobro.'
+              )}
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              setStripeBanner(null);
+              router.replace('/');
+            }}
+            className="p-1 rounded text-neutral-500 hover:text-white transition cursor-pointer shrink-0"
+            title="Cerrar aviso"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Top Welcome & Actions Header */}
       <div className="order-1 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-neutral-800/80">
         <div>
