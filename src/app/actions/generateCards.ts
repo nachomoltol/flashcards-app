@@ -543,7 +543,7 @@ function extractTextFromHtml(html: string): string {
  * - https://www.youtube.com/shorts/ID
  * - https://www.youtube.com/live/ID
  */
-export function extractYouTubeVideoId(url: string): string | null {
+function extractYouTubeVideoId(url: string): string | null {
   if (!url) return null;
   const match = url.match(
     /(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/|v\/|live\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i
