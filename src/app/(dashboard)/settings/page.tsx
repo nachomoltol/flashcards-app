@@ -10,10 +10,12 @@ export default function SettingsPage() {
     isLoading,
     isSaving,
     error,
+    usernameError,
     successMessage,
     fetchSettings,
     updateSettings,
     resetToDefaults,
+    clearErrors,
   } = useSettingsStore();
   const { openTutorial } = useTutorialStore();
 
@@ -61,6 +63,11 @@ export default function SettingsPage() {
     setHasChanges(isDifferent);
   }, [retention, maxInterval, fuzz, fullName, username, settings]);
 
+  const hasUsernameConflict = Boolean(
+    usernameError ||
+    (error && (error.includes('nombre de usuario ya está en uso') || error.includes('profiles_username_key')))
+  );
+
   // Scroll y foco automático en la sección Datos del Perfil al acceder con hash
   useEffect(() => {
     const handleHash = () => {
@@ -86,6 +93,7 @@ export default function SettingsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (hasUsernameConflict) return;
     await updateSettings({
       request_retention: Number(retention),
       maximum_interval: Number(maxInterval),
@@ -145,7 +153,7 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {error && (
+      {error && !hasUsernameConflict && (
         <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2.5 animate-in fade-in">
           <svg className="w-4 h-4 text-rose-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -344,17 +352,37 @@ export default function SettingsPage() {
             </div>
 
             <div>
-              <label htmlFor="username-input" className="block text-xs font-semibold uppercase tracking-wider text-neutral-300 mb-1.5">
-                Nombre de Usuario
+              <label htmlFor="username-input" className="block text-xs font-semibold uppercase tracking-wider text-neutral-300 mb-1.5 flex items-center justify-between">
+                <span>Nombre de Usuario</span>
+                {hasUsernameConflict && (
+                  <span className="text-[10px] text-rose-400 font-medium lowercase">No disponible</span>
+                )}
               </label>
               <input
                 id="username-input"
                 type="text"
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                onChange={(e) => {
+                  setUsername(e.target.value);
+                  if (hasUsernameConflict) clearErrors();
+                }}
                 placeholder="usuario123"
-                className="w-full text-xs px-3.5 py-2.5 rounded-xl bg-neutral-950 border border-neutral-800 text-white placeholder-neutral-500 focus:outline-none focus:border-indigo-500 transition"
+                className={`w-full text-xs px-3.5 py-2.5 rounded-xl bg-neutral-950 border text-white placeholder-neutral-500 focus:outline-none transition ${
+                  hasUsernameConflict
+                    ? 'border-rose-500 focus:border-rose-500 focus:ring-1 focus:ring-rose-500/50 bg-rose-950/20 shadow-sm shadow-rose-950/30'
+                    : 'border-neutral-800 focus:border-indigo-500'
+                }`}
+                aria-invalid={hasUsernameConflict}
+                aria-describedby={hasUsernameConflict ? "username-error-msg" : undefined}
               />
+              {hasUsernameConflict && (
+                <p id="username-error-msg" className="text-xs text-rose-400 mt-1.5 flex items-center gap-1.5 font-medium animate-in fade-in">
+                  <svg className="w-3.5 h-3.5 text-rose-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span>Este nombre de usuario ya está en uso. Por favor, elige otro.</span>
+                </p>
+              )}
             </div>
 
             <div className="sm:col-span-2">
@@ -415,7 +443,7 @@ export default function SettingsPage() {
 
           <button
             type="submit"
-            disabled={isSaving || !hasChanges}
+            disabled={isSaving || !hasChanges || hasUsernameConflict}
             className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 disabled:opacity-50 text-white font-medium text-xs sm:text-sm transition-all duration-150 shadow-lg shadow-indigo-600/25 active:scale-95 cursor-pointer disabled:cursor-not-allowed"
           >
             {isSaving ? (

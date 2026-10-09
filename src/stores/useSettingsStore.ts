@@ -26,10 +26,12 @@ interface SettingsState {
   isLoading: boolean;
   isSaving: boolean;
   error: string | null;
+  usernameError: string | null;
   successMessage: string | null;
   fetchSettings: () => Promise<FSRSSettings | null>;
   updateSettings: (newSettings: Partial<FSRSSettings>) => Promise<boolean>;
   resetToDefaults: () => Promise<boolean>;
+  clearErrors: () => void;
   reset: () => void;
 }
 
@@ -38,7 +40,12 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   isLoading: false,
   isSaving: false,
   error: null,
+  usernameError: null,
   successMessage: null,
+
+  clearErrors: () => {
+    set({ error: null, usernameError: null });
+  },
 
   reset: () => {
     set({
@@ -46,6 +53,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       isLoading: false,
       isSaving: false,
       error: null,
+      usernameError: null,
       successMessage: null,
     });
   },
@@ -118,7 +126,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
 
   updateSettings: async (newSettings: Partial<FSRSSettings>) => {
-    set({ isSaving: true, error: null, successMessage: null });
+    set({ isSaving: true, error: null, usernameError: null, successMessage: null });
     try {
       const {
         data: { user },
@@ -183,6 +191,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           full_name: fullNameVal || '',
           username: usernameVal || '',
         },
+        usernameError: null,
         isSaving: false,
         successMessage: '¡Cambios guardados correctamente en tu perfil y configuración!',
       });
@@ -198,15 +207,23 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           : null) ||
         (err instanceof Error ? err.message : 'Error al guardar la configuración');
 
-      if (
+      const isDuplicateUsername =
         errorMessage.includes('profiles_username_key') ||
-        (typeof err === 'object' && err !== null && (err as { code?: string }).code === '23505')
-      ) {
-        errorMessage = 'Este nombre de usuario ya está en uso. Por favor, elige otro.';
+        (typeof err === 'object' && err !== null && (err as { code?: string }).code === '23505') ||
+        (typeof err === 'object' && err !== null && String((err as { details?: string }).details).includes('username'));
+
+      let duplicateUsernameMsg: string | null = null;
+      if (isDuplicateUsername) {
+        duplicateUsernameMsg = 'Este nombre de usuario ya está en uso. Por favor, elige otro.';
+        errorMessage = duplicateUsernameMsg;
       }
 
       console.error('Error saving settings:', errorMessage, err);
-      set({ error: errorMessage, isSaving: false });
+      set({
+        error: errorMessage,
+        usernameError: duplicateUsernameMsg,
+        isSaving: false,
+      });
       return false;
     }
   },
