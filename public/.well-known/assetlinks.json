@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.flashmente.app",
+      "sha256_cert_fingerprints": [
+        "34:56:38:55:A2:B1:C0:C8:F8:4E:D1:18:89:CF:25:70:42:FE:E3:02:26:D0:1E:02:25:E9:AC:6E:5F:6F:49:D1"
+      ]
+    }
+  }
+]
