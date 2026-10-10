@@ -440,94 +440,6 @@ export function DocumentUploader({
       ) : (
         /* Dropzone & File Selection Area */
         <div className="space-y-4">
-          {/* Selectores: Formato y Cantidad de Tarjetas */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {/* Card Format Selector Dropdown */}
-            <div className="p-3.5 rounded-xl bg-neutral-950/80 border border-neutral-800 space-y-1.5">
-              <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-300 flex items-center justify-between">
-                <span className="flex items-center gap-2">
-                  <svg className="w-3.5 h-3.5 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
-                  </svg>
-                  {t('ai_uploader.card_format_label', 'Formato de Tarjetas')}
-                </span>
-                <span className="text-[10px] font-mono text-violet-400 uppercase">{cardFormat}</span>
-              </label>
-
-              <div className="relative">
-                <select
-                  disabled={isBusy}
-                  value={cardFormat}
-                  onChange={(e) => setCardFormat(e.target.value as CardFormat)}
-                  className="w-full text-xs font-medium px-3.5 py-2.5 rounded-xl bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition appearance-none cursor-pointer disabled:opacity-50 pr-10"
-                >
-                  <option value="basic">🃏 {t('card_editor.format_basic', 'Básica')} — {t('url_generator.format_basic_desc', 'Pregunta directa y respuesta concisa')}</option>
-                  <option value="multiple_choice">📝 {t('card_editor.format_test', 'Opción Múltiple')} — {t('url_generator.format_mc_desc', 'Pregunta test con 4 alternativas y solución')}</option>
-                  <option value="cloze">🧩 {t('card_editor.format_cloze', 'Cloze')} — {t('url_generator.format_cloze_desc', 'Completar conceptos clave entre corchetes')}</option>
-                  <option value="true_false">⚖️ {t('card_editor.format_tf', 'Verdadero o Falso')}</option>
-                </select>
-                <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-neutral-400">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-              </div>
-
-              <p className="text-[11px] text-neutral-400 pt-0.5">
-                {cardFormat === 'basic' && (language === 'en' ? 'Direct questions with rigorous answers.' : 'Preguntas directas con respuestas rigurosas.')}
-                {cardFormat === 'multiple_choice' && (language === 'en' ? 'Quiz questions with 4 plausible options.' : 'Preguntas test con 4 opciones plausibles.')}
-                {cardFormat === 'cloze' && (language === 'en' ? 'Hide key concepts with [...].' : 'Oculta conceptos clave con [...].')}
-                {cardFormat === 'true_false' && (language === 'en' ? 'Statements with strict justifications.' : 'Afirmaciones con justificación estricta.')}
-              </p>
-            </div>
-
-            {/* Card Count Numeric Input con Límite Seguro y Hint Educativo */}
-            <div className="p-3.5 rounded-xl bg-neutral-950/80 border border-neutral-800 space-y-1.5">
-              <label htmlFor="cardCount" className="block text-xs font-semibold uppercase tracking-wider text-neutral-300 flex items-center justify-between">
-                <span className="flex items-center gap-2">
-                  <svg className="w-3.5 h-3.5 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                  </svg>
-                  {t('ai_uploader.card_count_label', 'Cantidad de Tarjetas')}
-                </span>
-                <span className="text-[10px] font-mono text-violet-400 font-bold">{cardCount} / 30 MÁX</span>
-              </label>
-
-              <div className="relative">
-                <input
-                  id="cardCount"
-                  name="cardCount"
-                  type="number"
-                  min={1}
-                  max={30}
-                  disabled={isBusy}
-                  value={cardCount}
-                  onChange={(e) => {
-                    const rawVal = e.target.value;
-                    if (rawVal === '') {
-                      setCardCount(1);
-                      return;
-                    }
-                    const val = parseInt(rawVal, 10);
-                    if (!isNaN(val)) {
-                      setCardCount(Math.min(30, Math.max(1, val)));
-                    }
-                  }}
-                  className="w-full text-xs font-semibold px-3.5 py-2.5 rounded-xl bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition disabled:opacity-50"
-                  placeholder="1 a 30 tarjetas"
-                />
-              </div>
-
-              {/* Mensaje de ayuda visualmente atractivo (hint/banner) */}
-              <div className="p-2.5 rounded-lg bg-violet-500/10 border border-violet-500/20 text-[11px] text-violet-200/90 flex items-start gap-2 leading-relaxed">
-                <span className="shrink-0 text-sm">💡</span>
-                <span>
-                  {t('deck_detail.batch_hint', 'Generamos por lotes para evitar saturación. Puedes pedir varios lotes seguidos del mismo documento: nuestra IA analiza tu mazo y extraerá conceptos 100% nuevos sin repetir preguntas anteriores.')}
-                </span>
-              </div>
-            </div>
-          </div>
-
           <input
             ref={fileInputRef}
             type="file"
@@ -540,6 +452,7 @@ export function DocumentUploader({
             }}
           />
 
+          {/* 1. Zona de Carga (Dropzone o Archivo Seleccionado) - POR ENCIMA de Formato y Cantidad */}
           {!selectedFile ? (
             /* Drag and drop zone */
             <div
@@ -547,7 +460,7 @@ export function DocumentUploader({
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
               onClick={() => fileInputRef.current?.click()}
-              className={`relative cursor-pointer rounded-2xl border-2 border-dashed p-8 text-center transition-all duration-200 group ${
+              className={`relative cursor-pointer rounded-2xl border-2 border-dashed p-6 sm:p-8 text-center transition-all duration-200 group ${
                 isDragging
                   ? 'border-violet-500 bg-violet-600/10 scale-[1.01] shadow-xl shadow-violet-900/20'
                   : 'border-neutral-800 hover:border-violet-500/60 bg-neutral-950/60 hover:bg-neutral-900/40'
@@ -558,13 +471,13 @@ export function DocumentUploader({
 
               <div className="relative z-10 flex flex-col items-center justify-center space-y-3">
                 <div
-                  className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-transform duration-200 group-hover:scale-110 shadow-lg ${
+                  className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center transition-transform duration-200 group-hover:scale-110 shadow-lg ${
                     isDragging
                       ? 'bg-violet-600 text-white shadow-violet-600/30'
                       : 'bg-neutral-900 border border-neutral-800 text-violet-400 group-hover:text-violet-300 group-hover:border-violet-500/40'
                   }`}
                 >
-                  <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-6 h-6 sm:w-7 sm:h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -584,7 +497,7 @@ export function DocumentUploader({
                 </div>
 
                 {/* Formats Pills */}
-                <div className="flex flex-wrap items-center justify-center gap-1.5 pt-2">
+                <div className="flex flex-wrap items-center justify-center gap-1.5 pt-1 sm:pt-2">
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-rose-500/10 border border-rose-500/25 text-rose-300">
                     PDF (.pdf)
                   </span>
@@ -614,7 +527,7 @@ export function DocumentUploader({
                             e.stopPropagation();
                             onSwitchToUrl();
                           }}
-                          className="underline hover:text-amber-100 font-semibold transition"
+                          className="underline hover:text-amber-100 font-semibold transition cursor-pointer"
                         >
                           {t('ai_uploader.video_hint_link', 'pega el enlace web')}
                         </button>
@@ -629,7 +542,7 @@ export function DocumentUploader({
             </div>
           ) : (
             /* Selected File Card */
-            <div className="space-y-4">
+            <div>
               {(() => {
                 const info = getFileTypeInfo(selectedFile);
                 return (
@@ -724,7 +637,100 @@ export function DocumentUploader({
                   </div>
                 );
               })()}
+            </div>
+          )}
 
+          {/* 2. Selectores: Formato y Cantidad de Tarjetas (Situados debajo de la zona de subida) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {/* Card Format Selector Dropdown */}
+            <div className="p-3.5 rounded-xl bg-neutral-950/80 border border-neutral-800 space-y-1.5">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-300 flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <svg className="w-3.5 h-3.5 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
+                  </svg>
+                  {t('ai_uploader.card_format_label', 'Formato de Tarjetas')}
+                </span>
+                <span className="text-[10px] font-mono text-violet-400 uppercase">{cardFormat}</span>
+              </label>
+
+              <div className="relative">
+                <select
+                  disabled={isBusy}
+                  value={cardFormat}
+                  onChange={(e) => setCardFormat(e.target.value as CardFormat)}
+                  className="w-full text-xs font-medium px-3.5 py-2.5 rounded-xl bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition appearance-none cursor-pointer disabled:opacity-50 pr-10"
+                >
+                  <option value="basic">🃏 {t('card_editor.format_basic', 'Básica')} — {t('url_generator.format_basic_desc', 'Pregunta directa y respuesta concisa')}</option>
+                  <option value="multiple_choice">📝 {t('card_editor.format_test', 'Opción Múltiple')} — {t('url_generator.format_mc_desc', 'Pregunta test con 4 alternativas y solución')}</option>
+                  <option value="cloze">🧩 {t('card_editor.format_cloze', 'Cloze')} — {t('url_generator.format_cloze_desc', 'Completar conceptos clave entre corchetes')}</option>
+                  <option value="true_false">⚖️ {t('card_editor.format_tf', 'Verdadero o Falso')}</option>
+                </select>
+                <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-neutral-400">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-neutral-400 pt-0.5">
+                {cardFormat === 'basic' && (language === 'en' ? 'Direct questions with rigorous answers.' : 'Preguntas directas con respuestas rigurosas.')}
+                {cardFormat === 'multiple_choice' && (language === 'en' ? 'Quiz questions with 4 plausible options.' : 'Preguntas test con 4 opciones plausibles.')}
+                {cardFormat === 'cloze' && (language === 'en' ? 'Hide key concepts with [...].' : 'Oculta conceptos clave con [...].')}
+                {cardFormat === 'true_false' && (language === 'en' ? 'Statements with strict justifications.' : 'Afirmaciones con justificación estricta.')}
+              </p>
+            </div>
+
+            {/* Card Count Numeric Input con Límite Seguro y Hint Educativo */}
+            <div className="p-3.5 rounded-xl bg-neutral-950/80 border border-neutral-800 space-y-1.5">
+              <label htmlFor="cardCount" className="block text-xs font-semibold uppercase tracking-wider text-neutral-300 flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <svg className="w-3.5 h-3.5 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                  </svg>
+                  {t('ai_uploader.card_count_label', 'Cantidad de Tarjetas')}
+                </span>
+                <span className="text-[10px] font-mono text-violet-400 font-bold">{cardCount} / 30 MÁX</span>
+              </label>
+
+              <div className="relative">
+                <input
+                  id="cardCount"
+                  name="cardCount"
+                  type="number"
+                  min={1}
+                  max={30}
+                  disabled={isBusy}
+                  value={cardCount}
+                  onChange={(e) => {
+                    const rawVal = e.target.value;
+                    if (rawVal === '') {
+                      setCardCount(1);
+                      return;
+                    }
+                    const val = parseInt(rawVal, 10);
+                    if (!isNaN(val)) {
+                      setCardCount(Math.min(30, Math.max(1, val)));
+                    }
+                  }}
+                  className="w-full text-xs font-semibold px-3.5 py-2.5 rounded-xl bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition disabled:opacity-50"
+                  placeholder="1 a 30 tarjetas"
+                />
+              </div>
+
+              {/* Mensaje de ayuda visualmente atractivo (hint/banner) */}
+              <div className="p-2.5 rounded-lg bg-violet-500/10 border border-violet-500/20 text-[11px] text-violet-200/90 flex items-start gap-2 leading-relaxed">
+                <span className="shrink-0 text-sm">💡</span>
+                <span>
+                  {t('deck_detail.batch_hint', 'Generamos por lotes para evitar saturación. Puedes pedir varios lotes seguidos del mismo documento: nuestra IA analiza tu mazo y extraerá conceptos 100% nuevos sin repetir preguntas anteriores.')}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* 3. Instrucción adicional y Botones de Acción (visibles cuando hay un archivo cargado) */}
+          {selectedFile && (
+            <div className="space-y-4 pt-1">
               {/* Optional Custom Instructions / Focus Instruction */}
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-300 mb-1.5 flex items-center justify-between">

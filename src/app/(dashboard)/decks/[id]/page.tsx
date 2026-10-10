@@ -36,6 +36,9 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
   // Estado para el modal de Compartir Mazo
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
+  // Estado para el acordeón del Editor Manual de Tarjetas (cerrado por defecto para evitar saturar la pantalla)
+  const [isManualEditorOpen, setIsManualEditorOpen] = useState(false);
+
   useEffect(() => {
     fetchDeckById(id);
     fetchCardsByDeck(id);
@@ -163,7 +166,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                 ID: {id.slice(0, 8)}...
               </span>
             </div>
-            <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-white">
+            <h1 className="text-xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-white">
               {deckLoading && !currentDeck ? t('deck_detail.loading_deck') : currentDeck?.title || t('deck_detail.untitled_deck')}
             </h1>
             <p className="text-sm text-neutral-400 mt-1">
@@ -238,19 +241,57 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
         </div>
       )}
 
-      {/* Main Grid: Card Editor & Cards List */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Left Column: Card Editor */}
-        <div className="lg:col-span-6 space-y-4">
-          <CardEditor deckId={id} onCardCreated={handleCardCreated} />
+      {/* Contenido Principal: Editor Manual Plegable y Lista de Tarjetas */}
+      <div className="space-y-6">
+        {/* Separador 1: Añadir tarjeta manualmente (Acordeón desplegable, cerrado por defecto) */}
+        <div className="rounded-2xl border border-neutral-800 bg-neutral-900/40 overflow-hidden transition-all duration-200 shadow-sm">
+          <button
+            type="button"
+            onClick={() => setIsManualEditorOpen(!isManualEditorOpen)}
+            className="w-full p-4 sm:p-5 flex items-center justify-between text-left hover:bg-neutral-800/40 transition group cursor-pointer"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-9 h-9 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-400 flex items-center justify-center text-base shrink-0 group-hover:scale-105 transition-transform">
+                ✏️
+              </div>
+              <div className="min-w-0">
+                <h2 className="text-sm sm:text-base font-bold text-white tracking-tight flex items-center gap-2">
+                  <span className="truncate">{t('deck_detail.add_manual_title', 'Añadir tarjeta manualmente')}</span>
+                  <span className="text-[10px] sm:text-[11px] font-normal px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-400 font-mono shrink-0">
+                    {isManualEditorOpen ? t('common.open', 'Abierto') : t('common.collapsed', 'Plegado')}
+                  </span>
+                </h2>
+                <p className="text-xs text-neutral-400 mt-0.5 truncate hidden sm:block">
+                  {t('deck_detail.add_manual_desc', 'Crea preguntas personalizadas (Básica, Test, Cloze o V/F)')}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 text-xs font-semibold text-neutral-400 group-hover:text-white transition shrink-0 ml-2">
+              <span className="hidden sm:inline">
+                {isManualEditorOpen ? t('deck_detail.hide_editor', 'Ocultar editor manual') : t('deck_detail.show_editor', 'Mostrar editor manual')}
+              </span>
+              <div className={`w-8 h-8 rounded-lg bg-neutral-800/80 border border-neutral-700/60 flex items-center justify-center transition-transform duration-200 ${isManualEditorOpen ? 'rotate-180' : ''}`}>
+                <svg className="w-4 h-4 text-neutral-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </div>
+          </button>
+
+          {isManualEditorOpen && (
+            <div className="p-4 sm:p-6 border-t border-neutral-800/80 bg-neutral-950/40 animate-in fade-in duration-200">
+              <CardEditor deckId={id} onCardCreated={handleCardCreated} />
+            </div>
+          )}
         </div>
 
-        {/* Right Column: Cards List & Empty State */}
-        <div className="lg:col-span-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
-              {t('deck_detail.cards_in_db')}
-              <span className="text-xs px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-300 font-normal">
+        {/* Separador 2: Tarjetas en este mazo */}
+        <div className="space-y-4 pt-1">
+          <div className="flex items-center justify-between pb-3 border-b border-neutral-800/80">
+            <h2 className="text-base sm:text-lg font-bold text-white tracking-tight flex items-center gap-2.5">
+              <span>🃏 {t('deck_detail.cards_in_deck_title', 'Tarjetas en este mazo')}</span>
+              <span className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 font-mono font-medium">
                 {cards.length}
               </span>
             </h2>
