@@ -6,17 +6,16 @@ import {
   FolderTree,
   Sparkles,
   Brain,
-  BarChart3,
   Rocket,
   ChevronRight,
   ChevronLeft,
   X,
   FileText,
   FileCode,
-  Flame,
   CheckCircle2,
   Clock,
   Layers,
+  Settings,
 } from 'lucide-react';
 
 export const TUTORIAL_STORAGE_KEY = 'flashcards_welcome_tutorial_seen';
@@ -38,42 +37,43 @@ const slides: SlideData[] = [
   {
     step: '1 de 5',
     badge: 'Organización',
-    title: 'Estructura tu conocimiento',
+    title: 'Crea tu primera Carpeta',
     description:
-      'Crea Carpetas para tus asignaturas y Mazos para tus temas. Mantén tu temario ordenado.',
+      'El primer paso es organizarte. Pulsa el botón principal \'+ Nuevo\' para crear una Carpeta para tu asignatura o tema. Dentro de ella, podrás crear subcarpetas y tus mazos de estudio.',
     gradient: 'from-blue-600/20 via-indigo-600/10 to-transparent',
     iconBg: 'bg-blue-500/15 border-blue-500/30',
     iconColor: 'text-blue-400',
     renderIcon: () => <FolderTree className="w-6 h-6" />,
     renderIllustration: () => (
       <div className="w-full bg-neutral-950/70 border border-neutral-800/80 rounded-2xl p-4 sm:p-5 space-y-3">
-        <div className="flex items-center gap-2.5 pb-2.5 border-b border-neutral-800/60">
-          <div className="w-7 h-7 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-400">
-            📁
+        <div className="flex items-center justify-between pb-2.5 border-b border-neutral-800/60">
+          <div className="flex items-center gap-2">
+            <span className="text-sm">📁</span>
+            <span className="text-xs font-semibold text-white">Biblioteca</span>
           </div>
-          <div className="text-left">
-            <span className="text-xs font-semibold text-white block">Carpeta: Medicina & Anatomía</span>
-            <span className="text-[10px] text-neutral-400">Asignatura Principal</span>
+          <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 text-white text-[11px] font-bold shadow-sm">
+            <span>+</span>
+            <span>Nuevo</span>
           </div>
         </div>
-        <div className="pl-4 sm:pl-6 space-y-2 border-l border-neutral-800">
+        <div className="pl-3 sm:pl-4 space-y-2 border-l-2 border-amber-500/40">
           <div className="flex items-center justify-between p-2 rounded-xl bg-neutral-900/80 border border-neutral-800 text-left">
             <div className="flex items-center gap-2">
-              <span className="text-sm">🗂️</span>
-              <span className="text-xs font-medium text-neutral-200">Mazo: Sistema Nervioso</span>
+              <span className="text-sm">📁</span>
+              <span className="text-xs font-medium text-neutral-200">Carpeta: Asignatura</span>
             </div>
-            <span className="text-[10px] text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full font-mono">
-              24 tarjetas
+            <span className="text-[10px] text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full font-mono">
+              Organizador
             </span>
           </div>
-          <div className="flex items-center justify-between p-2 rounded-xl bg-neutral-900/80 border border-neutral-800 text-left">
-            <div className="flex items-center gap-2">
-              <span className="text-sm">🗂️</span>
-              <span className="text-xs font-medium text-neutral-200">Mazo: Farmacología General</span>
+          <div className="pl-3 sm:pl-4 border-l border-neutral-800 space-y-1.5">
+            <div className="flex items-center justify-between p-1.5 rounded-lg bg-neutral-900/50 border border-neutral-800/60 text-left">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs">🃏</span>
+                <span className="text-[11px] text-neutral-300">Mazo de Estudio</span>
+              </div>
+              <span className="text-[10px] text-indigo-400 font-mono">FSRS</span>
             </div>
-            <span className="text-[10px] text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full font-mono">
-              18 tarjetas
-            </span>
           </div>
         </div>
       </div>
@@ -84,9 +84,9 @@ const slides: SlideData[] = [
   {
     step: '2 de 5',
     badge: 'Inteligencia Artificial',
-    title: 'Magia con IA',
+    title: 'Genera preguntas al instante',
     description:
-      'Olvídate de teclear. Sube apuntes (PDF/Word) o pega un enlace de YouTube. Nuestra IA extraerá las preguntas clave sin repetir conceptos.',
+      'Una vez creado un mazo, entra en él y pulsa \'Generar preguntas con IA\'. Sube tus apuntes en PDF, Word, un audio o pega un enlace de YouTube. Nosotros extraeremos las flashcards por ti.',
     gradient: 'from-purple-600/20 via-pink-600/10 to-transparent',
     iconBg: 'bg-purple-500/15 border-purple-500/30',
     iconColor: 'text-purple-400',
@@ -115,7 +115,7 @@ const slides: SlideData[] = [
         </div>
         <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-300 text-xs flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 text-purple-400 shrink-0" />
-          <span>Filtro anti-duplicados y fidelidad estricta al material.</span>
+          <span>Extracción inteligente por bloques de hasta 30 tarjetas.</span>
         </div>
       </div>
     ),
@@ -124,10 +124,10 @@ const slides: SlideData[] = [
   // Slide 3
   {
     step: '3 de 5',
-    badge: 'Ciencia FSRS',
-    title: 'Estudia menos, recuerda más',
+    badge: 'El arte del repaso',
+    title: 'El arte del repaso',
     description:
-      'Al responder, califica tu nivel de dificultad. Nuestro algoritmo científico (FSRS) calculará el día exacto en el que debes volver a ver esa tarjeta.',
+      'Al estudiar, lee la pregunta y piensa la respuesta. Luego mira la respuesta y sé honesto: pulsa 1, 2, 3 o 4 según te haya costado recordarlo. El algoritmo calculará el día exacto para volvértela a mostrar.',
     gradient: 'from-emerald-600/20 via-teal-600/10 to-transparent',
     iconBg: 'bg-emerald-500/15 border-emerald-500/30',
     iconColor: 'text-emerald-400',
@@ -137,26 +137,26 @@ const slides: SlideData[] = [
         <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
           <div className="p-2 sm:p-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-center">
             <span className="block text-[11px] font-bold text-red-400">1. Again</span>
-            <span className="text-[9px] text-neutral-400">10 min</span>
+            <span className="text-[9px] text-neutral-400">Repetir</span>
           </div>
           <div className="p-2 sm:p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-center">
             <span className="block text-[11px] font-bold text-amber-400">2. Hard</span>
-            <span className="text-[9px] text-neutral-400">1 día</span>
+            <span className="text-[9px] text-neutral-400">Difícil</span>
           </div>
           <div className="p-2 sm:p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/30 text-center">
             <span className="block text-[11px] font-bold text-blue-400">3. Good</span>
-            <span className="text-[9px] text-neutral-400">3 días</span>
+            <span className="text-[9px] text-neutral-400">Bien</span>
           </div>
           <div className="p-2 sm:p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-center">
             <span className="block text-[11px] font-bold text-emerald-400">4. Easy</span>
-            <span className="text-[9px] text-neutral-400">6 días</span>
+            <span className="text-[9px] text-neutral-400">Fácil</span>
           </div>
         </div>
         <div className="p-2.5 rounded-xl bg-neutral-900 border border-neutral-800 text-[11px] text-neutral-400 flex items-center justify-between">
           <span className="flex items-center gap-1.5 text-emerald-400">
-            <Clock className="w-3.5 h-3.5" /> FSRS v5 Spaced Repetition
+            <Clock className="w-3.5 h-3.5" /> Algoritmo FSRS de Repetición Espaciada
           </span>
-          <span className="font-mono text-neutral-300">90% Retención Óptima</span>
+          <span className="font-mono text-neutral-300">Teclas 1, 2, 3, 4</span>
         </div>
       </div>
     ),
@@ -165,36 +165,49 @@ const slides: SlideData[] = [
   // Slide 4
   {
     step: '4 de 5',
-    badge: 'Estadísticas',
-    title: 'Analiza tu progreso',
+    badge: 'Edición y Gestión',
+    title: 'Edita y organiza a tu gusto',
     description:
-      'Revisa el panel de estadísticas para medir tu retención real, consultar tus rachas y ver tu volumen de aciertos y errores.',
+      '¿Te has equivocado al crear algo? No pasa nada. Usa el botón del engranaje (⚙️) que verás junto a cualquier mazo o carpeta para cambiarle el nombre, el color o eliminarlo.',
     gradient: 'from-amber-600/20 via-orange-600/10 to-transparent',
     iconBg: 'bg-amber-500/15 border-amber-500/30',
     iconColor: 'text-amber-400',
-    renderIcon: () => <BarChart3 className="w-6 h-6" />,
+    renderIcon: () => <Settings className="w-6 h-6" />,
     renderIllustration: () => (
       <div className="w-full bg-neutral-950/70 border border-neutral-800/80 rounded-2xl p-4 sm:p-5 space-y-3">
-        <div className="grid grid-cols-3 gap-2 text-center">
-          <div className="p-2 sm:p-2.5 rounded-xl bg-neutral-900 border border-neutral-800">
-            <span className="text-[10px] text-neutral-400 block">Retención Real</span>
-            <span className="text-sm sm:text-base font-bold text-emerald-400 font-mono">92.4%</span>
+        {/* Mockup Card con Botón de Engranaje */}
+        <div className="p-3 rounded-xl bg-neutral-900 border border-neutral-800 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <span className="w-3 h-3 rounded-full bg-indigo-500" />
+            <div className="text-left">
+              <span className="text-xs font-bold text-white block">Mazo de Estudio</span>
+              <span className="text-[10px] text-neutral-400">20 tarjetas</span>
+            </div>
           </div>
-          <div className="p-2 sm:p-2.5 rounded-xl bg-neutral-900 border border-neutral-800">
-            <span className="text-[10px] text-neutral-400 block flex items-center justify-center gap-1">
-              <Flame className="w-3 h-3 text-amber-500" /> Racha
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] px-2.5 py-1 rounded-lg bg-indigo-600/20 text-indigo-300 font-semibold border border-indigo-500/30">
+              Estudiar
             </span>
-            <span className="text-sm sm:text-base font-bold text-amber-400 font-mono">7 días</span>
-          </div>
-          <div className="p-2 sm:p-2.5 rounded-xl bg-neutral-900 border border-neutral-800">
-            <span className="text-[10px] text-neutral-400 block">Aciertos</span>
-            <span className="text-sm sm:text-base font-bold text-indigo-400 font-mono">148</span>
+            <div className="p-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center justify-center animate-pulse">
+              <Settings className="w-3.5 h-3.5" />
+            </div>
           </div>
         </div>
-        <div className="w-full bg-neutral-900 h-2 rounded-full overflow-hidden flex">
-          <div className="bg-emerald-500 h-full w-[75%]" title="Correctos" />
-          <div className="bg-amber-500 h-full w-[15%]" title="Difíciles" />
-          <div className="bg-rose-500 h-full w-[10%]" title="Fallos" />
+
+        {/* Menú de Opciones */}
+        <div className="grid grid-cols-3 gap-2 text-center text-[11px]">
+          <div className="p-2 rounded-xl bg-neutral-900/90 border border-neutral-800/80 text-neutral-300 flex flex-col items-center gap-1">
+            <span className="text-sm">✏️</span>
+            <span>Editar nombre</span>
+          </div>
+          <div className="p-2 rounded-xl bg-neutral-900/90 border border-neutral-800/80 text-neutral-300 flex flex-col items-center gap-1">
+            <span className="text-sm">🎨</span>
+            <span>Cambiar color</span>
+          </div>
+          <div className="p-2 rounded-xl bg-neutral-900/90 border border-rose-500/20 text-rose-300 flex flex-col items-center gap-1">
+            <span className="text-sm">🗑️</span>
+            <span>Eliminar</span>
+          </div>
         </div>
       </div>
     ),
@@ -204,9 +217,9 @@ const slides: SlideData[] = [
   {
     step: '5 de 5',
     badge: 'Comienza ahora',
-    title: '¡Ponte a prueba!',
+    title: 'Tu turno. ¡A jugar!',
     description:
-      'Te hemos dejado un mazo llamado \'Guía Rápida\' en tu panel. Ábrelo y dale a \'Estudiar\' para aprender cómo funciona la interfaz usándola.',
+      'Te hemos dejado un mazo llamado \'Guía Rápida\' en tu panel. Ábrelo ahora mismo y dale a \'Estudiar\' para hacer tu primera sesión de prueba y entender la dinámica.',
     gradient: 'from-indigo-600/25 via-violet-600/15 to-transparent',
     iconBg: 'bg-indigo-500/20 border-indigo-500/40',
     iconColor: 'text-indigo-400',
@@ -408,7 +421,7 @@ export function WelcomeTutorial() {
                 onClick={handleDismiss}
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-indigo-600/30 transition active:scale-95 cursor-pointer animate-pulse"
               >
-                <span>¡Ponte a prueba!</span>
+                <span>¡A jugar!</span>
                 <Rocket className="w-4 h-4" />
               </button>
             ) : (

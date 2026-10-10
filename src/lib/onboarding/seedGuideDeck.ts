@@ -51,24 +51,24 @@ export async function ensureQuickGuideDeck(userId: string): Promise<string | nul
 
     const guideCards = [
       {
-        front: '¿Para qué sirven los tres puntitos (⋮) al lado de una carpeta o mazo?',
-        back: 'Despliegan el menú contextual para cambiar el nombre o color, mover carpetas y mazos a otra ubicación, compartir con un enlace o eliminarlos.',
+        front: '¿Cuál es el botón más importante de la pantalla de inicio para empezar a organizar tu temario?',
+        back: 'El botón  \'+ Nuevo\'. Desde ahí puedes crear Carpetas (para asignaturas) y Mazos de Estudio (donde irán las tarjetas).',
       },
       {
-        front: '¿Qué formatos de archivos y fuentes admite la IA para crear tarjetas?',
-        back: 'Admite documentos PDF, archivos de Word (.docx, .doc), audios (.mp3, .wav) y enlaces directos a vídeos de YouTube o páginas web.',
+        front: 'Tienes un PDF de 20 páginas y no quieres escribir las preguntas a mano. ¿Qué haces?',
+        back: 'Entras a tu mazo, pulsas \'Generar preguntas con IA\' y arrastras tu PDF. La IA creará las flashcards automáticamente sobre todo el documento o la parte que le pidas. Puedes generar tarjetas tantas veces como quieras en bloques de hasta 30 a la vez.',
       },
       {
-        front: '¿Cómo evalúa el algoritmo científico FSRS tu retención tras voltear una tarjeta?',
-        back: 'Te permite calificar tu recuerdo del 1 al 4 (Again, Hard, Good, Easy). FSRS calcula con exactitud matemática el día ideal del siguiente repaso para afianzar tu memoria a largo plazo.',
+        front: 'Acabas de voltear esta tarjeta. Si te ha parecido facilísima y te la sabes de memoria, ¿qué botón debes pulsar ahora mismo?',
+        back: 'El botón azul \'Easy\' (o la tecla 4). Al pulsarlo, el algoritmo entenderá que dominas este concepto y tardará más días en volvértela a preguntar para no hacerte perder el tiempo.',
       },
       {
-        front: '¿Cómo puedes mantener organizada tu biblioteca de estudio?',
-        back: 'Crea Carpetas para tus asignaturas o grandes áreas temáticas y añade Mazos dentro de ellas para cada tema o lección específica.',
+        front: 'Has creado un mazo pero quieres cambiarle el color o borrarlo por completo. ¿Dónde tocas?',
+        back: 'En el icono del engranaje (⚙️) o en los tres puntitos (⋮) que aparecen al lado del botón de \'Estudiar\' en la vista general.',
       },
       {
-        front: '¿Qué sucede si marcas una tarjeta con "Again" (1) durante tu sesión?',
-        back: 'La tarjeta se reprograma de inmediato y vuelve a aparecer al final de la misma sesión para que fijes el concepto antes de terminar tu estudio diario.',
+        front: 'Te has quedado en blanco con una pregunta. Pulsas \'Again\' (botón rojo o tecla 1). ¿Qué ocurrirá con esa tarjeta?',
+        back: 'Que no te librarás de ella. Volverá a aparecer al final de esta misma sesión de estudio hasta que logres memorizarla y puedas pulsar \'Good\'.',
       },
     ];
 
