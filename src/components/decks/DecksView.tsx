@@ -505,14 +505,14 @@ function DecksViewContent() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 shrink-0 flex-wrap relative">
+        <div className="flex items-center gap-2 shrink-0 flex-nowrap sm:flex-wrap relative w-full sm:w-auto justify-between sm:justify-start">
           {currentFolderId && (
             <button
               onClick={() => {
                 const parentId = currentFolder?.parent_id || null;
                 navigateToFolder(parentId);
               }}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-300 hover:text-white text-xs font-medium transition active:scale-95"
+              className="inline-flex items-center justify-center gap-1 sm:gap-1.5 px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-300 hover:text-white text-xs font-medium transition active:scale-95 shrink-0"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -529,7 +529,7 @@ function DecksViewContent() {
                 e.stopPropagation();
                 setIsNewDropdownOpen(!isNewDropdownOpen);
               }}
-              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold text-xs sm:text-sm transition-all duration-150 shadow-lg shadow-indigo-600/25 active:scale-95 border border-indigo-400/20"
+              className="inline-flex items-center justify-center gap-1.5 sm:gap-2 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold text-xs sm:text-sm transition-all duration-150 shadow-lg shadow-indigo-600/25 active:scale-95 border border-indigo-400/20 shrink-0"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
@@ -549,64 +549,141 @@ function DecksViewContent() {
 
             {/* Menú Desplegable (Dropdown) */}
             {isNewDropdownOpen && (
-              <div
-                onClick={(e) => e.stopPropagation()}
-                className="absolute right-0 mt-2 w-64 rounded-2xl bg-neutral-900 border border-neutral-800 shadow-2xl p-1.5 z-40 animate-in fade-in slide-in-from-top-2 duration-150 divide-y divide-neutral-800/60"
-              >
-                <div className="p-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCreateType('folder');
-                      setNewColor('#f59e0b');
-                      setNewTitle('');
-                      setNewDescription('');
-                      setIsNewDropdownOpen(false);
-                      setIsCreateModalOpen(true);
-                    }}
-                    className="w-full text-left p-2.5 rounded-xl hover:bg-neutral-800 transition flex items-start gap-3 group"
+              <>
+                {/* Mobile Bottom Sheet (evita cortes en pantalla pequeña) */}
+                <div
+                  onClick={() => setIsNewDropdownOpen(false)}
+                  className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 md:hidden flex items-end justify-center p-3 animate-in fade-in duration-150"
+                >
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-full max-w-sm rounded-2xl bg-neutral-900 border border-neutral-800 shadow-2xl p-2.5 pb-4 space-y-1.5 animate-in slide-in-from-bottom duration-200"
                   >
-                    <div className="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 flex items-center justify-center text-lg shrink-0 group-hover:scale-105 transition-transform">
-                      📁
+                    <div className="flex items-center justify-between px-2 pt-1 pb-2 border-b border-neutral-800/80">
+                      <span className="text-xs font-semibold text-neutral-400">
+                        {t('dashboard.new_button', '+ Nuevo')}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setIsNewDropdownOpen(false)}
+                        className="w-6 h-6 rounded-full bg-neutral-800 text-neutral-400 hover:text-white flex items-center justify-center text-xs"
+                      >
+                        ✕
+                      </button>
                     </div>
-                    <div>
-                      <div className="text-xs font-bold text-white group-hover:text-amber-300 transition">
-                        {t('dashboard.new_folder', 'Nueva Carpeta')}
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCreateType('folder');
+                        setNewColor('#f59e0b');
+                        setNewTitle('');
+                        setNewDescription('');
+                        setIsNewDropdownOpen(false);
+                        setIsCreateModalOpen(true);
+                      }}
+                      className="w-full text-left p-3 rounded-xl hover:bg-neutral-800 active:bg-neutral-800/80 transition flex items-start gap-3 group"
+                    >
+                      <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 flex items-center justify-center text-xl shrink-0">
+                        📁
                       </div>
-                      <div className="text-[11px] text-neutral-400 leading-tight mt-0.5">
-                        {t('dashboard.new_folder_desc', 'Agrupa asignaturas o temas')}
+                      <div>
+                        <div className="text-sm font-bold text-white group-hover:text-amber-300 transition">
+                          {t('dashboard.new_folder', 'Nueva Carpeta')}
+                        </div>
+                        <div className="text-xs text-neutral-400 mt-0.5">
+                          {t('dashboard.new_folder_desc', 'Agrupa asignaturas o temas')}
+                        </div>
                       </div>
-                    </div>
-                  </button>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCreateType('deck');
+                        setNewColor('#6366f1');
+                        setNewTitle('');
+                        setNewDescription('');
+                        setIsNewDropdownOpen(false);
+                        setIsCreateModalOpen(true);
+                      }}
+                      className="w-full text-left p-3 rounded-xl hover:bg-neutral-800 active:bg-neutral-800/80 transition flex items-start gap-3 group"
+                    >
+                      <div className="w-10 h-10 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 flex items-center justify-center text-xl shrink-0">
+                        🃏
+                      </div>
+                      <div>
+                        <div className="text-sm font-bold text-white group-hover:text-indigo-300 transition">
+                          {t('dashboard.new_deck', 'Nuevo Mazo de Estudio')}
+                        </div>
+                        <div className="text-xs text-neutral-400 mt-0.5">
+                          {t('dashboard.new_deck_desc', 'Crea tarjetas con repaso FSRS')}
+                        </div>
+                      </div>
+                    </button>
+                  </div>
                 </div>
 
-                <div className="p-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCreateType('deck');
-                      setNewColor('#6366f1');
-                      setNewTitle('');
-                      setNewDescription('');
-                      setIsNewDropdownOpen(false);
-                      setIsCreateModalOpen(true);
-                    }}
-                    className="w-full text-left p-2.5 rounded-xl hover:bg-neutral-800 transition flex items-start gap-3 group"
-                  >
-                    <div className="w-9 h-9 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 flex items-center justify-center text-lg shrink-0 group-hover:scale-105 transition-transform">
-                      🃏
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold text-white group-hover:text-indigo-300 transition">
-                        {t('dashboard.new_deck', 'Nuevo Mazo de Estudio')}
+                {/* Desktop Dropdown (md y superiores: mantiene exactamente el diseño original) */}
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  className="hidden md:block absolute right-0 mt-2 w-64 rounded-2xl bg-neutral-900 border border-neutral-800 shadow-2xl p-1.5 z-40 animate-in fade-in slide-in-from-top-2 duration-150 divide-y divide-neutral-800/60"
+                >
+                  <div className="p-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCreateType('folder');
+                        setNewColor('#f59e0b');
+                        setNewTitle('');
+                        setNewDescription('');
+                        setIsNewDropdownOpen(false);
+                        setIsCreateModalOpen(true);
+                      }}
+                      className="w-full text-left p-2.5 rounded-xl hover:bg-neutral-800 transition flex items-start gap-3 group"
+                    >
+                      <div className="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 flex items-center justify-center text-lg shrink-0 group-hover:scale-105 transition-transform">
+                        📁
                       </div>
-                      <div className="text-[11px] text-neutral-400 leading-tight mt-0.5">
-                        {t('dashboard.new_deck_desc', 'Crea tarjetas con repaso FSRS')}
+                      <div>
+                        <div className="text-xs font-bold text-white group-hover:text-amber-300 transition">
+                          {t('dashboard.new_folder', 'Nueva Carpeta')}
+                        </div>
+                        <div className="text-[11px] text-neutral-400 leading-tight mt-0.5">
+                          {t('dashboard.new_folder_desc', 'Agrupa asignaturas o temas')}
+                        </div>
                       </div>
-                    </div>
-                  </button>
+                    </button>
+                  </div>
+
+                  <div className="p-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCreateType('deck');
+                        setNewColor('#6366f1');
+                        setNewTitle('');
+                        setNewDescription('');
+                        setIsNewDropdownOpen(false);
+                        setIsCreateModalOpen(true);
+                      }}
+                      className="w-full text-left p-2.5 rounded-xl hover:bg-neutral-800 transition flex items-start gap-3 group"
+                    >
+                      <div className="w-9 h-9 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 flex items-center justify-center text-lg shrink-0 group-hover:scale-105 transition-transform">
+                        🃏
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-white group-hover:text-indigo-300 transition">
+                          {t('dashboard.new_deck', 'Nuevo Mazo de Estudio')}
+                        </div>
+                        <div className="text-[11px] text-neutral-400 leading-tight mt-0.5">
+                          {t('dashboard.new_deck_desc', 'Crea tarjetas con repaso FSRS')}
+                        </div>
+                      </div>
+                    </button>
+                  </div>
                 </div>
-              </div>
+              </>
             )}
           </div>
         </div>
@@ -621,10 +698,10 @@ function DecksViewContent() {
         </div>
       )}
 
-      {/* Migas de pan (Breadcrumbs) Dinámicas y Discretas */}
+      {/* Migas de pan (Breadcrumbs) Dinámicas y Discretas: oculto en móvil en raíz (hidden md:flex), visible en subcarpetas */}
       <nav
         aria-label="Migas de pan"
-        className="order-2 flex items-center gap-1 p-1.5 px-3 rounded-xl bg-neutral-900/70 border border-neutral-800/90 text-xs overflow-x-auto shadow-sm"
+        className={`order-2 ${!currentFolder ? 'hidden md:flex' : 'flex'} items-center gap-1 p-1.5 px-3 rounded-xl bg-neutral-900/70 border border-neutral-800/90 text-xs overflow-x-auto shadow-sm`}
       >
         <span className="text-neutral-500 font-mono text-[11px] uppercase mr-1.5 flex items-center gap-1 shrink-0">
           <svg className="w-3.5 h-3.5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -665,9 +742,9 @@ function DecksViewContent() {
         })}
       </nav>
 
-      {/* Metrics Row: 4 Metric Cards (Solo visible en la raíz, al final en móvil y arriba en escritorio) */}
+      {/* Metrics Row: 4 Metric Cards (Oculto en móvil en la pantalla de inicio, visible en escritorio) */}
       {!currentFolder && (
-        <div className="order-5 md:order-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="order-5 md:order-3 hidden md:grid md:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Stat 1: Tarjetas a Repasar Hoy */}
           <div className="p-5 rounded-2xl bg-neutral-900/50 border border-neutral-800/80 backdrop-blur-sm relative overflow-hidden group hover:border-neutral-700/80 transition-all duration-200">
             <div className="flex items-center justify-between">
@@ -817,8 +894,8 @@ function DecksViewContent() {
           )}
         </div>
 
-        {/* Filter Pills */}
-        <div className="flex items-center gap-1.5 self-start sm:self-auto p-1 rounded-xl bg-neutral-900 border border-neutral-800 text-xs flex-wrap">
+        {/* Filter Pills: oculto en móvil dentro de subcarpetas/subniveles, visible en escritorio */}
+        <div className={`${currentFolder ? 'hidden md:flex' : 'flex'} items-center gap-1.5 self-start sm:self-auto p-1 rounded-xl bg-neutral-900 border border-neutral-800 text-xs flex-wrap`}>
           <button
             onClick={() => setFilterMode('all')}
             className={`px-3 py-1.5 rounded-lg font-medium transition ${
@@ -925,8 +1002,8 @@ function DecksViewContent() {
             )}
           </div>
         ) : (
-          /* Cuadrícula de Carpetas y Mazos */
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          /* Cuadrícula de Carpetas y Mazos: 2 columnas en móvil (< sm), layout original en escritorio */
+          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-4 md:gap-5">
             {filteredDecks.map((deck) => {
               const isFolder = Boolean(deck.is_folder || (deck as unknown as Record<string, unknown>).isFolder);
               const accentColor = deck.color || (isFolder ? '#f59e0b' : '#6366f1');
@@ -939,14 +1016,14 @@ function DecksViewContent() {
                   <div
                     key={deck.id}
                     onClick={() => navigateToFolder(deck.id)}
-                    className="group rounded-2xl border border-neutral-800 bg-neutral-900/60 p-5 hover:border-amber-500/50 hover:bg-neutral-900/90 transition-all duration-200 flex flex-col justify-between relative shadow-sm hover:shadow-xl hover:shadow-black/50 hover:-translate-y-0.5 cursor-pointer"
+                    className="group rounded-xl sm:rounded-2xl border border-neutral-800 bg-neutral-900/60 p-3 sm:p-5 hover:border-amber-500/50 hover:bg-neutral-900/90 transition-all duration-200 flex flex-col justify-between relative shadow-sm hover:shadow-xl hover:shadow-black/50 hover:-translate-y-0.5 cursor-pointer"
                   >
                     <div>
                       {/* Top Bar: Icono de Carpeta, Badge de Carpeta y Menú Desplegable (⋮) */}
-                      <div className="flex items-center justify-between gap-2 mb-3">
-                        <div className="flex items-center gap-2.5">
+                      <div className="flex items-center justify-between gap-1.5 sm:gap-2 mb-2 sm:mb-3">
+                        <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0">
                           <div
-                            className="w-8 h-8 rounded-xl flex items-center justify-center text-sm shadow-sm border"
+                            className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl flex items-center justify-center text-xs sm:text-sm shadow-sm border shrink-0"
                             style={{
                               backgroundColor: `${accentColor}18`,
                               borderColor: `${accentColor}40`,
@@ -955,13 +1032,13 @@ function DecksViewContent() {
                           >
                             📁
                           </div>
-                          <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-300 font-mono font-medium border border-amber-500/25">
+                          <span className="text-[10px] sm:text-xs px-2 sm:px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-300 font-mono font-medium border border-amber-500/25 truncate">
                             {t('dashboard.folder_badge', 'Carpeta')}
                           </span>
                         </div>
 
                         {/* Menú Desplegable de Tres Puntos (⋮) */}
-                        <div className="relative" onClick={(e) => e.stopPropagation()}>
+                        <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
                           <button
                             type="button"
                             onClick={(e) => {
@@ -970,7 +1047,7 @@ function DecksViewContent() {
                               setActiveDropdownDeckId(activeDropdownDeckId === deck.id ? null : deck.id);
                             }}
                             title={t('dashboard.options_folder', 'Opciones de la carpeta')}
-                            className="w-7 h-7 rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-800 transition flex items-center justify-center font-bold text-sm tracking-wider"
+                            className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-800 transition flex items-center justify-center font-bold text-xs sm:text-sm tracking-wider"
                           >
                             ⋮
                           </button>
@@ -1026,41 +1103,41 @@ function DecksViewContent() {
                       </div>
 
                       {/* Folder Title & Description */}
-                      <h3 className="text-base font-bold text-white tracking-tight line-clamp-1 group-hover:text-amber-300 transition flex items-center gap-1.5">
+                      <h3 className="text-xs sm:text-base font-bold text-white tracking-tight line-clamp-1 group-hover:text-amber-300 transition flex items-center gap-1.5">
                         <span>{deck.title}</span>
                       </h3>
-                      <p className="text-xs text-neutral-400 mt-1 line-clamp-2 leading-relaxed min-h-[2rem]">
+                      <p className="text-[10px] sm:text-xs text-neutral-400 mt-0.5 sm:mt-1 line-clamp-1 sm:line-clamp-2 leading-tight sm:leading-relaxed min-h-0 sm:min-h-[2rem]">
                         {deck.description || 'Carpeta organizadora de temas y mazos.'}
                       </p>
 
                       {/* Recuento de Elementos Contenidos */}
-                      <div className="mt-3.5 pt-3 border-t border-neutral-800/60">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-neutral-400 font-medium">{t('dashboard.folder_content', 'Contenido:')}</span>
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-neutral-800 text-neutral-300 font-medium text-xs border border-neutral-700/50">
+                      <div className="mt-2.5 sm:mt-3.5 pt-2 sm:pt-3 border-t border-neutral-800/60">
+                        <div className="flex items-center justify-between text-[10px] sm:text-xs">
+                          <span className="text-neutral-400 font-medium hidden sm:inline">{t('dashboard.folder_content', 'Contenido:')}</span>
+                          <span className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-neutral-800 text-neutral-300 font-medium text-[10px] sm:text-xs border border-neutral-700/50">
                             <span>📁</span>
                             <span>
-                              {deck.childrenCount ?? 0} {deck.childrenCount === 1 ? t('dashboard.item_singular', 'elemento') : t('dashboard.item_plural', 'elementos')}
+                              {deck.childrenCount ?? 0} {deck.childrenCount === 1 ? t('dashboard.item_singular', 'elem.') : t('dashboard.item_plural', 'elem.')}
                             </span>
                           </span>
                         </div>
                       </div>
                     </div>
 
-                    {/* Pie de la Carpeta: Únicamente Abrir Carpeta y Gestionar */}
-                    <div className="mt-5 pt-3 border-t border-neutral-800/80 flex items-center justify-between gap-3">
+                    {/* Pie de la Carpeta */}
+                    <div className="mt-3 sm:mt-5 pt-2 sm:pt-3 border-t border-neutral-800/80 flex items-center justify-between gap-1 sm:gap-3">
                       <button
                         type="button"
                         onClick={() => navigateToFolder(deck.id)}
-                        className="inline-flex items-center justify-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 transition-all duration-150 active:scale-95"
+                        className="inline-flex items-center justify-center gap-1 text-[11px] sm:text-xs font-semibold px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 transition-all duration-150 active:scale-95 flex-1 sm:flex-initial"
                       >
-                        <span>{t('dashboard.open_folder', 'Abrir Carpeta')}</span>
+                        <span>{t('dashboard.open_folder', 'Abrir')}</span>
                         <span>→</span>
                       </button>
                       <button
                         type="button"
                         onClick={(e) => handleOpenEdit(e, deck)}
-                        className="text-xs font-medium text-neutral-400 hover:text-white px-3 py-2 rounded-xl hover:bg-neutral-800 transition flex items-center gap-1"
+                        className="hidden sm:flex text-xs font-medium text-neutral-400 hover:text-white px-3 py-2 rounded-xl hover:bg-neutral-800 transition items-center gap-1 shrink-0"
                       >
                         <span>{t('dashboard.manage', 'Gestionar')}</span>
                         <span>→</span>
@@ -1074,23 +1151,23 @@ function DecksViewContent() {
               return (
                 <div
                   key={deck.id}
-                  className="group rounded-2xl border border-neutral-800 bg-neutral-900/60 p-5 hover:border-neutral-700/80 transition-all duration-200 flex flex-col justify-between relative shadow-sm hover:shadow-xl hover:shadow-black/40 hover:-translate-y-0.5"
+                  className="group rounded-xl sm:rounded-2xl border border-neutral-800 bg-neutral-900/60 p-3 sm:p-5 hover:border-neutral-700/80 transition-all duration-200 flex flex-col justify-between relative shadow-sm hover:shadow-xl hover:shadow-black/40 hover:-translate-y-0.5"
                 >
                   <div>
                     {/* Top Bar: Accent color, Total Cards badge, and Menú Desplegable (⋮) */}
-                    <div className="flex items-center justify-between gap-2 mb-3">
-                      <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-between gap-1.5 sm:gap-2 mb-2 sm:mb-3">
+                      <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
                         <span
-                          className="w-3 h-3 rounded-full shrink-0 shadow-sm"
+                          className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full shrink-0 shadow-sm"
                           style={{ backgroundColor: accentColor }}
                         />
-                        <span className="text-xs px-2.5 py-0.5 rounded-full bg-neutral-800/80 text-neutral-300 font-mono font-medium border border-neutral-700/40">
-                          {deck.cardsCount} {deck.cardsCount === 1 ? t('dashboard.cards_count_singular', 'tarjeta') : t('dashboard.cards_count_plural', 'tarjetas')}
+                        <span className="text-[10px] sm:text-xs px-2 sm:px-2.5 py-0.5 rounded-full bg-neutral-800/80 text-neutral-300 font-mono font-medium border border-neutral-700/40 truncate">
+                          {deck.cardsCount} <span className="hidden sm:inline">{deck.cardsCount === 1 ? t('dashboard.cards_count_singular', 'tarjeta') : t('dashboard.cards_count_plural', 'tarjetas')}</span><span className="sm:hidden">t.</span>
                         </span>
                       </div>
 
                       {/* Menú Desplegable de Tres Puntos (⋮) con acciones secundarias */}
-                      <div className="relative" onClick={(e) => e.stopPropagation()}>
+                      <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
                         <button
                           type="button"
                           onClick={(e) => {
@@ -1099,7 +1176,7 @@ function DecksViewContent() {
                             setActiveDropdownDeckId(activeDropdownDeckId === deck.id ? null : deck.id);
                           }}
                           title={t('dashboard.options_deck', 'Opciones del mazo')}
-                          className="w-7 h-7 rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-800 transition flex items-center justify-center font-bold text-sm tracking-wider"
+                          className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-800 transition flex items-center justify-center font-bold text-xs sm:text-sm tracking-wider"
                         >
                           ⋮
                         </button>
@@ -1169,44 +1246,48 @@ function DecksViewContent() {
 
                     {/* Mazo Title & Description */}
                     <Link href={`/decks/${deck.id}`} className="block group-hover:text-indigo-400 transition">
-                      <h3 className="text-base font-bold text-white tracking-tight line-clamp-1 group-hover:text-indigo-300 transition">
+                      <h3 className="text-xs sm:text-base font-bold text-white tracking-tight line-clamp-1 group-hover:text-indigo-300 transition">
                         {deck.title}
                       </h3>
                     </Link>
-                    <p className="text-xs text-neutral-400 mt-1 line-clamp-2 leading-relaxed min-h-[2rem]">
+                    <p className="text-[10px] sm:text-xs text-neutral-400 mt-0.5 sm:mt-1 line-clamp-1 sm:line-clamp-2 leading-tight sm:leading-relaxed min-h-0 sm:min-h-[2rem]">
                       {deck.description || 'Sin descripción añadida.'}
                     </p>
 
                     {/* Indicador Numérico de Tarjetas a Repasar Hoy (FSRS due_date) */}
-                    <div className="mt-3.5 pt-3 border-t border-neutral-800/60">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-neutral-400 font-medium">{t('dashboard.fsrs_review', 'Repaso FSRS:')}</span>
+                    <div className="mt-2.5 sm:mt-3.5 pt-2 sm:pt-3 border-t border-neutral-800/60">
+                      <div className="flex items-center justify-between text-[10px] sm:text-xs">
+                        <span className="text-neutral-400 font-medium hidden sm:inline">{t('dashboard.fsrs_review', 'Repaso FSRS:')}</span>
                         {hasDue ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-300 font-semibold text-xs animate-in fade-in">
+                          <span className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-300 font-semibold text-[10px] sm:text-xs animate-in fade-in">
                             <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse" />
-                            {deck.dueCount} {t('dashboard.due_today', 'para repasar hoy')}
+                            <span>{deck.dueCount}</span>
+                            <span className="hidden sm:inline">{t('dashboard.due_today', 'para repasar hoy')}</span>
+                            <span className="sm:hidden">hoy</span>
                           </span>
                         ) : hasCards ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 font-medium text-xs">
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <span className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 font-medium text-[10px] sm:text-xs">
+                            <svg className="w-3 h-3 sm:w-3.5 sm:h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                             </svg>
-                            {t('dashboard.all_caught_up', 'Al día (0 pendientes)')}
+                            <span className="hidden sm:inline">{t('dashboard.all_caught_up', 'Al día (0 pendientes)')}</span>
+                            <span className="sm:hidden">Al día</span>
                           </span>
                         ) : (
-                          <span className="text-neutral-500 text-xs font-mono">
-                            {t('dashboard.no_cards', 'Mazo sin tarjetas')}
+                          <span className="text-neutral-500 text-[10px] sm:text-xs font-mono">
+                            <span className="hidden sm:inline">{t('dashboard.no_cards', 'Mazo sin tarjetas')}</span>
+                            <span className="sm:hidden">Vacío</span>
                           </span>
                         )}
                       </div>
                     </div>
                   </div>
 
-                  {/* Pie del Mazo: Únicamente "Estudiar" y "Gestionar" */}
-                  <div className="mt-5 pt-3 border-t border-neutral-800/80 flex items-center justify-between gap-3">
+                  {/* Pie del Mazo */}
+                  <div className="mt-3 sm:mt-5 pt-2 sm:pt-3 border-t border-neutral-800/80 flex items-center justify-between gap-1 sm:gap-3">
                     <Link
                       href={`/study/${deck.id}`}
-                      className={`inline-flex items-center justify-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-xl transition-all duration-150 ${
+                      className={`inline-flex items-center justify-center gap-1 text-[11px] sm:text-xs font-semibold px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl transition-all duration-150 flex-1 sm:flex-initial ${
                         !hasCards
                           ? 'bg-neutral-800/50 text-neutral-500 pointer-events-none'
                           : hasDue
@@ -1214,7 +1295,7 @@ function DecksViewContent() {
                           : 'bg-indigo-600/20 text-indigo-300 hover:bg-indigo-600/30 border border-indigo-500/30'
                       }`}
                     >
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="w-3 h-3 sm:w-3.5 sm:h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
@@ -1223,7 +1304,7 @@ function DecksViewContent() {
 
                     <Link
                       href={`/decks/${deck.id}`}
-                      className="text-xs font-medium text-neutral-400 hover:text-white px-3 py-2 rounded-xl hover:bg-neutral-800 transition flex items-center gap-1 shrink-0"
+                      className="hidden sm:flex text-xs font-medium text-neutral-400 hover:text-white px-3 py-2 rounded-xl hover:bg-neutral-800 transition items-center gap-1 shrink-0"
                     >
                       <span>{t('dashboard.manage', 'Gestionar')}</span>
                       <span>→</span>
