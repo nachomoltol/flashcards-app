@@ -1,10 +1,10 @@
-const CACHE_NAME = 'flashcards-pwa-v2';
+const CACHE_NAME = 'flashmente-pwa-v3';
 const PRECACHE_ASSETS = [
   '/',
   '/manifest.json',
-  '/icons/icon-192x192.png',
-  '/icons/icon-512x512.png',
-  '/icons/icon.svg',
+  '/icons/android-chrome-192x192.png',
+  '/icons/android-chrome-512x512.png',
+  '/icons/apple-touch-icon.png',
 ];
 
 // Install: precache essential shell assets

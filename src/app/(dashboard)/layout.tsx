@@ -214,10 +214,12 @@ export default function DashboardLayout({
       {!isStudyPage && (
         <header className="md:hidden flex items-center justify-between px-4 py-3 border-b border-neutral-800/80 bg-neutral-900/50 backdrop-blur sticky top-0 z-40">
           <Link href="/" className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-              <span className="font-bold text-white text-base">F</span>
-            </div>
-            <span className="font-semibold text-white tracking-tight">Flashcards</span>
+            <img
+              src="/icons/android-chrome-192x192.png"
+              alt="Flashmente"
+              className="w-10 h-10 rounded-lg object-contain shadow-sm"
+            />
+            <span className="font-semibold text-white tracking-tight text-base">Flashmente</span>
           </Link>
 
           <div className="flex items-center gap-2">
@@ -504,14 +506,16 @@ export default function DashboardLayout({
         <div className="space-y-6">
           {/* Logo / Brand */}
           <Link href="/" className="flex items-center gap-3 px-2 py-2 group">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/25 group-hover:scale-105 transition-transform duration-200">
-              <span className="font-bold text-white text-lg">F</span>
-            </div>
+            <img
+              src="/icons/android-chrome-192x192.png"
+              alt="Flashmente"
+              className="w-10 h-10 rounded-lg object-contain shadow-md group-hover:scale-105 transition-transform duration-200"
+            />
             <div>
               <span className="font-semibold text-white tracking-tight block text-base">
-                Flashcards
+                Flashmente
               </span>
-              <span className="text-[11px] text-indigo-400 font-mono tracking-wider uppercase block">
+              <span className="text-[11px] text-amber-400 font-mono tracking-wider uppercase block">
                 FSRS Spaced Rep
               </span>
             </div>

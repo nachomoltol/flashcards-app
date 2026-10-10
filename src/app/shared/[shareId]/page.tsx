@@ -1,4 +1,5 @@
 'use client';
+/* eslint-disable @next/next/no-img-element */
 
 import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -160,11 +161,13 @@ export default function SharedDeckPage({ params }: SharedDeckPageProps) {
       <header className="border-b border-neutral-800/80 bg-neutral-950/70 backdrop-blur-md sticky top-0 z-40">
         <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
           <Link href="/decks" className="flex items-center gap-2.5 group">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white text-base shadow-md shadow-indigo-600/30 group-hover:scale-105 transition-transform">
-              ⚡
-            </div>
-            <span className="font-bold text-sm tracking-tight text-white group-hover:text-indigo-300 transition-colors">
-              Flashcards App
+            <img
+              src="/icons/android-chrome-192x192.png"
+              alt="Flashmente"
+              className="w-8 h-8 rounded-lg object-contain shadow-md group-hover:scale-105 transition-transform"
+            />
+            <span className="font-bold text-sm tracking-tight text-white group-hover:text-amber-300 transition-colors">
+              Flashmente
             </span>
           </Link>
 

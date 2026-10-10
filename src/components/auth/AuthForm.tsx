@@ -1,4 +1,5 @@
 'use client';
+/* eslint-disable @next/next/no-img-element */
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -190,14 +191,16 @@ export function AuthForm({ initialMode = 'signin' }: AuthFormProps) {
       <div className="text-center space-y-2">
         <div className="inline-flex items-center justify-center">
           <Link href="/" className="inline-flex items-center gap-2.5 group">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/25 group-hover:scale-105 transition-transform duration-200">
-              <span className="font-bold text-white text-lg">F</span>
-            </div>
+            <img
+              src="/icons/android-chrome-192x192.png"
+              alt="Flashmente"
+              className="w-10 h-10 rounded-lg object-contain shadow-md group-hover:scale-105 transition-transform duration-200"
+            />
             <div className="text-left">
               <span className="font-bold text-white tracking-tight block text-base leading-tight">
-                Flashcards
+                Flashmente
               </span>
-              <span className="text-[10px] text-indigo-400 font-mono tracking-wider uppercase block">
+              <span className="text-[10px] text-amber-400 font-mono tracking-wider uppercase block">
                 FSRS Spaced Rep
               </span>
             </div>

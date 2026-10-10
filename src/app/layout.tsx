@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const viewport: Viewport = {
-  themeColor: "#6366f1",
+  themeColor: "#FFD700",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -22,19 +22,19 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Flashcards App - Repetición Espaciada FSRS",
-  description: "Next.js Flashcards application with FSRS algorithm, Zustand state management, and Supabase integration.",
+  title: "Flashmente - Memoriza a la velocidad del rayo con flashcards impulsadas por IA",
+  description: "Memoriza a la velocidad del rayo con flashcards impulsadas por IA",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "black-translucent",
-    title: "Flashcards",
+    statusBarStyle: "default",
+    title: "Flashmente",
+    startupImage: "/icons/apple-touch-icon.png",
   },
   icons: {
     icon: [
-      { url: "/icons/icon-192x192.png", sizes: "192x192", type: "image/png" },
-      { url: "/icons/icon-512x512.png", sizes: "512x512", type: "image/png" },
-      { url: "/icons/icon.svg", type: "image/svg+xml" },
+      { url: "/icons/android-chrome-192x192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/android-chrome-512x512.png", sizes: "512x512", type: "image/png" },
     ],
     apple: [
       { url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
