@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
-import { useAuthStore } from '@/stores';
+import { useAuthStore, useLanguageStore } from '@/stores';
 import {
   Mail,
   Lock,
@@ -47,6 +47,7 @@ function getFriendlyErrorMessage(errorMsg: string): string {
 
 export function AuthForm({ initialMode = 'signin' }: AuthFormProps) {
   const router = useRouter();
+  const { t } = useLanguageStore();
   const [mode, setMode] = useState<'signin' | 'signup'>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -390,6 +391,16 @@ export function AuthForm({ initialMode = 'signin' }: AuthFormProps) {
             </button>
           </p>
         )}
+      </div>
+
+      {/* Privacy Policy Link */}
+      <div className="text-center pt-2 border-t border-neutral-800/60">
+        <Link
+          href="/privacidad"
+          className="text-[11px] text-neutral-500 hover:text-neutral-300 transition-colors inline-block"
+        >
+          {t('auth.privacy_policy', 'Política de Privacidad')}
+        </Link>
       </div>
     </div>
   );

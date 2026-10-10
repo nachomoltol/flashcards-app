@@ -24,7 +24,11 @@
     "subscription": "Suscripción",
     "pro_subscription": "Suscripción (PRO)",
     "support_feedback": "Soporte y Feedback",
-    "logout": "Cerrar Sesión"
+    "logout": "Cerrar Sesión",
+    "privacy": "Política de Privacidad"
+  },
+  "auth": {
+    "privacy_policy": "Política de Privacidad"
   },
   "pro_modal": {
     "badge": "FLASHCARDS PRO",
@@ -411,6 +415,9 @@
     "changes_pending": "Tienes cambios sin guardar",
     "synced": "Ajustes sincronizados con Supabase",
     "save_button": "Guardar Cambios",
-    "saving": "Guardando cambios..."
+    "saving": "Guardando cambios...",
+    "privacy_section_title": "Privacidad y Protección de Datos",
+    "privacy_section_desc": "Consulta nuestra política de privacidad, uso seguro de datos y cómo solicitar la eliminación de tu cuenta.",
+    "privacy_button": "Ver Política de Privacidad"
   }
 }

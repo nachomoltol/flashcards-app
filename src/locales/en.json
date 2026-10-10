@@ -24,7 +24,11 @@
     "subscription": "Subscription",
     "pro_subscription": "Subscription (PRO)",
     "support_feedback": "Support & Feedback",
-    "logout": "Log Out"
+    "logout": "Log Out",
+    "privacy": "Privacy Policy"
+  },
+  "auth": {
+    "privacy_policy": "Privacy Policy"
   },
   "pro_modal": {
     "badge": "FLASHCARDS PRO",
@@ -411,6 +415,9 @@
     "changes_pending": "You have unsaved changes",
     "synced": "Settings synchronized with Supabase",
     "save_button": "Save Changes",
-    "saving": "Saving changes..."
+    "saving": "Saving changes...",
+    "privacy_section_title": "Privacy & Data Protection",
+    "privacy_section_desc": "View our privacy policy, secure data handling, and how to request account deletion.",
+    "privacy_button": "View Privacy Policy"
   }
 }

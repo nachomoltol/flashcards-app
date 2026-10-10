@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Ticket, CheckCircle2, AlertCircle, Languages } from 'lucide-react';
+import Link from 'next/link';
+import { Ticket, CheckCircle2, AlertCircle, Languages, ShieldCheck } from 'lucide-react';
 import { useAuthStore, useSettingsStore, useTutorialStore, useLanguageStore, DEFAULT_FSRS_SETTINGS } from '@/stores';
 import { redeemPromoCodeAction } from '@/app/actions/redeemPromoCode';
 
@@ -594,6 +595,29 @@ export default function SettingsPage() {
               </svg>
               <span>{t('settings.tutorial_button', 'Volver a ver el tutorial de bienvenida')}</span>
             </button>
+          </div>
+        </div>
+
+        {/* Sección: Legal y Privacidad de Datos */}
+        <div className="p-6 rounded-2xl bg-neutral-900/60 border border-neutral-800 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h2 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <span>{t('settings.privacy_section_title', 'Privacidad y Protección de Datos')}</span>
+              </h2>
+              <p className="text-xs text-neutral-400 mt-1">
+                {t('settings.privacy_section_desc', 'Consulta nuestra política de privacidad, uso seguro de datos y cómo solicitar la eliminación de tu cuenta.')}
+              </p>
+            </div>
+
+            <Link
+              href="/privacidad"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-700/80 hover:border-neutral-600 text-neutral-200 hover:text-white text-xs sm:text-sm font-medium transition active:scale-95 shrink-0 cursor-pointer shadow-sm group"
+            >
+              <span>{t('settings.privacy_button', 'Ver Política de Privacidad')}</span>
+              <span className="text-neutral-500 group-hover:translate-x-0.5 transition-transform">→</span>
+            </Link>
           </div>
         </div>
 

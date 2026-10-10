@@ -14,6 +14,7 @@ import {
   LogOut,
   ChevronsUpDown,
   ChevronRight,
+  ShieldCheck,
 } from 'lucide-react';
 import { WelcomeTutorial } from '@/components/onboarding/WelcomeTutorial';
 import { ProModal } from '@/components/subscription/ProModal';
@@ -334,6 +335,19 @@ export default function DashboardLayout({
                   </span>
                 </button>
 
+                {/* 5. Política de Privacidad */}
+                <Link
+                  href="/privacidad"
+                  onClick={() => setIsMobileUserMenuOpen(false)}
+                  className="w-full flex items-center justify-between px-2.5 py-2 text-xs font-medium rounded-xl text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/50 transition-colors group text-left"
+                  role="menuitem"
+                >
+                  <span className="flex items-center gap-2.5">
+                    <ShieldCheck className="w-4 h-4 text-neutral-500 group-hover:text-neutral-300 transition-colors" />
+                    <span>{t('nav.privacy', 'Política de Privacidad')}</span>
+                  </span>
+                </Link>
+
                 {/* Separador */}
                 <div className="my-1 border-t border-neutral-800/80" />
 
@@ -484,6 +498,18 @@ export default function DashboardLayout({
                 <span>Soporte y Feedback</span>
               </span>
             </button>
+
+            {/* Política de Privacidad */}
+            <Link
+              href="/privacidad"
+              onClick={() => setMobileMenuOpen(false)}
+              className="w-full flex items-center justify-between px-2.5 py-2 text-xs font-medium rounded-xl text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/50 transition-colors text-left"
+            >
+              <span className="flex items-center gap-2.5">
+                <ShieldCheck className="w-4 h-4 text-neutral-500" />
+                <span>{t('nav.privacy', 'Política de Privacidad')}</span>
+              </span>
+            </Link>
 
             {/* Separador */}
             <div className="my-1 border-t border-neutral-800/80" />
@@ -636,6 +662,19 @@ export default function DashboardLayout({
                 </span>
               </button>
 
+              {/* 5. Política de Privacidad */}
+              <Link
+                href="/privacidad"
+                onClick={() => setIsUserMenuOpen(false)}
+                className="w-full flex items-center justify-between px-2.5 py-2 text-xs font-medium rounded-xl text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/50 transition-colors group text-left"
+                role="menuitem"
+              >
+                <span className="flex items-center gap-2.5">
+                  <ShieldCheck className="w-4 h-4 text-neutral-500 group-hover:text-neutral-300 transition-colors" />
+                  <span>{t('nav.privacy', 'Política de Privacidad')}</span>
+                </span>
+              </Link>
+
               {/* Línea divisoria / Separador */}
               <div className="my-1 border-t border-neutral-800/80" />
 
@@ -684,6 +723,16 @@ export default function DashboardLayout({
             </div>
             <ChevronsUpDown className="w-4 h-4 text-neutral-500 group-hover:text-neutral-300 transition-colors shrink-0 ml-1" />
           </button>
+
+          {/* Enlace discreto a Política de Privacidad */}
+          <div className="pt-2 text-center">
+            <Link
+              href="/privacidad"
+              className="text-[11px] text-neutral-500 hover:text-neutral-400 transition-colors inline-block"
+            >
+              {t('nav.privacy', 'Política de Privacidad')}
+            </Link>
+          </div>
         </div>
       </aside>
 
