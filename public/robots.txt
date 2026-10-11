@@ -1,0 +1,10 @@
+# robots.txt para Flashmente (https://flashmente.com)
+# Permitir acceso total a todos los rastreadores y robots (Googlebot, Google Play Review Bot, etc.)
+
+User-agent: *
+Allow: /
+Allow: /privacidad
+Allow: /privacy
+Allow: /.well-known/assetlinks.json
+
+Sitemap: https://flashmente.com/sitemap.xml

@@ -5,7 +5,8 @@
       "namespace": "android_app",
       "package_name": "com.flashmente.app",
       "sha256_cert_fingerprints": [
-        "34:56:38:55:A2:B1:C0:C8:F8:4E:D1:18:89:CF:25:70:42:FE:E3:02:26:D0:1E:02:25:E9:AC:6E:5F:6F:49:D1"
+        "34:56:38:55:A2:B1:C0:C8:F8:4E:D1:18:89:CF:25:70:42:FE:E3:02:26:D0:1E:02:25:E9:AC:6E:5F:6F:49:D1",
+        "DB:A6:51:DF:7F:C0:20:FF:64:21:9B:8A:5D:A2:4E:FB:31:94:10:F3:94:D6:48:E2:C1:2D:00:AA:0B:2C:50:62"
       ]
     }
   }

@@ -6,9 +6,19 @@ export const metadata: Metadata = {
   title: 'Política de Privacidad | Flashmente',
   description:
     'Política de Privacidad de Flashmente para la gestión segura de datos de usuario y cumplimiento de Google Play Store.',
+  alternates: {
+    canonical: 'https://flashmente.com/privacidad',
+  },
   robots: {
     index: true,
     follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
   },
 };
 
