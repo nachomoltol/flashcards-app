@@ -20,21 +20,17 @@ export async function POST(req: NextRequest) {
     }
 
     const body: CheckoutRequestBody = await req.json();
-    const plan = body.plan === 'monthly' ? 'monthly' : 'annual';
+    const plan = 'monthly'; // Pivote a modelo único: Plan Mensual (3,50€/mes)
     const userId = body.userId?.trim();
     const email = body.email?.trim();
 
-    const priceId =
-      plan === 'annual'
-        ? process.env.STRIPE_PRICE_ANNUAL
-        : process.env.STRIPE_PRICE_MONTHLY;
+    const priceId = process.env.STRIPE_PRICE_MONTHLY;
 
     if (!priceId) {
-      const missingVarName =
-        plan === 'annual' ? 'STRIPE_PRICE_ANNUAL' : 'STRIPE_PRICE_MONTHLY';
       return NextResponse.json(
         {
-          error: `La variable de entorno ${missingVarName} no está configurada con el ID del precio de Stripe (ej. price_...).`,
+          error:
+            'La variable de entorno STRIPE_PRICE_MONTHLY no está configurada con el ID del precio de Stripe (ej. price_...).',
         },
         { status: 500 }
       );

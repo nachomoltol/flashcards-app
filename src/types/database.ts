@@ -22,6 +22,7 @@ export type Database = {
           tier: 'free' | 'pro' | 'vip'
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
+          bonus_credits: number
           created_at: string
           updated_at: string
         }
@@ -32,6 +33,7 @@ export type Database = {
           tier?: 'free' | 'pro' | 'vip'
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
+          bonus_credits?: number
           created_at?: string
           updated_at?: string
         }
@@ -42,6 +44,7 @@ export type Database = {
           tier?: 'free' | 'pro' | 'vip'
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
+          bonus_credits?: number
           created_at?: string
           updated_at?: string
         }
@@ -328,6 +331,13 @@ export type Database = {
       increment_api_generation: {
         Args: {
           p_user_id: string
+        }
+        Returns: Json
+      }
+      add_bonus_credit: {
+        Args: {
+          p_user_id: string
+          p_amount?: number
         }
         Returns: Json
       }

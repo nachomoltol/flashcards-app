@@ -193,7 +193,7 @@ Toda nueva tarjeta que generes DEBE evaluar aspectos, conceptos, detalles, relac
 /**
  * Modelo global de Google Gemini unificado para rentabilidad y generaciones ilimitadas sostenibles.
  */
-const GEMINI_MODEL = 'gemini-3.5-flash-lite';
+const GEMINI_MODEL = 'gemini-3.1-flash-lite';
 
 /**
  * Inyecta la directiva estricta de idioma según las especificaciones de la Fase 25:
@@ -264,14 +264,15 @@ interface ApiLimitCheck {
   allowed: boolean;
   tier: 'free' | 'pro' | 'vip';
   currentCount: number;
+  bonusCredits?: number;
   userId: string;
 }
 
 /**
  * Valida la cuota de generación del usuario en api_limits antes de llamar a Gemini:
- * - Si tier es 'pro' o 'vip': omite límites (bypass).
- * - Si tier es 'free': verifica si last_generation_date es de hoy. Si es anterior o null,
- *   reinicia el conteo a 0. Si es de hoy y count >= 5, aborta devolviendo { error: 'LIMIT_REACHED' }.
+ * - Si tier es 'pro' o 'vip': omite límites (bypass ilimitado).
+ * - Si tier es 'free': cuota de 10 generaciones mensuales. Si supera 10, consume
+ *   créditos acumulables de anuncios (bonus_credits). Si ambos se agotan, devuelve { error: 'LIMIT_REACHED' }.
  */
 async function enforceApiLimit(
   userId: string
@@ -287,6 +288,7 @@ async function enforceApiLimit(
         allowed?: boolean;
         tier?: 'free' | 'pro' | 'vip';
         count?: number;
+        bonus_credits?: number;
         error?: string;
       };
 
@@ -299,6 +301,7 @@ async function enforceApiLimit(
           allowed: true,
           tier: res.tier || 'free',
           currentCount: typeof res.count === 'number' ? res.count : 0,
+          bonusCredits: typeof res.bonus_credits === 'number' ? res.bonus_credits : 0,
           userId,
         },
       };
@@ -319,6 +322,8 @@ async function enforceApiLimit(
       const tier = (directData.tier as 'free' | 'pro' | 'vip') || 'free';
       const generationsCount =
         typeof directData.generations_count === 'number' ? directData.generations_count : 0;
+      const bonusCredits =
+        typeof directData.bonus_credits === 'number' ? directData.bonus_credits : 0;
       const lastDate = directData.last_generation_date
         ? String(directData.last_generation_date).slice(0, 10)
         : null;
@@ -329,16 +334,19 @@ async function enforceApiLimit(
             allowed: true,
             tier,
             currentCount: generationsCount,
+            bonusCredits,
             userId,
           },
         };
       }
 
-      const todayStr = new Date().toISOString().slice(0, 10);
-      const isToday = lastDate === todayStr;
-      const count = isToday ? generationsCount : 0;
+      const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+      const lastMonth = lastDate ? lastDate.slice(0, 7) : null;
+      const isSameMonth = lastMonth === currentMonth;
+      const count = isSameMonth ? generationsCount : 0;
 
-      if (isToday && count >= 5) {
+      // Si agotó las 10 mensuales y no tiene créditos bonus, bloquear
+      if (count >= 10 && bonusCredits <= 0) {
         return { error: 'LIMIT_REACHED' };
       }
 
@@ -347,6 +355,7 @@ async function enforceApiLimit(
           allowed: true,
           tier: 'free',
           currentCount: count,
+          bonusCredits,
           userId,
         },
       };
@@ -362,6 +371,7 @@ async function enforceApiLimit(
 
 /**
  * Incrementa el uso en api_limits tras completarse la generación con la IA mediante RPC atómico.
+ * Consume de la cuota mensual (hasta 10) o de los créditos bonificados acumulables.
  */
 async function recordApiUsage(userId: string) {
   try {
@@ -386,7 +396,7 @@ async function recordApiUsage(userId: string) {
 }
 
 /**
- * Server Action que genera tarjetas a partir de un tema de texto usando Gemini 3.8 Flash.
+ * Server Action que genera tarjetas a partir de un tema de texto usando Gemini 3.1 Flash-Lite.
  */
 export async function generateCardsAction(
   topic: string,
@@ -671,7 +681,7 @@ REGLA ESTRICTA: Si el usuario proporciona una instrucción de enfoque (ej. un ca
       ? `Debes analizar el documento dando PRIORIDAD ABSOLUTA a la sección solicitada ("${focusInstruction}") y generar EXACTAMENTE ${targetCount} tarjetas extraídas EXCLUSIVAMENTE de esa parte del documento.`
       : `Debes analizar el documento completo y generar EXACTAMENTE ${targetCount} tarjetas cubriendo los conceptos clave de forma equitativa desde el principio hasta el final del texto.`;
 
-    // 5. Preparar llamada a Gemini 3.8 Flash con instrucciones de formato, cantidad, enfoque e historial
+    // 5. Preparar llamada a Gemini 3.1 Flash-Lite con instrucciones de formato, cantidad, enfoque e historial
     const ai = new GoogleGenAI({ apiKey });
 
     const promptText = `Eres un pedagogo experto en diseño pedagógico y repetición espaciada (algoritmo FSRS).

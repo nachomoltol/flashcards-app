@@ -33,7 +33,7 @@ Flashmente es una plataforma de aprendizaje acelerado y memorización a largo pl
           ▼                                           ▼
 ┌──────────────────────────────────┐        ┌────────────────────────────┐
 │      SUPABASE (BaaS / Cloud)     │        │     GOOGLE GENAI API       │
-│  - PostgreSQL 14.18 (RLS + RPC)  │        │  - Gemini 3.5 Flash        │
+│  - PostgreSQL 14.18 (RLS + RPC)  │        │  - Gemini 3.1 Flash-Lite   │
 │  - GoTrue Auth (Sesiones JWT)    │        │  - Extracción Multimodal   │
 │  - Storage (Bucket user-docs)    │        │  - JSON Schema Estricto    │
 └──────────────────────────────────┘        └────────────────────────────┘
@@ -90,12 +90,13 @@ La aplicación unifica la experiencia web de escritorio y móvil a través de es
     - `notes`: Notas maestras con campos semiestructurados (`fields` tipo JSONB).
     - `reviews`: Registro histórico de cada repaso para métricas de retención y curvas de aprendizaje.
     - `profiles`: Datos de usuario, avatares, configuración FSRS personalizada (`request_retention`, `maximum_interval`, `enable_fuzz`).
-    - `api_limits`: Control atómico de cuotas de generación de IA (`user_id`, `generations_count`, `last_generation_date`, `tier`: `'free' | 'pro' | 'vip'`).
+    - `api_limits`: Control atómico de cuotas de generación de IA (`user_id`, `generations_count`, `last_generation_date`, `bonus_credits`, `tier`: `'free' | 'pro' | 'vip'`).
   - **Seguridad y RLS (Row Level Security):**
     - Todas las tablas principales tienen RLS activado.
     - Funciones RPC con directiva `SECURITY DEFINER` para operaciones atómicas de sistema:
-      - `check_api_limit`: Valida si el usuario tiene saldo o bypass PRO/VIP sin exponer la lógica de límites al cliente.
-      - `increment_api_generation`: Registra el uso diario en base de datos.
+      - `check_api_limit`: Valida si el usuario tiene saldo mensual (10 generaciones gratuitas), créditos adicionales acumulables de anuncios o bypass PRO/VIP sin exponer la lógica al cliente.
+      - `increment_api_generation`: Registra el uso mensual o descuenta de `bonus_credits` de anuncios.
+      - `add_bonus_credit`: Suma créditos bonificados acumulables tras la visualización exitosa de anuncios de Google AdMob.
       - `get_deck_owner`: Permite a los Server Actions verificar la propiedad del mazo.
 
 ---
@@ -104,7 +105,7 @@ La aplicación unifica la experiencia web de escritorio y móvil a través de es
 
 ### 2.1. Orquestación del SDK y Selección de Modelo
 - **SDK Oficial:** `@google/genai` (versión `^2.27.0`) con la clase unificada `GoogleGenAI`.
-- **Modelo Utilizado:** `gemini-3.5-flash-lite` (referenciado internamente en `generateCards.ts`). Proporciona una ventana de contexto masiva (hasta 1 millón de tokens), baja latencia de respuesta y coste ultra-sostenible para generaciones ilimitadas.
+- **Modelo Utilizado:** `gemini-3.1-flash-lite` (referenciado internamente en `generateCards.ts`). Proporciona una ventana de contexto masiva (hasta 1 millón de tokens), baja latencia de respuesta y coste ultra-sostenible para generaciones ilimitadas.
 
 ### 2.2. Ingesta de Datos Multicanal
 La arquitectura en `src/app/actions/generateCards.ts` soporta 3 canales de ingesta:
