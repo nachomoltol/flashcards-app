@@ -475,5 +475,6 @@ node scratch/generate_aab.mjs
 | **Acciones de IA (Gemini)** | [`src/app/actions/generateCards.ts`](file:///c:/Users/Nacho/OneDrive/Desktop/flashcards-app/src/app/actions/generateCards.ts) |
 | **Tutorial de Onboarding** | [`src/components/onboarding/WelcomeTutorial.tsx`](file:///c:/Users/Nacho/OneDrive/Desktop/flashcards-app/src/components/onboarding/WelcomeTutorial.tsx) |
 | **Mazo Demo Seed** | [`src/lib/onboarding/seedGuideDeck.ts`](file:///c:/Users/Nacho/OneDrive/Desktop/flashcards-app/src/lib/onboarding/seedGuideDeck.ts) |
-| **Binario Android (.aab)** | [`Flashmente-1.0.1.aab`](file:///C:/Users/Nacho/OneDrive/Desktop/Flashmente-1.0.1.aab) |
+| **Integración AdMob** | [`src/lib/admob.ts`](file:///c:/Users/Nacho/OneDrive/Desktop/flashcards-app/src/lib/admob.ts) |
+| **Binario Android (.aab)** | [`Flashmente-1.0.2.aab`](file:///C:/Users/Nacho/OneDrive/Desktop/Flashmente-1.0.2.aab) |
 | **Keystore de Firma** | `Flashmente - Google Play package 1.0.1\signing.keystore` |
