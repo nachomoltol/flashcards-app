@@ -3,15 +3,18 @@
 import { detectPlatform } from './platform';
 
 /**
- * Identificadores oficiales de Google AdMob para pruebas (Test Ad Unit IDs).
+ * Identificadores de Google AdMob para Flashmente (Android Producción & Pruebas).
  * @see https://developers.google.com/admob/android/test-ads
  */
 export const ADMOB_CONFIG = {
-  // ID de bloque de anuncio bonificado (Rewarded Video) oficial de Google para pruebas en Android
+  // App ID oficial de Flashmente en Google AdMob (Producción)
+  APP_ID: 'ca-app-pub-8525131609099761~8283952108',
+  // ID de bloque de anuncio bonificado (Rewarded Ad Unit ID) oficial de producción
+  REWARDED_AD_UNIT_ID: 'ca-app-pub-8525131609099761/8767167832',
+
+  // Identificadores oficiales de Google AdMob para pruebas (Test Ad Unit IDs)
   TEST_REWARDED_AD_UNIT_ID: 'ca-app-pub-3940256099942544/5224354917',
-  // ID de bloque de anuncio bonificado intersticial alternativo para pruebas
   TEST_REWARDED_INTERSTITIAL_AD_UNIT_ID: 'ca-app-pub-3940256099942544/5354046379',
-  // App ID de prueba de AdMob para Android
   TEST_APP_ID: 'ca-app-pub-3940256099942544~3347511713',
 };
 
@@ -59,9 +62,10 @@ export async function initializeAdMob(): Promise<boolean> {
       ).catch(() => null);
 
       if (admobModule?.AdMob) {
+        const isDev = process.env.NODE_ENV === 'development';
         await admobModule.AdMob.initialize({
-          testingDevices: ['EMULATOR'],
-          initializeForTesting: true,
+          testingDevices: isDev ? ['EMULATOR'] : [],
+          initializeForTesting: isDev,
         });
         isAdMobInitialized = true;
         return true;
@@ -80,7 +84,7 @@ export async function initializeAdMob(): Promise<boolean> {
  * completa la visualización requerida para recibir la bonificación (+1 crédito).
  */
 export async function showAdMobRewardedAd(
-  adUnitId: string = ADMOB_CONFIG.TEST_REWARDED_AD_UNIT_ID
+  adUnitId: string = ADMOB_CONFIG.REWARDED_AD_UNIT_ID
 ): Promise<ShowRewardedAdResult> {
   const platform = detectPlatform();
 
@@ -137,10 +141,11 @@ export async function showAdMobRewardedAd(
             }
           );
 
-          // Preparar y desplegar el anuncio bonificado de prueba
+          // Preparar y desplegar el anuncio bonificado
+          const isTestAd = adUnitId === ADMOB_CONFIG.TEST_REWARDED_AD_UNIT_ID;
           AdMob.prepareRewardVideoAd({
             adId: adUnitId,
-            isTesting: true,
+            isTesting: isTestAd,
           })
             .then(() => AdMob.showRewardVideoAd())
             .catch((err: Error) => {
@@ -190,14 +195,16 @@ export async function showAdMobRewardedAd(
 
   // 3. Canal 3: Emulación en Entorno de Desarrollo / Modo de Pruebas Local
   // Permite validar íntegramente el ciclo de recompensa y conexión con Supabase desde el navegador
-  return emulateRewardedAdDialog();
+  return emulateRewardedAdDialog(adUnitId);
 }
 
 /**
  * Emula la visualización de un anuncio bonificado de AdMob durante el desarrollo local,
  * mostrando una cuenta atrás de prueba para certificar que el frontend y Supabase se integran correctamente.
  */
-function emulateRewardedAdDialog(): Promise<ShowRewardedAdResult> {
+function emulateRewardedAdDialog(
+  adUnitId: string = ADMOB_CONFIG.REWARDED_AD_UNIT_ID
+): Promise<ShowRewardedAdResult> {
   return new Promise<ShowRewardedAdResult>((resolve) => {
     // Si no estamos en el navegador, resolver inmediatamente
     if (typeof document === 'undefined') {
@@ -219,13 +226,13 @@ function emulateRewardedAdDialog(): Promise<ShowRewardedAdResult> {
       <div class="max-w-md w-full bg-neutral-900 border border-amber-500/40 rounded-3xl p-6 sm:p-8 text-center space-y-6 shadow-2xl shadow-amber-950/40">
         <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-semibold tracking-wide">
           <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
-          GOOGLE ADMOB • MODO PRUEBAS
+          GOOGLE ADMOB • SIMULACIÓN
         </div>
 
         <div class="space-y-2">
-          <h3 class="text-xl font-bold text-white">Anuncio Bonificado Simulado</h3>
+          <h3 class="text-xl font-bold text-white">Anuncio Bonificado</h3>
           <p class="text-xs text-neutral-300 leading-relaxed">
-            Test Ad Unit ID: <code class="text-amber-300 font-mono text-[11px]">${ADMOB_CONFIG.TEST_REWARDED_AD_UNIT_ID}</code>
+            Ad Unit ID: <code class="text-amber-300 font-mono text-[11px]">${adUnitId}</code>
           </p>
         </div>
 
