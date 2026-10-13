@@ -15,9 +15,11 @@ import {
   ChevronsUpDown,
   ChevronRight,
   ShieldCheck,
+  Trash2,
 } from 'lucide-react';
 import { WelcomeTutorial } from '@/components/onboarding/WelcomeTutorial';
 import { ProModal } from '@/components/subscription/ProModal';
+import { DeleteAccountModal } from '@/components/auth/DeleteAccountModal';
 import { useProModalStore } from '@/stores/useProModalStore';
 
 interface NavItem {
@@ -87,6 +89,7 @@ export default function DashboardLayout({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isMobileUserMenuOpen, setIsMobileUserMenuOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const { openProModal } = useProModalStore();
   const [isMounted, setIsMounted] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
@@ -361,6 +364,20 @@ export default function DashboardLayout({
                   <LogOut className="w-4 h-4 text-red-400 group-hover:text-red-300 transition-colors" />
                   <span className="font-medium">{t('nav.logout', 'Cerrar Sesión')}</span>
                 </button>
+
+                {/* 6. Eliminar Cuenta */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMobileUserMenuOpen(false);
+                    setIsDeleteModalOpen(true);
+                  }}
+                  className="w-full flex items-center gap-2.5 px-2.5 py-2 text-xs font-medium rounded-xl text-red-500 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer group text-left"
+                  role="menuitem"
+                >
+                  <Trash2 className="w-4 h-4 text-red-500 group-hover:text-red-400 transition-colors" />
+                  <span className="font-medium">{t('nav.delete_account', 'Eliminar Cuenta')}</span>
+                </button>
               </div>
             )}
           </div>
@@ -522,6 +539,19 @@ export default function DashboardLayout({
             >
               <LogOut className="w-4 h-4 text-red-400" />
               <span className="font-medium">Cerrar Sesión</span>
+            </button>
+
+            {/* 6. Eliminar Cuenta */}
+            <button
+              type="button"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                setIsDeleteModalOpen(true);
+              }}
+              className="w-full flex items-center gap-2.5 px-2.5 py-2 text-xs font-medium rounded-xl text-red-500 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer text-left"
+            >
+              <Trash2 className="w-4 h-4 text-red-500" />
+              <span className="font-medium">{t('nav.delete_account', 'Eliminar Cuenta')}</span>
             </button>
           </div>
         </div>
@@ -688,6 +718,20 @@ export default function DashboardLayout({
                 <LogOut className="w-4 h-4 text-red-400 group-hover:text-red-300 transition-colors" />
                 <span className="font-medium">{t('nav.logout', 'Cerrar Sesión')}</span>
               </button>
+
+              {/* 6. Eliminar Cuenta */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsUserMenuOpen(false);
+                  setIsDeleteModalOpen(true);
+                }}
+                className="w-full flex items-center gap-2.5 px-2.5 py-2 text-xs font-medium rounded-xl text-red-500 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer group text-left"
+                role="menuitem"
+              >
+                <Trash2 className="w-4 h-4 text-red-500 group-hover:text-red-400 transition-colors" />
+                <span className="font-medium">{t('nav.delete_account', 'Eliminar Cuenta')}</span>
+              </button>
             </div>
           )}
 
@@ -754,6 +798,12 @@ export default function DashboardLayout({
 
       {/* Modal de Suscripción PRO */}
       <ProModal />
+
+      {/* Modal de Confirmación de Eliminación de Cuenta */}
+      <DeleteAccountModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+      />
     </div>
   );
 }

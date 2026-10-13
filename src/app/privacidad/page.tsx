@@ -220,10 +220,10 @@ export default function PrivacidadPage() {
               <div className="pt-1">
                 <a
                   href="mailto:nachomoltol@gmail.com?subject=Eliminar%20cuenta"
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-medium text-xs rounded-lg transition-colors"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-medium text-xs rounded-lg transition-colors cursor-pointer shadow-xs"
                 >
                   <Mail className="w-3.5 h-3.5" />
-                  <span>Enviar solicitud a nachomoltol@gmail.com</span>
+                  <span>Enviar solicitud</span>
                 </a>
               </div>
             </div>

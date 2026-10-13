@@ -25,6 +25,7 @@
     "pro_subscription": "Suscripción (PRO)",
     "support_feedback": "Soporte y Feedback",
     "logout": "Cerrar Sesión",
+    "delete_account": "Eliminar Cuenta",
     "privacy": "Política de Privacidad"
   },
   "auth": {
