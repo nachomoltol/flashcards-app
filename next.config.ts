@@ -7,6 +7,10 @@ const nextConfig: NextConfig = {
         source: '/privacy',
         destination: '/privacidad',
       },
+      {
+        source: '/auth/confirm',
+        destination: '/auth/callback',
+      },
     ];
   },
   async headers() {

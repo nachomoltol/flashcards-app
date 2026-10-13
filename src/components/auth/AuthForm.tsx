@@ -110,9 +110,17 @@ export function AuthForm({ initialMode = 'signin' }: AuthFormProps) {
           setLoading(false);
         }
       } else {
+        const redirectUrl =
+          typeof window !== 'undefined'
+            ? `${window.location.origin}/auth/callback`
+            : 'https://flashmente.com/auth/callback';
+
         const { data, error: signUpError } = await supabase.auth.signUp({
           email: cleanEmail,
           password,
+          options: {
+            emailRedirectTo: redirectUrl,
+          },
         });
 
         if (signUpError) {
