@@ -21,6 +21,7 @@
     "my_profile": "My Profile",
     "appearance": "Appearance",
     "dark_mode": "Dark",
+    "light_mode": "Light",
     "subscription": "Subscription",
     "pro_subscription": "Subscription (PRO)",
     "support_feedback": "Support & Feedback",
@@ -429,5 +430,25 @@
     "privacy_section_title": "Privacy & Data Protection",
     "privacy_section_desc": "View our privacy policy, secure data handling, and how to request account deletion.",
     "privacy_button": "View Privacy Policy"
+  },
+  "feedback_modal": {
+    "title": "Support & Feedback",
+    "subtitle": "Have a question, issue, or suggestion? Let us know and we'll help you promptly.",
+    "category_label": "How can we help you?",
+    "category_bug": "Report a bug",
+    "category_feature": "Feature suggestion",
+    "category_question": "Technical question",
+    "category_other": "Other",
+    "message_label": "Detailed message",
+    "message_placeholder": "Describe what happened, steps to reproduce the issue, or what feature you'd like to see...",
+    "user_info_label": "User identification:",
+    "user_info_auto": "Automatically linked to your Supabase account",
+    "btn_submit": "Send Message",
+    "btn_sending": "Sending message...",
+    "toast_success_title": "Message sent successfully!",
+    "toast_success_desc": "We have received your inquiry and our team will get back to you shortly by email.",
+    "error_empty": "Please enter a descriptive message (minimum 5 characters).",
+    "error_generic": "Failed to send the message. Please try again later."
   }
 }
+

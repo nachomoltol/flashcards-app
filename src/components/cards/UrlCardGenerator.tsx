@@ -183,10 +183,10 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
                 </svg>
               </div>
               <div>
-                <h4 className="text-sm font-semibold text-white">
+                <h4 className="text-sm font-semibold text-neutral-900 dark:text-white">
                   {t('url_generator.success_title', '¡{count} tarjetas creadas y guardadas con éxito!').replace('{count}', String(successCount))}
                 </h4>
-                <p className="text-xs text-neutral-400 mt-0.5">
+                <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-0.5">
                   {t('url_generator.success_desc', 'Las tarjetas han sido agregadas a tu mazo y están listas para estudiar con FSRS.')}
                 </p>
               </div>
@@ -194,7 +194,7 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
 
             <button
               onClick={handleReset}
-              className="text-xs font-medium px-3 py-1.5 rounded-lg bg-neutral-900 border border-neutral-800 text-neutral-300 hover:text-white hover:bg-neutral-800 transition"
+              className="text-xs font-medium px-3 py-1.5 rounded-lg bg-neutral-100 hover:bg-neutral-200 text-neutral-700 hover:text-neutral-900 dark:bg-neutral-900 dark:border-neutral-800 dark:text-neutral-300 dark:hover:text-white dark:hover:bg-neutral-800 transition border border-neutral-200"
             >
               {t('url_generator.generate_another_batch', 'Generar otro lote')}
             </button>
@@ -202,13 +202,13 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
 
           {/* Banner de Temas Troncales Agotados */}
           {coreExhausted && (
-            <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs sm:text-sm flex items-start gap-3 shadow-lg shadow-amber-950/20">
+            <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-200 text-xs sm:text-sm flex items-start gap-3 shadow-lg shadow-amber-950/20">
               <span className="text-xl shrink-0 mt-0.5">🎯</span>
               <div className="space-y-1">
-                <h5 className="font-semibold text-amber-300">
+                <h5 className="font-semibold text-amber-700 dark:text-amber-300">
                   {t('url_generator.core_covered_title', 'Conceptos troncales principales cubiertos')}
                 </h5>
-                <p className="text-neutral-300 text-xs leading-relaxed">
+                <p className="text-neutral-700 dark:text-neutral-300 text-xs leading-relaxed">
                   {t('url_generator.core_covered_desc', 'Gemini ha cubierto las ideas y conceptos esenciales de este enlace. Si solicitas otro lote, la IA profundizará en detalles secundarios, matices avanzados y casos específicos.')}
                 </p>
               </div>
@@ -219,7 +219,7 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
           {generatedCardsPreview.length > 0 && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h5 className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
+                <h5 className="text-xs font-semibold uppercase tracking-wider text-neutral-600 dark:text-neutral-400">
                   {t('url_generator.preview_title', 'Vista previa de tarjetas generadas ({count})').replace('{count}', String(generatedCardsPreview.length))}
                 </h5>
                 <span className="text-[11px] text-neutral-500">
@@ -232,7 +232,7 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
                 {generatedCardsPreview.map((card, idx) => (
                   <div
                     key={idx}
-                    className="p-3.5 rounded-xl bg-neutral-900/90 border border-neutral-800 text-xs shadow-sm"
+                    className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-900/90 border border-neutral-200 dark:border-neutral-800 text-xs shadow-sm"
                   >
                     <FormattedCardView
                       front={card.front}
@@ -251,7 +251,7 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
             <button
               type="button"
               onClick={onCancel}
-              className="px-4 py-2 rounded-xl text-xs font-semibold bg-neutral-900 hover:bg-neutral-800 text-white transition border border-neutral-800"
+              className="px-4 py-2 rounded-xl text-xs font-semibold bg-neutral-100 hover:bg-neutral-200 text-neutral-800 dark:bg-neutral-900 dark:hover:bg-neutral-800 dark:text-white transition border border-neutral-200 dark:border-neutral-800"
             >
               {t('common.close', 'Cerrar')}
             </button>
@@ -263,8 +263,8 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
           {/* Input de URL */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-semibold text-neutral-300 flex items-center gap-1.5">
-                <svg className="w-4 h-4 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5">
+                <svg className="w-4 h-4 text-rose-500 dark:text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                 </svg>
                 <span>{t('url_generator.url_label', 'Enlace Web o Vídeo de YouTube')}</span>
@@ -274,9 +274,9 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
                 type="button"
                 onClick={handlePaste}
                 disabled={isBusy}
-                className="text-[11px] text-neutral-400 hover:text-white transition flex items-center gap-1 bg-neutral-900 hover:bg-neutral-800 px-2 py-0.5 rounded-md border border-neutral-800 disabled:opacity-50"
+                className="text-[11px] text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition flex items-center gap-1 bg-neutral-100 dark:bg-neutral-900 hover:bg-neutral-200 dark:hover:bg-neutral-800 px-2 py-0.5 rounded-md border border-neutral-200 dark:border-neutral-800 disabled:opacity-50"
               >
-                <svg className="w-3.5 h-3.5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-3.5 h-3.5 text-neutral-500 dark:text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                 </svg>
                 <span>{t('url_generator.paste_clipboard', 'Pegar del portapapeles')}</span>
@@ -284,11 +284,11 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
             </div>
 
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-neutral-500">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-neutral-400 dark:text-neutral-500">
                 {isYouTube ? (
                   <span className="text-rose-500 font-bold text-sm">▶</span>
                 ) : (
-                  <svg className="w-4 h-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-4 h-4 text-neutral-400 dark:text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
                   </svg>
                 )}
@@ -304,14 +304,14 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
                   setErrorMessage(null);
                 }}
                 placeholder={t('url_generator.url_placeholder', 'https://www.youtube.com/watch?v=... o https://es.wikipedia.org/...')}
-                className="w-full text-xs sm:text-sm pl-10 pr-9 py-3 rounded-xl bg-neutral-950 border border-neutral-800 text-white placeholder-neutral-500 focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition disabled:opacity-50"
+                className="w-full text-xs sm:text-sm pl-10 pr-9 py-3 rounded-xl bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition disabled:opacity-50"
               />
 
               {url && !isBusy && (
                 <button
                   type="button"
                   onClick={() => setUrl('')}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-neutral-500 hover:text-white transition"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-neutral-400 hover:text-neutral-700 dark:text-neutral-500 dark:hover:text-white transition"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -322,15 +322,15 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
 
             {/* Badges de detección dinámica */}
             {isYouTube && (
-              <div className="p-2 rounded-lg bg-rose-500/10 border border-rose-500/25 text-rose-300 text-[11px] flex items-center gap-2">
-                <span className="font-bold text-rose-400 text-xs">▶ YouTube</span>
+              <div className="p-2 rounded-lg bg-rose-500/10 border border-rose-500/25 text-rose-700 dark:text-rose-300 text-[11px] flex items-center gap-2">
+                <span className="font-bold text-rose-600 dark:text-rose-400 text-xs">▶ YouTube</span>
                 <span>{t('url_generator.youtube_detected', 'Vídeo detectado: Gemini analizará el contenido del vídeo directamente en la nube de Google para generar las tarjetas.')}</span>
               </div>
             )}
 
             {!isYouTube && isWebUrl && (
-              <div className="p-2 rounded-lg bg-sky-500/10 border border-sky-500/25 text-sky-300 text-[11px] flex items-center gap-2">
-                <span className="font-bold text-sky-400 text-xs">🌐 {t('deck_detail.tab_url', 'Enlace Web')}</span>
+              <div className="p-2 rounded-lg bg-sky-500/10 border border-sky-500/25 text-sky-700 dark:text-sky-300 text-[11px] flex items-center gap-2">
+                <span className="font-bold text-sky-600 dark:text-sky-400 text-xs">🌐 {t('deck_detail.tab_url', 'Enlace Web')}</span>
                 <span>{t('url_generator.web_detected', 'Página detectada: se extraerá el artículo o texto principal para generar el material de estudio.')}</span>
               </div>
             )}
@@ -338,7 +338,7 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
 
           {/* Formato de Tarjetas */}
           <div className="space-y-2">
-            <label className="text-xs font-semibold text-neutral-300">
+            <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">
               {t('url_generator.format_pedagogical', 'Formato Pedagógico')}
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -348,15 +348,15 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
                 onClick={() => setCardFormat('basic')}
                 className={`p-3 rounded-xl text-left border transition-all ${
                   cardFormat === 'basic'
-                    ? 'border-rose-500 bg-rose-600/10 text-white shadow-sm'
-                    : 'border-neutral-800 bg-neutral-950 hover:border-neutral-700 text-neutral-300'
+                    ? 'border-rose-500 bg-rose-50 dark:bg-rose-600/10 text-neutral-900 dark:text-white shadow-sm'
+                    : 'border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 hover:border-neutral-300 dark:hover:border-neutral-700 text-neutral-700 dark:text-neutral-300'
                 }`}
               >
                 <div className="font-semibold text-xs flex items-center justify-between">
                   <span>{t('url_generator.format_basic', 'Básicas')}</span>
-                  {cardFormat === 'basic' && <span className="text-rose-400 text-xs">●</span>}
+                  {cardFormat === 'basic' && <span className="text-rose-500 dark:text-rose-400 text-xs">●</span>}
                 </div>
-                <p className="text-[11px] text-neutral-400 mt-1 leading-snug">
+                <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-1 leading-snug">
                   {t('url_generator.format_basic_desc', 'Pregunta directa y respuesta concisa')}
                 </p>
               </button>
@@ -367,15 +367,15 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
                 onClick={() => setCardFormat('cloze')}
                 className={`p-3 rounded-xl text-left border transition-all ${
                   cardFormat === 'cloze'
-                    ? 'border-emerald-500 bg-emerald-600/10 text-white shadow-sm'
-                    : 'border-neutral-800 bg-neutral-950 hover:border-neutral-700 text-neutral-300'
+                    ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-600/10 text-neutral-900 dark:text-white shadow-sm'
+                    : 'border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 hover:border-neutral-300 dark:hover:border-neutral-700 text-neutral-700 dark:text-neutral-300'
                 }`}
               >
                 <div className="font-semibold text-xs flex items-center justify-between">
                   <span>{t('url_generator.format_cloze', 'Huecos (Cloze)')}</span>
-                  {cardFormat === 'cloze' && <span className="text-emerald-400 text-xs">●</span>}
+                  {cardFormat === 'cloze' && <span className="text-emerald-500 dark:text-emerald-400 text-xs">●</span>}
                 </div>
-                <p className="text-[11px] text-neutral-400 mt-1 leading-snug">
+                <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-1 leading-snug">
                   {t('url_generator.format_cloze_desc', 'Completar conceptos clave entre corchetes')}
                 </p>
               </button>
@@ -386,15 +386,15 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
                 onClick={() => setCardFormat('multiple_choice')}
                 className={`p-3 rounded-xl text-left border transition-all ${
                   cardFormat === 'multiple_choice'
-                    ? 'border-indigo-500 bg-indigo-600/10 text-white shadow-sm'
-                    : 'border-neutral-800 bg-neutral-950 hover:border-neutral-700 text-neutral-300'
+                    ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-600/10 text-neutral-900 dark:text-white shadow-sm'
+                    : 'border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 hover:border-neutral-300 dark:hover:border-neutral-700 text-neutral-700 dark:text-neutral-300'
                 }`}
               >
                 <div className="font-semibold text-xs flex items-center justify-between">
                   <span>{t('url_generator.format_mc', 'Opción Múltiple')}</span>
-                  {cardFormat === 'multiple_choice' && <span className="text-indigo-400 text-xs">●</span>}
+                  {cardFormat === 'multiple_choice' && <span className="text-indigo-500 dark:text-indigo-400 text-xs">●</span>}
                 </div>
-                <p className="text-[11px] text-neutral-400 mt-1 leading-snug">
+                <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-1 leading-snug">
                   {t('url_generator.format_mc_desc', 'Pregunta test con 4 alternativas y solución')}
                 </p>
               </button>
@@ -404,7 +404,7 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
           {/* Cantidad de Tarjetas e Instrucción de Enfoque */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-neutral-300 flex items-center justify-between">
+              <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 flex items-center justify-between">
                 <span>{t('url_generator.count_batch_label', 'Cantidad por Lote (Máx. 30)')}</span>
                 <span className="text-neutral-500 text-[11px] font-normal">{t('url_generator.count_recommended', 'Recomendado: 10')}</span>
               </label>
@@ -426,7 +426,7 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
                       setCardCount(Math.min(30, Math.max(1, val)));
                     }
                   }}
-                  className="w-24 text-xs font-semibold px-3 py-2.5 rounded-xl bg-neutral-950 border border-neutral-800 text-white focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition disabled:opacity-50"
+                  className="w-24 text-xs font-semibold px-3 py-2.5 rounded-xl bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition disabled:opacity-50"
                 />
                 <div className="flex items-center gap-1">
                   {[5, 10, 15, 20].map((num) => (
@@ -437,8 +437,8 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
                       onClick={() => setCardCount(num)}
                       className={`text-xs px-2.5 py-2 rounded-lg font-mono transition border ${
                         cardCount === num
-                          ? 'bg-rose-500/20 border-rose-500/50 text-rose-300'
-                          : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white'
+                          ? 'bg-rose-500/20 border-rose-500/50 text-rose-600 dark:text-rose-300'
+                          : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700 hover:text-neutral-900 dark:bg-neutral-900 dark:border-neutral-800 dark:text-neutral-400 dark:hover:text-white'
                       }`}
                     >
                       {num}
@@ -449,7 +449,7 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-neutral-300">
+              <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">
                 {t('url_generator.focus_label', 'Instrucción de Enfoque (Opcional)')}
               </label>
               <input
@@ -458,21 +458,21 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
                 value={customPrompt}
                 onChange={(e) => setCustomPrompt(e.target.value)}
                 placeholder={t('url_generator.focus_placeholder', 'Ej. Centrarse en la conclusión, fórmulas o minuto 5 al 12')}
-                className="w-full text-xs px-3.5 py-2.5 rounded-xl bg-neutral-950 border border-neutral-800 text-white placeholder-neutral-500 focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition disabled:opacity-50"
+                className="w-full text-xs px-3.5 py-2.5 rounded-xl bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition disabled:opacity-50"
               />
             </div>
           </div>
 
           {/* Estado de carga / Progreso */}
           {isBusy && (
-            <div className="p-4 rounded-xl bg-neutral-950 border border-rose-500/30 space-y-2.5 animate-pulse">
+            <div className="p-4 rounded-xl bg-neutral-50 dark:bg-neutral-950 border border-rose-500/30 space-y-2.5 animate-pulse">
               <div className="flex items-center gap-3">
                 <div className="w-5 h-5 border-2 border-rose-500 border-t-transparent rounded-full animate-spin shrink-0" />
-                <span className="text-xs font-medium text-rose-300">
+                <span className="text-xs font-medium text-rose-600 dark:text-rose-300">
                   {statusStep}
                 </span>
               </div>
-              <div className="w-full h-1.5 rounded-full bg-neutral-900 overflow-hidden">
+              <div className="w-full h-1.5 rounded-full bg-neutral-200 dark:bg-neutral-900 overflow-hidden">
                 <div className="h-full bg-gradient-to-r from-rose-500 to-indigo-500 w-2/3 rounded-full animate-pulse" />
               </div>
             </div>
@@ -485,7 +485,7 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
                 type="button"
                 onClick={onCancel}
                 disabled={isBusy}
-                className="px-4 py-2.5 rounded-xl text-xs font-semibold bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white transition border border-neutral-800 disabled:opacity-50"
+                className="px-4 py-2.5 rounded-xl text-xs font-semibold bg-neutral-100 hover:bg-neutral-200 text-neutral-700 hover:text-neutral-900 dark:bg-neutral-900 dark:hover:bg-neutral-800 dark:text-neutral-300 dark:hover:text-white transition border border-neutral-200 dark:border-neutral-800 disabled:opacity-50"
               >
                 {t('common.cancel', 'Cancelar')}
               </button>

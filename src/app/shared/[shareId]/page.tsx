@@ -9,6 +9,7 @@ import { useAuthStore } from '@/stores';
 import { importSharedDeck } from '@/app/actions/importSharedDeck';
 import { FormattedCardView } from '@/components/cards/FormattedCardView';
 import type { CardFormat } from '@/types/database';
+import { AlertCircle } from 'lucide-react';
 
 interface SharedDeckPageProps {
   params: Promise<{ shareId: string }>;
@@ -186,9 +187,7 @@ export default function SharedDeckPage({ params }: SharedDeckPageProps) {
         {/* Error Banner */}
         {importError && (
           <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-start gap-3 shadow-lg">
-            <svg className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
+            <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
             <div className="leading-relaxed">
               <strong className="font-semibold block text-rose-200">Error al importar:</strong>
               {importError}

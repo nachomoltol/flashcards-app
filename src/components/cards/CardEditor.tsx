@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useCardStore, useLanguageStore, type CardRow } from '@/stores';
 import type { CardFormat } from '@/types/database';
 import { FormattedCardView } from './FormattedCardView';
+import { Plus } from 'lucide-react';
 
 interface CardEditorProps {
   deckId: string;
@@ -96,28 +97,28 @@ d) Cuarta opción plausible`;
 
   return (
     <div
-      className={`rounded-2xl border border-neutral-800 bg-neutral-900/50 backdrop-blur-sm p-6 shadow-xl space-y-6 ${className}`}
+      className={`rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/50 backdrop-blur-sm p-6 shadow-xl space-y-6 ${className}`}
     >
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-neutral-800/80">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-neutral-200 dark:border-neutral-800/80">
         <div>
-          <h3 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
+          <h3 className="text-base font-bold text-neutral-900 dark:text-white tracking-tight flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
             {t('card_editor.title', 'Editor de Tarjetas Dinámico')}
           </h3>
-          <p className="text-xs text-neutral-400 mt-0.5">
+          <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-0.5">
             {t('card_editor.subtitle', 'Soporta formatos Básica, Opción Múltiple (Test), Cloze y Verdadero/Falso con FSRS.')}
           </p>
         </div>
 
         {/* Format Selector Pills */}
-        <div className="flex flex-wrap gap-1 p-1 rounded-xl bg-neutral-950 border border-neutral-800">
+        <div className="flex flex-wrap gap-1 p-1 rounded-xl bg-neutral-100 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800">
           <button
             type="button"
             onClick={() => setCardFormat('basic')}
             className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
               cardFormat === 'basic'
                 ? 'bg-blue-600 text-white shadow-sm'
-                : 'text-neutral-400 hover:text-neutral-200'
+                : 'text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-200'
             }`}
           >
             {t('card_editor.format_basic', 'Básica')}
@@ -128,7 +129,7 @@ d) Cuarta opción plausible`;
             className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
               cardFormat === 'multiple_choice'
                 ? 'bg-purple-600 text-white shadow-sm'
-                : 'text-neutral-400 hover:text-neutral-200'
+                : 'text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-200'
             }`}
           >
             {t('card_editor.format_test', 'Test (4 Opcs)')}
@@ -139,7 +140,7 @@ d) Cuarta opción plausible`;
             className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
               cardFormat === 'cloze'
                 ? 'bg-indigo-600 text-white shadow-sm'
-                : 'text-neutral-400 hover:text-neutral-200'
+                : 'text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-200'
             }`}
           >
             {t('card_editor.format_cloze', 'Cloze')}
@@ -150,7 +151,7 @@ d) Cuarta opción plausible`;
             className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
               cardFormat === 'true_false'
                 ? 'bg-amber-600 text-white shadow-sm'
-                : 'text-neutral-400 hover:text-neutral-200'
+                : 'text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-200'
             }`}
           >
             {t('card_editor.format_tf', 'V / F')}
@@ -170,7 +171,7 @@ d) Cuarta opción plausible`;
           <div className="flex items-center justify-between">
             <label
               htmlFor="card-front-input"
-              className="text-xs font-semibold uppercase tracking-wider text-neutral-300 flex items-center gap-1.5"
+              className="text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5"
             >
               <span>
                 {cardFormat === 'basic' && t('card_editor.front_basic', 'Front (Pregunta)')}
@@ -221,7 +222,7 @@ d) Cuarta opción plausible`;
                 ? 'ej. La capital de Francia es {{c1::París}} o La capital es [...].'
                 : 'ej. Las mitocondrias poseen su propio ADN circular independiente del núcleo.'
             }
-            className="w-full text-sm px-3.5 py-2.5 rounded-xl bg-neutral-950 border border-neutral-800 text-white placeholder-neutral-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition resize-none font-sans"
+            className="w-full text-sm px-3.5 py-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition resize-none font-sans"
           />
         </div>
 
@@ -230,7 +231,7 @@ d) Cuarta opción plausible`;
           <div className="flex items-center justify-between">
             <label
               htmlFor="card-back-input"
-              className="text-xs font-semibold uppercase tracking-wider text-neutral-300"
+              className="text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300"
             >
               {cardFormat === 'basic' && t('card_editor.back_basic', 'Back (Respuesta o Reverso)')}
               {cardFormat === 'multiple_choice' && t('card_editor.back_mc', 'Back (Solo la opción correcta)')}
@@ -274,7 +275,7 @@ d) Cuarta opción plausible`;
                 ? 'ej. La capital de Francia es París.'
                 : 'ej. **Verdadero**. Las mitocondrias contienen ADN mitocondrial (ADNmt).'
             }
-            className="w-full text-sm px-3.5 py-2.5 rounded-xl bg-neutral-950 border border-neutral-800 text-white placeholder-neutral-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition resize-none"
+            className="w-full text-sm px-3.5 py-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition resize-none"
           />
         </div>
 
@@ -282,21 +283,21 @@ d) Cuarta opción plausible`;
         {front.trim() && (
           <div className="pt-2 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400 flex items-center gap-1.5">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-600 dark:text-neutral-400 flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-violet-400" />
                 {t('card_editor.live_preview', 'Renderizado Visual en Vivo')}
               </span>
               <button
                 type="button"
                 onClick={() => setShowPreview(!showPreview)}
-                className="text-[11px] text-neutral-500 hover:text-neutral-300"
+                className="text-[11px] text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-300"
               >
                 {showPreview ? t('card_editor.hide', 'Ocultar') : t('card_editor.show', 'Mostrar')}
               </button>
             </div>
 
             {showPreview && (
-              <div className="p-4 rounded-xl border border-neutral-800 bg-neutral-950/70 shadow-inner">
+              <div className="p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950/70 shadow-inner">
                 <FormattedCardView
                   front={front}
                   back={back || (cardFormat === 'cloze' ? front : 'Esperando respuesta...')}
@@ -328,7 +329,7 @@ d) Cuarta opción plausible`;
                   setFront('');
                   setBack('');
                 }}
-                className="px-3.5 py-2 text-xs text-neutral-400 hover:text-white transition"
+                className="px-3.5 py-2 text-xs text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white transition"
               >
                 {t('card_editor.clear', 'Limpiar')}
               </button>
@@ -337,11 +338,9 @@ d) Cuarta opción plausible`;
             <button
               type="submit"
               disabled={isSubmitting || !front.trim()}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium text-xs sm:text-sm transition-all duration-150 shadow-lg shadow-indigo-600/25 active:scale-95"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium text-xs sm:text-sm transition-all duration-150 shadow-lg shadow-indigo-600/25 active:scale-95 cursor-pointer"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M12 4v16m8-8H4" />
-              </svg>
+              <Plus className="w-4 h-4" />
               {isSubmitting
                 ? t('card_editor.adding_card', 'Guardando...')
                 : `${t('card_editor.add_card', 'Añadir ({format})').replace('{format}', cardFormat)}`}

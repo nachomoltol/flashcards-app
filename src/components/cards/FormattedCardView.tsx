@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import type { CardFormat } from '@/types/database';
 import { useLanguageStore } from '@/stores';
+import { Volume2, Check, X } from 'lucide-react';
 
 export interface FormattedCardViewProps {
   front: string;
@@ -166,7 +167,7 @@ function renderMarkdownBold(text: string) {
   return parts.map((part, i) => {
     if (part.startsWith('**') && part.endsWith('**')) {
       return (
-        <strong key={i} className="text-white font-bold">
+        <strong key={i} className="text-neutral-900 dark:text-white font-bold">
           {part.slice(2, -2)}
         </strong>
       );
@@ -266,26 +267,26 @@ export function FormattedCardView({
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 flex-wrap">
           {resolvedFormat === 'multiple_choice' && (
-            <span className="text-[11px] px-2.5 py-0.5 rounded-full font-semibold uppercase tracking-wider bg-purple-500/15 text-purple-300 border border-purple-500/30 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-purple-400" />
+            <span className="text-[11px] px-2.5 py-0.5 rounded-full font-semibold uppercase tracking-wider bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
               {t('card_editor.format_test', 'Opción Múltiple (Test)')}
             </span>
           )}
           {resolvedFormat === 'cloze' && (
-            <span className="text-[11px] px-2.5 py-0.5 rounded-full font-semibold uppercase tracking-wider bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
+            <span className="text-[11px] px-2.5 py-0.5 rounded-full font-semibold uppercase tracking-wider bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
               {t('card_editor.format_cloze', 'Texto Cloze [...]')}
             </span>
           )}
           {resolvedFormat === 'true_false' && (
-            <span className="text-[11px] px-2.5 py-0.5 rounded-full font-semibold uppercase tracking-wider bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+            <span className="text-[11px] px-2.5 py-0.5 rounded-full font-semibold uppercase tracking-wider bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
               {t('card_editor.format_tf', 'Verdadero o Falso')}
             </span>
           )}
           {resolvedFormat === 'basic' && (
-            <span className="text-[11px] px-2.5 py-0.5 rounded-full font-semibold uppercase tracking-wider bg-blue-500/15 text-blue-300 border border-blue-500/30 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+            <span className="text-[11px] px-2.5 py-0.5 rounded-full font-semibold uppercase tracking-wider bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/30 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
               {t('card_editor.format_basic', 'Pregunta Directa')}
             </span>
           )}
@@ -297,20 +298,16 @@ export function FormattedCardView({
           onClick={handleSpeak}
           aria-label={isSpeaking ? (language === 'en' ? 'Stop audio' : 'Detener lectura en voz alta') : (language === 'en' ? 'Read aloud' : 'Leer pregunta en voz alta')}
           title={isSpeaking ? (language === 'en' ? 'Stop audio' : 'Detener audio') : (language === 'en' ? 'Read aloud' : 'Leer pregunta en voz alta')}
-          className={`px-2.5 py-1 rounded-xl border text-xs transition-all duration-150 flex items-center gap-1.5 shrink-0 ${
+          className={`px-2.5 py-1 rounded-xl border text-xs transition-all duration-150 flex items-center gap-1.5 shrink-0 cursor-pointer ${
             isSpeaking
-              ? 'bg-indigo-600/30 text-indigo-200 border-indigo-500/50 ring-1 ring-indigo-500/40 animate-pulse'
-              : 'bg-neutral-900/80 hover:bg-neutral-800 text-neutral-400 hover:text-white border-neutral-800 hover:border-neutral-700 active:scale-95'
+              ? 'bg-indigo-600/30 text-indigo-700 dark:text-indigo-200 border-indigo-500/50 ring-1 ring-indigo-500/40 animate-pulse'
+              : 'bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-900/80 dark:hover:bg-neutral-800 text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 active:scale-95'
           }`}
         >
           {isSpeaking ? (
-            <svg className="w-3.5 h-3.5 text-indigo-400 animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-            </svg>
+            <Volume2 className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 animate-bounce" />
           ) : (
-            <svg className="w-3.5 h-3.5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-            </svg>
+            <Volume2 className="w-3.5 h-3.5 text-neutral-500 dark:text-neutral-400" />
           )}
           <span className="text-[11px] font-medium hidden sm:inline">
             {isSpeaking ? t('formatted_card.reading', 'Leyendo...') : t('formatted_card.listen', 'Escuchar')}
@@ -321,7 +318,7 @@ export function FormattedCardView({
       {/* ANVERSO (FRONT) */}
       <div className="space-y-3 sm:space-y-4">
         {/* Pregunta principal */}
-        <div className="text-lg sm:text-xl md:text-2xl font-semibold text-white leading-snug sm:leading-relaxed">
+        <div className="text-lg sm:text-xl md:text-2xl font-semibold text-neutral-900 dark:text-white leading-snug sm:leading-relaxed">
           {resolvedFormat === 'cloze' ? (
             renderClozeContent(question, isRevealed)
           ) : (
@@ -338,24 +335,24 @@ export function FormattedCardView({
 
               // Estilo dinámico según revelación y selección
               let cardStyles =
-                'border-neutral-800 bg-neutral-950/70 hover:border-neutral-700 text-neutral-300';
-              let badgeStyles = 'bg-neutral-800 text-neutral-400 border-neutral-700';
+                'border-neutral-200 bg-white hover:border-neutral-300 hover:bg-neutral-50 text-neutral-800 dark:border-neutral-800 dark:bg-neutral-950/70 dark:hover:border-neutral-700 dark:text-neutral-300';
+              let badgeStyles = 'bg-neutral-100 text-neutral-700 border-neutral-200 dark:bg-neutral-800 dark:text-neutral-400 dark:border-neutral-700';
 
               if (isRevealed) {
                 if (isCorrect) {
                   cardStyles =
-                    'border-emerald-500/60 bg-emerald-500/15 text-emerald-200 shadow-md shadow-emerald-950/40 ring-1 ring-emerald-500/40';
-                  badgeStyles = 'bg-emerald-500 text-black font-bold border-emerald-400';
+                    'border-emerald-500/60 bg-emerald-50 text-emerald-950 shadow-md shadow-emerald-500/10 ring-1 ring-emerald-500/40 dark:border-emerald-500/60 dark:bg-emerald-500/15 dark:text-emerald-200 dark:shadow-emerald-950/40';
+                  badgeStyles = 'bg-emerald-500 text-white dark:text-black font-bold border-emerald-400';
                 } else if (isSelected && !isCorrect) {
                   cardStyles =
-                    'border-rose-500/60 bg-rose-500/15 text-rose-300 line-through opacity-85';
+                    'border-rose-500/60 bg-rose-50 text-rose-900 line-through opacity-85 dark:border-rose-500/60 dark:bg-rose-500/15 dark:text-rose-300';
                   badgeStyles = 'bg-rose-500 text-white font-bold border-rose-400';
                 } else {
-                  cardStyles = 'border-neutral-800/60 bg-neutral-950/40 text-neutral-500 opacity-60';
+                  cardStyles = 'border-neutral-200/80 bg-neutral-50/50 text-neutral-400 opacity-60 dark:border-neutral-800/60 dark:bg-neutral-950/40 dark:text-neutral-500';
                 }
               } else if (isSelected) {
                 cardStyles =
-                  'border-violet-500 bg-violet-600/20 text-white shadow-md shadow-violet-900/30 ring-1 ring-violet-500';
+                  'border-violet-500 bg-violet-50 text-violet-950 shadow-md shadow-violet-200/50 ring-1 ring-violet-500 dark:border-violet-500 dark:bg-violet-600/20 dark:text-white dark:shadow-violet-900/30';
                 badgeStyles = 'bg-violet-600 text-white font-bold border-violet-400';
               }
 
@@ -379,14 +376,10 @@ export function FormattedCardView({
                     {opt.text}
                   </div>
                   {isRevealed && isCorrect && (
-                    <svg className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                    </svg>
+                    <Check className="w-5 h-5 text-emerald-500 dark:text-emerald-400 shrink-0 mt-0.5" />
                   )}
                   {isRevealed && isSelected && !isCorrect && (
-                    <svg className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
+                    <X className="w-5 h-5 text-rose-500 dark:text-rose-400 shrink-0 mt-0.5" />
                   )}
                 </button>
               );
@@ -406,17 +399,15 @@ export function FormattedCardView({
               }}
               className={`flex-1 py-3.5 px-4 min-h-[48px] rounded-xl border font-semibold text-xs sm:text-sm transition-all flex items-center justify-center gap-2 ${
                 isRevealed && isTrue
-                  ? 'border-emerald-500 bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500'
+                  ? 'border-emerald-500 bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 ring-1 ring-emerald-500'
                   : isRevealed && selectedOption === 'true' && !isTrue
-                  ? 'border-rose-500 bg-rose-500/20 text-rose-300 line-through'
+                  ? 'border-rose-500 bg-rose-500/20 text-rose-800 dark:text-rose-300 line-through'
                   : selectedOption === 'true'
-                  ? 'border-emerald-500 bg-emerald-500/20 text-emerald-200'
-                  : 'border-neutral-800 bg-neutral-950/70 hover:border-emerald-500/40 text-neutral-300'
+                  ? 'border-emerald-500 bg-emerald-500/20 text-emerald-800 dark:text-emerald-200'
+                  : 'border-neutral-200 bg-white hover:border-emerald-500/40 text-neutral-800 dark:border-neutral-800 dark:bg-neutral-950/70 dark:text-neutral-300'
               }`}
             >
-              <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
+              <Check className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
               <span>{t('formatted_card.true_btn', 'Verdadero')}</span>
             </button>
 
@@ -429,17 +420,15 @@ export function FormattedCardView({
               }}
               className={`flex-1 py-3.5 px-4 min-h-[48px] rounded-xl border font-semibold text-xs sm:text-sm transition-all flex items-center justify-center gap-2 ${
                 isRevealed && isFalse
-                  ? 'border-rose-500 bg-rose-500/20 text-rose-300 ring-1 ring-rose-500'
+                  ? 'border-rose-500 bg-rose-500/20 text-rose-800 dark:text-rose-300 ring-1 ring-rose-500'
                   : isRevealed && selectedOption === 'false' && !isFalse
-                  ? 'border-rose-500 bg-rose-500/20 text-rose-300 line-through'
+                  ? 'border-rose-500 bg-rose-500/20 text-rose-800 dark:text-rose-300 line-through'
                   : selectedOption === 'false'
-                  ? 'border-rose-500 bg-rose-500/20 text-rose-200'
-                  : 'border-neutral-800 bg-neutral-950/70 hover:border-rose-500/40 text-neutral-300'
+                  ? 'border-rose-500 bg-rose-500/20 text-rose-800 dark:text-rose-200'
+                  : 'border-neutral-200 bg-white hover:border-rose-500/40 text-neutral-800 dark:border-neutral-800 dark:bg-neutral-950/70 dark:text-neutral-300'
               }`}
             >
-              <svg className="w-4 h-4 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              <X className="w-4 h-4 text-rose-500 dark:text-rose-400" />
               <span>{t('formatted_card.false_btn', 'Falso')}</span>
             </button>
           </div>
@@ -448,21 +437,21 @@ export function FormattedCardView({
 
       {/* REVERSO (BACK) */}
       {isRevealed && (
-        <div className="pt-3 sm:pt-6 border-t border-neutral-800/80 space-y-2 sm:space-y-3 animate-in fade-in slide-in-from-top-3 duration-300">
+        <div className="pt-3 sm:pt-6 border-t border-neutral-200 dark:border-neutral-800/80 space-y-2 sm:space-y-3 animate-in fade-in slide-in-from-top-3 duration-300">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               {t('formatted_card.answer_heading', 'Respuesta / Justificación')}
             </span>
 
             {resolvedFormat === 'multiple_choice' && correctKey && (
-              <span className="text-xs font-mono px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 uppercase">
+              <span className="text-xs font-mono px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/30 uppercase">
                 {t('formatted_card.correct_option', 'Opción Correcta: ({key})').replace('{key}', correctKey)}
               </span>
             )}
           </div>
 
-          <div className="text-sm sm:text-base md:text-lg text-neutral-200 leading-relaxed whitespace-pre-wrap bg-neutral-950/60 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-neutral-800/90 shadow-inner">
+          <div className="text-sm sm:text-base md:text-lg text-neutral-800 dark:text-neutral-200 leading-relaxed whitespace-pre-wrap bg-neutral-50 dark:bg-neutral-950/60 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-neutral-200 dark:border-neutral-800/90 shadow-inner">
             {renderMarkdownBold(back)}
           </div>
         </div>

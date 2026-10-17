@@ -7,3 +7,5 @@ export * from './useStreakStore';
 export * from './useProfileStore';
 export * from './useProModalStore';
 export * from './useLanguageStore';
+export * from './useFeedbackModalStore';
+export * from './useThemeStore';

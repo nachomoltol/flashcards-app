@@ -2,13 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Ticket, CheckCircle2, AlertCircle, Languages, ShieldCheck } from 'lucide-react';
+import { Ticket, CheckCircle2, AlertCircle, ShieldCheck } from 'lucide-react';
 import { useAuthStore, useSettingsStore, useTutorialStore, useLanguageStore, DEFAULT_FSRS_SETTINGS } from '@/stores';
 import { redeemPromoCodeAction } from '@/app/actions/redeemPromoCode';
 
 export default function SettingsPage() {
   const { user } = useAuthStore();
-  const { language, setLanguage, t } = useLanguageStore();
+  const { t } = useLanguageStore();
   const {
     settings,
     isLoading,
@@ -163,15 +163,15 @@ export default function SettingsPage() {
   return (
     <div className="space-y-8 animate-in fade-in duration-300 max-w-4xl">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-neutral-800/80">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-neutral-200 dark:border-neutral-800">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white flex items-center gap-3">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-neutral-900 dark:text-white flex items-center gap-3">
             <span>{t('settings.title', 'Configuración de Algoritmo y Perfil')}</span>
-            <span className="text-xs px-2.5 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 font-mono font-medium">
+            <span className="text-xs px-2.5 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-600 dark:text-indigo-400 font-mono font-medium">
               Persistencia Supabase
             </span>
           </h1>
-          <p className="text-sm text-neutral-400 mt-1">
+          <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
             {t('settings.subtitle', 'Personaliza tus parámetros del motor FSRS v5, gestiona tu identidad de usuario y sincroniza tu progreso en Supabase.')}
           </p>
         </div>
@@ -180,9 +180,9 @@ export default function SettingsPage() {
           type="button"
           onClick={handleReset}
           disabled={isSaving || isLoading}
-          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-neutral-900 border border-neutral-800 hover:border-neutral-700 text-neutral-400 hover:text-white text-xs font-medium transition active:scale-95 shrink-0 disabled:opacity-50"
+          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white text-xs font-medium transition active:scale-95 shrink-0 disabled:opacity-50 shadow-sm"
         >
-          <svg className="w-3.5 h-3.5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="w-3.5 h-3.5 text-neutral-400 dark:text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
           </svg>
           <span>{t('common.reset', 'Restablecer FSRS')}</span>
@@ -191,8 +191,8 @@ export default function SettingsPage() {
 
       {/* Notificaciones de Éxito / Error */}
       {successMessage && (
-        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2.5 animate-in fade-in">
-          <svg className="w-4 h-4 text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-xs flex items-center gap-2.5 animate-in fade-in">
+          <svg className="w-4 h-4 text-emerald-500 dark:text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
           </svg>
           <span className="font-medium">{successMessage}</span>
@@ -200,8 +200,8 @@ export default function SettingsPage() {
       )}
 
       {error && !hasUsernameConflict && (
-        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2.5 animate-in fade-in">
-          <svg className="w-4 h-4 text-rose-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2.5 animate-in fade-in">
+          <svg className="w-4 h-4 text-rose-500 dark:text-rose-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
           <span className="font-medium">{error}</span>
@@ -209,68 +209,16 @@ export default function SettingsPage() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-8">
-        {/* Sección: Idioma de la Aplicación (i18n) */}
-        <div className="p-6 rounded-2xl bg-neutral-900/60 border border-neutral-800 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h2 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
-                <Languages className="w-4 h-4 text-sky-400" />
-                <span>{t('settings.language_section_title', 'Idioma de la Aplicación')}</span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-sky-500/20 text-sky-300 border border-sky-500/30">
-                  i18n
-                </span>
-              </h2>
-              <p className="text-xs text-neutral-400 mt-1">
-                {t('settings.language_section_desc', 'Elige el idioma de la interfaz y de las flashcards generadas por la inteligencia artificial.')}
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-md pt-1">
-            <button
-              type="button"
-              onClick={() => setLanguage('es')}
-              className={`p-3.5 rounded-xl border text-left transition cursor-pointer flex items-center gap-3 ${
-                language === 'es'
-                  ? 'bg-sky-500/15 border-sky-500 text-white shadow-md shadow-sky-500/20 ring-1 ring-sky-500/40'
-                  : 'bg-neutral-950/60 border-neutral-800 text-neutral-400 hover:text-white hover:border-neutral-700'
-              }`}
-            >
-              <span className="text-2xl">🇪🇸</span>
-              <div>
-                <p className="text-xs font-semibold text-white">{t('settings.lang_es', 'Español (ES)')}</p>
-                <p className="text-[10px] text-neutral-400">{t('settings.lang_es_sub', 'Español nativo')}</p>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setLanguage('en')}
-              className={`p-3.5 rounded-xl border text-left transition cursor-pointer flex items-center gap-3 ${
-                language === 'en'
-                  ? 'bg-sky-500/15 border-sky-500 text-white shadow-md shadow-sky-500/20 ring-1 ring-sky-500/40'
-                  : 'bg-neutral-950/60 border-neutral-800 text-neutral-400 hover:text-white hover:border-neutral-700'
-              }`}
-            >
-              <span className="text-2xl">🇬🇧</span>
-              <div>
-                <p className="text-xs font-semibold text-white">{t('settings.lang_en', 'English (EN)')}</p>
-                <p className="text-[10px] text-neutral-400">{t('settings.lang_en_sub', 'International English')}</p>
-              </div>
-            </button>
-          </div>
-        </div>
-
         {/* Sección 1: Parámetros del Algoritmo FSRS */}
-        <div className="p-6 rounded-2xl bg-neutral-900/60 border border-neutral-800 space-y-6">
-          <div className="border-b border-neutral-800/80 pb-4">
-            <h2 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
-              <svg className="w-4 h-4 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="p-6 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 space-y-6 shadow-sm">
+          <div className="border-b border-neutral-200 dark:border-neutral-800/80 pb-4">
+            <h2 className="text-base font-bold text-neutral-900 dark:text-white tracking-tight flex items-center gap-2">
+              <svg className="w-4 h-4 text-indigo-500 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
               </svg>
               <span>{t('settings.fsrs_section_title', 'Parámetros del Motor FSRS (Free Spaced Repetition Scheduler)')}</span>
             </h2>
-            <p className="text-xs text-neutral-400 mt-1">
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
               {t('settings.fsrs_section_desc', 'FSRS modela la estabilidad y dificultad de cada tarjeta para programar intervalos óptimos según tus metas de retención.')}
             </p>
           </div>
@@ -279,10 +227,10 @@ export default function SettingsPage() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <label htmlFor="retention-slider" className="block text-xs font-semibold uppercase tracking-wider text-neutral-200">
+                <label htmlFor="retention-slider" className="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-200">
                   {t('settings.retention_label', 'Retención Deseada (Request Retention)')}
                 </label>
-                <p className="text-xs text-neutral-400 mt-0.5">
+                <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
                   {t('settings.retention_desc', 'Probabilidad objetivo de recordar la tarjeta en el momento exacto del repaso.')}
                 </p>
               </div>
@@ -291,10 +239,10 @@ export default function SettingsPage() {
               <div className="flex items-center gap-2">
                 <span className={`text-xs font-mono font-bold px-2.5 py-1 rounded-lg border ${
                   retentionPercentage === 90
-                    ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+                    ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
                     : retentionPercentage > 90
-                    ? 'bg-indigo-500/15 border-indigo-500/30 text-indigo-400'
-                    : 'bg-amber-500/15 border-amber-500/30 text-amber-400'
+                    ? 'bg-indigo-500/15 border-indigo-500/30 text-indigo-600 dark:text-indigo-400'
+                    : 'bg-amber-500/15 border-amber-500/30 text-amber-600 dark:text-amber-400'
                 }`}>
                   {retentionPercentage}% {retentionPercentage === 90 && ` ${t('settings.retention_recommended', '• Recomendado')}`}
                 </span>
@@ -311,29 +259,29 @@ export default function SettingsPage() {
                 step="0.01"
                 value={retention}
                 onChange={(e) => setRetention(parseFloat(e.target.value))}
-                className="w-full h-2 bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                className="w-full h-2 bg-neutral-200 dark:bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
               />
               <div className="flex justify-between text-[11px] text-neutral-500 font-mono mt-1">
                 <span>{t('settings.retention_low', '70% (Menos repasos)')}</span>
-                <span className="text-emerald-400 font-bold">{t('settings.retention_opt', '90% (Óptimo)')}</span>
+                <span className="text-emerald-600 dark:text-emerald-400 font-bold">{t('settings.retention_opt', '90% (Óptimo)')}</span>
                 <span>{t('settings.retention_high', '99% (Máxima retención)')}</span>
               </div>
             </div>
 
             {/* Guía contextual */}
-            <div className="p-3 rounded-xl bg-neutral-950/60 border border-neutral-800/80 text-xs leading-relaxed text-neutral-400">
+            <div className="p-3 rounded-xl bg-neutral-50 dark:bg-neutral-950/60 border border-neutral-200 dark:border-neutral-800/80 text-xs leading-relaxed text-neutral-600 dark:text-neutral-400">
               {retentionPercentage < 85 && (
-                <span className="text-amber-400">
+                <span className="text-amber-600 dark:text-amber-400">
                   ⚠️ <strong>{t('settings.retention_guide_light', 'Carga de estudio ligera: Ahorrarás tiempo diario de estudio, pero olvidarás aproximadamente entre un 15% y 30% de tus tarjetas.')}</strong>
                 </span>
               )}
               {retentionPercentage >= 85 && retentionPercentage <= 92 && (
-                <span className="text-emerald-400">
+                <span className="text-emerald-600 dark:text-emerald-400">
                   ✨ <strong>{t('settings.retention_guide_balanced', 'Equilibrio recomendado por FSRS: Maximiza la eficiencia cognitiva con una excelente tasa de retención a largo plazo sin sobrecarga de repasos.')}</strong>
                 </span>
               )}
               {retentionPercentage > 92 && (
-                <span className="text-indigo-400">
+                <span className="text-indigo-600 dark:text-indigo-400">
                   🔥 <strong>{t('settings.retention_guide_demanding', 'Alta exigencia: Ideal para exámenes de alta densidad o certificaciones inmediatas. El número de repasos diarios aumentará significativamente.')}</strong>
                 </span>
               )}
@@ -341,13 +289,13 @@ export default function SettingsPage() {
           </div>
 
           {/* Parámetro 2: Intervalo Máximo */}
-          <div className="space-y-3 pt-3 border-t border-neutral-800/60">
+          <div className="space-y-3 pt-3 border-t border-neutral-200 dark:border-neutral-800/60">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div>
-                <label htmlFor="max-interval" className="block text-xs font-semibold uppercase tracking-wider text-neutral-200">
+                <label htmlFor="max-interval" className="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-200">
                   {t('settings.max_interval_label', 'Intervalo Máximo (Días)')}
                 </label>
-                <p className="text-xs text-neutral-400 mt-0.5">
+                <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
                   {t('settings.max_interval_desc', 'El número máximo de días que FSRS puede espaciar una tarjeta hacia el futuro.')}
                 </p>
               </div>
@@ -361,9 +309,9 @@ export default function SettingsPage() {
                   max="36500"
                   value={maxInterval}
                   onChange={(e) => setMaxInterval(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="w-28 text-xs font-mono font-bold px-3 py-1.5 rounded-lg bg-neutral-950 border border-neutral-800 text-white focus:outline-none focus:border-indigo-500 text-right"
+                  className="w-28 text-xs font-mono font-bold px-3 py-1.5 rounded-lg bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:border-indigo-500 text-right"
                 />
-                <span className="text-xs text-neutral-400 font-mono">{t('settings.days_unit', 'días')}</span>
+                <span className="text-xs text-neutral-500 dark:text-neutral-400 font-mono">{t('settings.days_unit', 'días')}</span>
               </div>
             </div>
 
@@ -382,8 +330,8 @@ export default function SettingsPage() {
                   onClick={() => setMaxInterval(preset.value)}
                   className={`px-2.5 py-1 rounded-lg text-xs font-mono transition ${
                     maxInterval === preset.value
-                      ? 'bg-indigo-600/25 text-indigo-300 border border-indigo-500/40'
-                      : 'bg-neutral-800/80 text-neutral-400 hover:text-white hover:bg-neutral-700'
+                      ? 'bg-indigo-500/15 dark:bg-indigo-600/25 text-indigo-600 dark:text-indigo-300 border border-indigo-500/40'
+                      : 'bg-neutral-100 dark:bg-neutral-800/80 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-700'
                   }`}
                 >
                   {preset.label}
@@ -393,12 +341,12 @@ export default function SettingsPage() {
           </div>
 
           {/* Parámetro 3: Dispersión Anti-Clustering (Fuzz) */}
-          <div className="pt-3 border-t border-neutral-800/60 flex items-center justify-between gap-4">
+          <div className="pt-3 border-t border-neutral-200 dark:border-neutral-800/60 flex items-center justify-between gap-4">
             <div>
-              <label htmlFor="fuzz-toggle" className="block text-xs font-semibold uppercase tracking-wider text-neutral-200">
+              <label htmlFor="fuzz-toggle" className="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-200">
                 {t('settings.fuzz_label', 'Aleatoriedad Anti-Acumulación (FSRS Fuzz)')}
               </label>
-              <p className="text-xs text-neutral-400 mt-0.5">
+              <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
                 {t('settings.fuzz_desc', 'Añade una pequeña variación aleatoria a los intervalos para evitar que cientos de tarjetas se acumulen en el mismo día.')}
               </p>
             </div>
@@ -408,7 +356,7 @@ export default function SettingsPage() {
               type="button"
               onClick={() => setFuzz(!fuzz)}
               className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors duration-200 ease-in-out shrink-0 ${
-                fuzz ? 'bg-indigo-600' : 'bg-neutral-800'
+                fuzz ? 'bg-indigo-600' : 'bg-neutral-300 dark:bg-neutral-800'
               }`}
             >
               <div
@@ -421,22 +369,22 @@ export default function SettingsPage() {
         </div>
 
         {/* Sección 2: Perfil del Usuario en Supabase */}
-        <div id="profile-section" className="p-6 rounded-2xl bg-neutral-900/60 border border-neutral-800 space-y-5 scroll-mt-6 transition-all">
-          <div className="border-b border-neutral-800/80 pb-4">
-            <h2 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
-              <svg className="w-4 h-4 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div id="profile-section" className="p-6 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-5 scroll-mt-6 transition-all">
+          <div className="border-b border-neutral-200 dark:border-neutral-800/80 pb-4">
+            <h2 className="text-base font-bold text-neutral-900 dark:text-white tracking-tight flex items-center gap-2">
+              <svg className="w-4 h-4 text-violet-500 dark:text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
               <span>{t('settings.profile_section_title', 'Datos del Perfil')}</span>
             </h2>
-            <p className="text-xs text-neutral-400 mt-1">
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
               {t('settings.profile_section_desc', 'Vinculados a tu identificador único de usuario en Supabase con políticas RLS de seguridad.')}
             </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label htmlFor="full-name-input" className="block text-xs font-semibold uppercase tracking-wider text-neutral-300 mb-1.5">
+              <label htmlFor="full-name-input" className="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1.5">
                 {t('settings.full_name_label', 'Nombre Completo')}
               </label>
               <input
@@ -445,15 +393,15 @@ export default function SettingsPage() {
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder={t('settings.full_name_placeholder', 'Tu nombre y apellido...')}
-                className="w-full text-xs px-3.5 py-2.5 rounded-xl bg-neutral-950 border border-neutral-800 text-white placeholder-neutral-500 focus:outline-none focus:border-indigo-500 transition"
+                className="w-full text-xs px-3.5 py-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:border-indigo-500 transition"
               />
             </div>
 
             <div>
-              <label htmlFor="username-input" className="block text-xs font-semibold uppercase tracking-wider text-neutral-300 mb-1.5 flex items-center justify-between">
+              <label htmlFor="username-input" className="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1.5 flex items-center justify-between">
                 <span>{t('settings.username_label', 'Nombre de Usuario')}</span>
                 {hasUsernameConflict && (
-                  <span className="text-[10px] text-rose-400 font-medium lowercase">
+                  <span className="text-[10px] text-rose-500 dark:text-rose-400 font-medium lowercase">
                     {t('settings.username_not_available', 'No disponible')}
                   </span>
                 )}
@@ -467,17 +415,17 @@ export default function SettingsPage() {
                   if (hasUsernameConflict) clearErrors();
                 }}
                 placeholder={t('settings.username_placeholder', 'usuario123')}
-                className={`w-full text-xs px-3.5 py-2.5 rounded-xl bg-neutral-950 border text-white placeholder-neutral-500 focus:outline-none transition ${
+                className={`w-full text-xs px-3.5 py-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-950 border text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none transition ${
                   hasUsernameConflict
-                    ? 'border-rose-500 focus:border-rose-500 focus:ring-1 focus:ring-rose-500/50 bg-rose-950/20 shadow-sm shadow-rose-950/30'
-                    : 'border-neutral-800 focus:border-indigo-500'
+                    ? 'border-rose-500 focus:border-rose-500 focus:ring-1 focus:ring-rose-500/50 bg-rose-50 dark:bg-rose-950/20 shadow-sm shadow-rose-950/30'
+                    : 'border-neutral-300 dark:border-neutral-800 focus:border-indigo-500'
                 }`}
                 aria-invalid={hasUsernameConflict}
                 aria-describedby={hasUsernameConflict ? "username-error-msg" : undefined}
               />
               {hasUsernameConflict && (
-                <p id="username-error-msg" className="text-xs text-rose-400 mt-1.5 flex items-center gap-1.5 font-medium animate-in fade-in">
-                  <svg className="w-3.5 h-3.5 text-rose-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <p id="username-error-msg" className="text-xs text-rose-600 dark:text-rose-400 mt-1.5 flex items-center gap-1.5 font-medium animate-in fade-in">
+                  <svg className="w-3.5 h-3.5 text-rose-500 dark:text-rose-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   <span>{t('settings.username_conflict_error', 'Este nombre de usuario ya está en uso. Por favor, elige otro.')}</span>
@@ -486,31 +434,31 @@ export default function SettingsPage() {
             </div>
 
             <div className="sm:col-span-2">
-              <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-1.5">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-600 dark:text-neutral-400 mb-1.5">
                 {t('settings.email_label', 'Correo Electrónico (Auth)')}
               </label>
               <input
                 type="email"
                 disabled
                 value={user?.email || 'usuario@supabase.com'}
-                className="w-full text-xs px-3.5 py-2.5 rounded-xl bg-neutral-950/40 border border-neutral-800/60 text-neutral-500 cursor-not-allowed font-mono"
+                className="w-full text-xs px-3.5 py-2.5 rounded-xl bg-neutral-100 dark:bg-neutral-950/40 border border-neutral-300 dark:border-neutral-800/60 text-neutral-500 cursor-not-allowed font-mono"
               />
             </div>
           </div>
         </div>
 
         {/* Sección: Suscripción y Bonos Promocionales (VIP / PRO) */}
-        <div className="p-6 rounded-2xl bg-neutral-900/60 border border-purple-500/25 space-y-4">
+        <div className="p-6 rounded-2xl bg-white dark:bg-neutral-900 border border-purple-200 dark:border-purple-500/25 shadow-sm space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h2 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
-                <Ticket className="w-4 h-4 text-purple-400" />
+              <h2 className="text-base font-bold text-neutral-900 dark:text-white tracking-tight flex items-center gap-2">
+                <Ticket className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                 <span>{t('settings.promo_section_title', 'Suscripción y Bonos Promocionales')}</span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-50 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-500/30">
                   PRO & VIP
                 </span>
               </h2>
-              <p className="text-xs text-neutral-400 mt-1">
+              <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
                 {t('settings.promo_section_desc', 'Canjea un código promocional o bono VIP (ej. PROMO50) para desbloquear generaciones ilimitadas sin restricciones.')}
               </p>
             </div>
@@ -526,7 +474,7 @@ export default function SettingsPage() {
                   if (promoResult) setPromoResult(null);
                 }}
                 placeholder={t('settings.promo_placeholder', 'EJ: ESTUDIANTE2026')}
-                className="flex-1 bg-neutral-950/80 border border-neutral-700 focus:border-purple-500 rounded-xl px-3.5 py-2 text-xs sm:text-sm text-white placeholder-neutral-500 focus:outline-none uppercase tracking-wider font-mono transition"
+                className="flex-1 bg-neutral-50 dark:bg-neutral-950/80 border border-neutral-300 dark:border-neutral-700 focus:border-purple-500 rounded-xl px-3.5 py-2 text-xs sm:text-sm text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none uppercase tracking-wider font-mono transition"
                 disabled={isRedeeming}
               />
               <button
@@ -547,14 +495,14 @@ export default function SettingsPage() {
               <div
                 className={`mt-3 p-3 rounded-xl text-xs flex items-center gap-2.5 animate-in fade-in ${
                   promoResult.type === 'success'
-                    ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-200'
-                    : 'bg-red-500/15 border border-red-500/30 text-red-200'
+                    ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-800 dark:text-emerald-200'
+                    : 'bg-red-500/15 border border-red-500/30 text-red-800 dark:text-red-200'
                 }`}
               >
                 {promoResult.type === 'success' ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500 dark:text-emerald-400 shrink-0" />
                 ) : (
-                  <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+                  <AlertCircle className="w-4 h-4 text-red-500 dark:text-red-400 shrink-0" />
                 )}
                 <div>
                   <p className="font-semibold">{promoResult.message}</p>
@@ -570,16 +518,16 @@ export default function SettingsPage() {
         </div>
 
         {/* Sección 3: Tutorial y Guía de Bienvenida */}
-        <div className="p-6 rounded-2xl bg-neutral-900/60 border border-neutral-800 space-y-4">
+        <div className="p-6 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h2 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
-                <svg className="w-4 h-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <h2 className="text-base font-bold text-neutral-900 dark:text-white tracking-tight flex items-center gap-2">
+                <svg className="w-4 h-4 text-amber-500 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                 </svg>
                 <span>{t('settings.tutorial_section_title', 'Tutorial y Guía de Bienvenida')}</span>
               </h2>
-              <p className="text-xs text-neutral-400 mt-1">
+              <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
                 {t('settings.tutorial_section_desc', '¿Quieres repasar el flujo de carpetas, generación de tarjetas con IA y el algoritmo de repaso espaciado?')}
               </p>
             </div>
@@ -587,9 +535,9 @@ export default function SettingsPage() {
             <button
               type="button"
               onClick={() => openTutorial(0)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-700/80 hover:border-neutral-600 text-neutral-200 hover:text-white text-xs sm:text-sm font-medium transition active:scale-95 shrink-0 cursor-pointer shadow-sm group"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-900 dark:hover:bg-neutral-800 border border-neutral-300 dark:border-neutral-700/80 hover:border-neutral-400 dark:hover:border-neutral-600 text-neutral-800 dark:text-neutral-200 hover:text-neutral-900 dark:hover:text-white text-xs sm:text-sm font-medium transition active:scale-95 shrink-0 cursor-pointer shadow-sm group"
             >
-              <svg className="w-4 h-4 text-indigo-400 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-4 h-4 text-indigo-500 dark:text-indigo-400 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
@@ -599,21 +547,21 @@ export default function SettingsPage() {
         </div>
 
         {/* Sección: Legal y Privacidad de Datos */}
-        <div className="p-6 rounded-2xl bg-neutral-900/60 border border-neutral-800 space-y-4">
+        <div className="p-6 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h2 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <h2 className="text-base font-bold text-neutral-900 dark:text-white tracking-tight flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
                 <span>{t('settings.privacy_section_title', 'Privacidad y Protección de Datos')}</span>
               </h2>
-              <p className="text-xs text-neutral-400 mt-1">
+              <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
                 {t('settings.privacy_section_desc', 'Consulta nuestra política de privacidad, uso seguro de datos y cómo solicitar la eliminación de tu cuenta.')}
               </p>
             </div>
 
             <Link
               href="/privacidad"
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-700/80 hover:border-neutral-600 text-neutral-200 hover:text-white text-xs sm:text-sm font-medium transition active:scale-95 shrink-0 cursor-pointer shadow-sm group"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-900 dark:hover:bg-neutral-800 border border-neutral-300 dark:border-neutral-700/80 hover:border-neutral-400 dark:hover:border-neutral-600 text-neutral-800 dark:text-neutral-200 hover:text-neutral-900 dark:hover:text-white text-xs sm:text-sm font-medium transition active:scale-95 shrink-0 cursor-pointer shadow-sm group"
             >
               <span>{t('settings.privacy_button', 'Ver Política de Privacidad')}</span>
               <span className="text-neutral-500 group-hover:translate-x-0.5 transition-transform">→</span>
@@ -623,14 +571,14 @@ export default function SettingsPage() {
 
         {/* Barra de Acciones */}
         <div className="flex items-center justify-between pt-2">
-          <div className="text-xs text-neutral-400">
+          <div className="text-xs text-neutral-500 dark:text-neutral-400">
             {hasChanges ? (
-              <span className="text-amber-400 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+              <span className="text-amber-600 dark:text-amber-400 flex items-center gap-1.5 font-medium">
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
                 {t('settings.changes_pending', 'Tienes cambios sin guardar')}
               </span>
             ) : (
-              <span className="text-neutral-500">{t('settings.synced', 'Ajustes sincronizados con Supabase')}</span>
+              <span className="text-neutral-500 dark:text-neutral-500">{t('settings.synced', 'Ajustes sincronizados con Supabase')}</span>
             )}
           </div>
 

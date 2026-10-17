@@ -208,14 +208,14 @@ export default function StudyPage({ params }: StudyPageProps) {
   if (isInitialized && allCards.length === 0) {
     return (
       <div className="max-w-md mx-auto py-16 text-center space-y-6 animate-in fade-in">
-        <div className="w-16 h-16 rounded-2xl bg-neutral-900 border border-neutral-800 flex items-center justify-center text-neutral-500 mx-auto">
+        <div className="w-16 h-16 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 flex items-center justify-center text-neutral-400 dark:text-neutral-500 mx-auto shadow-sm">
           <svg className="w-8 h-8 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
           </svg>
         </div>
         <div>
-          <h2 className="text-xl font-bold text-white tracking-tight">{t('study.empty_deck_title')}</h2>
-          <p className="text-sm text-neutral-400 mt-1">
+          <h2 className="text-xl font-bold text-neutral-900 dark:text-white tracking-tight">{t('study.empty_deck_title')}</h2>
+          <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1">
             {t('study.empty_deck_desc')}
           </p>
         </div>
@@ -255,74 +255,74 @@ export default function StudyPage({ params }: StudyPageProps) {
 
         {/* Motivational Zero Inbox Heading */}
         <div className="space-y-2">
-          <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 shadow-sm">
+          <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 border border-emerald-500/30 shadow-sm">
             <span>🎉</span>
             <span>{t('study.zero_inbox_badge')}</span>
             <span>✨</span>
           </div>
 
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+          <h1 className="text-3xl sm:text-4xl font-extrabold text-neutral-900 dark:text-white tracking-tight">
             {t('study.zero_inbox_title')}
           </h1>
-          <p className="mt-2 text-sm text-neutral-300 max-w-lg mx-auto leading-relaxed">
+          <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-300 max-w-lg mx-auto leading-relaxed">
             {t('study.zero_inbox_desc')}
           </p>
         </div>
 
         {/* Key Summary Metric Banner: Tarjetas repasadas hoy en este mazo */}
-        <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-indigo-950/40 via-violet-950/30 to-emerald-950/40 border border-indigo-500/30 shadow-lg text-left flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-indigo-50/70 via-violet-50/50 to-emerald-50/70 dark:from-indigo-950/40 dark:via-violet-950/30 dark:to-emerald-950/40 border border-indigo-200 dark:border-indigo-500/30 shadow-lg text-left flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-xl shrink-0">
+            <div className="w-12 h-12 rounded-2xl bg-indigo-600/15 dark:bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-xl shrink-0">
               📊
             </div>
             <div>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-indigo-300 block">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-300 block">
                 {t('study.daily_summary')}
               </span>
-              <p className="text-sm sm:text-base font-bold text-white">
+              <p className="text-sm sm:text-base font-bold text-neutral-900 dark:text-white">
                 {t('study.cards_reviewed_today')}
               </p>
-              <span className="text-xs text-neutral-400">
+              <span className="text-xs text-neutral-600 dark:text-neutral-400">
                 {t('study.reviews_in_session', { count: sessionReviews.length, unit: sessionReviews.length === 1 ? t('study.review_singular') : t('study.review_plural') })}
               </span>
             </div>
           </div>
 
-          <div className="sm:text-right w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-neutral-800">
+          <div className="sm:text-right w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-neutral-200 dark:border-neutral-800">
             <div className="inline-flex items-baseline gap-1.5 bg-emerald-500/10 border border-emerald-500/25 px-4 py-2 rounded-xl">
-              <span className="text-2xl sm:text-3xl font-extrabold text-emerald-400 font-mono">
+              <span className="text-2xl sm:text-3xl font-extrabold text-emerald-600 dark:text-emerald-400 font-mono">
                 {cardsReviewedTodayTotal}
               </span>
-              <span className="text-xs font-semibold text-emerald-300">{t('study.cards_unit')}</span>
+              <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">{t('study.cards_unit')}</span>
             </div>
           </div>
         </div>
 
         {/* Resumen de calificaciones de la sesión */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 rounded-2xl bg-neutral-900/50 border border-neutral-800 text-left">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 rounded-2xl bg-neutral-50 dark:bg-neutral-900/50 border border-neutral-200 dark:border-neutral-800 text-left">
           <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20">
-            <span className="text-[11px] font-semibold text-rose-400 uppercase tracking-wider block">
+            <span className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 uppercase tracking-wider block">
               {t('study.rating_again_sub')}
             </span>
-            <span className="text-2xl font-bold text-white mt-1 block">{counts.again}</span>
+            <span className="text-2xl font-bold text-neutral-900 dark:text-white mt-1 block">{counts.again}</span>
           </div>
           <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
-            <span className="text-[11px] font-semibold text-amber-400 uppercase tracking-wider block">
+            <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider block">
               {t('study.rating_hard_sub')}
             </span>
-            <span className="text-2xl font-bold text-white mt-1 block">{counts.hard}</span>
+            <span className="text-2xl font-bold text-neutral-900 dark:text-white mt-1 block">{counts.hard}</span>
           </div>
           <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-            <span className="text-[11px] font-semibold text-emerald-400 uppercase tracking-wider block">
+            <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block">
               {t('study.rating_good_sub')}
             </span>
-            <span className="text-2xl font-bold text-white mt-1 block">{counts.good}</span>
+            <span className="text-2xl font-bold text-neutral-900 dark:text-white mt-1 block">{counts.good}</span>
           </div>
           <div className="p-3 rounded-xl bg-sky-500/10 border border-sky-500/20">
-            <span className="text-[11px] font-semibold text-sky-400 uppercase tracking-wider block">
+            <span className="text-[11px] font-semibold text-sky-600 dark:text-sky-400 uppercase tracking-wider block">
               {t('study.rating_easy_sub')}
             </span>
-            <span className="text-2xl font-bold text-white mt-1 block">{counts.easy}</span>
+            <span className="text-2xl font-bold text-neutral-900 dark:text-white mt-1 block">{counts.easy}</span>
           </div>
         </div>
 
@@ -335,13 +335,13 @@ export default function StudyPage({ params }: StudyPageProps) {
               setIsAnswerRevealed(false);
               setSessionReviews([]);
             }}
-            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white font-medium text-sm border border-neutral-700 transition"
+            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-800 border-neutral-300 dark:bg-neutral-800 dark:hover:bg-neutral-700 dark:text-white font-medium text-sm border dark:border-neutral-700 transition"
           >
             {t('study.review_again_btn')}
           </button>
           <Link
             href={`/decks/${deckId}`}
-            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-300 font-medium text-sm border border-neutral-800 transition"
+            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-white hover:bg-neutral-100 text-neutral-700 border-neutral-200 dark:bg-neutral-900 dark:hover:bg-neutral-800 dark:text-neutral-300 font-medium text-sm border dark:border-neutral-800 transition"
           >
             {t('study.view_deck_btn')}
           </Link>
@@ -380,7 +380,7 @@ export default function StudyPage({ params }: StudyPageProps) {
         <div className="flex items-center justify-between gap-3">
           <Link
             href={`/decks/${deckId}`}
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-neutral-400 hover:text-white transition group py-1"
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white transition group py-1"
           >
             <svg
               className="w-4 h-4 transition-transform group-hover:-translate-x-1"
@@ -398,20 +398,20 @@ export default function StudyPage({ params }: StudyPageProps) {
           {/* Counter of Remaining Cards */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <div className="flex items-center gap-1 text-[11px] sm:text-xs">
-              <span className="text-neutral-400 hidden sm:inline">{t('study.progress_label')}</span>
-              <span className="font-semibold text-white">
+              <span className="text-neutral-500 dark:text-neutral-400 hidden sm:inline">{t('study.progress_label')}</span>
+              <span className="font-semibold text-neutral-900 dark:text-white">
                 {currentIndex + 1} / {queue.length}
               </span>
             </div>
 
-            <span className="text-[10px] sm:text-xs px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+            <span className="text-[10px] sm:text-xs px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full font-semibold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
               {remainingCount} {remainingCount === 1 ? t('study.remaining_singular') : t('study.remaining_plural')}
             </span>
           </div>
         </div>
 
         {/* Progress Bar */}
-        <div className="w-full bg-neutral-900 rounded-full h-1 sm:h-1.5 overflow-hidden">
+        <div className="w-full bg-neutral-200 dark:bg-neutral-900 rounded-full h-1 sm:h-1.5 overflow-hidden">
           <div
             className="bg-gradient-to-r from-indigo-500 to-violet-500 h-full rounded-full transition-all duration-300"
             style={{ width: `${progressPercent}%` }}
@@ -420,9 +420,9 @@ export default function StudyPage({ params }: StudyPageProps) {
       </div>
 
       {/* Main Isolated Card Container */}
-      <div className="flex-1 min-h-0 flex flex-col justify-between rounded-2xl sm:rounded-3xl border border-neutral-800 bg-neutral-900/60 backdrop-blur-xl p-3.5 sm:p-6 md:p-8 shadow-2xl overflow-hidden transition-all my-1.5 sm:my-3">
+      <div className="flex-1 min-h-0 flex flex-col justify-between rounded-2xl sm:rounded-3xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/60 backdrop-blur-xl p-3.5 sm:p-6 md:p-8 shadow-xl shadow-neutral-200/50 dark:shadow-2xl overflow-hidden transition-all my-1.5 sm:my-3">
         {/* Card Header Information */}
-        <div className="shrink-0 flex items-center justify-between pb-2 sm:pb-3 border-b border-neutral-800/60">
+        <div className="shrink-0 flex items-center justify-between pb-2 sm:pb-3 border-b border-neutral-200 dark:border-neutral-800/60">
           <div className="flex items-center gap-1.5 sm:gap-2">
             <span
               className={`text-[9px] sm:text-[10px] px-2 py-0.5 rounded-md uppercase tracking-wider font-semibold border ${
@@ -482,7 +482,7 @@ export default function StudyPage({ params }: StudyPageProps) {
         )}
 
         {/* Bottom Actions Bar */}
-        <div className="shrink-0 pt-2 sm:pt-3 border-t border-neutral-800/60">
+        <div className="shrink-0 pt-2 sm:pt-3 border-t border-neutral-200 dark:border-neutral-800/60">
           {!isAnswerRevealed ? (
             /* Button: Mostrar respuesta */
             <button
@@ -509,12 +509,12 @@ export default function StudyPage({ params }: StudyPageProps) {
                     (e.currentTarget as HTMLElement)?.blur();
                     handleRate(1);
                   }}
-                  className="p-1 sm:p-2.5 min-h-[52px] sm:min-h-[70px] rounded-xl sm:rounded-2xl bg-rose-500/10 hover:bg-rose-500/20 active:bg-rose-500/30 text-rose-300 border border-rose-500/30 hover:border-rose-500/50 transition-all duration-150 flex flex-col items-center justify-center gap-0.5 sm:gap-1.5 group active:scale-95 shadow-sm cursor-pointer"
+                  className="p-1 sm:p-2.5 min-h-[52px] sm:min-h-[70px] rounded-xl sm:rounded-2xl bg-rose-500/10 hover:bg-rose-500/20 active:bg-rose-500/30 text-rose-700 dark:text-rose-300 border border-rose-500/30 hover:border-rose-500/50 transition-all duration-150 flex flex-col items-center justify-center gap-0.5 sm:gap-1.5 group active:scale-95 shadow-sm cursor-pointer"
                 >
-                  <span className="text-[10px] sm:text-xs font-mono font-bold px-1.5 sm:px-2 py-0 sm:py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                  <span className="text-[10px] sm:text-xs font-mono font-bold px-1.5 sm:px-2 py-0 sm:py-0.5 rounded-full bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/30">
                     {nextIntervals ? formatInterval(nextIntervals[1].due) : '10m'}
                   </span>
-                  <span className="font-semibold text-[11px] sm:text-xs md:text-sm text-white text-center leading-tight">
+                  <span className="font-semibold text-[11px] sm:text-xs md:text-sm text-neutral-900 dark:text-white text-center leading-tight">
                     {t('study.rating_again')}
                   </span>
                 </button>
@@ -526,12 +526,12 @@ export default function StudyPage({ params }: StudyPageProps) {
                     (e.currentTarget as HTMLElement)?.blur();
                     handleRate(2);
                   }}
-                  className="p-1 sm:p-2.5 min-h-[52px] sm:min-h-[70px] rounded-xl sm:rounded-2xl bg-amber-500/10 hover:bg-amber-500/20 active:bg-amber-500/30 text-amber-300 border border-amber-500/30 hover:border-amber-500/50 transition-all duration-150 flex flex-col items-center justify-center gap-0.5 sm:gap-1.5 group active:scale-95 shadow-sm cursor-pointer"
+                  className="p-1 sm:p-2.5 min-h-[52px] sm:min-h-[70px] rounded-xl sm:rounded-2xl bg-amber-500/10 hover:bg-amber-500/20 active:bg-amber-500/30 text-amber-700 dark:text-amber-300 border border-amber-500/30 hover:border-amber-500/50 transition-all duration-150 flex flex-col items-center justify-center gap-0.5 sm:gap-1.5 group active:scale-95 shadow-sm cursor-pointer"
                 >
-                  <span className="text-[10px] sm:text-xs font-mono font-bold px-1.5 sm:px-2 py-0 sm:py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  <span className="text-[10px] sm:text-xs font-mono font-bold px-1.5 sm:px-2 py-0 sm:py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30">
                     {nextIntervals ? formatInterval(nextIntervals[2].due) : '3h'}
                   </span>
-                  <span className="font-semibold text-[11px] sm:text-xs md:text-sm text-white text-center leading-tight">
+                  <span className="font-semibold text-[11px] sm:text-xs md:text-sm text-neutral-900 dark:text-white text-center leading-tight">
                     {t('study.rating_hard')}
                   </span>
                 </button>
@@ -543,12 +543,12 @@ export default function StudyPage({ params }: StudyPageProps) {
                     (e.currentTarget as HTMLElement)?.blur();
                     handleRate(3);
                   }}
-                  className="p-1 sm:p-2.5 min-h-[52px] sm:min-h-[70px] rounded-xl sm:rounded-2xl bg-emerald-500/10 hover:bg-emerald-500/20 active:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 hover:border-emerald-500/50 transition-all duration-150 flex flex-col items-center justify-center gap-0.5 sm:gap-1.5 group active:scale-95 shadow-sm cursor-pointer"
+                  className="p-1 sm:p-2.5 min-h-[52px] sm:min-h-[70px] rounded-xl sm:rounded-2xl bg-emerald-500/10 hover:bg-emerald-500/20 active:bg-emerald-500/30 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 hover:border-emerald-500/50 transition-all duration-150 flex flex-col items-center justify-center gap-0.5 sm:gap-1.5 group active:scale-95 shadow-sm cursor-pointer"
                 >
-                  <span className="text-[10px] sm:text-xs font-mono font-bold px-1.5 sm:px-2 py-0 sm:py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  <span className="text-[10px] sm:text-xs font-mono font-bold px-1.5 sm:px-2 py-0 sm:py-0.5 rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
                     {nextIntervals ? formatInterval(nextIntervals[3].due) : '1d'}
                   </span>
-                  <span className="font-semibold text-[11px] sm:text-xs md:text-sm text-white text-center leading-tight">
+                  <span className="font-semibold text-[11px] sm:text-xs md:text-sm text-neutral-900 dark:text-white text-center leading-tight">
                     {t('study.rating_good')}
                   </span>
                 </button>
@@ -560,12 +560,12 @@ export default function StudyPage({ params }: StudyPageProps) {
                     (e.currentTarget as HTMLElement)?.blur();
                     handleRate(4);
                   }}
-                  className="p-1 sm:p-2.5 min-h-[52px] sm:min-h-[70px] rounded-xl sm:rounded-2xl bg-sky-500/10 hover:bg-sky-500/20 active:bg-sky-500/30 text-sky-300 border border-sky-500/30 hover:border-sky-500/50 transition-all duration-150 flex flex-col items-center justify-center gap-0.5 sm:gap-1.5 group active:scale-95 shadow-sm cursor-pointer"
+                  className="p-1 sm:p-2.5 min-h-[52px] sm:min-h-[70px] rounded-xl sm:rounded-2xl bg-sky-500/10 hover:bg-sky-500/20 active:bg-sky-500/30 text-sky-700 dark:text-sky-300 border border-sky-500/30 hover:border-sky-500/50 transition-all duration-150 flex flex-col items-center justify-center gap-0.5 sm:gap-1.5 group active:scale-95 shadow-sm cursor-pointer"
                 >
-                  <span className="text-[10px] sm:text-xs font-mono font-bold px-1.5 sm:px-2 py-0 sm:py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30">
+                  <span className="text-[10px] sm:text-xs font-mono font-bold px-1.5 sm:px-2 py-0 sm:py-0.5 rounded-full bg-sky-500/20 text-sky-700 dark:text-sky-300 border border-sky-500/30">
                     {nextIntervals ? formatInterval(nextIntervals[4].due) : '4d'}
                   </span>
-                  <span className="font-semibold text-[11px] sm:text-xs md:text-sm text-white text-center leading-tight">
+                  <span className="font-semibold text-[11px] sm:text-xs md:text-sm text-neutral-900 dark:text-white text-center leading-tight">
                     {t('study.rating_easy')}
                   </span>
                 </button>

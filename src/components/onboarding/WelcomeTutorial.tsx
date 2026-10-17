@@ -16,6 +16,7 @@ import {
   Clock,
   Layers,
   Settings,
+  Video,
 } from 'lucide-react';
 
 export const TUTORIAL_STORAGE_KEY = 'flashcards_welcome_tutorial_seen';
@@ -45,11 +46,11 @@ const slides: SlideData[] = [
     iconColor: 'text-blue-400',
     renderIcon: () => <FolderTree className="w-6 h-6" />,
     renderIllustration: () => (
-      <div className="w-full bg-neutral-950/70 border border-neutral-800/80 rounded-2xl p-4 sm:p-5 space-y-3">
-        <div className="flex items-center justify-between pb-2.5 border-b border-neutral-800/60">
+      <div className="w-full bg-neutral-50 dark:bg-neutral-950/70 border border-neutral-200 dark:border-neutral-800/80 rounded-2xl p-4 sm:p-5 space-y-3">
+        <div className="flex items-center justify-between pb-2.5 border-b border-neutral-200 dark:border-neutral-800/60">
           <div className="flex items-center gap-2">
             <span className="text-sm">📁</span>
-            <span className="text-xs font-semibold text-white">Biblioteca</span>
+            <span className="text-xs font-semibold text-neutral-900 dark:text-white">Biblioteca</span>
           </div>
           <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 text-white text-[11px] font-bold shadow-sm">
             <span>+</span>
@@ -57,22 +58,22 @@ const slides: SlideData[] = [
           </div>
         </div>
         <div className="pl-3 sm:pl-4 space-y-2 border-l-2 border-amber-500/40">
-          <div className="flex items-center justify-between p-2 rounded-xl bg-neutral-900/80 border border-neutral-800 text-left">
+          <div className="flex items-center justify-between p-2 rounded-xl bg-white dark:bg-neutral-900/80 border border-neutral-200 dark:border-neutral-800 text-left">
             <div className="flex items-center gap-2">
               <span className="text-sm">📁</span>
-              <span className="text-xs font-medium text-neutral-200">Carpeta: Asignatura</span>
+              <span className="text-xs font-medium text-neutral-800 dark:text-neutral-200">Carpeta: Asignatura</span>
             </div>
-            <span className="text-[10px] text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full font-mono">
+            <span className="text-[10px] text-amber-700 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full font-mono">
               Organizador
             </span>
           </div>
-          <div className="pl-3 sm:pl-4 border-l border-neutral-800 space-y-1.5">
-            <div className="flex items-center justify-between p-1.5 rounded-lg bg-neutral-900/50 border border-neutral-800/60 text-left">
+          <div className="pl-3 sm:pl-4 border-l border-neutral-200 dark:border-neutral-800 space-y-1.5">
+            <div className="flex items-center justify-between p-1.5 rounded-lg bg-white dark:bg-neutral-900/50 border border-neutral-200 dark:border-neutral-800/60 text-left">
               <div className="flex items-center gap-1.5">
                 <span className="text-xs">🃏</span>
-                <span className="text-[11px] text-neutral-300">Mazo de Estudio</span>
+                <span className="text-[11px] text-neutral-700 dark:text-neutral-300">Mazo de Estudio</span>
               </div>
-              <span className="text-[10px] text-indigo-400 font-mono">FSRS</span>
+              <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-mono">FSRS</span>
             </div>
           </div>
         </div>
@@ -92,29 +93,27 @@ const slides: SlideData[] = [
     iconColor: 'text-purple-400',
     renderIcon: () => <Sparkles className="w-6 h-6" />,
     renderIllustration: () => (
-      <div className="w-full bg-neutral-950/70 border border-neutral-800/80 rounded-2xl p-4 sm:p-5 space-y-3">
+      <div className="w-full bg-neutral-50 dark:bg-neutral-950/70 border border-neutral-200 dark:border-neutral-800/80 rounded-2xl p-4 sm:p-5 space-y-3">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
-          <div className="p-2.5 rounded-xl bg-neutral-900 border border-neutral-800/80 flex flex-col items-center gap-1.5">
-            <FileText className="w-4 h-4 text-rose-400" />
-            <span className="text-[11px] font-medium text-neutral-300">PDFs</span>
+          <div className="p-2.5 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800/80 flex flex-col items-center gap-1.5 shadow-sm">
+            <FileText className="w-4 h-4 text-rose-500 dark:text-rose-400" />
+            <span className="text-[11px] font-medium text-neutral-700 dark:text-neutral-300">PDFs</span>
           </div>
-          <div className="p-2.5 rounded-xl bg-neutral-900 border border-neutral-800/80 flex flex-col items-center gap-1.5">
-            <FileCode className="w-4 h-4 text-blue-400" />
-            <span className="text-[11px] font-medium text-neutral-300">Word .docx</span>
+          <div className="p-2.5 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800/80 flex flex-col items-center gap-1.5 shadow-sm">
+            <FileCode className="w-4 h-4 text-blue-500 dark:text-blue-400" />
+            <span className="text-[11px] font-medium text-neutral-700 dark:text-neutral-300">Word .docx</span>
           </div>
-          <div className="p-2.5 rounded-xl bg-neutral-900 border border-neutral-800/80 flex flex-col items-center gap-1.5">
-            <svg className="w-4 h-4 text-red-500 fill-current" viewBox="0 0 24 24">
-              <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-            </svg>
-            <span className="text-[11px] font-medium text-neutral-300">YouTube</span>
+          <div className="p-2.5 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800/80 flex flex-col items-center gap-1.5 shadow-sm">
+            <Video className="w-4 h-4 text-red-500" />
+            <span className="text-[11px] font-medium text-neutral-700 dark:text-neutral-300">YouTube</span>
           </div>
-          <div className="p-2.5 rounded-xl bg-neutral-900 border border-neutral-800/80 flex flex-col items-center gap-1.5">
-            <Sparkles className="w-4 h-4 text-amber-400" />
-            <span className="text-[11px] font-medium text-neutral-300">Audios MP3</span>
+          <div className="p-2.5 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800/80 flex flex-col items-center gap-1.5 shadow-sm">
+            <Sparkles className="w-4 h-4 text-amber-500 dark:text-amber-400" />
+            <span className="text-[11px] font-medium text-neutral-700 dark:text-neutral-300">Audios MP3</span>
           </div>
         </div>
-        <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-300 text-xs flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-purple-400 shrink-0" />
+        <div className="p-3 rounded-xl bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/20 text-purple-700 dark:text-purple-300 text-xs flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0" />
           <span>Extracción inteligente por bloques de hasta 30 tarjetas.</span>
         </div>
       </div>
@@ -133,30 +132,30 @@ const slides: SlideData[] = [
     iconColor: 'text-emerald-400',
     renderIcon: () => <Brain className="w-6 h-6" />,
     renderIllustration: () => (
-      <div className="w-full bg-neutral-950/70 border border-neutral-800/80 rounded-2xl p-4 sm:p-5 space-y-3">
+      <div className="w-full bg-neutral-50 dark:bg-neutral-950/70 border border-neutral-200 dark:border-neutral-800/80 rounded-2xl p-4 sm:p-5 space-y-3">
         <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
           <div className="p-2 sm:p-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-center">
-            <span className="block text-[11px] font-bold text-red-400">1. Again</span>
-            <span className="text-[9px] text-neutral-400">Repetir</span>
+            <span className="block text-[11px] font-bold text-red-600 dark:text-red-400">1. Again</span>
+            <span className="text-[9px] text-neutral-500 dark:text-neutral-400">Repetir</span>
           </div>
           <div className="p-2 sm:p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-center">
-            <span className="block text-[11px] font-bold text-amber-400">2. Hard</span>
-            <span className="text-[9px] text-neutral-400">Difícil</span>
+            <span className="block text-[11px] font-bold text-amber-600 dark:text-amber-400">2. Hard</span>
+            <span className="text-[9px] text-neutral-500 dark:text-neutral-400">Difícil</span>
           </div>
           <div className="p-2 sm:p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/30 text-center">
-            <span className="block text-[11px] font-bold text-blue-400">3. Good</span>
-            <span className="text-[9px] text-neutral-400">Bien</span>
+            <span className="block text-[11px] font-bold text-blue-600 dark:text-blue-400">3. Good</span>
+            <span className="text-[9px] text-neutral-500 dark:text-neutral-400">Bien</span>
           </div>
           <div className="p-2 sm:p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-center">
-            <span className="block text-[11px] font-bold text-emerald-400">4. Easy</span>
-            <span className="text-[9px] text-neutral-400">Fácil</span>
+            <span className="block text-[11px] font-bold text-emerald-600 dark:text-emerald-400">4. Easy</span>
+            <span className="text-[9px] text-neutral-500 dark:text-neutral-400">Fácil</span>
           </div>
         </div>
-        <div className="p-2.5 rounded-xl bg-neutral-900 border border-neutral-800 text-[11px] text-neutral-400 flex items-center justify-between">
-          <span className="flex items-center gap-1.5 text-emerald-400">
+        <div className="p-2.5 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-[11px] text-neutral-600 dark:text-neutral-400 flex items-center justify-between">
+          <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-medium">
             <Clock className="w-3.5 h-3.5" /> Algoritmo FSRS de Repetición Espaciada
           </span>
-          <span className="font-mono text-neutral-300">Teclas 1, 2, 3, 4</span>
+          <span className="font-mono text-neutral-700 dark:text-neutral-300">Teclas 1, 2, 3, 4</span>
         </div>
       </div>
     ),
@@ -174,21 +173,21 @@ const slides: SlideData[] = [
     iconColor: 'text-amber-400',
     renderIcon: () => <Settings className="w-6 h-6" />,
     renderIllustration: () => (
-      <div className="w-full bg-neutral-950/70 border border-neutral-800/80 rounded-2xl p-4 sm:p-5 space-y-3">
+      <div className="w-full bg-neutral-50 dark:bg-neutral-950/70 border border-neutral-200 dark:border-neutral-800/80 rounded-2xl p-4 sm:p-5 space-y-3">
         {/* Mockup Card con Botón de Engranaje */}
-        <div className="p-3 rounded-xl bg-neutral-900 border border-neutral-800 flex items-center justify-between">
+        <div className="p-3 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 flex items-center justify-between shadow-sm">
           <div className="flex items-center gap-2.5">
             <span className="w-3 h-3 rounded-full bg-indigo-500" />
             <div className="text-left">
-              <span className="text-xs font-bold text-white block">Mazo de Estudio</span>
-              <span className="text-[10px] text-neutral-400">20 tarjetas</span>
+              <span className="text-xs font-bold text-neutral-900 dark:text-white block">Mazo de Estudio</span>
+              <span className="text-[10px] text-neutral-500 dark:text-neutral-400">20 tarjetas</span>
             </div>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="text-[11px] px-2.5 py-1 rounded-lg bg-indigo-600/20 text-indigo-300 font-semibold border border-indigo-500/30">
+            <span className="text-[11px] px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-600/20 text-indigo-700 dark:text-indigo-300 font-semibold border border-indigo-200 dark:border-indigo-500/30">
               Estudiar
             </span>
-            <div className="p-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center justify-center animate-pulse">
+            <div className="p-1 rounded-lg bg-amber-500/15 dark:bg-amber-500/20 text-amber-600 dark:text-amber-300 border border-amber-500/30 dark:border-amber-500/40 flex items-center justify-center animate-pulse">
               <Settings className="w-3.5 h-3.5" />
             </div>
           </div>
@@ -196,15 +195,15 @@ const slides: SlideData[] = [
 
         {/* Menú de Opciones */}
         <div className="grid grid-cols-3 gap-2 text-center text-[11px]">
-          <div className="p-2 rounded-xl bg-neutral-900/90 border border-neutral-800/80 text-neutral-300 flex flex-col items-center gap-1">
+          <div className="p-2 rounded-xl bg-white dark:bg-neutral-900/90 border border-neutral-200 dark:border-neutral-800/80 text-neutral-700 dark:text-neutral-300 flex flex-col items-center gap-1 shadow-sm">
             <span className="text-sm">✏️</span>
             <span>Editar nombre</span>
           </div>
-          <div className="p-2 rounded-xl bg-neutral-900/90 border border-neutral-800/80 text-neutral-300 flex flex-col items-center gap-1">
+          <div className="p-2 rounded-xl bg-white dark:bg-neutral-900/90 border border-neutral-200 dark:border-neutral-800/80 text-neutral-700 dark:text-neutral-300 flex flex-col items-center gap-1 shadow-sm">
             <span className="text-sm">🎨</span>
             <span>Cambiar color</span>
           </div>
-          <div className="p-2 rounded-xl bg-neutral-900/90 border border-rose-500/20 text-rose-300 flex flex-col items-center gap-1">
+          <div className="p-2 rounded-xl bg-white dark:bg-neutral-900/90 border border-rose-200 dark:border-rose-500/20 text-rose-600 dark:text-rose-300 flex flex-col items-center gap-1 shadow-sm">
             <span className="text-sm">🗑️</span>
             <span>Eliminar</span>
           </div>
@@ -225,23 +224,23 @@ const slides: SlideData[] = [
     iconColor: 'text-indigo-400',
     renderIcon: () => <Rocket className="w-6 h-6" />,
     renderIllustration: () => (
-      <div className="w-full bg-neutral-950/70 border border-indigo-500/30 rounded-2xl p-4 sm:p-5 space-y-3">
-        <div className="flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-indigo-950/50 to-neutral-900 border border-indigo-500/40">
+      <div className="w-full bg-neutral-50 dark:bg-neutral-950/70 border border-indigo-200 dark:border-indigo-500/30 rounded-2xl p-4 sm:p-5 space-y-3">
+        <div className="flex items-center justify-between p-3 rounded-xl bg-indigo-50 dark:bg-gradient-to-r dark:from-indigo-950/50 dark:to-neutral-900 border border-indigo-200 dark:border-indigo-500/40 shadow-sm">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-600/30">
               <Layers className="w-5 h-5" />
             </div>
             <div className="text-left">
-              <h4 className="text-xs sm:text-sm font-bold text-white">Guía Rápida</h4>
-              <p className="text-[11px] text-indigo-300">5 tarjetas interactivas de prueba</p>
+              <h4 className="text-xs sm:text-sm font-bold text-neutral-900 dark:text-white">Guía Rápida</h4>
+              <p className="text-[11px] text-indigo-700 dark:text-indigo-300">5 tarjetas interactivas de prueba</p>
             </div>
           </div>
           <span className="text-[11px] font-medium px-2.5 py-1 rounded-lg bg-indigo-600 text-white shadow-sm">
             Listo para estudiar
           </span>
         </div>
-        <p className="text-[11px] text-neutral-400 text-left">
-          💡 Puedes voltear tarjetas haciendo clic o con la tecla <kbd className="px-1.5 py-0.5 rounded bg-neutral-800 text-neutral-300 border border-neutral-700 font-mono text-[10px]">Espacio</kbd>.
+        <p className="text-[11px] text-neutral-500 dark:text-neutral-400 text-left">
+          💡 Puedes voltear tarjetas haciendo clic o con la tecla <kbd className="px-1.5 py-0.5 rounded bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-300 border border-neutral-300 dark:border-neutral-700 font-mono text-[10px]">Espacio</kbd>.
         </p>
       </div>
     ),
@@ -329,7 +328,7 @@ export function WelcomeTutorial() {
       aria-label="Tutorial de bienvenida"
     >
       <div
-        className="relative w-full max-w-lg rounded-3xl bg-neutral-900 border border-neutral-800/90 shadow-2xl shadow-black overflow-hidden flex flex-col animate-in zoom-in-95 duration-200"
+        className="relative w-full max-w-lg rounded-3xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800/90 shadow-2xl shadow-neutral-950/20 dark:shadow-black overflow-hidden flex flex-col animate-in zoom-in-95 duration-200"
         style={{ maxHeight: '92vh' }}
       >
         {/* Glow de fondo dinámico según el slide */}
@@ -340,10 +339,10 @@ export function WelcomeTutorial() {
         {/* Barra superior con navegación y botón cerrar */}
         <div className="relative flex items-center justify-between px-6 pt-5 pb-2 z-10">
           <div className="flex items-center gap-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-neutral-800 border border-neutral-700/80 text-neutral-300 font-mono">
+            <span className="text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700/80 text-neutral-700 dark:text-neutral-300 font-mono">
               {current.step}
             </span>
-            <span className="text-xs text-neutral-400 font-medium hidden sm:inline">
+            <span className="text-xs text-neutral-500 dark:text-neutral-400 font-medium hidden sm:inline">
               {current.badge}
             </span>
           </div>
@@ -351,7 +350,7 @@ export function WelcomeTutorial() {
           <button
             type="button"
             onClick={handleDismiss}
-            className="p-1.5 rounded-full text-neutral-400 hover:text-white hover:bg-neutral-800/80 transition cursor-pointer"
+            className="p-1.5 rounded-full text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800/80 transition cursor-pointer"
             aria-label="Cerrar tutorial"
           >
             <X className="w-5 h-5" />
@@ -368,10 +367,10 @@ export function WelcomeTutorial() {
               {current.renderIcon()}
             </div>
             <div>
-              <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+              <h3 className="text-xl sm:text-2xl font-bold text-neutral-900 dark:text-white tracking-tight">
                 {current.title}
               </h3>
-              <p className="text-xs sm:text-sm text-neutral-300 mt-1 leading-relaxed">
+              <p className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-300 mt-1 leading-relaxed">
                 {current.description}
               </p>
             </div>
@@ -384,7 +383,7 @@ export function WelcomeTutorial() {
         </div>
 
         {/* Barra de control inferior: Dots y botones de navegación */}
-        <div className="relative px-6 py-4 bg-neutral-950/80 border-t border-neutral-800/80 flex items-center justify-between gap-3 z-10">
+        <div className="relative px-6 py-4 bg-neutral-50 dark:bg-neutral-950/80 border-t border-neutral-200 dark:border-neutral-800/80 flex items-center justify-between gap-3 z-10">
           {/* Indicadores de diapositiva (Dots) */}
           <div className="flex items-center gap-1.5" aria-label="Indicador de diapositiva">
             {slides.map((_, idx) => (
@@ -396,7 +395,7 @@ export function WelcomeTutorial() {
                 className={`transition-all duration-300 rounded-full h-2 ${
                   idx === currentSlide
                     ? 'w-6 bg-indigo-500 shadow-sm shadow-indigo-500/50'
-                    : 'w-2 bg-neutral-700 hover:bg-neutral-600'
+                    : 'w-2 bg-neutral-300 dark:bg-neutral-700 hover:bg-neutral-400 dark:hover:bg-neutral-600'
                 }`}
               />
             ))}
@@ -408,7 +407,7 @@ export function WelcomeTutorial() {
               <button
                 type="button"
                 onClick={handlePrev}
-                className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-800 hover:border-neutral-700 text-neutral-300 hover:text-white text-xs font-medium transition active:scale-95 cursor-pointer"
+                className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white text-xs font-medium transition active:scale-95 cursor-pointer shadow-sm"
               >
                 <ChevronLeft className="w-4 h-4" />
                 <span>Anterior</span>

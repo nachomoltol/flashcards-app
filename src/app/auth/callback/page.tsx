@@ -1,7 +1,7 @@
 'use client';
 /* eslint-disable @next/next/no-img-element */
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useState, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
@@ -10,14 +10,56 @@ import { ensureQuickGuideDeck } from '@/lib/onboarding/seedGuideDeck';
 import { Loader2, CheckCircle2, AlertCircle, ArrowRight, Sparkles, Mail } from 'lucide-react';
 import type { EmailOtpType, Session } from '@supabase/supabase-js';
 
+function getAuthRedirectParams(searchParams: ReturnType<typeof useSearchParams>) {
+  let hashType = '';
+  let hashNext = '';
+  let queryNext = searchParams.get('next') || searchParams.get('redirect_to') || '';
+  let queryType = searchParams.get('type') || '';
+
+  if (typeof window !== 'undefined') {
+    if (window.location.search) {
+      try {
+        const sp = new URLSearchParams(window.location.search);
+        if (!queryNext) queryNext = sp.get('next') || sp.get('redirect_to') || '';
+        if (!queryType) queryType = sp.get('type') || '';
+      } catch {}
+    }
+    if (window.location.hash) {
+      try {
+        const hp = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+        hashType = hp.get('type') || '';
+        hashNext = hp.get('next') || hp.get('redirect_to') || '';
+      } catch {}
+    }
+  }
+
+  const next = queryNext || hashNext || '';
+  const type = queryType || hashType || '';
+  const isRecovery =
+    type === 'recovery' ||
+    next === '/update-password' ||
+    next === 'update-password' ||
+    (typeof window !== 'undefined' &&
+      (window.location.search.includes('type=recovery') ||
+        window.location.hash.includes('type=recovery')));
+
+  return { next, type, isRecovery };
+}
+
 function CallbackHandler() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const hasRedirectedRef = useRef(false);
 
   useEffect(() => {
-    let isCancelled = false;
+    // 0. Listener reactivo para eventos de Supabase (ej. PASSWORD_RECOVERY o SIGNED_IN)
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session && (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN')) {
+        await handleSessionSuccess(session, event === 'PASSWORD_RECOVERY');
+      }
+    });
 
     async function processAuth() {
       try {
@@ -48,7 +90,10 @@ function CallbackHandler() {
         }
 
         // 2. Comprobar flujo con código PKCE (?code=...)
-        const code = searchParams.get('code');
+        const rawSearch = typeof window !== 'undefined' ? window.location.search : '';
+        const windowParams = new URLSearchParams(rawSearch);
+        const code = searchParams.get('code') || windowParams.get('code');
+
         if (code) {
           const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
           if (!exchangeError && data.session) {
@@ -57,12 +102,20 @@ function CallbackHandler() {
           }
 
           // Fallback: si exchangeCodeForSession falla, comprobar si el 'code' era en realidad un token_hash
+          const { type: fallbackType } = getAuthRedirectParams(searchParams);
           const { data: otpData, error: otpError } = await supabase.auth.verifyOtp({
             token_hash: code,
-            type: 'email',
+            type: (fallbackType as EmailOtpType) || 'email',
           });
           if (!otpError && otpData.session) {
             await handleSessionSuccess(otpData.session);
+            return;
+          }
+
+          // Si exchangeCodeForSession falló porque ya fue canjeado en segundo plano, verificar si hay sesión activa
+          const { data: currentSessionData } = await supabase.auth.getSession();
+          if (currentSessionData.session) {
+            await handleSessionSuccess(currentSessionData.session);
             return;
           }
 
@@ -72,8 +125,10 @@ function CallbackHandler() {
         }
 
         // 3. Comprobar flujo con OTP / Token Hash (?token_hash=...&type=...)
-        const tokenHash = searchParams.get('token_hash');
-        const otpType = (searchParams.get('type') as EmailOtpType) || 'email';
+        const tokenHash = searchParams.get('token_hash') || windowParams.get('token_hash');
+        const { type: currentType } = getAuthRedirectParams(searchParams);
+        const otpType = (currentType as EmailOtpType) || 'email';
+
         if (tokenHash) {
           const { data, error: verifyError } = await supabase.auth.verifyOtp({
             token_hash: tokenHash,
@@ -92,7 +147,7 @@ function CallbackHandler() {
 
         // 4. Comprobar flujo Implícito (fragmento hash: #access_token=...&refresh_token=...)
         if (typeof window !== 'undefined' && window.location.hash) {
-          const hashParams = new URLSearchParams(window.location.hash.substring(1));
+          const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
           const accessToken = hashParams.get('access_token');
           const refreshToken = hashParams.get('refresh_token');
 
@@ -123,7 +178,7 @@ function CallbackHandler() {
         // Si no se encontró ningún token ni sesión válida
         throw new Error('No se encontraron credenciales de verificación en el enlace proporcionado.');
       } catch (err: unknown) {
-        if (isCancelled) return;
+        if (hasRedirectedRef.current) return;
         console.error('Error durante el intercambio de autenticación:', err);
         const rawMessage = err instanceof Error ? err.message : 'Error desconocido al validar la cuenta.';
         setErrorMessage(getFriendlyAuthMessage(rawMessage));
@@ -131,29 +186,53 @@ function CallbackHandler() {
       }
     }
 
-    async function handleSessionSuccess(session: Session) {
-      if (isCancelled) return;
+    async function handleSessionSuccess(session: Session, isPasswordRecoveryEvent = false) {
+      if (hasRedirectedRef.current) return;
+
       try {
-        // Inicializar mazo demo de bienvenida para nuevo usuario si no existe
-        if (session?.user?.id) {
-          try {
-            await ensureQuickGuideDeck(session.user.id);
-          } catch (seedErr) {
-            console.warn('Error inicializando mazo demo en callback:', seedErr);
-          }
-        }
+        const { next, isRecovery: isParamRecovery } = getAuthRedirectParams(searchParams);
+        const isRecovery = isPasswordRecoveryEvent || isParamRecovery;
 
         // Actualizar store global
         useAuthStore.getState().setSession(session);
         setStatus('success');
 
-        // Redirigir al dashboard tras breve confirmación visual
+        // Determinar ruta de destino
+        let targetRoute = '/';
+        if (isRecovery || next === '/update-password' || next === 'update-password') {
+          targetRoute = '/update-password';
+        } else if (next) {
+          targetRoute = next.startsWith('/') ? next : `/${next}`;
+        }
+
+        // Inicializar mazo demo en segundo plano SOLO si es alta normal, no en recovery
+        if (!isRecovery && session?.user?.id) {
+          ensureQuickGuideDeck(session.user.id).catch((seedErr) => {
+            console.warn('Error inicializando mazo demo en callback:', seedErr);
+          });
+        }
+
+        hasRedirectedRef.current = true;
+
+        // Si es flujo de recuperación o hay un parámetro 'next' específico, redirigir obligatoria e inmediatamente
+        if (isRecovery || next) {
+          router.replace(targetRoute);
+          router.push(targetRoute);
+
+          // Seguro de navegación fallback por si el enrutador del cliente se retrasa
+          setTimeout(() => {
+            if (typeof window !== 'undefined' && window.location.pathname !== targetRoute) {
+              window.location.href = targetRoute;
+            }
+          }, 350);
+          return;
+        }
+
+        // Redirigir al dashboard tras breve confirmación visual en login/signup
         setTimeout(() => {
-          if (!isCancelled) {
-            const nextPath = searchParams.get('next') || '/';
-            router.replace(nextPath);
-          }
-        }, 1200);
+          router.replace('/');
+          router.push('/');
+        }, 1100);
       } catch (e) {
         console.warn('Advertencia durante la finalización del inicio de sesión:', e);
         router.replace('/');
@@ -163,7 +242,7 @@ function CallbackHandler() {
     processAuth();
 
     return () => {
-      isCancelled = true;
+      authListener?.subscription?.unsubscribe();
     };
   }, [searchParams, router]);
 
@@ -208,15 +287,23 @@ function CallbackHandler() {
             <CheckCircle2 className="w-8 h-8" />
           </div>
           <div className="space-y-1">
-            <h2 className="text-lg font-bold text-white">¡Cuenta confirmada con éxito!</h2>
+            <h2 className="text-lg font-bold text-white">
+              {getAuthRedirectParams(searchParams).isRecovery
+                ? '¡Sesión de recuperación validada!'
+                : '¡Cuenta confirmada con éxito!'}
+            </h2>
             <p className="text-xs text-emerald-300">
-              Tu correo ha sido verificado correctamente. Entrando a Flashmente...
+              {getAuthRedirectParams(searchParams).isRecovery
+                ? 'Redirigiendo a restablecer tu contraseña...'
+                : 'Tu correo ha sido verificado correctamente. Entrando a Flashmente...'}
             </p>
           </div>
           <div className="pt-2">
             <span className="inline-flex items-center gap-1.5 text-xs text-neutral-400">
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              Redirigiendo a tus mazos...
+              {getAuthRedirectParams(searchParams).isRecovery
+                ? 'Abriendo actualización de credenciales...'
+                : 'Redirigiendo a tus mazos...'}
             </span>
           </div>
         </div>

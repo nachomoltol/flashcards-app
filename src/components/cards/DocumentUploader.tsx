@@ -423,14 +423,14 @@ export function DocumentUploader({
             </button>
             <button
               onClick={handleReset}
-              className="px-3.5 py-2.5 text-xs rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white font-medium transition"
+              className="px-3.5 py-2.5 text-xs rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-800 dark:bg-neutral-800 dark:hover:bg-neutral-700 dark:text-neutral-300 dark:hover:text-white font-medium transition cursor-pointer"
             >
               {t('ai_uploader.process_another_btn', 'Procesar otro documento')}
             </button>
             {onCancel && (
               <button
                 onClick={onCancel}
-                className="px-3.5 py-2.5 text-xs rounded-xl border border-neutral-700 bg-neutral-900/80 hover:bg-neutral-800 text-neutral-400 hover:text-white font-medium transition"
+                className="px-3.5 py-2.5 text-xs rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900/80 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white font-medium transition cursor-pointer"
               >
                 {t('ai_uploader.close_btn', 'Cerrar ventana')}
               </button>
@@ -463,7 +463,7 @@ export function DocumentUploader({
               className={`relative cursor-pointer rounded-2xl border-2 border-dashed p-6 sm:p-8 text-center transition-all duration-200 group ${
                 isDragging
                   ? 'border-violet-500 bg-violet-600/10 scale-[1.01] shadow-xl shadow-violet-900/20'
-                  : 'border-neutral-800 hover:border-violet-500/60 bg-neutral-950/60 hover:bg-neutral-900/40'
+                  : 'border-neutral-300 dark:border-neutral-800 hover:border-violet-500/60 bg-neutral-50/70 dark:bg-neutral-950/60 hover:bg-neutral-100/80 dark:hover:bg-neutral-900/40'
               }`}
             >
               {/* Background Glow */}
@@ -471,10 +471,10 @@ export function DocumentUploader({
 
               <div className="relative z-10 flex flex-col items-center justify-center space-y-3">
                 <div
-                  className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center transition-transform duration-200 group-hover:scale-110 shadow-lg ${
+                  className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center transition-transform duration-200 group-hover:scale-110 shadow-sm ${
                     isDragging
                       ? 'bg-violet-600 text-white shadow-violet-600/30'
-                      : 'bg-neutral-900 border border-neutral-800 text-violet-400 group-hover:text-violet-300 group-hover:border-violet-500/40'
+                      : 'bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-violet-600 dark:text-violet-400 group-hover:text-violet-500 group-hover:border-violet-500/40'
                   }`}
                 >
                   <svg className="w-6 h-6 sm:w-7 sm:h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -488,26 +488,26 @@ export function DocumentUploader({
                 </div>
 
                 <div>
-                  <h4 className="text-sm font-semibold text-white tracking-tight">
+                  <h4 className="text-sm font-semibold text-neutral-900 dark:text-white tracking-tight">
                     {t('ai_uploader.drag_drop_title', 'Arrastra y suelta tu archivo aquí')}
                   </h4>
-                  <p className="text-xs text-neutral-400 mt-1">
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
                     {t('ai_uploader.drag_drop_subtitle', 'o haz clic para explorar en tu dispositivo')}
                   </p>
                 </div>
 
                 {/* Formats Pills */}
                 <div className="flex flex-wrap items-center justify-center gap-1.5 pt-1 sm:pt-2">
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-rose-500/10 border border-rose-500/25 text-rose-300">
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-rose-500/10 border border-rose-500/25 text-rose-700 dark:text-rose-300">
                     PDF (.pdf)
                   </span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/25 text-blue-300">
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/25 text-blue-700 dark:text-blue-300">
                     Word (.docx, .doc)
                   </span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/25 text-emerald-300">
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/25 text-emerald-700 dark:text-emerald-300">
                     Audio (.mp3, .wav)
                   </span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/25 text-amber-300">
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/25 text-amber-700 dark:text-amber-300">
                     Texto (.txt)
                   </span>
                 </div>
@@ -516,7 +516,7 @@ export function DocumentUploader({
                   <span className="text-[10px] text-neutral-500 block">
                     {t('ai_uploader.max_file_size', 'Tamaño máximo por archivo: 50 MB • Almacenamiento privado seguro con Supabase RLS')}
                   </span>
-                  <p className="text-[11px] text-amber-300/95 font-medium flex items-center justify-center gap-1.5">
+                  <p className="text-[11px] text-amber-800 dark:text-amber-300/95 font-medium flex items-center justify-center gap-1.5">
                     <span>💡</span>
                     <span>
                       {t('ai_uploader.video_hint', 'Para vídeos o clases grabadas,')}{' '}
@@ -527,7 +527,7 @@ export function DocumentUploader({
                             e.stopPropagation();
                             onSwitchToUrl();
                           }}
-                          className="underline hover:text-amber-100 font-semibold transition cursor-pointer"
+                          className="underline hover:text-amber-900 dark:hover:text-amber-100 font-semibold transition cursor-pointer"
                         >
                           {t('ai_uploader.video_hint_link', 'pega el enlace web')}
                         </button>
@@ -546,7 +546,7 @@ export function DocumentUploader({
               {(() => {
                 const info = getFileTypeInfo(selectedFile);
                 return (
-                  <div className="p-4 rounded-2xl border border-neutral-800 bg-neutral-950/80 space-y-3">
+                  <div className="p-4 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950/80 space-y-3">
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-3 overflow-hidden">
                         <div
@@ -575,7 +575,7 @@ export function DocumentUploader({
                         </div>
 
                         <div className="min-w-0">
-                          <p className="text-xs sm:text-sm font-semibold text-white truncate" title={selectedFile.name}>
+                          <p className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white truncate" title={selectedFile.name}>
                             {selectedFile.name}
                           </p>
                           <div className="flex items-center gap-2 mt-0.5">
@@ -584,7 +584,7 @@ export function DocumentUploader({
                             >
                               {info.label}
                             </span>
-                            <span className="text-[11px] text-neutral-400 font-mono">
+                            <span className="text-[11px] text-neutral-500 dark:text-neutral-400 font-mono">
                               {formatFileSize(selectedFile.size)}
                             </span>
                           </div>
@@ -596,7 +596,7 @@ export function DocumentUploader({
                           type="button"
                           onClick={handleReset}
                           title="Cambiar archivo"
-                          className="p-1.5 rounded-lg text-neutral-400 hover:text-rose-400 hover:bg-neutral-800 transition"
+                          className="p-1.5 rounded-lg text-neutral-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-neutral-200 dark:hover:bg-neutral-800 transition cursor-pointer"
                         >
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -607,21 +607,21 @@ export function DocumentUploader({
 
                     {/* Progress Indicator */}
                     {isBusy && (
-                      <div className="pt-2 border-t border-neutral-800/80 space-y-2">
+                      <div className="pt-2 border-t border-neutral-200 dark:border-neutral-800/80 space-y-2">
                         <div className="flex items-center justify-between text-xs">
-                          <span className="text-neutral-300 font-medium flex items-center gap-2">
+                          <span className="text-neutral-800 dark:text-neutral-300 font-medium flex items-center gap-2">
                             <div className="w-3.5 h-3.5 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
                             {status === 'uploading' && t('ai_uploader.status_uploading', '1/3 Subiendo archivo a Supabase Storage...')}
                             {status === 'analyzing' && t('ai_uploader.status_analyzing', '2/3 Gemini Flash generando {count} tarjetas ({format})...').replace('{count}', String(cardCount)).replace('{format}', cardFormat)}
                             {status === 'saving' && t('ai_uploader.status_saving', '3/3 Guardando tarjetas generadas en Supabase...')}
                           </span>
-                          <span className="text-[11px] text-violet-400 font-mono uppercase">
+                          <span className="text-[11px] text-violet-600 dark:text-violet-400 font-mono uppercase">
                             {status === 'uploading' && 'Storage'}
                             {status === 'analyzing' && 'Gemini Flash'}
                             {status === 'saving' && 'Zustand / DB'}
                           </span>
                         </div>
-                        <div className="h-1.5 w-full bg-neutral-900 rounded-full overflow-hidden">
+                        <div className="h-1.5 w-full bg-neutral-200 dark:bg-neutral-900 rounded-full overflow-hidden">
                           <div
                             className={`h-full bg-gradient-to-r from-violet-600 via-indigo-500 to-emerald-400 transition-all duration-500 ${
                               status === 'uploading'
@@ -643,15 +643,15 @@ export function DocumentUploader({
           {/* 2. Selectores: Formato y Cantidad de Tarjetas (Situados debajo de la zona de subida) */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {/* Card Format Selector Dropdown */}
-            <div className="p-3.5 rounded-xl bg-neutral-950/80 border border-neutral-800 space-y-1.5">
-              <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-300 flex items-center justify-between">
+            <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 space-y-1.5">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 flex items-center justify-between">
                 <span className="flex items-center gap-2">
-                  <svg className="w-3.5 h-3.5 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
                   </svg>
                   {t('ai_uploader.card_format_label', 'Formato de Tarjetas')}
                 </span>
-                <span className="text-[10px] font-mono text-violet-400 uppercase">{cardFormat}</span>
+                <span className="text-[10px] font-mono text-violet-600 dark:text-violet-400 uppercase">{cardFormat}</span>
               </label>
 
               <div className="relative">
@@ -659,7 +659,7 @@ export function DocumentUploader({
                   disabled={isBusy}
                   value={cardFormat}
                   onChange={(e) => setCardFormat(e.target.value as CardFormat)}
-                  className="w-full text-xs font-medium px-3.5 py-2.5 rounded-xl bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition appearance-none cursor-pointer disabled:opacity-50 pr-10"
+                  className="w-full text-xs font-medium px-3.5 py-2.5 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition appearance-none cursor-pointer disabled:opacity-50 pr-10"
                 >
                   <option value="basic">🃏 {t('card_editor.format_basic', 'Básica')} — {t('url_generator.format_basic_desc', 'Pregunta directa y respuesta concisa')}</option>
                   <option value="multiple_choice">📝 {t('card_editor.format_test', 'Opción Múltiple')} — {t('url_generator.format_mc_desc', 'Pregunta test con 4 alternativas y solución')}</option>
@@ -673,7 +673,7 @@ export function DocumentUploader({
                 </div>
               </div>
 
-              <p className="text-[11px] text-neutral-400 pt-0.5">
+              <p className="text-[11px] text-neutral-500 dark:text-neutral-400 pt-0.5">
                 {cardFormat === 'basic' && (language === 'en' ? 'Direct questions with rigorous answers.' : 'Preguntas directas con respuestas rigurosas.')}
                 {cardFormat === 'multiple_choice' && (language === 'en' ? 'Quiz questions with 4 plausible options.' : 'Preguntas test con 4 opciones plausibles.')}
                 {cardFormat === 'cloze' && (language === 'en' ? 'Hide key concepts with [...].' : 'Oculta conceptos clave con [...].')}
@@ -682,15 +682,15 @@ export function DocumentUploader({
             </div>
 
             {/* Card Count Numeric Input con Límite Seguro y Hint Educativo */}
-            <div className="p-3.5 rounded-xl bg-neutral-950/80 border border-neutral-800 space-y-1.5">
-              <label htmlFor="cardCount" className="block text-xs font-semibold uppercase tracking-wider text-neutral-300 flex items-center justify-between">
+            <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 space-y-1.5">
+              <label htmlFor="cardCount" className="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 flex items-center justify-between">
                 <span className="flex items-center gap-2">
-                  <svg className="w-3.5 h-3.5 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                   </svg>
                   {t('ai_uploader.card_count_label', 'Cantidad de Tarjetas')}
                 </span>
-                <span className="text-[10px] font-mono text-violet-400 font-bold">{cardCount} / 30 MÁX</span>
+                <span className="text-[10px] font-mono text-violet-600 dark:text-violet-400 font-bold">{cardCount} / 30 MÁX</span>
               </label>
 
               <div className="relative">
@@ -713,13 +713,13 @@ export function DocumentUploader({
                       setCardCount(Math.min(30, Math.max(1, val)));
                     }
                   }}
-                  className="w-full text-xs font-semibold px-3.5 py-2.5 rounded-xl bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition disabled:opacity-50"
+                  className="w-full text-xs font-semibold px-3.5 py-2.5 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition disabled:opacity-50"
                   placeholder="1 a 30 tarjetas"
                 />
               </div>
 
               {/* Mensaje de ayuda visualmente atractivo (hint/banner) */}
-              <div className="p-2.5 rounded-lg bg-violet-500/10 border border-violet-500/20 text-[11px] text-violet-200/90 flex items-start gap-2 leading-relaxed">
+              <div className="p-2.5 rounded-lg bg-violet-50 dark:bg-violet-500/10 border border-violet-200 dark:border-violet-500/20 text-[11px] text-violet-800 dark:text-violet-200/90 flex items-start gap-2 leading-relaxed">
                 <span className="shrink-0 text-sm">💡</span>
                 <span>
                   {t('deck_detail.batch_hint', 'Generamos por lotes para evitar saturación. Puedes pedir varios lotes seguidos del mismo documento: nuestra IA analiza tu mazo y extraerá conceptos 100% nuevos sin repetir preguntas anteriores.')}
@@ -733,7 +733,7 @@ export function DocumentUploader({
             <div className="space-y-4 pt-1">
               {/* Optional Custom Instructions / Focus Instruction */}
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-300 mb-1.5 flex items-center justify-between">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1.5 flex items-center justify-between">
                   <span>{t('ai_uploader.custom_prompt_label', 'Instrucción de Enfoque Focalizado')}</span>
                   <span className="text-neutral-500 text-[10px] normal-case">{t('ai_uploader.custom_prompt_sub', '(opcional - ej. Capítulo 3, o Páginas 10-25)')}</span>
                 </label>
@@ -743,7 +743,7 @@ export function DocumentUploader({
                   value={customPrompt}
                   onChange={(e) => setCustomPrompt(e.target.value)}
                   placeholder={t('ai_uploader.custom_prompt_placeholder', 'ej. Extraer información EXCLUSIVAMENTE del Capítulo 2 o sección de conceptos clave...')}
-                  className="w-full text-xs px-3.5 py-2.5 rounded-xl bg-neutral-950 border border-neutral-800 text-white placeholder-neutral-500 focus:outline-none focus:border-violet-500 transition disabled:opacity-50"
+                  className="w-full text-xs px-3.5 py-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:border-violet-500 transition disabled:opacity-50"
                 />
               </div>
 
@@ -754,7 +754,7 @@ export function DocumentUploader({
                     type="button"
                     disabled={isBusy}
                     onClick={onCancel}
-                    className="px-4 py-2 text-xs text-neutral-400 hover:text-white rounded-xl hover:bg-neutral-800 transition disabled:opacity-50"
+                    className="px-4 py-2 text-xs text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 transition disabled:opacity-50 cursor-pointer"
                   >
                     {t('common.cancel', 'Cancelar')}
                   </button>
@@ -764,7 +764,7 @@ export function DocumentUploader({
                   type="button"
                   disabled={isBusy || !selectedFile}
                   onClick={handleProcessDocument}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 disabled:opacity-50 text-white font-medium text-xs sm:text-sm transition-all duration-150 shadow-lg shadow-violet-600/25 active:scale-95"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 disabled:opacity-50 text-white font-medium text-xs sm:text-sm transition-all duration-150 shadow-lg shadow-violet-600/25 active:scale-95 cursor-pointer"
                 >
                   {isBusy ? (
                     <>

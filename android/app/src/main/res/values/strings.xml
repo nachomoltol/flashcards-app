@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Flashmente</string>
+    <string name="title_activity_main">Flashmente</string>
+    <string name="package_name">com.flashmente.app</string>
+    <string name="custom_url_scheme">com.flashmente.app</string>
+</resources>

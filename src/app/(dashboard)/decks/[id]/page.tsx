@@ -141,7 +141,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
       <div>
         <Link
           href="/"
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-neutral-400 hover:text-white transition group mb-3"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white transition group mb-3"
         >
           <svg
             className="w-4 h-4 transition-transform group-hover:-translate-x-1"
@@ -155,21 +155,21 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
         </Link>
 
         {/* Deck Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-neutral-800/80">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-neutral-200 dark:border-neutral-800/80">
           <div>
             <div className="flex items-center gap-2.5 mb-1.5">
               <span
                 className="w-3 h-3 rounded-full shadow-md"
                 style={{ backgroundColor: currentDeck?.color || '#6366f1' }}
               />
-              <span className="text-xs px-2.5 py-0.5 rounded-full bg-neutral-900 border border-neutral-800 text-neutral-400 font-mono">
+              <span className="text-xs px-2.5 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 font-mono">
                 ID: {id.slice(0, 8)}...
               </span>
             </div>
-            <h1 className="text-xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-white">
+            <h1 className="text-xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-neutral-900 dark:text-white">
               {deckLoading && !currentDeck ? t('deck_detail.loading_deck') : currentDeck?.title || t('deck_detail.untitled_deck')}
             </h1>
-            <p className="text-sm text-neutral-400 mt-1">
+            <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1">
               {currentDeck?.description || t('deck_detail.cards_registered', { count: cards.length })}
             </p>
           </div>
@@ -205,7 +205,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
               href={`/study/${id}`}
               className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all duration-150 shadow-lg ${
                 cards.length === 0
-                  ? 'bg-neutral-800/60 text-neutral-500 pointer-events-none border border-neutral-800'
+                  ? 'bg-neutral-100 text-neutral-400 pointer-events-none border border-neutral-200 dark:bg-neutral-800/60 dark:text-neutral-500 dark:border-neutral-800'
                   : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/25 active:scale-95'
               }`}
             >
@@ -224,9 +224,9 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
             {/* Botón: Compartir Mazo */}
             <button
               onClick={() => setIsShareModalOpen(true)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm text-neutral-300 bg-neutral-900 hover:bg-neutral-800 hover:text-white border border-neutral-700/80 shadow-md transition-all duration-150 active:scale-95"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm text-neutral-700 hover:text-neutral-950 dark:text-neutral-300 dark:hover:text-white bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 border border-neutral-300 dark:border-neutral-700/80 shadow-sm transition-all duration-150 active:scale-95"
             >
-              <svg className="w-4 h-4 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-4 h-4 text-indigo-500 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
               </svg>
               <span>{t('deck_detail.share')}</span>
@@ -244,35 +244,35 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
       {/* Contenido Principal: Editor Manual Plegable y Lista de Tarjetas */}
       <div className="space-y-6">
         {/* Separador 1: Añadir tarjeta manualmente (Acordeón desplegable, cerrado por defecto) */}
-        <div className="rounded-2xl border border-neutral-800 bg-neutral-900/40 overflow-hidden transition-all duration-200 shadow-sm">
+        <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/40 overflow-hidden transition-all duration-200 shadow-sm">
           <button
             type="button"
             onClick={() => setIsManualEditorOpen(!isManualEditorOpen)}
-            className="w-full p-4 sm:p-5 flex items-center justify-between text-left hover:bg-neutral-800/40 transition group cursor-pointer"
+            className="w-full p-4 sm:p-5 flex items-center justify-between text-left hover:bg-neutral-50 dark:hover:bg-neutral-800/40 transition group cursor-pointer"
           >
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-9 h-9 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-400 flex items-center justify-center text-base shrink-0 group-hover:scale-105 transition-transform">
+              <div className="w-9 h-9 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-base shrink-0 group-hover:scale-105 transition-transform">
                 ✏️
               </div>
               <div className="min-w-0">
-                <h2 className="text-sm sm:text-base font-bold text-white tracking-tight flex items-center gap-2">
+                <h2 className="text-sm sm:text-base font-bold text-neutral-900 dark:text-white tracking-tight flex items-center gap-2">
                   <span className="truncate">{t('deck_detail.add_manual_title', 'Añadir tarjeta manualmente')}</span>
-                  <span className="text-[10px] sm:text-[11px] font-normal px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-400 font-mono shrink-0">
+                  <span className="text-[10px] sm:text-[11px] font-normal px-2 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 font-mono shrink-0">
                     {isManualEditorOpen ? t('common.open', 'Abierto') : t('common.collapsed', 'Plegado')}
                   </span>
                 </h2>
-                <p className="text-xs text-neutral-400 mt-0.5 truncate hidden sm:block">
+                <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5 truncate hidden sm:block">
                   {t('deck_detail.add_manual_desc', 'Crea preguntas personalizadas (Básica, Test, Cloze o V/F)')}
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 text-xs font-semibold text-neutral-400 group-hover:text-white transition shrink-0 ml-2">
+            <div className="flex items-center gap-2 text-xs font-semibold text-neutral-500 group-hover:text-neutral-900 dark:text-neutral-400 dark:group-hover:text-white transition shrink-0 ml-2">
               <span className="hidden sm:inline">
                 {isManualEditorOpen ? t('deck_detail.hide_editor', 'Ocultar editor manual') : t('deck_detail.show_editor', 'Mostrar editor manual')}
               </span>
-              <div className={`w-8 h-8 rounded-lg bg-neutral-800/80 border border-neutral-700/60 flex items-center justify-center transition-transform duration-200 ${isManualEditorOpen ? 'rotate-180' : ''}`}>
-                <svg className="w-4 h-4 text-neutral-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className={`w-8 h-8 rounded-lg bg-neutral-100 dark:bg-neutral-800/80 border border-neutral-200 dark:border-neutral-700/60 flex items-center justify-center transition-transform duration-200 ${isManualEditorOpen ? 'rotate-180' : ''}`}>
+                <svg className="w-4 h-4 text-neutral-600 dark:text-neutral-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </div>
@@ -280,7 +280,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
           </button>
 
           {isManualEditorOpen && (
-            <div className="p-4 sm:p-6 border-t border-neutral-800/80 bg-neutral-950/40 animate-in fade-in duration-200">
+            <div className="p-4 sm:p-6 border-t border-neutral-200 dark:border-neutral-800/80 bg-neutral-50/50 dark:bg-neutral-950/40 animate-in fade-in duration-200">
               <CardEditor deckId={id} onCardCreated={handleCardCreated} />
             </div>
           )}
@@ -288,24 +288,24 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
 
         {/* Separador 2: Tarjetas en este mazo */}
         <div className="space-y-4 pt-1">
-          <div className="flex items-center justify-between pb-3 border-b border-neutral-800/80">
-            <h2 className="text-base sm:text-lg font-bold text-white tracking-tight flex items-center gap-2.5">
+          <div className="flex items-center justify-between pb-3 border-b border-neutral-200 dark:border-neutral-800/80">
+            <h2 className="text-base sm:text-lg font-bold text-neutral-900 dark:text-white tracking-tight flex items-center gap-2.5">
               <span>🃏 {t('deck_detail.cards_in_deck_title', 'Tarjetas en este mazo')}</span>
-              <span className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 font-mono font-medium">
+              <span className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-500/15 border border-indigo-500/30 text-indigo-700 dark:text-indigo-300 font-mono font-medium">
                 {cards.length}
               </span>
             </h2>
           </div>
 
           {cardsLoading && cards.length === 0 ? (
-            <div className="p-12 text-center text-neutral-400 text-xs">
+            <div className="p-12 text-center text-neutral-500 dark:text-neutral-400 text-xs">
               <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
               {t('deck_detail.loading_cards')}
             </div>
           ) : cards.length === 0 ? (
             /* Empty State */
-            <div className="rounded-2xl border border-dashed border-neutral-800 bg-neutral-900/20 p-8 sm:p-12 text-center flex flex-col items-center justify-center space-y-4">
-              <div className="w-14 h-14 rounded-2xl bg-neutral-900 border border-neutral-800 flex items-center justify-center text-neutral-500 shadow-inner">
+            <div className="rounded-2xl border border-dashed border-neutral-300 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/20 p-8 sm:p-12 text-center flex flex-col items-center justify-center space-y-4">
+              <div className="w-14 h-14 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 flex items-center justify-center text-neutral-400 dark:text-neutral-500 shadow-sm">
                 <svg className="w-7 h-7 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path
                     strokeLinecap="round"
@@ -316,10 +316,10 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                 </svg>
               </div>
               <div className="space-y-1">
-                <h3 className="text-base font-semibold text-white">
+                <h3 className="text-base font-semibold text-neutral-900 dark:text-white">
                   {t('deck_detail.empty_title')}
                 </h3>
-                <p className="text-xs text-neutral-400 max-w-sm mx-auto leading-relaxed">
+                <p className="text-xs text-neutral-600 dark:text-neutral-400 max-w-sm mx-auto leading-relaxed">
                   {t('deck_detail.empty_desc')}
                 </p>
               </div>
@@ -329,9 +329,9 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                   setAiMode('multimodal');
                   setIsAiModalOpen(true);
                 }}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium text-violet-300 bg-violet-600/15 border border-violet-500/30 hover:bg-violet-600/25 transition active:scale-95"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium text-violet-700 dark:text-violet-300 bg-violet-600/15 border border-violet-500/30 hover:bg-violet-600/25 transition active:scale-95"
               >
-                <svg className="w-4 h-4 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-4 h-4 text-violet-600 dark:text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
                 {t('deck_detail.upload_multimodal_btn')}
@@ -345,14 +345,14 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                   card.cardFormat ||
                   card.card_format ||
                   (card.card_type === 'cloze' ? 'cloze' : 'basic');
-                const badge = formatBadges[fmt] || { label: fmt, style: 'bg-neutral-800 text-neutral-400 border-neutral-700' };
+                const badge = formatBadges[fmt] || { label: fmt, style: 'bg-neutral-100 text-neutral-600 border-neutral-200 dark:bg-neutral-800 dark:text-neutral-400 dark:border-neutral-700' };
 
                 return (
                   <div
                     key={card.id}
-                    className="rounded-2xl border border-neutral-800/80 bg-neutral-900/40 p-4 hover:border-neutral-700/80 transition-all space-y-3 group"
+                    className="rounded-2xl border border-neutral-200 dark:border-neutral-800/80 bg-white dark:bg-neutral-900/40 p-4 hover:border-neutral-300 dark:hover:border-neutral-700/80 shadow-sm transition-all space-y-3 group"
                   >
-                    <div className="flex items-center justify-between text-xs pb-2 border-b border-neutral-800/50">
+                    <div className="flex items-center justify-between text-xs pb-2 border-b border-neutral-100 dark:border-neutral-800/50">
                       <span className="font-mono text-neutral-500">#{cards.length - index}</span>
                       <div className="flex items-center gap-2">
                         <span
@@ -370,7 +370,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                         <button
                           onClick={() => handleDeleteCard(card.id)}
                           title={t('deck_detail.delete_card_title')}
-                          className="text-neutral-500 hover:text-rose-400 p-1 rounded transition opacity-60 group-hover:opacity-100"
+                          className="text-neutral-400 hover:text-rose-600 dark:text-neutral-500 dark:hover:text-rose-400 p-1 rounded transition opacity-60 group-hover:opacity-100 cursor-pointer"
                         >
                           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path
@@ -395,7 +395,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                       />
                     </div>
 
-                    <div className="flex items-center gap-3 pt-2 text-[10px] text-neutral-500 font-mono border-t border-neutral-800/40">
+                    <div className="flex items-center gap-3 pt-2 text-[10px] text-neutral-500 font-mono border-t border-neutral-100 dark:border-neutral-800/40">
                       <span>{t('deck_detail.reps')} {card.reps}</span>
                       <span>{t('deck_detail.lapses')} {card.lapses}</span>
                       <span>{t('deck_detail.stability')} {card.stability.toFixed(2)}</span>
@@ -410,12 +410,12 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
 
       {/* Modal: Generar con IA (Gemini Flash Multimodal) */}
       {isAiModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in">
-          <div className="w-full max-w-xl rounded-2xl border border-neutral-800 bg-neutral-900 p-6 shadow-2xl relative space-y-5 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/75 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-xl rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6 shadow-2xl relative space-y-5 max-h-[90vh] overflow-y-auto">
             {/* Header */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-violet-500/20 text-violet-400 border border-violet-500/30 flex items-center justify-center shadow-md">
+                <div className="w-8 h-8 rounded-xl bg-violet-500/20 text-violet-600 dark:text-violet-400 border border-violet-500/30 flex items-center justify-center shadow-md">
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path
                       strokeLinecap="round"
@@ -426,10 +426,10 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                   </svg>
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-white tracking-tight">
+                  <h3 className="text-base font-bold text-neutral-900 dark:text-white tracking-tight">
                     {t('deck_detail.modal_ai_title')}
                   </h3>
-                  <span className="text-[11px] text-violet-400 font-mono">
+                  <span className="text-[11px] text-violet-600 dark:text-violet-400 font-mono">
                     {t('deck_detail.modal_ai_sub')}
                   </span>
                 </div>
@@ -437,7 +437,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
               <button
                 onClick={() => !isGenerating && setIsAiModalOpen(false)}
                 disabled={isGenerating}
-                className="text-neutral-400 hover:text-white p-1 rounded-lg hover:bg-neutral-800 transition disabled:opacity-50"
+                className="text-neutral-400 hover:text-neutral-900 dark:hover:text-white p-1 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 transition disabled:opacity-50 cursor-pointer"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -447,10 +447,10 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
 
             {/* Mensaje informativo destacado si el mazo ya tiene tarjetas */}
             {((cards && cards.length > 0) || (currentDeck && currentDeck.cardsCount > 0)) && (
-              <div className="p-4 rounded-xl bg-gradient-to-r from-violet-950/60 via-indigo-950/50 to-neutral-950/80 border border-violet-500/35 text-violet-200 text-xs sm:text-sm leading-relaxed flex items-start gap-3 shadow-lg shadow-violet-950/25">
+              <div className="p-4 rounded-xl bg-gradient-to-r from-violet-50/80 via-indigo-50/60 to-neutral-50/80 dark:from-violet-950/60 dark:via-indigo-950/50 dark:to-neutral-950/80 border border-violet-200 dark:border-violet-500/35 text-violet-800 dark:text-violet-200 text-xs sm:text-sm leading-relaxed flex items-start gap-3 shadow-sm">
                 <span className="text-xl shrink-0 mt-0.5">💡</span>
                 <div className="flex-1">
-                  <p className="font-medium text-white leading-relaxed">
+                  <p className="font-medium text-neutral-900 dark:text-white leading-relaxed">
                     {t('deck_detail.modal_ai_existing_hint', { count: cards.length || currentDeck?.cardsCount || 0 })}
                   </p>
                 </div>
@@ -458,7 +458,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
             )}
 
             {/* Mode Tabs */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 p-1 rounded-xl bg-neutral-950 border border-neutral-800 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 p-1 rounded-xl bg-neutral-100 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 text-xs">
               <button
                 type="button"
                 onClick={() => {
@@ -466,13 +466,13 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                   setAiError(null);
                   setAiSuccessMessage(null);
                 }}
-                className={`py-2 px-3 rounded-lg font-medium transition flex items-center justify-center gap-2 ${
+                className={`py-2 px-3 rounded-lg font-medium transition flex items-center justify-center gap-2 cursor-pointer ${
                   aiMode === 'multimodal'
-                    ? 'bg-neutral-800 text-white shadow-sm'
-                    : 'text-neutral-400 hover:text-neutral-200'
+                    ? 'bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-sm'
+                    : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
                 }`}
               >
-                <svg className="w-4 h-4 text-violet-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-4 h-4 text-violet-500 dark:text-violet-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
                 <span>{t('deck_detail.tab_upload')}</span>
@@ -485,13 +485,13 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                   setAiSuccessMessage(null);
                   setAiCoreExhausted(false);
                 }}
-                className={`py-2 px-3 rounded-lg font-medium transition flex items-center justify-center gap-2 ${
+                className={`py-2 px-3 rounded-lg font-medium transition flex items-center justify-center gap-2 cursor-pointer ${
                   aiMode === 'url'
-                    ? 'bg-neutral-800 text-white shadow-sm'
-                    : 'text-neutral-400 hover:text-neutral-200'
+                    ? 'bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-sm'
+                    : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
                 }`}
               >
-                <svg className="w-4 h-4 text-rose-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-4 h-4 text-rose-500 dark:text-rose-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                 </svg>
                 <span>{t('deck_detail.tab_url')}</span>
@@ -504,13 +504,13 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                   setAiSuccessMessage(null);
                   setAiCoreExhausted(false);
                 }}
-                className={`py-2 px-3 rounded-lg font-medium transition flex items-center justify-center gap-2 ${
+                className={`py-2 px-3 rounded-lg font-medium transition flex items-center justify-center gap-2 cursor-pointer ${
                   aiMode === 'topic'
-                    ? 'bg-neutral-800 text-white shadow-sm'
-                    : 'text-neutral-400 hover:text-neutral-200'
+                    ? 'bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-sm'
+                    : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
                 }`}
               >
-                <svg className="w-4 h-4 text-indigo-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-4 h-4 text-indigo-500 dark:text-indigo-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                 </svg>
                 <span>{t('deck_detail.tab_topic')}</span>
@@ -538,32 +538,32 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
             ) : (
               /* Topic Prompt Mode Content */
               <div className="space-y-4">
-                <p className="text-xs text-neutral-400 leading-relaxed">
+                <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed">
                   {t('deck_detail.topic_desc', { count: aiCardCount })}
                 </p>
 
                 {aiError && (
-                  <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs leading-relaxed">
+                  <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-500 dark:text-rose-300 text-xs leading-relaxed">
                     {aiError}
                   </div>
                 )}
 
                 {aiSuccessMessage && (
                   aiCoreExhausted ? (
-                    <div className="p-3.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-200 text-xs leading-relaxed flex items-start gap-2.5 shadow-sm">
+                    <div className="p-3.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-800 dark:text-amber-200 text-xs leading-relaxed flex items-start gap-2.5 shadow-sm">
                       <span className="text-base shrink-0">🎯</span>
                       <div className="flex-1">
                         <p className="leading-relaxed">
-                          <strong className="font-semibold text-amber-300">{t('deck_detail.theory_covered_title')}</strong> {t('deck_detail.theory_covered_desc')}
+                          <strong className="font-semibold text-amber-700 dark:text-amber-300">{t('deck_detail.theory_covered_title')}</strong> {t('deck_detail.theory_covered_desc')}
                         </p>
                       </div>
                     </div>
                   ) : (
-                    <div className="p-3.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-200 text-xs leading-relaxed flex items-start gap-2.5 shadow-sm">
+                    <div className="p-3.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-800 dark:text-emerald-200 text-xs leading-relaxed flex items-start gap-2.5 shadow-sm">
                       <span className="text-base shrink-0">✅</span>
                       <div className="flex-1">
                         <p className="leading-relaxed">
-                          <strong className="font-semibold text-emerald-300">{t('deck_detail.cards_added_title')}</strong> {t('deck_detail.cards_added_desc')}
+                          <strong className="font-semibold text-emerald-700 dark:text-emerald-300">{t('deck_detail.cards_added_title')}</strong> {t('deck_detail.cards_added_desc')}
                         </p>
                       </div>
                     </div>
@@ -575,16 +575,16 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {/* Card Format Selector Dropdown */}
                     <div>
-                      <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-300 mb-1.5 flex items-center justify-between">
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1.5 flex items-center justify-between">
                         <span>{t('deck_detail.card_format_label')}</span>
-                        <span className="text-violet-400 font-mono text-[10px] lowercase">{aiCardFormat}</span>
+                        <span className="text-violet-600 dark:text-violet-400 font-mono text-[10px] lowercase">{aiCardFormat}</span>
                       </label>
                       <div className="relative">
                         <select
                           disabled={isGenerating}
                           value={aiCardFormat}
                           onChange={(e) => setAiCardFormat(e.target.value as CardFormat)}
-                          className="w-full text-xs font-medium px-3.5 py-2.5 rounded-xl bg-neutral-950 border border-neutral-800 text-white focus:outline-none focus:border-violet-500 transition appearance-none cursor-pointer disabled:opacity-50 pr-10"
+                          className="w-full text-xs font-medium px-3.5 py-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:border-violet-500 transition appearance-none cursor-pointer disabled:opacity-50 pr-10"
                         >
                           <option value="basic">{t('deck_detail.format_opt_basic')}</option>
                           <option value="multiple_choice">{t('deck_detail.format_opt_mc')}</option>
@@ -601,9 +601,9 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
 
                     {/* Card Count Numeric Input con Límite Seguro */}
                     <div>
-                      <label htmlFor="topicCardCount" className="block text-xs font-semibold uppercase tracking-wider text-neutral-300 mb-1.5 flex items-center justify-between">
+                      <label htmlFor="topicCardCount" className="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1.5 flex items-center justify-between">
                         <span>{t('deck_detail.card_count_label')}</span>
-                        <span className="text-violet-400 font-mono text-[10px] font-bold">{t('deck_detail.card_count_max', { count: aiCardCount })}</span>
+                        <span className="text-violet-600 dark:text-violet-400 font-mono text-[10px] font-bold">{t('deck_detail.card_count_max', { count: aiCardCount })}</span>
                       </label>
                       <div className="relative">
                         <input
@@ -625,7 +625,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                               setAiCardCount(Math.min(30, Math.max(1, val)));
                             }
                           }}
-                          className="w-full text-xs font-semibold px-3.5 py-2.5 rounded-xl bg-neutral-950 border border-neutral-800 text-white focus:outline-none focus:border-violet-500 transition disabled:opacity-50"
+                          className="w-full text-xs font-semibold px-3.5 py-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:border-violet-500 transition disabled:opacity-50"
                           placeholder={t('deck_detail.card_count_placeholder')}
                         />
                       </div>
@@ -633,7 +633,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                   </div>
 
                   {/* Mensaje de ayuda visualmente atractivo (hint/banner) */}
-                  <div className="p-2.5 rounded-lg bg-violet-500/10 border border-violet-500/20 text-[11px] text-violet-200/90 flex items-start gap-2 leading-relaxed">
+                  <div className="p-2.5 rounded-lg bg-violet-50 dark:bg-violet-500/10 border border-violet-200 dark:border-violet-500/20 text-[11px] text-violet-800 dark:text-violet-200/90 flex items-start gap-2 leading-relaxed">
                     <span className="shrink-0 text-sm">💡</span>
                     <span>
                       {t('deck_detail.batch_hint')}
@@ -641,8 +641,8 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-300 mb-1.5">
-                      {t('deck_detail.topic_label')} <span className="text-violet-400">*</span>
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1.5">
+                      {t('deck_detail.topic_label')} <span className="text-violet-500 dark:text-violet-400">*</span>
                     </label>
                     <input
                       type="text"
@@ -651,7 +651,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                       value={aiTopic}
                       onChange={(e) => setAiTopic(e.target.value)}
                       placeholder={t('deck_detail.topic_placeholder')}
-                      className="w-full text-sm px-3.5 py-2.5 rounded-xl bg-neutral-950 border border-neutral-800 text-white placeholder-neutral-500 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition disabled:opacity-50"
+                      className="w-full text-sm px-3.5 py-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition disabled:opacity-50"
                     />
                   </div>
 
@@ -660,14 +660,14 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                       type="button"
                       disabled={isGenerating}
                       onClick={() => setIsAiModalOpen(false)}
-                      className="px-4 py-2 text-xs sm:text-sm text-neutral-400 hover:text-white rounded-xl hover:bg-neutral-800 transition disabled:opacity-50"
+                      className="px-4 py-2 text-xs sm:text-sm text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 transition disabled:opacity-50 cursor-pointer"
                     >
                       {t('deck_detail.cancel')}
                     </button>
                     <button
                       type="submit"
                       disabled={isGenerating || !aiTopic.trim()}
-                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 disabled:opacity-50 text-white font-medium text-xs sm:text-sm transition-all duration-150 shadow-lg shadow-violet-600/25 active:scale-95"
+                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 disabled:opacity-50 text-white font-medium text-xs sm:text-sm transition-all duration-150 shadow-lg shadow-violet-600/25 active:scale-95 cursor-pointer"
                     >
                       {isGenerating ? (
                         <>

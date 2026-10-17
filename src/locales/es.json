@@ -21,6 +21,7 @@
     "my_profile": "Mi Perfil",
     "appearance": "Apariencia",
     "dark_mode": "Oscuro",
+    "light_mode": "Claro",
     "subscription": "Suscripción",
     "pro_subscription": "Suscripción (PRO)",
     "support_feedback": "Soporte y Feedback",
@@ -429,5 +430,25 @@
     "privacy_section_title": "Privacidad y Protección de Datos",
     "privacy_section_desc": "Consulta nuestra política de privacidad, uso seguro de datos y cómo solicitar la eliminación de tu cuenta.",
     "privacy_button": "Ver Política de Privacidad"
+  },
+  "feedback_modal": {
+    "title": "Soporte y Feedback",
+    "subtitle": "¿Tienes alguna duda, problema o sugerencia? Cuéntanoslo y te ayudaremos con rapidez.",
+    "category_label": "¿En qué podemos ayudarte?",
+    "category_bug": "Informar de un error",
+    "category_feature": "Sugerencia de mejora",
+    "category_question": "Duda técnica",
+    "category_other": "Otro",
+    "message_label": "Mensaje detallado",
+    "message_placeholder": "Describe aquí qué ha ocurrido, los pasos para reproducir el fallo o qué funcionalidad te gustaría ver...",
+    "user_info_label": "Identificación de usuario:",
+    "user_info_auto": "Datos vinculados automáticamente a tu cuenta de Supabase",
+    "btn_submit": "Enviar Mensaje",
+    "btn_sending": "Enviando mensaje...",
+    "toast_success_title": "¡Mensaje enviado con éxito!",
+    "toast_success_desc": "Hemos recibido tu consulta y nuestro equipo te responderá pronto por email.",
+    "error_empty": "Por favor, escribe un mensaje descriptivo (mínimo 5 caracteres).",
+    "error_generic": "No se pudo enviar el mensaje. Inténtalo de nuevo más tarde."
   }
 }
+

@@ -70,20 +70,20 @@ export function DeleteAccountModal({ isOpen, onClose }: DeleteAccountModalProps)
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/80 backdrop-blur-sm animate-in fade-in duration-150"
       role="dialog"
       aria-modal="true"
       aria-labelledby="delete-account-title"
     >
       <div
-        className="w-full max-w-md rounded-2xl bg-neutral-900 border border-red-500/30 p-6 sm:p-7 shadow-2xl shadow-red-950/40 text-left space-y-5 animate-in zoom-in-95 duration-150 relative"
+        className="w-full max-w-md rounded-2xl bg-white dark:bg-neutral-900 border border-red-200 dark:border-red-500/30 p-6 sm:p-7 shadow-2xl shadow-red-950/10 dark:shadow-red-950/40 text-left space-y-5 animate-in zoom-in-95 duration-150 relative"
       >
         {/* Botón cerrar */}
         <button
           type="button"
           onClick={onClose}
           disabled={isDeleting}
-          className="absolute right-4 top-4 text-neutral-400 hover:text-white p-1 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+          className="absolute right-4 top-4 text-neutral-400 hover:text-neutral-700 dark:hover:text-white p-1 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
           aria-label="Cerrar modal"
         >
           <X className="w-5 h-5" />
@@ -91,25 +91,25 @@ export function DeleteAccountModal({ isOpen, onClose }: DeleteAccountModalProps)
 
         {/* Encabezado con Icono de Advertencia */}
         <div className="flex items-start gap-3.5">
-          <div className="w-12 h-12 rounded-xl bg-red-500/15 border border-red-500/30 flex items-center justify-center text-red-400 shrink-0 shadow-inner">
+          <div className="w-12 h-12 rounded-xl bg-red-100 dark:bg-red-500/15 border border-red-200 dark:border-red-500/30 flex items-center justify-center text-red-600 dark:text-red-400 shrink-0 shadow-inner">
             <AlertTriangle className="w-6 h-6" />
           </div>
           <div>
-            <h3 id="delete-account-title" className="text-lg font-bold text-white tracking-tight">
+            <h3 id="delete-account-title" className="text-lg font-bold text-neutral-900 dark:text-white tracking-tight">
               ¿Eliminar cuenta permanentemente?
             </h3>
-            <p className="text-xs text-red-300/90 font-medium mt-0.5">
+            <p className="text-xs text-red-600 dark:text-red-300/90 font-medium mt-0.5">
               Esta acción es completamente irreversible.
             </p>
           </div>
         </div>
 
         {/* Mensaje de advertencia detallado */}
-        <div className="p-3.5 rounded-xl bg-neutral-950/80 border border-neutral-800 space-y-2 text-xs text-neutral-300 leading-relaxed">
+        <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 space-y-2 text-xs text-neutral-700 dark:text-neutral-300 leading-relaxed">
           <p>
             Al confirmar el borrado de tu cuenta de <strong>Flashmente</strong>:
           </p>
-          <ul className="space-y-1.5 pl-4 list-disc text-neutral-400">
+          <ul className="space-y-1.5 pl-4 list-disc text-neutral-600 dark:text-neutral-400">
             <li>
               Se eliminarán de forma definitiva todos tus <strong>mazos, carpetas y flashcards</strong>.
             </li>
@@ -127,8 +127,8 @@ export function DeleteAccountModal({ isOpen, onClose }: DeleteAccountModalProps)
 
         {/* Banner de Error (si ocurre alguno) */}
         {errorMessage && (
-          <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/25 flex items-start gap-2.5 text-red-300 text-xs animate-in fade-in duration-150">
-            <AlertCircle className="w-4 h-4 shrink-0 text-red-400 mt-0.5" />
+          <div className="p-3 rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/25 flex items-start gap-2.5 text-red-600 dark:text-red-300 text-xs animate-in fade-in duration-150">
+            <AlertCircle className="w-4 h-4 shrink-0 text-red-600 dark:text-red-400 mt-0.5" />
             <span className="leading-relaxed">{errorMessage}</span>
           </div>
         )}
@@ -139,7 +139,7 @@ export function DeleteAccountModal({ isOpen, onClose }: DeleteAccountModalProps)
             type="button"
             onClick={onClose}
             disabled={isDeleting}
-            className="w-full sm:w-1/2 py-2.5 px-4 rounded-xl bg-neutral-800 hover:bg-neutral-700/80 text-neutral-300 hover:text-white text-xs font-semibold transition cursor-pointer disabled:opacity-50 text-center"
+            className="w-full sm:w-1/2 py-2.5 px-4 rounded-xl bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700/80 text-neutral-700 hover:text-neutral-950 dark:text-neutral-300 dark:hover:text-white text-xs font-semibold transition cursor-pointer disabled:opacity-50 text-center"
           >
             Cancelar
           </button>

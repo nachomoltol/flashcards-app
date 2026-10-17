@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores';
 import { calculateStreak } from '@/lib/stats/streak';
 import type { Database } from '@/types/database';
+import { RefreshCw, ShieldCheck, Flame, CheckCircle2 } from 'lucide-react';
 
 type CardItem = Database['public']['Tables']['cards']['Row'];
 type ReviewItem = Database['public']['Tables']['reviews']['Row'];
@@ -228,15 +229,15 @@ export default function StatsPage() {
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-neutral-800/80">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-neutral-200 dark:border-neutral-800/80">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white flex items-center gap-3">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-neutral-900 dark:text-white flex items-center gap-3">
             <span>Panel de Estadísticas FSRS</span>
-            <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-mono font-medium">
+            <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-mono font-medium">
               Datos en Vivo
             </span>
           </h1>
-          <p className="text-sm text-neutral-400 mt-1">
+          <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
             Análisis de retención de memoria, volumen de estudio y estados cognitivos del algoritmo FSRS.
           </p>
         </div>
@@ -244,24 +245,17 @@ export default function StatsPage() {
         <button
           onClick={fetchData}
           disabled={isLoading}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-neutral-900 border border-neutral-800 hover:border-neutral-700 text-neutral-300 hover:text-white text-xs font-medium transition active:scale-95 shrink-0"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white text-xs font-medium transition active:scale-95 shrink-0 shadow-sm cursor-pointer"
         >
-          <svg
-            className={`w-3.5 h-3.5 text-indigo-400 ${isLoading ? 'animate-spin' : ''}`}
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
+          <RefreshCw className={`w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400 ${isLoading ? 'animate-spin' : ''}`} />
           <span>Sincronizar Datos</span>
         </button>
       </div>
 
       {error && (
-        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center justify-between">
+        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs flex items-center justify-between">
           <span>{error}</span>
-          <button onClick={fetchData} className="underline hover:text-rose-300 font-medium ml-2">
+          <button onClick={fetchData} className="underline hover:text-rose-700 dark:hover:text-rose-300 font-medium ml-2">
             Reintentar
           </button>
         </div>
@@ -270,33 +264,31 @@ export default function StatsPage() {
       {/* KPI Cards: 3 Métricas Clave (Responsivo: 1 columna en móvil, 3 en tablet/PC) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Recuadro 1: Tarjetas Consolidadas (Estado Maduras / A Revisar) */}
-        <div className="p-5 rounded-2xl bg-neutral-900/50 border border-neutral-800/80 backdrop-blur-sm relative overflow-hidden group hover:border-emerald-500/40 transition-all duration-200">
+        <div className="p-5 rounded-2xl bg-white dark:bg-neutral-900/50 border border-neutral-200 dark:border-neutral-800/80 shadow-sm backdrop-blur-sm relative overflow-hidden group hover:border-emerald-500/40 transition-all duration-200">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">
+            <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
               Tarjetas Consolidadas
             </span>
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-              </svg>
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <ShieldCheck className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-white">
+            <span className="text-3xl font-extrabold text-neutral-900 dark:text-white">
               {stateCounts.reviewCards}
             </span>
-            <span className="text-xs text-neutral-500">maduras (A Revisar)</span>
+            <span className="text-xs text-neutral-500 dark:text-neutral-400">maduras (A Revisar)</span>
           </div>
           <div className="mt-2 text-xs flex items-center justify-between font-medium">
-            <span className="text-emerald-400">
+            <span className="text-emerald-600 dark:text-emerald-400">
               {totalCards > 0 ? Math.round((stateCounts.reviewCards / totalCards) * 100) : 0}% de tu temario
             </span>
-            <span className="text-neutral-500 font-mono text-[11px]">
+            <span className="text-neutral-500 dark:text-neutral-400 font-mono text-[11px]">
               FSRS State 2
             </span>
           </div>
           {/* Progress bar */}
-          <div className="mt-2.5 h-1.5 w-full bg-neutral-800 rounded-full overflow-hidden">
+          <div className="mt-2.5 h-1.5 w-full bg-neutral-100 dark:bg-neutral-800 rounded-full overflow-hidden">
             <div
               className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-500"
               style={{
@@ -307,32 +299,29 @@ export default function StatsPage() {
         </div>
 
         {/* Recuadro 2: Racha Activa (Días consecutivos y racha máxima) */}
-        <div className="p-5 rounded-2xl bg-neutral-900/50 border border-neutral-800/80 backdrop-blur-sm relative overflow-hidden group hover:border-amber-500/40 transition-all duration-200">
+        <div className="p-5 rounded-2xl bg-white dark:bg-neutral-900/50 border border-neutral-200 dark:border-neutral-800/80 shadow-sm backdrop-blur-sm relative overflow-hidden group hover:border-amber-500/40 transition-all duration-200">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider flex items-center gap-1.5">
+            <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider flex items-center gap-1.5">
               <span>🔥 Racha Activa</span>
             </span>
-            <div className="w-8 h-8 rounded-lg bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z" />
-              </svg>
+            <div className="w-8 h-8 rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <Flame className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-white">
+            <span className="text-3xl font-extrabold text-neutral-900 dark:text-white">
               {streak.current}
             </span>
-            <span className="text-xs text-neutral-500">
+            <span className="text-xs text-neutral-500 dark:text-neutral-400">
               {streak.current === 1 ? 'día consecutivo' : 'días consecutivos'}
             </span>
           </div>
           <div className="mt-2 text-xs flex items-center justify-between font-medium">
-            <span className={streak.studiedToday ? 'text-amber-400' : 'text-neutral-400'}>
+            <span className={streak.studiedToday ? 'text-amber-600 dark:text-amber-400' : 'text-neutral-500 dark:text-neutral-400'}>
               {streak.studiedToday ? '🔥 Racha activa hoy' : '⏳ Repasa hoy para sumar'}
             </span>
-            <span className="text-neutral-400 font-mono text-[11px] bg-neutral-800/80 px-2 py-0.5 rounded-md">
-              Racha máx: <strong className="text-amber-400">{streak.max}d</strong>
+            <span className="text-neutral-600 dark:text-neutral-400 font-mono text-[11px] bg-neutral-100 dark:bg-neutral-800/80 px-2 py-0.5 rounded-md">
+              Racha máx: <strong className="text-amber-600 dark:text-amber-400">{streak.max}d</strong>
             </span>
           </div>
           {/* Visual Streak Mini Dots */}
@@ -343,7 +332,7 @@ export default function StatsPage() {
                 <div
                   key={idx}
                   className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${
-                    active ? 'bg-amber-500 shadow-sm shadow-amber-500/50' : 'bg-neutral-800'
+                    active ? 'bg-amber-500 shadow-sm shadow-amber-500/50' : 'bg-neutral-200 dark:bg-neutral-800'
                   }`}
                 />
               );
@@ -352,35 +341,33 @@ export default function StatsPage() {
         </div>
 
         {/* Recuadro 3: Tasa de Aciertos (Good/Easy vs Again/Hard) */}
-        <div className="p-5 rounded-2xl bg-neutral-900/50 border border-neutral-800/80 backdrop-blur-sm relative overflow-hidden group hover:border-indigo-500/40 transition-all duration-200">
+        <div className="p-5 rounded-2xl bg-white dark:bg-neutral-900/50 border border-neutral-200 dark:border-neutral-800/80 shadow-sm backdrop-blur-sm relative overflow-hidden group hover:border-indigo-500/40 transition-all duration-200">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">
+            <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
               Tasa de Aciertos
             </span>
-            <div className="w-8 h-8 rounded-lg bg-indigo-500/15 text-indigo-400 border border-indigo-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+            <div className="w-8 h-8 rounded-lg bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <CheckCircle2 className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-white">
+            <span className="text-3xl font-extrabold text-neutral-900 dark:text-white">
               {accuracyStats.accuracyRate}%
             </span>
-            <span className="text-xs text-neutral-500">
+            <span className="text-xs text-neutral-500 dark:text-neutral-400">
               {accuracyStats.hasData ? 'respuestas acertadas' : 'sin repasos'}
             </span>
           </div>
           <div className="mt-2 text-xs flex items-center justify-between font-medium">
-            <span className="text-indigo-400">
+            <span className="text-indigo-600 dark:text-indigo-400">
               {accuracyStats.goodOrEasyCount} aciertos (Good/Easy)
             </span>
-            <span className="text-neutral-500 font-mono text-[11px]">
+            <span className="text-neutral-500 dark:text-neutral-400 font-mono text-[11px]">
               {accuracyStats.againOrHardCount} fallos (Again/Hard)
             </span>
           </div>
           {/* Progress bar */}
-          <div className="mt-2.5 h-1.5 w-full bg-neutral-800 rounded-full overflow-hidden">
+          <div className="mt-2.5 h-1.5 w-full bg-neutral-100 dark:bg-neutral-800 rounded-full overflow-hidden">
             <div
               className="h-full bg-gradient-to-r from-indigo-500 via-violet-500 to-emerald-400 rounded-full transition-all duration-500"
               style={{
@@ -392,30 +379,30 @@ export default function StatsPage() {
       </div>
 
       {/* Desglose del Estado FSRS de las Tarjetas (Nuevas, En Aprendizaje, A Revisar) */}
-      <div className="p-6 rounded-2xl bg-neutral-900/60 border border-neutral-800 space-y-6">
+      <div className="p-6 rounded-2xl bg-white dark:bg-neutral-900/60 border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div>
-            <h2 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
+            <h2 className="text-lg font-bold text-neutral-900 dark:text-white tracking-tight flex items-center gap-2">
               <span>Desglose del Estado FSRS</span>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-300 font-mono font-normal">
+              <span className="text-xs px-2 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 font-mono font-normal">
                 {totalCards} tarjetas en {decks.length} {decks.length === 1 ? 'mazo' : 'mazos'}
               </span>
             </h2>
-            <p className="text-xs text-neutral-400 mt-0.5">
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
               Distribución de tus flashcards según su fase en el ciclo de repetición espaciada FSRS.
             </p>
           </div>
 
           <div className="flex items-center gap-4 text-xs font-medium">
-            <span className="flex items-center gap-1.5 text-blue-400">
+            <span className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
               <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
               Nuevas ({stateCounts.newCards})
             </span>
-            <span className="flex items-center gap-1.5 text-amber-400">
+            <span className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
               <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
               En Aprendizaje ({stateCounts.learningCards})
             </span>
-            <span className="flex items-center gap-1.5 text-emerald-400">
+            <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
               A Revisar / Maduras ({stateCounts.reviewCards})
             </span>
@@ -423,7 +410,7 @@ export default function StatsPage() {
         </div>
 
         {/* Stacked Distribution Bar */}
-        <div className="h-4 w-full bg-neutral-800 rounded-xl overflow-hidden flex shadow-inner">
+        <div className="h-4 w-full bg-neutral-100 dark:bg-neutral-800 rounded-xl overflow-hidden flex shadow-inner">
           {totalCards > 0 ? (
             <>
               <div
@@ -443,7 +430,7 @@ export default function StatsPage() {
               />
             </>
           ) : (
-            <div className="w-full h-full bg-neutral-800 text-neutral-500 text-[10px] flex items-center justify-center font-mono">
+            <div className="w-full h-full bg-neutral-100 dark:bg-neutral-800 text-neutral-400 dark:text-neutral-500 text-[10px] flex items-center justify-center font-mono">
               Sin tarjetas registradas
             </div>
           )}
@@ -454,16 +441,16 @@ export default function StatsPage() {
           {/* 1. Nuevas */}
           <div className="p-4 rounded-xl bg-blue-500/5 border border-blue-500/20 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-blue-400 flex items-center gap-1.5">
+              <span className="text-xs font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-blue-500" />
                 Nuevas (State 0)
               </span>
-              <span className="text-xs font-mono font-bold text-white">
+              <span className="text-xs font-mono font-bold text-neutral-900 dark:text-white">
                 {totalCards > 0 ? Math.round((stateCounts.newCards / totalCards) * 100) : 0}%
               </span>
             </div>
-            <p className="text-2xl font-black text-white">{stateCounts.newCards}</p>
-            <p className="text-[11px] text-neutral-400 leading-relaxed">
+            <p className="text-2xl font-black text-neutral-900 dark:text-white">{stateCounts.newCards}</p>
+            <p className="text-[11px] text-neutral-600 dark:text-neutral-400 leading-relaxed">
               Tarjetas pendientes de su primera sesión de estudio. FSRS aún no ha calculado estabilidad ni dificultad personalizada.
             </p>
           </div>
@@ -471,16 +458,16 @@ export default function StatsPage() {
           {/* 2. En Aprendizaje */}
           <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/20 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+              <span className="text-xs font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-amber-500" />
                 En Aprendizaje (State 1/3)
               </span>
-              <span className="text-xs font-mono font-bold text-white">
+              <span className="text-xs font-mono font-bold text-neutral-900 dark:text-white">
                 {totalCards > 0 ? Math.round((stateCounts.learningCards / totalCards) * 100) : 0}%
               </span>
             </div>
-            <p className="text-2xl font-black text-white">{stateCounts.learningCards}</p>
-            <p className="text-[11px] text-neutral-400 leading-relaxed">
+            <p className="text-2xl font-black text-neutral-900 dark:text-white">{stateCounts.learningCards}</p>
+            <p className="text-[11px] text-neutral-600 dark:text-neutral-400 leading-relaxed">
               En proceso de fijación a corto plazo o recuperación tras un fallo (&ldquo;Again&rdquo;). Repasos en intervalos breves.
             </p>
           </div>
@@ -488,16 +475,16 @@ export default function StatsPage() {
           {/* 3. A Revisar / Maduras */}
           <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/20 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+              <span className="text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-emerald-500" />
                 A Revisar (State 2)
               </span>
-              <span className="text-xs font-mono font-bold text-white">
+              <span className="text-xs font-mono font-bold text-neutral-900 dark:text-white">
                 {totalCards > 0 ? Math.round((stateCounts.reviewCards / totalCards) * 100) : 0}%
               </span>
             </div>
-            <p className="text-2xl font-black text-white">{stateCounts.reviewCards}</p>
-            <p className="text-[11px] text-neutral-400 leading-relaxed">
+            <p className="text-2xl font-black text-neutral-900 dark:text-white">{stateCounts.reviewCards}</p>
+            <p className="text-[11px] text-neutral-600 dark:text-neutral-400 leading-relaxed">
               Consolidadas en memoria a largo plazo. Programadas en intervalos expansivos optimizados según su estabilidad.
             </p>
           </div>
@@ -507,12 +494,12 @@ export default function StatsPage() {
       {/* Row: Distribución de Calificaciones & Actividad de Repasos */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Distribución de Calificaciones (FSRS Ratings 1..4) */}
-        <div className="lg:col-span-6 p-6 rounded-2xl bg-neutral-900/60 border border-neutral-800 space-y-5">
+        <div className="lg:col-span-6 p-6 rounded-2xl bg-white dark:bg-neutral-900/60 border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-5">
           <div>
-            <h3 className="text-base font-bold text-white tracking-tight">
+            <h3 className="text-base font-bold text-neutral-900 dark:text-white tracking-tight">
               Distribución de Calificaciones FSRS
             </h3>
-            <p className="text-xs text-neutral-400 mt-0.5">
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
               Respuestas otorgadas en el botón de calificación durante tus sesiones de estudio.
             </p>
           </div>
@@ -521,14 +508,14 @@ export default function StatsPage() {
             {/* Again */}
             <div className="space-y-1">
               <div className="flex items-center justify-between text-xs">
-                <span className="font-semibold text-rose-400 flex items-center gap-1.5">
+                <span className="font-semibold text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
                   <span>1. Again (Fallo / Olvido)</span>
                 </span>
-                <span className="font-mono text-neutral-300">
+                <span className="font-mono text-neutral-600 dark:text-neutral-300">
                   {ratingDistribution.again.count} ({ratingDistribution.again.pct}%)
                 </span>
               </div>
-              <div className="h-2 w-full bg-neutral-800 rounded-full overflow-hidden">
+              <div className="h-2 w-full bg-neutral-100 dark:bg-neutral-800 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-rose-500 rounded-full transition-all duration-500"
                   style={{ width: `${ratingDistribution.again.pct}%` }}
@@ -539,14 +526,14 @@ export default function StatsPage() {
             {/* Hard */}
             <div className="space-y-1">
               <div className="flex items-center justify-between text-xs">
-                <span className="font-semibold text-amber-400 flex items-center gap-1.5">
+                <span className="font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
                   <span>2. Hard (Difícil)</span>
                 </span>
-                <span className="font-mono text-neutral-300">
+                <span className="font-mono text-neutral-600 dark:text-neutral-300">
                   {ratingDistribution.hard.count} ({ratingDistribution.hard.pct}%)
                 </span>
               </div>
-              <div className="h-2 w-full bg-neutral-800 rounded-full overflow-hidden">
+              <div className="h-2 w-full bg-neutral-100 dark:bg-neutral-800 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-amber-500 rounded-full transition-all duration-500"
                   style={{ width: `${ratingDistribution.hard.pct}%` }}
@@ -557,14 +544,14 @@ export default function StatsPage() {
             {/* Good */}
             <div className="space-y-1">
               <div className="flex items-center justify-between text-xs">
-                <span className="font-semibold text-indigo-400 flex items-center gap-1.5">
+                <span className="font-semibold text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
                   <span>3. Good (Bueno / Correcto)</span>
                 </span>
-                <span className="font-mono text-neutral-300">
+                <span className="font-mono text-neutral-600 dark:text-neutral-300">
                   {ratingDistribution.good.count} ({ratingDistribution.good.pct}%)
                 </span>
               </div>
-              <div className="h-2 w-full bg-neutral-800 rounded-full overflow-hidden">
+              <div className="h-2 w-full bg-neutral-100 dark:bg-neutral-800 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-indigo-500 rounded-full transition-all duration-500"
                   style={{ width: `${ratingDistribution.good.pct}%` }}
@@ -575,14 +562,14 @@ export default function StatsPage() {
             {/* Easy */}
             <div className="space-y-1">
               <div className="flex items-center justify-between text-xs">
-                <span className="font-semibold text-emerald-400 flex items-center gap-1.5">
+                <span className="font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
                   <span>4. Easy (Fácil)</span>
                 </span>
-                <span className="font-mono text-neutral-300">
+                <span className="font-mono text-neutral-600 dark:text-neutral-300">
                   {ratingDistribution.easy.count} ({ratingDistribution.easy.pct}%)
                 </span>
               </div>
-              <div className="h-2 w-full bg-neutral-800 rounded-full overflow-hidden">
+              <div className="h-2 w-full bg-neutral-100 dark:bg-neutral-800 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-emerald-500 rounded-full transition-all duration-500"
                   style={{ width: `${ratingDistribution.easy.pct}%` }}
@@ -593,12 +580,12 @@ export default function StatsPage() {
         </div>
 
         {/* Actividad de Repasos de los Últimos 7 Días */}
-        <div className="lg:col-span-6 p-6 rounded-2xl bg-neutral-900/60 border border-neutral-800 space-y-5">
+        <div className="lg:col-span-6 p-6 rounded-2xl bg-white dark:bg-neutral-900/60 border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-5">
           <div>
-            <h3 className="text-base font-bold text-white tracking-tight">
+            <h3 className="text-base font-bold text-neutral-900 dark:text-white tracking-tight">
               Actividad Semanal de Repaso
             </h3>
-            <p className="text-xs text-neutral-400 mt-0.5">
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
               Volumen de tarjetas repasadas durante los últimos 7 días.
             </p>
           </div>
@@ -610,22 +597,22 @@ export default function StatsPage() {
 
               return (
                 <div key={day.dateStr} className="flex-1 flex flex-col items-center gap-2 h-full justify-end group">
-                  <span className="text-[10px] font-mono text-neutral-400 group-hover:text-white transition">
+                  <span className="text-[10px] font-mono text-neutral-500 dark:text-neutral-400 group-hover:text-neutral-900 dark:group-hover:text-white transition">
                     {day.count}
                   </span>
-                  <div className="w-full max-w-[2.25rem] bg-neutral-800/80 rounded-lg overflow-hidden flex items-end h-28">
+                  <div className="w-full max-w-[2.25rem] bg-neutral-100 dark:bg-neutral-800/80 rounded-lg overflow-hidden flex items-end h-28">
                     <div
                       className={`w-full rounded-t-lg transition-all duration-500 ${
                         isToday
                           ? 'bg-gradient-to-t from-indigo-600 to-violet-500 shadow-lg shadow-indigo-600/30'
                           : day.count > 0
-                          ? 'bg-neutral-600 group-hover:bg-indigo-500'
-                          : 'bg-neutral-800'
+                          ? 'bg-neutral-400 dark:bg-neutral-600 group-hover:bg-indigo-500'
+                          : 'bg-neutral-200 dark:bg-neutral-800'
                       }`}
                       style={{ height: `${heightPct}%` }}
                     />
                   </div>
-                  <span className={`text-[11px] font-medium ${isToday ? 'text-indigo-400 font-bold' : 'text-neutral-400'}`}>
+                  <span className={`text-[11px] font-medium ${isToday ? 'text-indigo-600 dark:text-indigo-400 font-bold' : 'text-neutral-500 dark:text-neutral-400'}`}>
                     {day.label}
                   </span>
                 </div>
@@ -633,9 +620,9 @@ export default function StatsPage() {
             })}
           </div>
 
-          <div className="pt-2 border-t border-neutral-800/60 flex items-center justify-between text-xs text-neutral-400">
+          <div className="pt-2 border-t border-neutral-200 dark:border-neutral-800/60 flex items-center justify-between text-xs text-neutral-500 dark:text-neutral-400">
             <span>Racha activa y constancia</span>
-            <span className="font-mono text-indigo-400">
+            <span className="font-mono text-indigo-600 dark:text-indigo-400">
               {reviews.length > 0 ? `${reviews.length} repasos registrados` : 'Sin actividad aún'}
             </span>
           </div>
@@ -644,38 +631,38 @@ export default function StatsPage() {
 
       {/* Tarjetas Informativas FSRS: Estabilidad y Dificultad */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-4 rounded-2xl bg-neutral-900/40 border border-neutral-800 space-y-1">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
+        <div className="p-4 rounded-2xl bg-white dark:bg-neutral-900/40 border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-1">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
             Estabilidad Media FSRS
           </span>
-          <p className="text-2xl font-black text-white">
-            {averageMetrics.stability} <span className="text-xs font-normal text-neutral-400">días</span>
+          <p className="text-2xl font-black text-neutral-900 dark:text-white">
+            {averageMetrics.stability} <span className="text-xs font-normal text-neutral-500 dark:text-neutral-400">días</span>
           </p>
-          <p className="text-[11px] text-neutral-500">
+          <p className="text-[11px] text-neutral-500 dark:text-neutral-500">
             Tiempo estimado en que una tarjeta mantiene al menos el 90% de probabilidad de recuerdo.
           </p>
         </div>
 
-        <div className="p-4 rounded-2xl bg-neutral-900/40 border border-neutral-800 space-y-1">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
+        <div className="p-4 rounded-2xl bg-white dark:bg-neutral-900/40 border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-1">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
             Dificultad Media FSRS
           </span>
-          <p className="text-2xl font-black text-white">
-            {averageMetrics.difficulty} <span className="text-xs font-normal text-neutral-400">/ 10</span>
+          <p className="text-2xl font-black text-neutral-900 dark:text-white">
+            {averageMetrics.difficulty} <span className="text-xs font-normal text-neutral-500 dark:text-neutral-400">/ 10</span>
           </p>
-          <p className="text-[11px] text-neutral-500">
+          <p className="text-[11px] text-neutral-500 dark:text-neutral-500">
             Complejidad intrínseca calculada dinámicamente según tus calificaciones individuales.
           </p>
         </div>
 
-        <div className="p-4 rounded-2xl bg-neutral-900/40 border border-neutral-800 space-y-1">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
+        <div className="p-4 rounded-2xl bg-white dark:bg-neutral-900/40 border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-1">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
             Lapsos Totales (Olvidos)
           </span>
-          <p className="text-2xl font-black text-white">
-            {averageMetrics.totalLapses} <span className="text-xs font-normal text-neutral-400">veces</span>
+          <p className="text-2xl font-black text-neutral-900 dark:text-white">
+            {averageMetrics.totalLapses} <span className="text-xs font-normal text-neutral-500 dark:text-neutral-400">veces</span>
           </p>
-          <p className="text-[11px] text-neutral-500">
+          <p className="text-[11px] text-neutral-500 dark:text-neutral-500">
             Frecuencia con que tarjetas consolidadas fueron olvidadas y reprogramadas con FSRS.
           </p>
         </div>
