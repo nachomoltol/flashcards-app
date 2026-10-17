@@ -7,6 +7,7 @@ export interface GeneratedCard {
   back: string;
   cardFormat: CardFormat;
   cardType?: string;
+  options?: string[];
 }
 
 export interface GenerateCardsResult {

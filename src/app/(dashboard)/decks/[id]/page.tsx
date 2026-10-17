@@ -26,7 +26,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [aiMode, setAiMode] = useState<'multimodal' | 'url' | 'topic'>('multimodal');
   const [aiTopic, setAiTopic] = useState('');
-  const [aiCardFormat, setAiCardFormat] = useState<CardFormat>('basic');
+  const [aiCardFormat, setAiCardFormat] = useState<CardFormat>('multiple_choice');
   const [aiCardCount, setAiCardCount] = useState<number>(10);
   const [isGenerating, setIsGenerating] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);

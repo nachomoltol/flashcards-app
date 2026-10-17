@@ -20,7 +20,7 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
   const { language, t } = useLanguageStore();
 
   const [url, setUrl] = useState('');
-  const [cardFormat, setCardFormat] = useState<CardFormat>('basic');
+  const [cardFormat, setCardFormat] = useState<CardFormat>('multiple_choice');
   const [cardCount, setCardCount] = useState<number>(10);
   const [customPrompt, setCustomPrompt] = useState('');
 
@@ -448,17 +448,23 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">
-                {t('url_generator.focus_label', 'Instrucción de Enfoque (Opcional)')}
-              </label>
-              <input
-                type="text"
+            {/* Focus Instruction - High visibility callout box */}
+            <div className="relative p-3.5 rounded-2xl bg-gradient-to-r from-purple-500/10 via-violet-500/5 to-indigo-500/10 dark:from-purple-950/40 dark:via-violet-950/30 dark:to-indigo-950/40 border border-purple-300 dark:border-purple-500/40 ring-2 ring-purple-500/50 shadow-[0_0_20px_rgba(168,85,247,0.25)] transition-all space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-purple-950 dark:text-purple-200 flex items-center gap-1.5">
+                  {t('url_generator.focus_label', '🎯 Enfoque de las preguntas (Opcional)')}
+                </label>
+                <span className="text-purple-700/90 dark:text-purple-300/80 text-[10px] font-semibold">
+                  {t('url_generator.focus_sub', '(ej. Fórmulas, min 5 al 12)')}
+                </span>
+              </div>
+              <textarea
+                rows={2}
                 disabled={isBusy}
                 value={customPrompt}
                 onChange={(e) => setCustomPrompt(e.target.value)}
                 placeholder={t('url_generator.focus_placeholder', 'Ej. Centrarse en la conclusión, fórmulas o minuto 5 al 12')}
-                className="w-full text-xs px-3.5 py-2.5 rounded-xl bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition disabled:opacity-50"
+                className="w-full text-xs px-3.5 py-2.5 rounded-xl bg-white dark:bg-neutral-900 border border-purple-200 dark:border-purple-600/50 text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 ring-1 ring-purple-400/40 dark:ring-purple-500/40 shadow-inner transition disabled:opacity-50 resize-none"
               />
             </div>
           </div>

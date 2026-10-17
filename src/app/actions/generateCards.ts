@@ -15,7 +15,7 @@ import type {
 
 const flashcardSchema = {
   type: Type.OBJECT,
-  description: 'Objeto con tarjetas de estudio y radar de profundidad de contenido',
+  description: 'Objeto con tarjetas de estudio clínico y académico y radar de profundidad',
   properties: {
     core_exhausted: {
       type: Type.BOOLEAN,
@@ -24,7 +24,8 @@ const flashcardSchema = {
     },
     cards: {
       type: Type.ARRAY,
-      description: 'Array con tarjetas de estudio de alta precisión según el formato solicitado',
+      description:
+        'Array con tarjetas de estudio de alta precisión según el formato solicitado. Cada tarjeta multiple_choice DEBE tener obligatoriamente 4 opciones de respuesta.',
       items: {
         type: Type.OBJECT,
         properties: {
@@ -35,11 +36,18 @@ const flashcardSchema = {
           },
           back: {
             type: Type.STRING,
-            description: 'Reverso de la tarjeta según el formato indicado',
+            description: 'Reverso de la tarjeta según el formato indicado (ejemplo: "b) Texto de la opción correcta").',
           },
           cardFormat: {
             type: Type.STRING,
-            description: 'Formato de la tarjeta: "basic", "multiple_choice", "cloze" o "true_false"',
+            description: 'Formato de la tarjeta: "multiple_choice", "basic", "cloze" o "true_false"',
+          },
+          options: {
+            type: Type.ARRAY,
+            description: 'Array con exactamente las 4 opciones de respuesta para preguntas de opción múltiple: [a, b, c, d]',
+            items: {
+              type: Type.STRING,
+            },
           },
         },
         required: ['front', 'back', 'cardFormat'],
@@ -52,11 +60,13 @@ const flashcardSchema = {
 /**
  * Devuelve las instrucciones del prompt según el formato de tarjeta solicitado.
  */
-function getFormatInstructions(format: CardFormat): string {
+function getFormatInstructions(format: CardFormat = 'multiple_choice'): string {
   switch (format) {
     case 'multiple_choice':
-      return `FORMATO OBLIGATORIO: multiple_choice (Opción Múltiple / Test):
-- "front": El texto DEBE estructurarse estrictamente con saltos de línea (\\n) con el siguiente formato exacto:
+      return `FORMATO INNEGOCIABLE: multiple_choice (Opción Múltiple / Test):
+Cada tarjeta DEBE tener obligatoriamente 4 opciones de respuesta múltiples (a, b, c, d). Bajo ninguna circunstancia puedes generar tarjetas de 'Verdadero/Falso' o de texto libre.
+
+ESTRUCTURA EXACTA DE "front":
 [Escribe aquí ÚNICAMENTE el enunciado de la pregunta limpia, sin incluir ninguna letra a, b, c o d]
 
 a) [Texto de la opción A]
@@ -65,13 +75,14 @@ c) [Texto de la opción C]
 d) [Texto de la opción D]
 
 REGLAS CRÍTICAS PARA "front":
-1. Primero coloca ÚNICAMENTE la pregunta limpia.
-2. Añade obligatoriamente un salto de línea antes de empezar las opciones.
-3. Cada una de las 4 opciones (a, b, c, d) DEBE ir en su propia línea independiente separada por un salto de línea (\\n).
-4. NUNCA mezcles las letras a), b), c), d) dentro del texto o párrafo de la pregunta.
-5. La opción correcta DEBE estar posicionada de manera totalmente aleatoria entre a, b, c o d. Los distractores deben ser técnicamente plausibles y basados estrictamente en el temario.
+1. Primero coloca ÚNICAMENTE el enunciado de la pregunta limpia, directo, clínico y riguroso.
+2. Añade obligatoriamente un salto de línea doble antes de empezar las opciones.
+3. Cada una de las exactamente 4 opciones (a, b, c, d) DEBE ir en su propia línea independiente separada por un salto de línea (\\n).
+4. NUNCA mezcles las letras a), b), c), d) dentro del enunciado de la pregunta.
+5. La opción correcta DEBE estar posicionada de manera aleatoria entre a, b, c o d. Los 3 distractores deben ser técnicamente plausibles y extraídos estrictamente de términos y conceptos presentes en el texto fuente.
 - "back": SOLAMENTE la respuesta correcta indicando letra y texto (ejemplo: "b) Texto de la opción correcta"). No agregues texto innecesario.
-- "cardFormat": "multiple_choice"`;
+- "cardFormat": "multiple_choice"
+- "options": Array con exactamente las 4 alternativas [opción A, opción B, opción C, opción D].`;
 
     case 'cloze':
       return `FORMATO OBLIGATORIO: cloze (Texto para rellenar / Cloze):
@@ -82,7 +93,7 @@ REGLAS CRÍTICAS PARA "front":
     case 'true_false':
       return `FORMATO OBLIGATORIO: true_false (Verdadero o Falso):
 - "front": Una afirmación técnica o conceptual rotunda (que puede ser verdadera o falsa según el temario).
-- "back": Iniciar obligatoriamente con la palabra "Verdadero" o "Falso" (en negrita: **Verdadero** o **Falso**), seguido de una breve justificación directa basada estrictamente en el texto.
+- "back": Iniciar obligatoriamente con la palabra "**Verdadero**" o "**Falso**", seguido de una breve justificación directa basada estrictamente en el texto.
 - "cardFormat": "true_false"`;
 
     case 'basic':
@@ -98,23 +109,36 @@ const RADAR_DIRECTIVE = `RADAR DE PROFUNDIDAD DE CONTENIDO (RADAR, NO FRENO):
 Analiza el historial de tarjetas existentes frente al texto proporcionado. Si consideras que la teoría troncal y los conceptos principales del texto ya han sido extraídos en lotes anteriores, marca core_exhausted: true y CONTINÚA generando el número de tarjetas solicitado buscando detalles minuciosos, excepciones, datos muy específicos o notas al pie dentro del texto. Si aún queda información troncal por cubrir, marca false.`;
 
 /**
- * System Prompt de Restricción Estricta (Grounding) y Extracción de Contenido.
- * Obliga a Gemini a actuar exclusivamente como un extractor fidedigno, prohibiendo el conocimiento externo.
+ * System Prompt de Restricción Estricta (Grounding) y Extracción de Contenido (Estilo NotebookLM).
+ * Obliga a Gemini a actuar exclusivamente como un extractor fidedigno de conocimiento clínico y académico,
+ * prohibiendo terminantemente el conocimiento externo y forzando el formato estricto de 4 opciones.
  */
-const SYSTEM_INSTRUCTION_GROUNDING = `Eres un sistema pedagógico experto en ciencias cognitivas, extracción estricta de contenidos y diseño de flashcards para el algoritmo de repetición espaciada FSRS.
+const SYSTEM_INSTRUCTION_GROUNDING = `Eres un extractor de conocimiento clínico y académico estricto. Tu única fuente de verdad es el texto proporcionado.
+
+REGLA DE ORO (Estilo NotebookLM):
+NO inventes información. Si un concepto, dato o respuesta no se puede deducir directa y explícitamente del texto proporcionado, DEBES omitirlo. No uses conocimiento previo externo.
+
+LÍMITE DINÁMICO (ESCAPE HATCH):
+Se te pide una cantidad máxima de tarjetas. Sin embargo, si el texto original se agota y ya no hay MÁS DATOS ÚNICOS para extraer, DEBES DETENER LA GENERACIÓN INMEDIATAMENTE y devolver el JSON solo con las tarjetas únicas posibles. Tienes terminantemente prohibido refrasear o preguntar sobre un mismo concepto dos veces para intentar llegar al máximo.
+
+FORMATO INNEGOCIABLE:
+Cada tarjeta DEBE tener obligatoriamente 4 opciones de respuesta múltiples. Bajo ninguna circunstancia puedes generar tarjetas de 'Verdadero/Falso' o de texto libre.
 
 REGLAS INQUEBRANTABLES DE EXTRACCIÓN Y RESTRICCIÓN DE CONTEXTO (GROUNDING ESTRICTO):
 1. TU ÚNICA FUENTE DE VERDAD ES EL TEXTO PROPORCIONADO: Toda la información de las tarjetas DEBE extraerse EXCLUSIVA Y ESTRICTAMENTE de este texto.
-2. PROHIBICIÓN TERMINANTE DE CONOCIMIENTO EXTERNO: Tienes TERMINANTEMENTE PROHIBIDO utilizar tu conocimiento externo, asunciones no fundadas o datos que no aparezcan en la fuente proporcionada.
-3. SI UN CONCEPTO O DETALLE NO SE EXPLICA EXPLÍCITAMENTE EN EL DOCUMENTO, NO PUEDES GENERAR UNA TARJETA SOBRE ÉL: Actúa únicamente y exclusivamente como un extractor fidedigno. Si un dato no figura de forma explícita en el material de origen, para ti no existe y bajo ningún concepto debes inventarlo, completarlo o extrapolarlo.
+2. PROHIBICIÓN TERMINANTE DE CONOCIMIENTO EXTERNO: Tienes TERMINANTEMENTE PROHIBIDO utilizar conocimiento previo externo, asunciones no fundadas o datos que no aparezcan en la fuente proporcionada.
+3. SI UN CONCEPTO O DETALLE NO SE EXPLICA EXPLÍCITAMENTE EN EL DOCUMENTO, NO PUEDES GENERAR UNA TARJETA SOBRE ÉL: Actúa únicamente y exclusivamente como un extractor fidedigno. Si un dato no figura de forma explícitamente en el material de origen, para ti no existe y bajo ningún concepto debes inventarlo, completarlo o extrapolarlo.
 4. DISTRACTORES BASADOS EN EL TEXTO: En preguntas de opción múltiple (test), todos los distractores incorrectos deben ser técnicamente plausibles pero fundamentados en términos y conceptos del propio texto fuente, sin introducir elementos externos.
-5. OBJETIVIDAD Y RIGOR CIENTÍFICO: Las preguntas y respuestas deben reflejar exactamente la definición, clasificación o dato que el autor o texto expone sin divagar.`;
+5. OBJETIVIDAD Y RIGOR CIENTÍFICO: Las preguntas y respuestas deben reflejar exactamente la definición, clasificación, mecanismo, dosis, valor o dato que el texto expone sin divagar.
+6. LÍMITE DINÁMICO DE GENERACIÓN: Si la información fidedigna del texto se agota antes de alcanzar el número máximo solicitado, detén la generación de inmediato con las tarjetas obtenidas. No dupliques ni refrasees contenido.`;
 
-const GLOBAL_RULES = `REGLAS GLOBALES INQUEBRANTABLES DE GROUNDING Y EXTRACCIÓN:
-1. RESTRICCIÓN ESTRICTA DE CONTEXTO: Tu única fuente de verdad es el texto proporcionado. Toda la información de las tarjetas DEBE extraerse EXCLUSIVA Y ESTRICTAMENTE de este texto. Tienes TERMINANTEMENTE PROHIBIDO utilizar tu conocimiento externo. Si un concepto o detalle no se explica explícitamente en el documento, NO puedes generar una tarjeta sobre él.
-2. DISTRACTORES BASADOS EN EL TEMARIO: Los distractores (en preguntas de opción múltiple) deben ser técnicamente plausibles y basados estrictamente en el texto fuente.
-3. ACRÓNIMOS: Todo acrónimo debe ir acompañado obligatoriamente de su nombre completo si figura en la fuente (ejemplo: "ARN (Ácido Ribonucleico)", "TCP (Transmission Control Protocol)").
-4. INTEGRIDAD ESTRUCTURAL DEL JSON (PRIORIDAD ABSOLUTA): Debes devolver un objeto JSON válido con los campos "core_exhausted" (booleano) y "cards" (array). Sé sintético, directo y conciso en el texto de las preguntas, opciones y respuestas, sin rodeos innecesarios.`;
+const GLOBAL_RULES = `REGLAS GLOBALES INQUEBRANTABLES DE BLINDAJE (ESTILO NOTEBOOKLM):
+1. REGLA DE ORO (Estilo NotebookLM): NO inventes información. Si un concepto, dato o respuesta no se puede deducir directa y explícitamente del texto proporcionado, DEBES omitirlo. No uses conocimiento previo externo.
+2. LÍMITE DINÁMICO (FRENO DE REPETICIÓN): Se te pide una cantidad máxima de tarjetas. Sin embargo, si el texto original se agota y ya no hay MÁS DATOS ÚNICOS para extraer, DEBES DETENER LA GENERACIÓN INMEDIATAMENTE y devolver el JSON solo con las tarjetas únicas posibles. Tienes terminantemente prohibido refrasear o preguntar sobre un mismo concepto dos veces para intentar llegar al máximo.
+3. FORMATO INNEGOCIABLE: Cada tarjeta DEBE tener obligatoriamente 4 opciones de respuesta múltiples (a, b, c, d). Bajo ninguna circunstancia generes tarjetas de 'Verdadero/Falso' o de texto libre.
+4. DISTRACTORES BASADOS EN EL TEMARIO: Los distractores (en preguntas de opción múltiple) deben ser técnicamente plausibles y basados estrictamente en el texto fuente.
+5. ACRÓNIMOS: Todo acrónimo debe ir acompañado obligatoriamente de su nombre completo si figura en la fuente (ejemplo: "ARN (Ácido Ribonucleico)", "TCP (Transmission Control Protocol)").
+6. INTEGRIDAD ESTRUCTURAL DEL JSON (PRIORIDAD ABSOLUTA): Debes devolver un objeto JSON válido con los campos "core_exhausted" (booleano) y "cards" (array con exactamente 4 opciones cada una). Sé sintético, directo y conciso en el texto de las preguntas, opciones y respuestas, sin rodeos innecesarios.`;
 
 /**
  * Recupera de forma segura el texto del front de todas las tarjetas ya existentes en el mazo.
@@ -162,38 +186,125 @@ async function fetchExistingCardFronts(
 }
 
 /**
- * Construye la sección del prompt de Memoria Anti-Duplicados según las directivas estrictas de la Fase 20.
+ * Extrae y sintetiza de forma concisa los conceptos o tópicos evaluados en tarjetas existentes.
+ * Evita inyectar bloques JSON masivos o 120 preguntas completas con opciones que saturan el contexto de Gemini.
+ */
+function extractConceptsFromExistingCards(existingFronts: string[]): string[] {
+  if (!existingFronts || existingFronts.length === 0) {
+    return [];
+  }
+
+  const conceptsSet = new Set<string>();
+
+  for (const front of existingFronts) {
+    if (!front || typeof front !== 'string') continue;
+
+    // 1. Tomar únicamente la primera línea de la pregunta (descartar opciones a, b, c, d y saltos de línea)
+    const firstLine = front.split(/\r?\n/)[0].trim();
+    if (!firstLine || firstLine.length < 3) continue;
+
+    // 2. Limpiar numeraciones iniciales ("1.", "Q1:", "1)", etc.) y signos de interrogación
+    let cleaned = firstLine
+      .replace(/^(\d+[\.\)\-:]|\(?[a-dA-D]\)|\bQ\d+[:\.]?)\s*/i, '')
+      .replace(/^[¿\?¡\!]+|[¿\?¡\!]+$/g, '')
+      .trim();
+
+    // 3. Omitir preámbulos interrogativos genéricos para aislar el concepto clínico/académico
+    const genericPrefixRegex =
+      /^(?:cu[aá]l(?:es)?(?:\s+de\s+l[oa]s\s+siguientes)?(?:\s+afirmaci[oó]n(?:es)?|\s+opci[oó]n(?:es)?)?(?:\s+sobre|\s+respecto\s+a)?|qu[eé]\s+(?:es|caracteriza|indica|produce)|defina|explique|en\s+relaci[oó]n\s+con|respecto\s+a(?:l)?|seg[uú]n\s+el\s+texto)\s+/i;
+    cleaned = cleaned.replace(genericPrefixRegex, '').trim();
+
+    if (cleaned.length > 3) {
+      // Limitar a máximo 80 caracteres por concepto para economía de tokens
+      if (cleaned.length > 80) {
+        cleaned = cleaned.substring(0, 80).replace(/\s+\S*$/, '') + '...';
+      }
+      cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+      conceptsSet.add(cleaned);
+    }
+  }
+
+  // Devolver los conceptos más relevantes (máximo 40 tópicos) para mantener el prompt compacto
+  return Array.from(conceptsSet).slice(-40);
+}
+
+/**
+ * Construye la sección del prompt de Control de Repetición y Gestión de Contexto (Blindaje Estricto).
+ * En lugar de enviar un JSON o texto completo de 120 preguntas previas, pasa una lista sintetizada de conceptos.
  */
 function buildAntiDuplicateSection(existingFronts: string[]): string {
-  if (!existingFronts || existingFronts.length === 0) {
+  const concepts = extractConceptsFromExistingCards(existingFronts);
+  if (concepts.length === 0) {
     return '';
   }
 
-  // Extraemos la pregunta limpia de cada tarjeta existente (tomando la primera línea para descartar opciones de multiple_choice)
-  const cleanQuestions = existingFronts
-    .map((f) => f.split('\n')[0].replace(/^\d+[\.\)]\s*/, '').trim())
-    .filter((f) => f.length > 3);
+  const list = concepts.map((c) => `- ${c}`).join('\n');
 
-  const uniqueQuestions = Array.from(new Set(cleanQuestions));
-  if (uniqueQuestions.length === 0) return '';
+  return `🚨 CONTROL DE REPETICIÓN (GESTIÓN DE CONTEXTO ESTRICTA):
+Evita formular preguntas sobre los siguientes conceptos que ya han sido evaluados:
+${list}
 
-  const frontsList = uniqueQuestions
-    .map((f, i) => `${i + 1}. "${f}"`)
-    .join('\n');
+DIRECTIVA: Tienes terminantemente prohibido formular preguntas sobre estos mismos conceptos ya evaluados. Toda nueva tarjeta DEBE profundizar en conceptos, mecanismos, detalles o datos diferentes del material de origen.`;
+}
 
-  return `🚨 FILTRO ANTI-DUPLICADOS CONTEXTUAL (PROHIBICIÓN ESTRICTA):
-Aquí tienes una lista de preguntas que ya existen en este mazo:
-==================================================
-${frontsList}
-==================================================
-DIRECTIVA OBLIGATORIA: Aquí tienes una lista de preguntas que ya existen. Tienes PROHIBIDO generar tarjetas sobre estos mismos conceptos o hacer preguntas similares.
-Toda nueva tarjeta que generes DEBE evaluar aspectos, conceptos, detalles, relaciones o datos complementarios del material que NO hayan sido cubiertos en las preguntas anteriores.`;
+/**
+ * Normaliza y procesa las tarjetas generadas garantizando la estructura de 4 opciones para preguntas tipo test.
+ */
+function processGeneratedCards(
+  parsedCards: GeneratedCard[],
+  targetCount: number,
+  cardFormat: CardFormat
+): GeneratedCard[] {
+  return parsedCards.slice(0, targetCount).map((card) => {
+    let front = card.front.trim();
+    const back = card.back.trim();
+    const resolvedFormat = (card.cardFormat as CardFormat) || cardFormat;
+
+    // Si el modelo devolvió options en un array y front no tiene aún las opciones a), b), c), d), formatearlas
+    if (
+      resolvedFormat === 'multiple_choice' &&
+      card.options &&
+      Array.isArray(card.options) &&
+      card.options.length >= 4 &&
+      !/(?:^|\n)\s*[a-d]\)/i.test(front)
+    ) {
+      const letters = ['a', 'b', 'c', 'd'];
+      const formattedOpts = card.options
+        .slice(0, 4)
+        .map((opt, i) => `${letters[i]}) ${String(opt).replace(/^[a-d][\)\.\:\-]\s*/i, '').trim()}`)
+        .join('\n');
+      front = `${front}\n\n${formattedOpts}`;
+    }
+
+    const cleaned: GeneratedCard = {
+      front,
+      back,
+      cardFormat: resolvedFormat,
+      cardType: resolvedFormat === 'cloze' ? 'cloze' : 'basic',
+      options: card.options && Array.isArray(card.options) ? card.options.map(String) : undefined,
+    };
+
+    return randomizeMultipleChoiceCard(cleaned);
+  });
 }
 
 /**
  * Modelo global de Google Gemini unificado para rentabilidad y generaciones ilimitadas sostenibles.
  */
 const GEMINI_MODEL = 'gemini-3.1-flash-lite';
+
+/**
+ * Configuración base estricta de Gemini:
+ * - temperature: 0.1 para forzar respuestas deterministas, eliminar la creatividad y evitar alucinaciones.
+ * - responseMimeType: 'application/json' y responseJsonSchema: flashcardSchema para forzar la estructura de 4 opciones.
+ */
+const GEMINI_CONFIG_BASE = {
+  systemInstruction: SYSTEM_INSTRUCTION_GROUNDING,
+  temperature: 0.1,
+  responseMimeType: 'application/json',
+  responseJsonSchema: flashcardSchema,
+  maxOutputTokens: 8192,
+};
 
 /**
  * Inyecta la directiva estricta de idioma según las especificaciones de la Fase 25:
@@ -400,7 +511,7 @@ async function recordApiUsage(userId: string) {
  */
 export async function generateCardsAction(
   topic: string,
-  cardFormat: CardFormat = 'basic',
+  cardFormat: CardFormat = 'multiple_choice',
   cardCount: number = 10,
   deckId?: string,
   existingQuestions?: string[],
@@ -462,12 +573,7 @@ ${languageDirective}`;
     const response = await ai.models.generateContent({
       model: GEMINI_MODEL,
       contents: prompt,
-      config: {
-        systemInstruction: SYSTEM_INSTRUCTION_GROUNDING,
-        responseMimeType: 'application/json',
-        responseJsonSchema: flashcardSchema,
-        maxOutputTokens: 8192,
-      },
+      config: GEMINI_CONFIG_BASE,
     });
 
     const text = response.text;
@@ -511,19 +617,11 @@ ${languageDirective}`;
       await recordApiUsage(apiCheck.userId);
     }
 
-    // Aplicar aleatorización Fisher-Yates a las opciones de preguntas test antes de retornar y guardar
+    // Procesar y garantizar 4 opciones con aleatorización Fisher-Yates
     return {
       success: true,
       core_exhausted: coreExhausted,
-      cards: parsedCards.slice(0, targetCount).map((card) => {
-        const cleaned: GeneratedCard = {
-          front: card.front.trim(),
-          back: card.back.trim(),
-          cardFormat: (card.cardFormat as CardFormat) || cardFormat,
-          cardType: card.cardFormat === 'cloze' ? 'cloze' : 'basic',
-        };
-        return randomizeMultipleChoiceCard(cleaned);
-      }),
+      cards: processGeneratedCards(parsedCards, targetCount, cardFormat),
     };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Error desconocido al conectar con Gemini';
@@ -552,7 +650,7 @@ export async function generateCardsFromDocumentAction(
     fileName,
     customPrompt,
     focusInstruction: rawFocus,
-    cardFormat = 'basic',
+    cardFormat = 'multiple_choice',
     cardCount = 10,
     existingQuestions,
     language = 'es',
@@ -720,12 +818,7 @@ ${buildLanguageDirective(language)}`;
     const response = await ai.models.generateContent({
       model: GEMINI_MODEL,
       contents,
-      config: {
-        systemInstruction: SYSTEM_INSTRUCTION_GROUNDING,
-        responseMimeType: 'application/json',
-        responseJsonSchema: flashcardSchema,
-        maxOutputTokens: 8192,
-      },
+      config: GEMINI_CONFIG_BASE,
     });
 
     const text = response.text;
@@ -769,19 +862,11 @@ ${buildLanguageDirective(language)}`;
       await recordApiUsage(apiCheck.userId);
     }
 
-    // Aplicar aleatorización Fisher-Yates a las opciones de preguntas test antes de retornar y guardar
+    // Procesar y garantizar 4 opciones con aleatorización Fisher-Yates
     return {
       success: true,
       core_exhausted: coreExhausted,
-      cards: parsedCards.slice(0, targetCount).map((card) => {
-        const cleaned: GeneratedCard = {
-          front: card.front.trim(),
-          back: card.back.trim(),
-          cardFormat: (card.cardFormat as CardFormat) || cardFormat,
-          cardType: card.cardFormat === 'cloze' ? 'cloze' : 'basic',
-        };
-        return randomizeMultipleChoiceCard(cleaned);
-      }),
+      cards: processGeneratedCards(parsedCards, targetCount, cardFormat),
     };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Error desconocido al procesar el documento con Gemini';
@@ -849,7 +934,7 @@ export async function generateCardsFromUrlAction(
     deckId,
     customPrompt,
     focusInstruction: rawFocus,
-    cardFormat = 'basic',
+    cardFormat = 'multiple_choice',
     cardCount = 10,
     existingQuestions,
     language = 'es',
@@ -957,12 +1042,7 @@ ${buildLanguageDirective(language)}`;
               text: promptText,
             },
           ],
-          config: {
-            systemInstruction: SYSTEM_INSTRUCTION_GROUNDING,
-            responseMimeType: 'application/json',
-            responseJsonSchema: flashcardSchema,
-            maxOutputTokens: 8192,
-          },
+          config: GEMINI_CONFIG_BASE,
         });
         responseText = nativeResponse.text;
       } catch (err: unknown) {
@@ -999,12 +1079,7 @@ ${buildLanguageDirective(language)}`;
                 text: `${promptText}\n\nTRANSCRIPCIÓN DEL VÍDEO DE YOUTUBE:\n=========================================\n${truncatedTranscript}\n=========================================`,
               },
             ],
-            config: {
-              systemInstruction: SYSTEM_INSTRUCTION_GROUNDING,
-              responseMimeType: 'application/json',
-              responseJsonSchema: flashcardSchema,
-              maxOutputTokens: 8192,
-            },
+            config: GEMINI_CONFIG_BASE,
           });
           responseText = fallbackResponse.text;
         } else {
@@ -1073,12 +1148,7 @@ ${buildLanguageDirective(language)}`;
             text: `${promptText}\n\nCONTENIDO EXTRAÍDO DEL ENLACE WEB:\n=========================================\n${truncatedWebText}\n=========================================`,
           },
         ],
-        config: {
-          systemInstruction: SYSTEM_INSTRUCTION_GROUNDING,
-          responseMimeType: 'application/json',
-          responseJsonSchema: flashcardSchema,
-          maxOutputTokens: 8192,
-        },
+        config: GEMINI_CONFIG_BASE,
       });
       responseText = webResponse.text;
     }
@@ -1123,19 +1193,11 @@ ${buildLanguageDirective(language)}`;
       await recordApiUsage(apiCheck.userId);
     }
 
-    // Aplicar aleatorización Fisher-Yates a las opciones de preguntas test
+    // Procesar y garantizar 4 opciones con aleatorización Fisher-Yates
     return {
       success: true,
       core_exhausted: coreExhausted,
-      cards: parsedCards.slice(0, targetCount).map((card) => {
-        const cleaned: GeneratedCard = {
-          front: card.front.trim(),
-          back: card.back.trim(),
-          cardFormat: (card.cardFormat as CardFormat) || cardFormat,
-          cardType: card.cardFormat === 'cloze' ? 'cloze' : 'basic',
-        };
-        return randomizeMultipleChoiceCard(cleaned);
-      }),
+      cards: processGeneratedCards(parsedCards, targetCount, cardFormat),
     };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Error desconocido al procesar el enlace';
