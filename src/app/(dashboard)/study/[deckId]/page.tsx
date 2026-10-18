@@ -1,8 +1,8 @@
 'use client';
 
-import { use, useState, useEffect, useCallback, useMemo } from 'react';
+import { use, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
-import { Trash2, Edit3, X, Lightbulb } from 'lucide-react';
+import { Trash2, Edit3, X, Lightbulb, Camera, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useDeckStore, useCardStore, useSettingsStore, useLanguageStore, type CardRow } from '@/stores';
 import {
@@ -56,7 +56,10 @@ export default function StudyPage({ params }: StudyPageProps) {
   // Estado para la nota rápida de la tarjeta activa (icono bombilla)
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [quickNoteText, setQuickNoteText] = useState('');
+  const [quickNoteImageUrl, setQuickNoteImageUrl] = useState<string | null>(null);
   const [isSavingQuickNote, setIsSavingQuickNote] = useState(false);
+  const [isUploadingNoteImage, setIsUploadingNoteImage] = useState(false);
+  const noteImageInputRef = useRef<HTMLInputElement>(null);
 
   // Consultar cantidad de repasos guardados hoy en este mazo desde Supabase
   const fetchTodayReviewsCount = useCallback(async () => {
@@ -231,7 +234,73 @@ export default function StudyPage({ params }: StudyPageProps) {
   const handleOpenNoteModal = () => {
     if (!currentCard) return;
     setQuickNoteText(currentCard.notes || '');
+    setQuickNoteImageUrl(currentCard.note_image_url || null);
     setIsNoteModalOpen(true);
+  };
+
+  // Subir imagen para la nota a Supabase Storage (bucket study-notes)
+  const handleUploadNoteImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert(t('study.invalid_image_type', 'Por favor selecciona un archivo de imagen válido (JPG, PNG, WebP o GIF).'));
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      alert(t('study.image_too_large', 'La imagen no puede superar los 10MB.'));
+      return;
+    }
+
+    setIsUploadingNoteImage(true);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      const userId = user?.id || 'anon';
+      const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
+      const filePath = `${userId}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('study-notes')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: true,
+        });
+
+      if (uploadError) throw uploadError;
+
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from('study-notes').getPublicUrl(filePath);
+
+      setQuickNoteImageUrl(publicUrl);
+    } catch (err: unknown) {
+      console.error('Error subiendo imagen de nota:', err);
+      alert(t('study.image_upload_error', 'Error al subir la imagen a Supabase Storage.'));
+    } finally {
+      setIsUploadingNoteImage(false);
+      if (noteImageInputRef.current) {
+        noteImageInputRef.current.value = '';
+      }
+    }
+  };
+
+  // Eliminar imagen de la nota
+  const handleRemoveNoteImage = async () => {
+    if (!quickNoteImageUrl) return;
+    try {
+      const parts = quickNoteImageUrl.split('/study-notes/');
+      if (parts.length > 1) {
+        const pathInBucket = decodeURIComponent(parts[1]);
+        await supabase.storage.from('study-notes').remove([pathInBucket]);
+      }
+    } catch (err) {
+      console.warn('Advertencia al eliminar imagen del bucket:', err);
+    }
+    setQuickNoteImageUrl(null);
   };
 
   // Guardar nota específica en Supabase y actualizar la cola local
@@ -242,14 +311,19 @@ export default function StudyPage({ params }: StudyPageProps) {
     setIsSavingQuickNote(true);
     try {
       const finalNote = quickNoteText.trim() || null;
+      const finalImageUrl = quickNoteImageUrl || null;
+
       const updated = await updateCard(currentCard.id, {
         notes: finalNote,
+        note_image_url: finalImageUrl,
       });
 
       if (updated) {
         setQueue((prev) =>
           prev.map((c) =>
-            c.id === currentCard.id ? { ...c, notes: finalNote } : c
+            c.id === currentCard.id
+              ? { ...c, notes: finalNote, note_image_url: finalImageUrl }
+              : c
           )
         );
         setIsNoteModalOpen(false);
@@ -572,7 +646,7 @@ export default function StudyPage({ params }: StudyPageProps) {
                   type="button"
                   onClick={handleOpenNoteModal}
                   className={`p-1.5 rounded-lg transition active:scale-90 cursor-pointer flex items-center justify-center ${
-                    Boolean(currentCard?.notes && currentCard.notes.trim())
+                    Boolean((currentCard?.notes && currentCard.notes.trim()) || currentCard?.note_image_url)
                       ? 'text-amber-500 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 shadow-sm shadow-amber-500/10'
                       : 'text-neutral-400 hover:text-amber-500 hover:bg-amber-500/10 dark:hover:bg-neutral-800'
                   }`}
@@ -584,29 +658,42 @@ export default function StudyPage({ params }: StudyPageProps) {
                 >
                   <Lightbulb
                     className={`w-4 h-4 transition-transform duration-200 group-hover:scale-110 ${
-                      Boolean(currentCard?.notes && currentCard.notes.trim())
+                      Boolean((currentCard?.notes && currentCard.notes.trim()) || currentCard?.note_image_url)
                         ? 'fill-amber-400 text-amber-500 dark:text-amber-400 drop-shadow-[0_0_6px_rgba(245,158,11,0.5)]'
                         : ''
                     }`}
                   />
                 </button>
 
-                {/* Popover / Tooltip hover enriquecido */}
+                {/* Popover / Tooltip hover enriquecido con texto e imagen multimedia */}
                 <div className="absolute right-0 top-full mt-2 hidden group-hover:block z-50 pointer-events-none transition-all duration-150 animate-in fade-in zoom-in-95">
-                  <div className="w-64 max-w-xs p-3 rounded-xl bg-neutral-900/95 dark:bg-neutral-950/95 text-white border border-neutral-700/70 shadow-2xl backdrop-blur-md text-xs leading-relaxed space-y-1.5">
+                  <div className="w-72 max-w-sm p-3.5 rounded-xl bg-neutral-900/95 dark:bg-neutral-950/95 text-white border border-neutral-700/70 shadow-2xl backdrop-blur-md text-xs leading-relaxed space-y-2">
                     <div className="flex items-center gap-1.5 font-semibold text-[11px] text-amber-400 border-b border-neutral-700/50 pb-1">
                       <Lightbulb className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
                       <span>{t('study.note_tooltip_title', 'Nota Aclaratoria')}</span>
                     </div>
+
+                    {/* Previsualización de imagen adjunta en el popover */}
+                    {currentCard?.note_image_url && (
+                      <div className="rounded-lg overflow-hidden border border-neutral-700/60 bg-black/40 max-h-48 flex items-center justify-center p-0.5">
+                        <img
+                          src={currentCard.note_image_url}
+                          alt="Nota visual"
+                          className="w-full h-auto max-h-44 object-contain rounded-md"
+                        />
+                      </div>
+                    )}
+
                     {Boolean(currentCard?.notes && currentCard.notes.trim()) ? (
                       <p className="text-neutral-200 text-[11px] max-h-36 overflow-y-auto whitespace-pre-wrap">
                         {currentCard?.notes?.trim()}
                       </p>
-                    ) : (
+                    ) : !currentCard?.note_image_url ? (
                       <p className="text-neutral-400 text-[11px] italic">
                         {t('study.add_note_tooltip', 'Añadir nota aclaratoria')}
                       </p>
-                    )}
+                    ) : null}
+
                     <div className="pt-1 text-[10px] text-neutral-400 border-t border-neutral-800/80">
                       {t('study.click_to_edit_note', 'Haz clic en la bombilla para editar')}
                     </div>
@@ -643,6 +730,7 @@ export default function StudyPage({ params }: StudyPageProps) {
               front={currentCard.front}
               back={currentCard.back}
               notes={currentCard.notes}
+              noteImageUrl={currentCard.note_image_url}
               cardFormat={
                 currentCard.cardFormat ||
                 currentCard.card_format ||
@@ -905,9 +993,9 @@ export default function StudyPage({ params }: StudyPageProps) {
                   {t('study.note_content_label', 'Contenido de la nota')}
                 </label>
                 <textarea
-                  rows={5}
+                  rows={4}
                   autoFocus
-                  disabled={isSavingQuickNote}
+                  disabled={isSavingQuickNote || isUploadingNoteImage}
                   value={quickNoteText}
                   onChange={(e) => setQuickNoteText(e.target.value)}
                   placeholder={t('study.note_content_placeholder', 'Escribe aquí tu aclaración, nemotecnia, regla clínica o detalle a recordar...')}
@@ -915,11 +1003,84 @@ export default function StudyPage({ params }: StudyPageProps) {
                 />
               </div>
 
+              {/* Previsualización de la imagen adjunta */}
+              {quickNoteImageUrl && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-xs font-medium text-neutral-700 dark:text-neutral-300">
+                    <span className="flex items-center gap-1.5">
+                      <ImageIcon className="w-3.5 h-3.5 text-amber-500" />
+                      <span>{t('study.attached_image', 'Imagen adjunta')}</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleRemoveNoteImage}
+                      disabled={isSavingQuickNote || isUploadingNoteImage}
+                      className="text-[11px] text-rose-500 hover:text-rose-600 dark:hover:text-rose-400 flex items-center gap-1 transition cursor-pointer"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      <span>{t('study.remove_image', 'Eliminar')}</span>
+                    </button>
+                  </div>
+                  <div className="relative rounded-xl overflow-hidden border border-neutral-200 dark:border-neutral-800 bg-neutral-950/40 max-h-48 flex items-center justify-center p-1 group">
+                    <img
+                      src={quickNoteImageUrl}
+                      alt="Nota visual"
+                      className="w-full h-auto max-h-44 object-contain rounded-lg"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleRemoveNoteImage}
+                      className="absolute top-2 right-2 p-1.5 rounded-full bg-black/75 hover:bg-rose-600 text-white transition shadow-md cursor-pointer"
+                      title={t('study.remove_image', 'Eliminar imagen')}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Botón camuflado estéticamente para subir/cambiar imagen */}
+              <div className="flex items-center justify-between pt-1">
+                <input
+                  ref={noteImageInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleUploadNoteImage}
+                  disabled={isSavingQuickNote || isUploadingNoteImage}
+                />
+                <button
+                  type="button"
+                  onClick={() => noteImageInputRef.current?.click()}
+                  disabled={isSavingQuickNote || isUploadingNoteImage}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700 transition active:scale-95 cursor-pointer disabled:opacity-50"
+                >
+                  {isUploadingNoteImage ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-500" />
+                      <span>{t('study.uploading_image', 'Subiendo imagen...')}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Camera className="w-3.5 h-3.5 text-amber-500" />
+                      <span>
+                        {quickNoteImageUrl
+                          ? t('study.change_image', 'Cambiar imagen')
+                          : t('study.add_image', 'Añadir imagen a la nota')}
+                      </span>
+                    </>
+                  )}
+                </button>
+                <span className="text-[10px] text-neutral-400">
+                  {t('study.image_max_size', 'Máx. 10MB')}
+                </span>
+              </div>
+
               {/* Botones de Acción */}
               <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-neutral-200 dark:border-neutral-800">
                 <button
                   type="button"
-                  disabled={isSavingQuickNote}
+                  disabled={isSavingQuickNote || isUploadingNoteImage}
                   onClick={() => setIsNoteModalOpen(false)}
                   className="px-4 py-2 text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 transition disabled:opacity-50 cursor-pointer"
                 >
@@ -927,7 +1088,7 @@ export default function StudyPage({ params }: StudyPageProps) {
                 </button>
                 <button
                   type="submit"
-                  disabled={isSavingQuickNote}
+                  disabled={isSavingQuickNote || isUploadingNoteImage}
                   className="inline-flex items-center gap-2 px-5 py-2 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-500 rounded-xl transition shadow-md shadow-amber-600/25 active:scale-95 disabled:opacity-50 cursor-pointer"
                 >
                   {isSavingQuickNote ? (

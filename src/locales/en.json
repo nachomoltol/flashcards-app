@@ -409,7 +409,14 @@
     "note_modal_sub": "Will appear when hovering over the lightbulb during review",
     "note_content_label": "Note content",
     "note_content_placeholder": "Write your clarification, mnemonic, clinical rule, or reminder...",
-    "save_note_btn": "Save note"
+    "save_note_btn": "Save note",
+    "add_image": "Add image",
+    "change_image": "Change image",
+    "uploading_image": "Uploading image...",
+    "remove_image": "Remove image",
+    "image_upload_error": "Error uploading image to Supabase Storage.",
+    "invalid_image_type": "Please select a valid image file (JPG, PNG, WebP or GIF).",
+    "image_too_large": "Image must not exceed 10MB."
   },
   "settings": {
     "title": "Algorithm & Profile Settings",

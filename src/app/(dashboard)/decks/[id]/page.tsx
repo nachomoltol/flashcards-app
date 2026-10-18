@@ -472,6 +472,8 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                         cardFormat={fmt}
                         isRevealed={true}
                         interactive={false}
+                        notes={card.notes}
+                        noteImageUrl={card.note_image_url}
                       />
                     </div>
 

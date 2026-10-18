@@ -25,7 +25,7 @@ interface CardState {
   deleteCard: (cardId: string) => Promise<boolean>;
   updateCard: (
     cardId: string,
-    updates: Partial<Pick<CardRow, 'front' | 'back' | 'card_format' | 'cardFormat' | 'card_type' | 'notes'>>
+    updates: Partial<Pick<CardRow, 'front' | 'back' | 'card_format' | 'cardFormat' | 'card_type' | 'notes' | 'note_image_url'>>
   ) => Promise<CardRow | null>;
   recordReview: (
     card: CardRow,

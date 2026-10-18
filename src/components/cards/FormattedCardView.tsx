@@ -9,6 +9,7 @@ export interface FormattedCardViewProps {
   front: string;
   back: string;
   notes?: string | null;
+  noteImageUrl?: string | null;
   cardFormat?: CardFormat | string;
   isRevealed?: boolean;
   interactive?: boolean; // Permite al usuario seleccionar opciones durante el estudio
@@ -181,6 +182,7 @@ export function FormattedCardView({
   front,
   back,
   notes,
+  noteImageUrl,
   cardFormat = 'basic',
   isRevealed = false,
   interactive = true,
@@ -457,15 +459,26 @@ export function FormattedCardView({
             {renderMarkdownBold(back)}
           </div>
 
-          {notes && notes.trim() && (
-            <div className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-500/10 dark:bg-amber-950/20 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-xs sm:text-sm">
-              <Lightbulb className="w-4 h-4 text-amber-500 shrink-0 mt-0.5 fill-amber-400" />
-              <div className="flex-1 whitespace-pre-wrap">
-                <span className="font-semibold block text-[11px] uppercase tracking-wider text-amber-600 dark:text-amber-400 mb-0.5">
-                  {t('study.note_tooltip_title', 'Nota Aclaratoria')}
-                </span>
-                {notes.trim()}
+          {Boolean((notes && notes.trim()) || noteImageUrl) && (
+            <div className="p-3 sm:p-3.5 rounded-xl bg-amber-500/10 dark:bg-amber-950/20 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-xs sm:text-sm space-y-2.5">
+              <div className="flex items-start gap-2.5">
+                <Lightbulb className="w-4 h-4 text-amber-500 shrink-0 mt-0.5 fill-amber-400" />
+                <div className="flex-1 whitespace-pre-wrap">
+                  <span className="font-semibold block text-[11px] uppercase tracking-wider text-amber-600 dark:text-amber-400 mb-0.5">
+                    {t('study.note_tooltip_title', 'Nota Aclaratoria')}
+                  </span>
+                  {notes && notes.trim()}
+                </div>
               </div>
+              {noteImageUrl && (
+                <div className="rounded-xl overflow-hidden border border-amber-500/30 bg-black/40 max-h-56 flex items-center justify-center p-1">
+                  <img
+                    src={noteImageUrl}
+                    alt="Nota visual"
+                    className="w-full h-auto max-h-52 object-contain rounded-lg"
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>

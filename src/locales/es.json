@@ -408,7 +408,14 @@
     "note_modal_sub": "Aparecerá al pasar el cursor sobre la bombilla durante el repaso",
     "note_content_label": "Contenido de la nota",
     "note_content_placeholder": "Escribe aquí tu aclaración, nemotecnia, regla clínica o detalle a recordar...",
-    "save_note_btn": "Guardar nota"
+    "save_note_btn": "Guardar nota",
+    "add_image": "Añadir imagen",
+    "change_image": "Cambiar imagen",
+    "uploading_image": "Subiendo imagen...",
+    "remove_image": "Eliminar imagen",
+    "image_upload_error": "Error al subir la imagen a Supabase Storage.",
+    "invalid_image_type": "Por favor selecciona un archivo de imagen válido (JPG, PNG, WebP o GIF).",
+    "image_too_large": "La imagen no puede superar los 10MB."
   },
   "settings": {
     "title": "Configuración de Algoritmo y Perfil",

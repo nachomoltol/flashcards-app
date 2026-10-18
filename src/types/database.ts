@@ -66,6 +66,7 @@ export type Database = {
           last_review: string | null
           note_id: string | null
           notes?: string | null
+          note_image_url?: string | null
           reps: number
           stability: number
           state: number
@@ -86,6 +87,7 @@ export type Database = {
           last_review?: string | null
           note_id?: string | null
           notes?: string | null
+          note_image_url?: string | null
           reps?: number
           stability?: number
           state?: number
@@ -106,6 +108,7 @@ export type Database = {
           last_review?: string | null
           note_id?: string | null
           notes?: string | null
+          note_image_url?: string | null
           reps?: number
           stability?: number
           state?: number

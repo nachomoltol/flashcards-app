@@ -386,13 +386,14 @@ function DecksViewContent() {
     setIsUpdating(true);
     const success = await updateDeck(editingDeck.id, {
       title: editTitle.trim(),
-      description: editDescription.trim() || null,
+      description: editingDeck.is_folder ? null : (editDescription.trim() || null),
       color: editColor,
     });
     setIsUpdating(false);
 
     if (success) {
       setEditingDeck(null);
+      await fetchDecks();
     }
   };
 
@@ -860,23 +861,33 @@ function DecksViewContent() {
                   <div
                     key={deck.id}
                     onClick={() => navigateToFolder(deck.id)}
-                    className="group rounded-xl sm:rounded-2xl border border-neutral-200/90 dark:border-neutral-800 bg-white dark:bg-neutral-900/60 p-3 sm:p-5 hover:border-amber-400 dark:hover:border-amber-500/50 hover:bg-amber-50/20 dark:hover:bg-neutral-900/90 transition-all duration-200 flex flex-col justify-between relative shadow-sm hover:shadow-md hover:shadow-neutral-950/5 dark:hover:shadow-black/50 hover:-translate-y-0.5 cursor-pointer"
+                    className="group rounded-xl sm:rounded-2xl border border-neutral-200/90 dark:border-neutral-800 bg-white dark:bg-neutral-900/60 p-3 sm:p-5 hover:border-neutral-300 dark:hover:border-neutral-700/80 transition-all duration-200 flex flex-col justify-between relative shadow-sm hover:shadow-md hover:shadow-neutral-950/5 dark:hover:shadow-black/50 hover:-translate-y-0.5 cursor-pointer"
                   >
                     <div>
-                      {/* Top Bar: Icono de Carpeta, Badge de Carpeta y Menú Desplegable (⋮) */}
+                      {/* Top Bar: Icono de Carpeta dinámico según su color, Badge de Carpeta y Menú Desplegable (⋮) */}
                       <div className="flex items-center justify-between gap-1.5 sm:gap-2 mb-2 sm:mb-3">
                         <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0">
                           <div
-                            className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl flex items-center justify-center text-xs sm:text-sm shadow-sm border shrink-0"
+                            className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl flex items-center justify-center text-xs sm:text-sm shadow-sm border shrink-0 transition-colors"
                             style={{
                               backgroundColor: `${accentColor}18`,
                               borderColor: `${accentColor}40`,
                               color: accentColor,
                             }}
                           >
-                            📁
+                            <Folder
+                              className="w-4 h-4 sm:w-4.5 sm:h-4.5"
+                              style={{ color: accentColor, fill: `${accentColor}33` }}
+                            />
                           </div>
-                          <span className="text-[10px] sm:text-xs px-2 sm:px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300 font-mono font-medium border border-amber-500/25 truncate">
+                          <span
+                            className="text-[10px] sm:text-xs px-2 sm:px-2.5 py-0.5 rounded-full font-mono font-medium border truncate transition-colors"
+                            style={{
+                              backgroundColor: `${accentColor}15`,
+                              borderColor: `${accentColor}35`,
+                              color: accentColor,
+                            }}
+                          >
                             {t('dashboard.folder_badge', 'Carpeta')}
                           </span>
                         </div>
@@ -1189,7 +1200,6 @@ function DecksViewContent() {
                   aria-checked={createType === 'folder'}
                   onClick={() => {
                     setCreateType('folder');
-                    setNewColor('#f59e0b');
                   }}
                   className={`p-3.5 rounded-2xl border text-left transition-all duration-150 flex flex-col justify-between relative cursor-pointer ${
                     createType === 'folder'
@@ -1223,7 +1233,6 @@ function DecksViewContent() {
                   aria-checked={createType === 'deck'}
                   onClick={() => {
                     setCreateType('deck');
-                    setNewColor('#6366f1');
                   }}
                   className={`p-3.5 rounded-2xl border text-left transition-all duration-150 flex flex-col justify-between relative cursor-pointer ${
                     createType === 'deck'
@@ -1323,7 +1332,7 @@ function DecksViewContent() {
                       onClick={() => setNewColor(c.hex)}
                       className={`w-7 h-7 rounded-full transition-transform cursor-pointer ${
                         newColor === c.hex
-                          ? 'scale-125 ring-2 ring-indigo-500 dark:ring-white ring-offset-2 ring-offset-white dark:ring-offset-neutral-900'
+                          ? 'scale-125 ring-2 ring-offset-2 ring-offset-white dark:ring-offset-neutral-900 shadow-md ring-neutral-800 dark:ring-white'
                           : 'hover:scale-110 opacity-70 hover:opacity-100'
                       }`}
                       style={{ backgroundColor: c.hex }}
@@ -1419,7 +1428,7 @@ function DecksViewContent() {
                       onClick={() => setEditColor(c.hex)}
                       className={`w-7 h-7 rounded-full transition-transform cursor-pointer ${
                         editColor === c.hex
-                          ? 'scale-125 ring-2 ring-indigo-500 dark:ring-white ring-offset-2 ring-offset-white dark:ring-offset-neutral-900'
+                          ? 'scale-125 ring-2 ring-offset-2 ring-offset-white dark:ring-offset-neutral-900 shadow-md ring-neutral-800 dark:ring-white'
                           : 'hover:scale-110 opacity-70 hover:opacity-100'
                       }`}
                       style={{ backgroundColor: c.hex }}
