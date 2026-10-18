@@ -25,18 +25,18 @@ const flashcardSchema = {
     cards: {
       type: Type.ARRAY,
       description:
-        'Array con tarjetas de estudio de alta precisión según el formato solicitado. Cada tarjeta multiple_choice DEBE tener obligatoriamente 4 opciones de respuesta.',
+        'Array con tarjetas de estudio de alta precisión según el formato solicitado (multiple_choice, basic, cloze o true_false).',
       items: {
         type: Type.OBJECT,
         properties: {
           front: {
             type: Type.STRING,
             description:
-              'Anverso de la tarjeta. En multiple_choice DEBE contener la pregunta limpia, un salto de línea doble, y luego exactamente las 4 opciones a), b), c), d) en líneas separadas.',
+              'Anverso de la tarjeta según el formato solicitado (pregunta directa para basic, texto con [...] para cloze, afirmación categórica para true_false, o pregunta con opciones a-d para multiple_choice).',
           },
           back: {
             type: Type.STRING,
-            description: 'Reverso de la tarjeta según el formato indicado (ejemplo: "b) Texto de la opción correcta").',
+            description: 'Reverso de la tarjeta con la respuesta exacta según el formato indicado.',
           },
           cardFormat: {
             type: Type.STRING,
@@ -44,7 +44,8 @@ const flashcardSchema = {
           },
           options: {
             type: Type.ARRAY,
-            description: 'Array con exactamente las 4 opciones de respuesta para preguntas de opción múltiple: [a, b, c, d]',
+            description:
+              'Array con las 4 opciones de respuesta exclusivas para preguntas de opción múltiple: [a, b, c, d]. En formatos true_false, basic y cloze este campo DEBE OMITIRSE o dejarse vacío ([]).',
             items: {
               type: Type.STRING,
             },
@@ -58,13 +59,33 @@ const flashcardSchema = {
 };
 
 /**
+ * Regla de formato obligatoria inyectada dinámicamente en el System Prompt y Reglas Globales.
+ */
+function getFormatRule(format: CardFormat = 'multiple_choice'): string {
+  switch (format) {
+    case 'multiple_choice':
+      return 'FORMATO OBLIGATORIO: Múltiple opción con exactamente 4 alternativas (a, b, c, d). Cada tarjeta DEBE incluir obligatoriamente el array "options" con las 4 opciones de respuesta.';
+    case 'true_false':
+      return `FORMATO OBLIGATORIO: Afirmación categórica. 
+- El campo 'front' DEBE contener la afirmación.
+- El campo 'back' DEBE ser exactamente la palabra 'Verdadero' o 'Falso'.
+- REGLA CRÍTICA: El array 'options' DEBE SER OMITIDO o estar VACÍO ([]). BAJO NINGÚN CONCEPTO generes opciones A, B, C, D.`;
+    case 'cloze':
+      return 'FORMATO OBLIGATORIO: Texto con una palabra clave o concepto fundamental oculto (ej. usando corchetes [...] o el estándar que utilice el frontend). PROHIBIDO terminantemente generar 4 opciones de respuesta o formato de test múltiple. REGLA CRÍTICA: El array \'options\' DEBE SER OMITIDO o estar VACÍO ([]).';
+    case 'basic':
+    default:
+      return 'FORMATO OBLIGATORIO: Pregunta directa y concisa en el anverso, y respuesta exacta en el reverso. PROHIBIDO terminantemente generar 4 opciones de respuesta o formato de test múltiple. REGLA CRÍTICA: El array \'options\' DEBE SER OMITIDO o estar VACÍO ([]).';
+  }
+}
+
+/**
  * Devuelve las instrucciones del prompt según el formato de tarjeta solicitado.
  */
 function getFormatInstructions(format: CardFormat = 'multiple_choice'): string {
   switch (format) {
     case 'multiple_choice':
       return `FORMATO INNEGOCIABLE: multiple_choice (Opción Múltiple / Test):
-Cada tarjeta DEBE tener obligatoriamente 4 opciones de respuesta múltiples (a, b, c, d). Bajo ninguna circunstancia puedes generar tarjetas de 'Verdadero/Falso' o de texto libre.
+Cada tarjeta DEBE tener obligatoriamente exactamente 4 opciones de respuesta múltiples (a, b, c, d).
 
 ESTRUCTURA EXACTA DE "front":
 [Escribe aquí ÚNICAMENTE el enunciado de la pregunta limpia, sin incluir ninguna letra a, b, c o d]
@@ -86,22 +107,28 @@ REGLAS CRÍTICAS PARA "front":
 
     case 'cloze':
       return `FORMATO OBLIGATORIO: cloze (Texto para rellenar / Cloze):
+PROHIBIDO terminantemente generar opciones múltiples (a, b, c, d).
 - "front": Un texto explicativo riguroso con una palabra o frase clave oculta usando obligatoriamente la notación [...] (ejemplo: "El proceso mediante el cual las plantas convierten la luz solar en energía química se denomina [...]").
 - "back": El texto completo donde la palabra o frase clave revelada esté claramente resaltada con doble asterisco (ejemplo: "El proceso mediante el cual las plantas convierten la luz solar en energía química se denomina **fotosíntesis**").
-- "cardFormat": "cloze"`;
+- "cardFormat": "cloze"
+- REGLA CRÍTICA: El array 'options' DEBE SER OMITIDO o estar VACÍO ([]).`;
 
     case 'true_false':
       return `FORMATO OBLIGATORIO: true_false (Verdadero o Falso):
+PROHIBIDO terminantemente generar 4 opciones múltiples (a, b, c, d).
 - "front": Una afirmación técnica o conceptual rotunda (que puede ser verdadera o falsa según el temario).
-- "back": Iniciar obligatoriamente con la palabra "**Verdadero**" o "**Falso**", seguido de una breve justificación directa basada estrictamente en el texto.
-- "cardFormat": "true_false"`;
+- "back": Debe ser exactamente la palabra "Verdadero" o "Falso".
+- "cardFormat": "true_false"
+- REGLA CRÍTICA: El array 'options' DEBE SER OMITIDO o estar VACÍO ([]). BAJO NINGÚN CONCEPTO generes opciones A, B, C, D.`;
 
     case 'basic':
     default:
       return `FORMATO OBLIGATORIO: basic (Pregunta y Respuesta Directa):
+PROHIBIDO terminantemente generar opciones múltiples (a, b, c, d).
 - "front": Pregunta directa, específica y concisa para evaluar el concepto.
 - "back": Respuesta rigurosa, comprensiva y directa.
-- "cardFormat": "basic"`;
+- "cardFormat": "basic"
+- REGLA CRÍTICA: El array 'options' DEBE SER OMITIDO o estar VACÍO ([]).`;
   }
 }
 
@@ -111,34 +138,53 @@ Analiza el historial de tarjetas existentes frente al texto proporcionado. Si co
 /**
  * System Prompt de Restricción Estricta (Grounding) y Extracción de Contenido (Estilo NotebookLM).
  * Obliga a Gemini a actuar exclusivamente como un extractor fidedigno de conocimiento clínico y académico,
- * prohibiendo terminantemente el conocimiento externo y forzando el formato estricto de 4 opciones.
+ * manteniendo inquebrantable el muro anti-alucinaciones, el límite dinámico (escape hatch)
+ * y la inyección dinámica de la regla del formato solicitado.
  */
-const SYSTEM_INSTRUCTION_GROUNDING = `Eres un extractor de conocimiento clínico y académico estricto. Tu única fuente de verdad es el texto proporcionado.
+function getSystemInstruction(format: CardFormat = 'multiple_choice'): string {
+  const formatRule = getFormatRule(format);
+  const contextSpecificRule =
+    format === 'multiple_choice'
+      ? '4. DISTRACTORES BASADOS EN EL TEXTO: En preguntas de opción múltiple (test), todos los distractores incorrectos deben ser técnicamente plausibles pero fundamentados en términos y conceptos del propio texto fuente, sin introducir elementos externos.'
+      : '4. FIDELIDAD TERMINOLÓGICA Y RIGOR: Todo concepto, pregunta, afirmación o respuesta debe fundamentarse estricta y textualmente en el texto fuente, sin introducir terminología ajena ni elementos externos.';
+
+  return `Eres un extractor de conocimiento clínico y académico estricto. Tu única fuente de verdad es el texto proporcionado.
 
 REGLA DE ORO (Estilo NotebookLM):
-NO inventes información. Si un concepto, dato o respuesta no se puede deducir directa y explícitamente del texto proporcionado, DEBES omitirlo. No uses conocimiento previo externo.
+NO inventes información. Tu única fuente de verdad es el texto. Si un concepto, dato o respuesta no se puede deducir directa y explícitamente del texto proporcionado, DEBES omitirlo. No uses conocimiento previo externo.
 
-LÍMITE DINÁMICO (ESCAPE HATCH):
-Se te pide una cantidad máxima de tarjetas. Sin embargo, si el texto original se agota y ya no hay MÁS DATOS ÚNICOS para extraer, DEBES DETENER LA GENERACIÓN INMEDIATAMENTE y devolver el JSON solo con las tarjetas únicas posibles. Tienes terminantemente prohibido refrasear o preguntar sobre un mismo concepto dos veces para intentar llegar al máximo.
+LÍMITE DINÁMICO:
+Se te pide una cantidad máxima de tarjetas. Si el texto se agota y no hay MÁS DATOS ÚNICOS, DEBES DETENER LA GENERACIÓN INMEDIATAMENTE. Prohibido refrasear o repetir para llegar al máximo.
 
-FORMATO INNEGOCIABLE:
-Cada tarjeta DEBE tener obligatoriamente 4 opciones de respuesta múltiples. Bajo ninguna circunstancia puedes generar tarjetas de 'Verdadero/Falso' o de texto libre.
+${formatRule}
 
 REGLAS INQUEBRANTABLES DE EXTRACCIÓN Y RESTRICCIÓN DE CONTEXTO (GROUNDING ESTRICTO):
 1. TU ÚNICA FUENTE DE VERDAD ES EL TEXTO PROPORCIONADO: Toda la información de las tarjetas DEBE extraerse EXCLUSIVA Y ESTRICTAMENTE de este texto.
 2. PROHIBICIÓN TERMINANTE DE CONOCIMIENTO EXTERNO: Tienes TERMINANTEMENTE PROHIBIDO utilizar conocimiento previo externo, asunciones no fundadas o datos que no aparezcan en la fuente proporcionada.
 3. SI UN CONCEPTO O DETALLE NO SE EXPLICA EXPLÍCITAMENTE EN EL DOCUMENTO, NO PUEDES GENERAR UNA TARJETA SOBRE ÉL: Actúa únicamente y exclusivamente como un extractor fidedigno. Si un dato no figura de forma explícitamente en el material de origen, para ti no existe y bajo ningún concepto debes inventarlo, completarlo o extrapolarlo.
-4. DISTRACTORES BASADOS EN EL TEXTO: En preguntas de opción múltiple (test), todos los distractores incorrectos deben ser técnicamente plausibles pero fundamentados en términos y conceptos del propio texto fuente, sin introducir elementos externos.
+${contextSpecificRule}
 5. OBJETIVIDAD Y RIGOR CIENTÍFICO: Las preguntas y respuestas deben reflejar exactamente la definición, clasificación, mecanismo, dosis, valor o dato que el texto expone sin divagar.
 6. LÍMITE DINÁMICO DE GENERACIÓN: Si la información fidedigna del texto se agota antes de alcanzar el número máximo solicitado, detén la generación de inmediato con las tarjetas obtenidas. No dupliques ni refrasees contenido.`;
+}
 
-const GLOBAL_RULES = `REGLAS GLOBALES INQUEBRANTABLES DE BLINDAJE (ESTILO NOTEBOOKLM):
-1. REGLA DE ORO (Estilo NotebookLM): NO inventes información. Si un concepto, dato o respuesta no se puede deducir directa y explícitamente del texto proporcionado, DEBES omitirlo. No uses conocimiento previo externo.
-2. LÍMITE DINÁMICO (FRENO DE REPETICIÓN): Se te pide una cantidad máxima de tarjetas. Sin embargo, si el texto original se agota y ya no hay MÁS DATOS ÚNICOS para extraer, DEBES DETENER LA GENERACIÓN INMEDIATAMENTE y devolver el JSON solo con las tarjetas únicas posibles. Tienes terminantemente prohibido refrasear o preguntar sobre un mismo concepto dos veces para intentar llegar al máximo.
-3. FORMATO INNEGOCIABLE: Cada tarjeta DEBE tener obligatoriamente 4 opciones de respuesta múltiples (a, b, c, d). Bajo ninguna circunstancia generes tarjetas de 'Verdadero/Falso' o de texto libre.
-4. DISTRACTORES BASADOS EN EL TEMARIO: Los distractores (en preguntas de opción múltiple) deben ser técnicamente plausibles y basados estrictamente en el texto fuente.
+/**
+ * Reglas globales inquebrantables de blindaje (Estilo NotebookLM) con inyección dinámica de formato.
+ */
+function getGlobalRules(format: CardFormat = 'multiple_choice'): string {
+  const formatRule = getFormatRule(format);
+  const cardRequirement =
+    format === 'multiple_choice'
+      ? 'array con tarjetas según formato multiple_choice con sus 4 opciones y respuesta correcta'
+      : `array con tarjetas formuladas estrictamente según el formato "${format}"`;
+
+  return `REGLAS GLOBALES INQUEBRANTABLES DE BLINDAJE (ESTILO NOTEBOOKLM):
+1. REGLA DE ORO (Estilo NotebookLM): NO inventes información. Tu única fuente de verdad es el texto. Si un concepto, dato o respuesta no se puede deducir directa y explícitamente del texto proporcionado, DEBES omitirlo. No uses conocimiento previo externo.
+2. LÍMITE DINÁMICO: Se te pide una cantidad máxima de tarjetas. Si el texto se agota y no hay MÁS DATOS ÚNICOS, DEBES DETENER LA GENERACIÓN INMEDIATAMENTE. Prohibido refrasear o repetir para llegar al máximo.
+3. ${formatRule}
+4. PRECISIÓN Y GROUNDING: Toda pregunta, afirmación, distractor o respuesta debe estar basada estricta y textualmente en el texto fuente.
 5. ACRÓNIMOS: Todo acrónimo debe ir acompañado obligatoriamente de su nombre completo si figura en la fuente (ejemplo: "ARN (Ácido Ribonucleico)", "TCP (Transmission Control Protocol)").
-6. INTEGRIDAD ESTRUCTURAL DEL JSON (PRIORIDAD ABSOLUTA): Debes devolver un objeto JSON válido con los campos "core_exhausted" (booleano) y "cards" (array con exactamente 4 opciones cada una). Sé sintético, directo y conciso en el texto de las preguntas, opciones y respuestas, sin rodeos innecesarios.`;
+6. INTEGRIDAD ESTRUCTURAL DEL JSON (PRIORIDAD ABSOLUTA): Debes devolver un objeto JSON válido con los campos "core_exhausted" (booleano) y "cards" (${cardRequirement}). Sé sintético, directo y conciso en el texto de las preguntas, opciones y respuestas, sin rodeos innecesarios.`;
+}
 
 /**
  * Recupera de forma segura el texto del front de todas las tarjetas ya existentes en el mazo.
@@ -260,9 +306,11 @@ function processGeneratedCards(
     const back = card.back.trim();
     const resolvedFormat = (card.cardFormat as CardFormat) || cardFormat;
 
+    const isMultipleChoice = resolvedFormat === 'multiple_choice';
+
     // Si el modelo devolvió options en un array y front no tiene aún las opciones a), b), c), d), formatearlas
     if (
-      resolvedFormat === 'multiple_choice' &&
+      isMultipleChoice &&
       card.options &&
       Array.isArray(card.options) &&
       card.options.length >= 4 &&
@@ -281,7 +329,11 @@ function processGeneratedCards(
       back,
       cardFormat: resolvedFormat,
       cardType: resolvedFormat === 'cloze' ? 'cloze' : 'basic',
-      options: card.options && Array.isArray(card.options) ? card.options.map(String) : undefined,
+      // Blindaje de backend: solo multiple_choice puede conservar options; en cualquier otro formato se descarta
+      options:
+        isMultipleChoice && card.options && Array.isArray(card.options)
+          ? card.options.map(String)
+          : undefined,
     };
 
     return randomizeMultipleChoiceCard(cleaned);
@@ -294,17 +346,21 @@ function processGeneratedCards(
 const GEMINI_MODEL = 'gemini-3.1-flash-lite';
 
 /**
- * Configuración base estricta de Gemini:
+ * Configuración estricta de Gemini generada dinámicamente según el formato de tarjeta:
  * - temperature: 0.1 para forzar respuestas deterministas, eliminar la creatividad y evitar alucinaciones.
- * - responseMimeType: 'application/json' y responseJsonSchema: flashcardSchema para forzar la estructura de 4 opciones.
+ * - responseMimeType: 'application/json' y responseJsonSchema: flashcardSchema para forzar la estructura de salida.
+ * - systemInstruction: System Prompt adaptado dinámicamente con la regla del formato seleccionado.
  */
-const GEMINI_CONFIG_BASE = {
-  systemInstruction: SYSTEM_INSTRUCTION_GROUNDING,
-  temperature: 0.1,
-  responseMimeType: 'application/json',
-  responseJsonSchema: flashcardSchema,
-  maxOutputTokens: 8192,
-};
+function getGeminiConfig(format: CardFormat = 'multiple_choice') {
+  return {
+    systemInstruction: getSystemInstruction(format),
+    temperature: 0.1,
+    responseMimeType: 'application/json',
+    responseJsonSchema: flashcardSchema,
+    maxOutputTokens: 8192,
+  };
+}
+
 
 /**
  * Inyecta la directiva estricta de idioma según las especificaciones de la Fase 25:
@@ -557,23 +613,23 @@ export async function generateCardsAction(
     const ai = new GoogleGenAI({ apiKey });
 
     const prompt = `Eres un pedagogo experto en ciencias cognitivas y diseño de flashcards para el algoritmo de repetición espaciada FSRS.
-Debes analizar el tema en profundidad y generar EXACTAMENTE ${targetCount} tarjetas de estudio de alta calidad cubriendo los conceptos clave de forma equitativa desde el principio hasta el final sobre el tema: "${cleanTopic}".
+CANTIDAD MÁXIMA A GENERAR: ${targetCount}. Si el texto es corto, DEBES devolver menos tarjetas. PROHIBIDO inventar o repetir para llegar al límite. Cubre los conceptos clave sobre el tema: "${cleanTopic}".
 
-${GLOBAL_RULES}
+${getGlobalRules(cardFormat)}
 
 ${getFormatInstructions(cardFormat)}
 
 ${RADAR_DIRECTIVE}
 
 ${antiDuplicatePrompt ? `${antiDuplicatePrompt}\n\n` : ''}REGLA CRÍTICA DE INTEGRIDAD:
-La integridad estructural del JSON es prioridad absoluta y DEBES devolver un objeto con "core_exhausted" (booleano) y "cards" (array con exactamente ${targetCount} tarjetas del formato "${cardFormat}"). Para asegurar que las ${targetCount} tarjetas quepan dentro del límite sin truncarse, formula preguntas, opciones y respuestas directas y concisas.
+La integridad estructural del JSON es prioridad absoluta y DEBES devolver un objeto con "core_exhausted" (booleano) y "cards" (array con hasta un máximo de ${targetCount} tarjetas únicas del formato "${cardFormat}"). Para asegurar que las tarjetas quepan dentro del límite sin truncarse, formula preguntas, textos, opciones (si aplica) y respuestas directas y concisas.
 
 ${languageDirective}`;
 
     const response = await ai.models.generateContent({
       model: GEMINI_MODEL,
       contents: prompt,
-      config: GEMINI_CONFIG_BASE,
+      config: getGeminiConfig(cardFormat),
     });
 
     const text = response.text;
@@ -775,9 +831,11 @@ El usuario ha indicado la siguiente instrucción de enfoque: "${focusInstruction
 REGLA ESTRICTA: Si el usuario proporciona una instrucción de enfoque (ej. un capítulo o tema específico), DEBES ignorar el resto del documento y extraer la información EXCLUSIVAMENTE de la sección solicitada. Bajo ninguna circunstancia generes preguntas sobre partes o secciones ajenas a lo solicitado.`
       : '';
 
+    const maxAmountDirective = `CANTIDAD MÁXIMA A GENERAR: ${targetCount}. Si el texto es corto, DEBES devolver menos tarjetas. PROHIBIDO inventar o repetir para llegar al límite.`;
+
     const coverageText = focusInstruction
-      ? `Debes analizar el documento dando PRIORIDAD ABSOLUTA a la sección solicitada ("${focusInstruction}") y generar EXACTAMENTE ${targetCount} tarjetas extraídas EXCLUSIVAMENTE de esa parte del documento.`
-      : `Debes analizar el documento completo y generar EXACTAMENTE ${targetCount} tarjetas cubriendo los conceptos clave de forma equitativa desde el principio hasta el final del texto.`;
+      ? `Debes analizar el documento dando PRIORIDAD ABSOLUTA a la sección solicitada ("${focusInstruction}"). ${maxAmountDirective} Extrae la información EXCLUSIVAMENTE de esa parte del documento.`
+      : `Debes analizar el documento completo. ${maxAmountDirective} Cubre los conceptos clave de forma equitativa desde el principio hasta el final del texto.`;
 
     // 5. Preparar llamada a Gemini 3.1 Flash-Lite con instrucciones de formato, cantidad, enfoque e historial
     const ai = new GoogleGenAI({ apiKey });
@@ -785,14 +843,14 @@ REGLA ESTRICTA: Si el usuario proporciona una instrucción de enfoque (ej. un ca
     const promptText = `Eres un pedagogo experto en diseño pedagógico y repetición espaciada (algoritmo FSRS).
 ${coverageText}${fileName ? ` Documento de referencia: "${fileName}".` : ''}
 
-${focusRuleSection ? `${focusRuleSection}\n\n` : ''}${GLOBAL_RULES}
+${focusRuleSection ? `${focusRuleSection}\n\n` : ''}${getGlobalRules(cardFormat)}
 
 ${getFormatInstructions(cardFormat)}
 
 ${RADAR_DIRECTIVE}
 
 ${antiDuplicatePrompt ? `${antiDuplicatePrompt}\n\n` : ''}REGLA CRÍTICA DE INTEGRIDAD:
-La integridad estructural del JSON es prioridad absoluta y DEBES devolver un objeto con "core_exhausted" (booleano) y "cards" (array con exactamente ${targetCount} tarjetas del formato "${cardFormat}"). Para garantizar que quepan las ${targetCount} tarjetas dentro del límite de tokens sin que el JSON se corte, mantén cada pregunta, opción y respuesta rigurosa pero concisa y directa.
+La integridad estructural del JSON es prioridad absoluta y DEBES devolver un objeto con "core_exhausted" (booleano) y "cards" (array con hasta un máximo de ${targetCount} tarjetas únicas del formato "${cardFormat}"). Para garantizar que quepan las tarjetas dentro del límite de tokens sin que el JSON se corte, mantén cada pregunta, texto, opción (si aplica) y respuesta rigurosa pero concisa y directa.
 
 ${buildLanguageDirective(language)}`;
 
@@ -818,7 +876,7 @@ ${buildLanguageDirective(language)}`;
     const response = await ai.models.generateContent({
       model: GEMINI_MODEL,
       contents,
-      config: GEMINI_CONFIG_BASE,
+      config: getGeminiConfig(cardFormat),
     });
 
     const text = response.text;
@@ -1000,21 +1058,23 @@ REGLA ESTRICTA: Debes ignorar el resto del contenido y extraer la información E
     const sourceLabel = isYouTube ? 'Vídeo de YouTube' : 'Enlace Web';
     const sourceRef = isYouTube ? canonicalYouTubeUrl : parsedUrl.href;
 
+    const maxAmountDirective = `CANTIDAD MÁXIMA A GENERAR: ${targetCount}. Si el texto es corto, DEBES devolver menos tarjetas. PROHIBIDO inventar o repetir para llegar al límite.`;
+
     const coverageText = focusInstruction
-      ? `Debes analizar el contenido dando PRIORIDAD ABSOLUTA a la sección solicitada ("${focusInstruction}") y generar EXACTAMENTE ${targetCount} tarjetas extraídas EXCLUSIVAMENTE de esa parte.`
-      : `Debes analizar el contenido completo y generar EXACTAMENTE ${targetCount} tarjetas cubriendo los conceptos clave de forma equitativa desde el principio hasta el final del contenido.`;
+      ? `Debes analizar el contenido dando PRIORIDAD ABSOLUTA a la sección solicitada ("${focusInstruction}"). ${maxAmountDirective} Extrae la información EXCLUSIVAMENTE de esa parte.`
+      : `Debes analizar el contenido completo. ${maxAmountDirective} Cubre los conceptos clave de forma equitativa desde el principio hasta el final del contenido.`;
 
     const promptText = `Eres un pedagogo experto en diseño pedagógico y repetición espaciada (algoritmo FSRS).
 ${coverageText} Fuente: ${sourceLabel} ("${sourceRef}").
 
-${focusRuleSection ? `${focusRuleSection}\n\n` : ''}${GLOBAL_RULES}
+${focusRuleSection ? `${focusRuleSection}\n\n` : ''}${getGlobalRules(cardFormat)}
 
 ${getFormatInstructions(cardFormat)}
 
 ${RADAR_DIRECTIVE}
 
 ${antiDuplicatePrompt ? `${antiDuplicatePrompt}\n\n` : ''}REGLA CRÍTICA DE INTEGRIDAD:
-La integridad estructural del JSON es prioridad absoluta y DEBES devolver un objeto con "core_exhausted" (booleano) y "cards" (array con exactamente ${targetCount} tarjetas del formato "${cardFormat}"). Para garantizar que quepan las ${targetCount} tarjetas dentro del límite de tokens sin que el JSON se corte, mantén cada pregunta, opción y respuesta rigurosa pero concisa y directa.
+La integridad estructural del JSON es prioridad absoluta y DEBES devolver un objeto con "core_exhausted" (booleano) y "cards" (array con hasta un máximo de ${targetCount} tarjetas únicas del formato "${cardFormat}"). Para garantizar que quepan las tarjetas dentro del límite de tokens sin que el JSON se corte, mantén cada pregunta, texto, opción (si aplica) y respuesta rigurosa pero concisa y directa.
 
 ${buildLanguageDirective(language)}`;
 
@@ -1042,7 +1102,7 @@ ${buildLanguageDirective(language)}`;
               text: promptText,
             },
           ],
-          config: GEMINI_CONFIG_BASE,
+          config: getGeminiConfig(cardFormat),
         });
         responseText = nativeResponse.text;
       } catch (err: unknown) {
@@ -1079,7 +1139,7 @@ ${buildLanguageDirective(language)}`;
                 text: `${promptText}\n\nTRANSCRIPCIÓN DEL VÍDEO DE YOUTUBE:\n=========================================\n${truncatedTranscript}\n=========================================`,
               },
             ],
-            config: GEMINI_CONFIG_BASE,
+            config: getGeminiConfig(cardFormat),
           });
           responseText = fallbackResponse.text;
         } else {
@@ -1148,7 +1208,7 @@ ${buildLanguageDirective(language)}`;
             text: `${promptText}\n\nCONTENIDO EXTRAÍDO DEL ENLACE WEB:\n=========================================\n${truncatedWebText}\n=========================================`,
           },
         ],
-        config: GEMINI_CONFIG_BASE,
+        config: getGeminiConfig(cardFormat),
       });
       responseText = webResponse.text;
     }

@@ -2,6 +2,7 @@
 
 import { use, useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
+import { Trash2, Edit3, X, Lightbulb } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useDeckStore, useCardStore, useSettingsStore, useLanguageStore, type CardRow } from '@/stores';
 import {
@@ -34,7 +35,7 @@ export default function StudyPage({ params }: StudyPageProps) {
   const { deckId } = use(params);
 
   const { currentDeck, fetchDeckById } = useDeckStore();
-  const { cards: allCards, isLoading, fetchCardsByDeck, recordReview } = useCardStore();
+  const { cards: allCards, isLoading, fetchCardsByDeck, recordReview, deleteCard, updateCard } = useCardStore();
   const { settings, fetchSettings } = useSettingsStore();
   const { t } = useLanguageStore();
 
@@ -44,6 +45,18 @@ export default function StudyPage({ params }: StudyPageProps) {
   const [sessionReviews, setSessionReviews] = useState<{ rating: FSRSRating; cardId: string }[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
   const [reviewsTodayCount, setReviewsTodayCount] = useState<number>(0);
+
+  // Estado para la edición y borrado de la tarjeta activa en modo estudio
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editFront, setEditFront] = useState('');
+  const [editBack, setEditBack] = useState('');
+  const [editNote, setEditNote] = useState('');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  // Estado para la nota rápida de la tarjeta activa (icono bombilla)
+  const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
+  const [quickNoteText, setQuickNoteText] = useState('');
+  const [isSavingQuickNote, setIsSavingQuickNote] = useState(false);
 
   // Consultar cantidad de repasos guardados hoy en este mazo desde Supabase
   const fetchTodayReviewsCount = useCallback(async () => {
@@ -153,9 +166,104 @@ export default function StudyPage({ params }: StudyPageProps) {
     [currentCard, recordReview]
   );
 
+  // Borrar tarjeta de Supabase, extraerla de la cola de estudio y saltar a la siguiente tarjeta automáticamente
+  const handleDeleteCurrentCard = async () => {
+    if (!currentCard) return;
+
+    const confirmed = window.confirm(
+      t(
+        'study.confirm_delete_card',
+        '¿Estás seguro de que deseas eliminar esta tarjeta permanentemente de tu mazo? Esta acción no se puede deshacer.'
+      )
+    );
+    if (!confirmed) return;
+
+    const cardIdToDelete = currentCard.id;
+    const success = await deleteCard(cardIdToDelete);
+    if (success) {
+      const newQueue = queue.filter((c) => c.id !== cardIdToDelete);
+      setQueue(newQueue);
+      setIsAnswerRevealed(false);
+      fetchDeckById(deckId);
+    }
+  };
+
+  // Abrir modal de edición para la tarjeta actual
+  const handleOpenEditModal = () => {
+    if (!currentCard) return;
+    setEditFront(currentCard.front);
+    setEditBack(currentCard.back);
+    setEditNote(currentCard.notes || '');
+    setIsEditModalOpen(true);
+  };
+
+  // Guardar edición de la tarjeta en Supabase y actualizar la cola local
+  const handleSaveCardEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentCard || !editFront.trim() || !editBack.trim()) return;
+
+    setIsSavingEdit(true);
+    try {
+      const finalNotes = editNote.trim() || null;
+
+      const updated = await updateCard(currentCard.id, {
+        front: editFront.trim(),
+        back: editBack.trim(),
+        notes: finalNotes,
+      });
+
+      if (updated) {
+        setQueue((prev) =>
+          prev.map((c) =>
+            c.id === currentCard.id
+              ? { ...c, front: editFront.trim(), back: editBack.trim(), notes: finalNotes }
+              : c
+          )
+        );
+        setIsEditModalOpen(false);
+      }
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  // Abrir modal rápido exclusivo de la nota de estudio (icono bombilla)
+  const handleOpenNoteModal = () => {
+    if (!currentCard) return;
+    setQuickNoteText(currentCard.notes || '');
+    setIsNoteModalOpen(true);
+  };
+
+  // Guardar nota específica en Supabase y actualizar la cola local
+  const handleSaveQuickNote = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentCard) return;
+
+    setIsSavingQuickNote(true);
+    try {
+      const finalNote = quickNoteText.trim() || null;
+      const updated = await updateCard(currentCard.id, {
+        notes: finalNote,
+      });
+
+      if (updated) {
+        setQueue((prev) =>
+          prev.map((c) =>
+            c.id === currentCard.id ? { ...c, notes: finalNote } : c
+          )
+        );
+        setIsNoteModalOpen(false);
+      }
+    } finally {
+      setIsSavingQuickNote(false);
+    }
+  };
+
   // Atajos de teclado: Espacio/Enter para revelar, 1-4 para calificar
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (isEditModalOpen || isNoteModalOpen) return;
+
       if (
         e.target instanceof HTMLElement &&
         (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName) || e.target.isContentEditable)
@@ -192,7 +300,7 @@ export default function StudyPage({ params }: StudyPageProps) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isAnswerRevealed, handleRate]);
+  }, [isAnswerRevealed, handleRate, isEditModalOpen, isNoteModalOpen]);
 
   // Estado de carga inicial
   if (isLoading && !isInitialized) {
@@ -420,9 +528,9 @@ export default function StudyPage({ params }: StudyPageProps) {
       </div>
 
       {/* Main Isolated Card Container */}
-      <div className="flex-1 min-h-0 flex flex-col justify-between rounded-2xl sm:rounded-3xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/60 backdrop-blur-xl p-3.5 sm:p-6 md:p-8 shadow-xl shadow-neutral-200/50 dark:shadow-2xl overflow-hidden transition-all my-1.5 sm:my-3">
+      <div className="flex-1 min-h-0 flex flex-col justify-between rounded-2xl sm:rounded-3xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/60 backdrop-blur-xl p-3.5 sm:p-6 md:p-8 shadow-xl shadow-neutral-200/50 dark:shadow-2xl relative transition-all my-1.5 sm:my-3">
         {/* Card Header Information */}
-        <div className="shrink-0 flex items-center justify-between pb-2 sm:pb-3 border-b border-neutral-200 dark:border-neutral-800/60">
+        <div className="shrink-0 flex items-center justify-between pb-2 sm:pb-3 border-b border-neutral-200 dark:border-neutral-800/60 relative z-20">
           <div className="flex items-center gap-1.5 sm:gap-2">
             <span
               className={`text-[9px] sm:text-[10px] px-2 py-0.5 rounded-md uppercase tracking-wider font-semibold border ${
@@ -451,8 +559,80 @@ export default function StudyPage({ params }: StudyPageProps) {
             })()}
           </div>
 
-          <div className="text-[10px] sm:text-[11px] text-neutral-500 font-mono">
-            Reps: {currentCard?.reps ?? 0} | Lapsos: {currentCard?.lapses ?? 0} | Est.: {currentCard?.stability?.toFixed(1) ?? '0.0'}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="text-[10px] sm:text-[11px] text-neutral-500 font-mono hidden xs:inline-block">
+              Reps: {currentCard?.reps ?? 0} | Lapsos: {currentCard?.lapses ?? 0} | Est.: {currentCard?.stability?.toFixed(1) ?? '0.0'}
+            </div>
+
+            {/* Acciones de Tarjeta: Bombilla de Notas, Editar y Borrar */}
+            <div className="flex items-center gap-1 shrink-0">
+              {/* Bombilla con Tooltip / Popover nativo al hacer hover y click para abrir modal rápido */}
+              <div className="relative group">
+                <button
+                  type="button"
+                  onClick={handleOpenNoteModal}
+                  className={`p-1.5 rounded-lg transition active:scale-90 cursor-pointer flex items-center justify-center ${
+                    Boolean(currentCard?.notes && currentCard.notes.trim())
+                      ? 'text-amber-500 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 shadow-sm shadow-amber-500/10'
+                      : 'text-neutral-400 hover:text-amber-500 hover:bg-amber-500/10 dark:hover:bg-neutral-800'
+                  }`}
+                  title={
+                    currentCard?.notes && currentCard.notes.trim()
+                      ? currentCard.notes.trim()
+                      : t('study.add_note_tooltip', 'Añadir nota aclaratoria')
+                  }
+                >
+                  <Lightbulb
+                    className={`w-4 h-4 transition-transform duration-200 group-hover:scale-110 ${
+                      Boolean(currentCard?.notes && currentCard.notes.trim())
+                        ? 'fill-amber-400 text-amber-500 dark:text-amber-400 drop-shadow-[0_0_6px_rgba(245,158,11,0.5)]'
+                        : ''
+                    }`}
+                  />
+                </button>
+
+                {/* Popover / Tooltip hover enriquecido */}
+                <div className="absolute right-0 top-full mt-2 hidden group-hover:block z-50 pointer-events-none transition-all duration-150 animate-in fade-in zoom-in-95">
+                  <div className="w-64 max-w-xs p-3 rounded-xl bg-neutral-900/95 dark:bg-neutral-950/95 text-white border border-neutral-700/70 shadow-2xl backdrop-blur-md text-xs leading-relaxed space-y-1.5">
+                    <div className="flex items-center gap-1.5 font-semibold text-[11px] text-amber-400 border-b border-neutral-700/50 pb-1">
+                      <Lightbulb className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                      <span>{t('study.note_tooltip_title', 'Nota Aclaratoria')}</span>
+                    </div>
+                    {Boolean(currentCard?.notes && currentCard.notes.trim()) ? (
+                      <p className="text-neutral-200 text-[11px] max-h-36 overflow-y-auto whitespace-pre-wrap">
+                        {currentCard?.notes?.trim()}
+                      </p>
+                    ) : (
+                      <p className="text-neutral-400 text-[11px] italic">
+                        {t('study.add_note_tooltip', 'Añadir nota aclaratoria')}
+                      </p>
+                    )}
+                    <div className="pt-1 text-[10px] text-neutral-400 border-t border-neutral-800/80">
+                      {t('study.click_to_edit_note', 'Haz clic en la bombilla para editar')}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Editar tarjeta */}
+              <button
+                type="button"
+                onClick={handleOpenEditModal}
+                className="p-1.5 rounded-lg text-neutral-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition active:scale-90 cursor-pointer"
+                title={t('study.edit_card', 'Editar tarjeta')}
+              >
+                <Edit3 className="w-4 h-4" />
+              </button>
+              {/* Borrar tarjeta */}
+              <button
+                type="button"
+                onClick={handleDeleteCurrentCard}
+                className="p-1.5 rounded-lg text-neutral-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition active:scale-90 cursor-pointer"
+                title={t('study.delete_card', 'Eliminar tarjeta')}
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -462,6 +642,7 @@ export default function StudyPage({ params }: StudyPageProps) {
             <FormattedCardView
               front={currentCard.front}
               back={currentCard.back}
+              notes={currentCard.notes}
               cardFormat={
                 currentCard.cardFormat ||
                 currentCard.card_format ||
@@ -578,6 +759,191 @@ export default function StudyPage({ params }: StudyPageProps) {
           )}
         </div>
       </div>
+
+      {/* Modal de Edición de Tarjeta en Modo Estudio */}
+      {isEditModalOpen && currentCard && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/75 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-lg rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5 sm:p-6 shadow-2xl relative space-y-4 max-h-[90vh] overflow-y-auto">
+            {/* Header del Modal */}
+            <div className="flex items-center justify-between pb-3 border-b border-neutral-200 dark:border-neutral-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-sm font-bold">
+                  ✏️
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-bold text-neutral-900 dark:text-white">
+                    {t('study.edit_modal_title', 'Editar Tarjeta')}
+                  </h3>
+                  <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                    {t('study.edit_modal_sub', 'Modifica la pregunta, respuestas o añade notas aclaratorias')}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={isSavingEdit}
+                onClick={() => setIsEditModalOpen(false)}
+                className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Formulario */}
+            <form onSubmit={handleSaveCardEdit} className="space-y-4">
+              {/* Anverso / Pregunta */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">
+                  {t('study.edit_front_label', 'Anverso / Pregunta')}
+                </label>
+                <textarea
+                  rows={4}
+                  required
+                  disabled={isSavingEdit}
+                  value={editFront}
+                  onChange={(e) => setEditFront(e.target.value)}
+                  placeholder={t('study.edit_front_placeholder', 'Escribe el enunciado de la pregunta u opciones...')}
+                  className="w-full text-xs px-3.5 py-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition shadow-inner"
+                />
+              </div>
+
+              {/* Reverso / Respuesta */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">
+                  {t('study.edit_back_label', 'Reverso / Respuesta')}
+                </label>
+                <textarea
+                  rows={4}
+                  required
+                  disabled={isSavingEdit}
+                  value={editBack}
+                  onChange={(e) => setEditBack(e.target.value)}
+                  placeholder={t('study.edit_back_placeholder', 'Escribe la respuesta correcta o justificación...')}
+                  className="w-full text-xs px-3.5 py-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition shadow-inner"
+                />
+              </div>
+
+              {/* Nota Aclaratoria Opcional */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 flex items-center justify-between">
+                  <span>{t('study.edit_note_label', '💡 Añadir Nota Aclaratoria (Opcional)')}</span>
+                  <span className="text-[10px] text-neutral-400">{t('study.edit_note_hint', 'Se añadirá al final del reverso')}</span>
+                </label>
+                <input
+                  type="text"
+                  disabled={isSavingEdit}
+                  value={editNote}
+                  onChange={(e) => setEditNote(e.target.value)}
+                  placeholder={t('study.edit_note_placeholder', 'ej. Excepción vista en clase / nemotecnia...')}
+                  className="w-full text-xs px-3.5 py-2 rounded-xl bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition shadow-inner"
+                />
+              </div>
+
+              {/* Botones de Acción */}
+              <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-neutral-200 dark:border-neutral-800">
+                <button
+                  type="button"
+                  disabled={isSavingEdit}
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="px-4 py-2 text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 transition disabled:opacity-50 cursor-pointer"
+                >
+                  {t('common.cancel', 'Cancelar')}
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingEdit || !editFront.trim() || !editBack.trim()}
+                  className="inline-flex items-center gap-2 px-5 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 rounded-xl transition shadow-md shadow-indigo-600/25 active:scale-95 disabled:opacity-50 cursor-pointer"
+                >
+                  {isSavingEdit ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>{t('study.saving_edit', 'Guardando...')}</span>
+                    </>
+                  ) : (
+                    <span>{t('study.save_changes', 'Guardar cambios')}</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Rápido de Nota de Estudio (Bombilla) */}
+      {isNoteModalOpen && currentCard && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/75 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-md rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5 sm:p-6 shadow-2xl relative space-y-4 animate-in zoom-in-95">
+            {/* Header del Modal */}
+            <div className="flex items-center justify-between pb-3 border-b border-neutral-200 dark:border-neutral-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-500 flex items-center justify-center">
+                  <Lightbulb className="w-4 h-4 fill-amber-400 text-amber-500" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-bold text-neutral-900 dark:text-white">
+                    {t('study.note_modal_title', 'Nota de Estudio')}
+                  </h3>
+                  <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                    {t('study.note_modal_sub', 'Aparecerá al pasar el cursor sobre la bombilla durante el repaso')}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={isSavingQuickNote}
+                onClick={() => setIsNoteModalOpen(false)}
+                className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Formulario de la Nota */}
+            <form onSubmit={handleSaveQuickNote} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">
+                  {t('study.note_content_label', 'Contenido de la nota')}
+                </label>
+                <textarea
+                  rows={5}
+                  autoFocus
+                  disabled={isSavingQuickNote}
+                  value={quickNoteText}
+                  onChange={(e) => setQuickNoteText(e.target.value)}
+                  placeholder={t('study.note_content_placeholder', 'Escribe aquí tu aclaración, nemotecnia, regla clínica o detalle a recordar...')}
+                  className="w-full text-xs px-3.5 py-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition shadow-inner leading-relaxed"
+                />
+              </div>
+
+              {/* Botones de Acción */}
+              <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-neutral-200 dark:border-neutral-800">
+                <button
+                  type="button"
+                  disabled={isSavingQuickNote}
+                  onClick={() => setIsNoteModalOpen(false)}
+                  className="px-4 py-2 text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 transition disabled:opacity-50 cursor-pointer"
+                >
+                  {t('common.cancel', 'Cancelar')}
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingQuickNote}
+                  className="inline-flex items-center gap-2 px-5 py-2 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-500 rounded-xl transition shadow-md shadow-amber-600/25 active:scale-95 disabled:opacity-50 cursor-pointer"
+                >
+                  {isSavingQuickNote ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>{t('study.saving_edit', 'Guardando...')}</span>
+                    </>
+                  ) : (
+                    <span>{t('study.save_note_btn', 'Guardar nota')}</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

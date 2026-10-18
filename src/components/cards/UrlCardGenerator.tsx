@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuthStore, useCardStore, useDeckStore, useProModalStore, useLanguageStore } from '@/stores';
 import { generateCardsFromUrlAction } from '@/app/actions/generateCards';
 import type { CardFormat, GeneratedCard } from '@/types/cards';
@@ -10,9 +10,17 @@ interface UrlCardGeneratorProps {
   deckId: string;
   onSuccess?: (cardsCount: number) => void;
   onCancel?: () => void;
+  initialMeticulousPhase?: boolean;
+  onMeticulousChange?: (val: boolean) => void;
 }
 
-export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGeneratorProps) {
+export function UrlCardGenerator({
+  deckId,
+  onSuccess,
+  onCancel,
+  initialMeticulousPhase,
+  onMeticulousChange,
+}: UrlCardGeneratorProps) {
   const { user } = useAuthStore();
   const { cards, createCard, fetchCardsByDeck } = useCardStore();
   const { fetchDeckById } = useDeckStore();
@@ -30,7 +38,18 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successCount, setSuccessCount] = useState<number>(0);
   const [coreExhausted, setCoreExhausted] = useState<boolean>(false);
+  const [isMeticulousPhase, setIsMeticulousPhase] = useState<boolean>(
+    () => Boolean(initialMeticulousPhase) || cards.length >= 30
+  );
   const [generatedCardsPreview, setGeneratedCardsPreview] = useState<GeneratedCard[]>([]);
+  const [materialExhaustedNotice, setMaterialExhaustedNotice] = useState<{ generated: number; requested: number } | null>(null);
+
+  // Sincronizar fase minuciosa si el mazo ya cuenta con 30 o más tarjetas o viene activo por prop
+  useEffect(() => {
+    if (cards.length >= 30 || initialMeticulousPhase) {
+      setIsMeticulousPhase(true);
+    }
+  }, [cards.length, initialMeticulousPhase]);
 
   // Detectar dinámicamente si es YouTube o URL web
   const trimmedUrl = url.trim().toLowerCase();
@@ -114,6 +133,28 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
         }
       }
 
+      // FASE 2: Notificación si el contenido no tenía suficientes conceptos únicos
+      if (result.cards.length < cardCount) {
+        setMaterialExhaustedNotice({
+          generated: result.cards.length,
+          requested: cardCount,
+        });
+      } else {
+        setMaterialExhaustedNotice(null);
+      }
+
+      const isExhausted =
+        Boolean(result.core_exhausted) ||
+        result.cards.length < cardCount ||
+        cards.length + result.cards.length >= 30;
+
+      if (isExhausted) {
+        setIsMeticulousPhase(true);
+        if (onMeticulousChange) {
+          onMeticulousChange(true);
+        }
+      }
+      setCoreExhausted(isExhausted);
       setSuccessCount(savedCount);
       setStatus('success');
 
@@ -137,8 +178,8 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
     setStatus('idle');
     setErrorMessage(null);
     setSuccessCount(0);
-    setCoreExhausted(false);
     setGeneratedCardsPreview([]);
+    // Conservar isMeticulousPhase fijo una vez alcanzada la fase minuciosa o material agotado
   };
 
   const isBusy = status === 'analyzing' || status === 'saving';
@@ -200,8 +241,23 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
             </button>
           </div>
 
-          {/* Banner de Temas Troncales Agotados */}
-          {coreExhausted && (
+          {/* FASE 2: Notificación de Límite de Material Agotado */}
+          {materialExhaustedNotice && (
+            <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/40 text-amber-800 dark:text-amber-200 text-xs sm:text-sm flex items-start gap-3 shadow-lg shadow-amber-950/20 animate-in fade-in">
+              <span className="text-xl shrink-0 mt-0.5">⚠️</span>
+              <p className="text-neutral-700 dark:text-neutral-300 text-xs leading-relaxed font-medium">
+                {t(
+                  'deck_detail.material_exhausted',
+                  'Material agotado: Se han generado {count} tarjetas. El texto no contenía más conceptos únicos para alcanzar las {requested} solicitadas.'
+                )
+                  .replace('{count}', String(materialExhaustedNotice.generated))
+                  .replace('{requested}', String(materialExhaustedNotice.requested))}
+              </p>
+            </div>
+          )}
+
+          {/* Banner de Temas Troncales Agotados / Radar de Profundidad */}
+          {(isMeticulousPhase || coreExhausted) && (
             <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-200 text-xs sm:text-sm flex items-start gap-3 shadow-lg shadow-amber-950/20">
               <span className="text-xl shrink-0 mt-0.5">🎯</span>
               <div className="space-y-1">
@@ -469,6 +525,21 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
             </div>
           </div>
 
+          {/* Banner Persistente de Fase Minuciosa si ya está activa */}
+          {isMeticulousPhase && (
+            <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-200 text-xs sm:text-sm flex items-start gap-3 shadow-sm">
+              <span className="text-xl shrink-0 mt-0.5">🎯</span>
+              <div className="space-y-0.5">
+                <h5 className="font-semibold text-amber-700 dark:text-amber-300">
+                  {t('url_generator.core_covered_title', 'Conceptos troncales principales cubiertos')}
+                </h5>
+                <p className="text-neutral-700 dark:text-neutral-300 text-xs leading-relaxed">
+                  {t('url_generator.core_covered_desc', 'Gemini ha cubierto las ideas y conceptos esenciales de este enlace. Si solicitas otro lote, la IA profundizará en detalles secundarios, matices avanzados y casos específicos.')}
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Estado de carga / Progreso */}
           {isBusy && (
             <div className="p-4 rounded-xl bg-neutral-50 dark:bg-neutral-950 border border-rose-500/30 space-y-2.5 animate-pulse">
@@ -500,7 +571,11 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
             <button
               type="submit"
               disabled={isBusy || !url.trim()}
-              className="px-6 py-2.5 rounded-xl text-xs font-semibold bg-gradient-to-r from-rose-600 via-rose-500 to-indigo-600 hover:from-rose-500 hover:to-indigo-500 text-white transition shadow-lg shadow-rose-950/40 disabled:opacity-50 flex items-center gap-2"
+              className={`px-6 py-2.5 rounded-xl text-xs font-semibold ${
+                isMeticulousPhase
+                  ? 'bg-gradient-to-r from-amber-600 via-rose-500 to-indigo-600 hover:from-amber-500 hover:to-indigo-500 shadow-amber-950/30'
+                  : 'bg-gradient-to-r from-rose-600 via-rose-500 to-indigo-600 hover:from-rose-500 hover:to-indigo-500 shadow-rose-950/40'
+              } text-white transition shadow-lg disabled:opacity-50 flex items-center gap-2`}
             >
               {isBusy ? (
                 <>
@@ -512,7 +587,11 @@ export function UrlCardGenerator({ deckId, onSuccess, onCancel }: UrlCardGenerat
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                   </svg>
-                  <span>{t('url_generator.generate_btn', 'Generar {count} Tarjetas desde Enlace').replace('{count}', String(cardCount))}</span>
+                  <span>
+                    {isMeticulousPhase
+                      ? t('url_generator.generate_meticulous_btn', 'Generar tarjetas detalladas desde enlace (hasta {count})').replace('{count}', String(cardCount))
+                      : t('url_generator.generate_btn', 'Generar hasta {count} tarjetas desde enlace').replace('{count}', String(cardCount))}
+                  </span>
                 </>
               )}
             </button>

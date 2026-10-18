@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore, useCardStore, useDeckStore, useProModalStore, useLanguageStore } from '@/stores';
 import { generateCardsFromDocumentAction } from '@/app/actions/generateCards';
@@ -12,6 +12,8 @@ interface DocumentUploaderProps {
   onSuccess?: (cardsCount: number) => void;
   onCancel?: () => void;
   onSwitchToUrl?: () => void;
+  initialMeticulousPhase?: boolean;
+  onMeticulousChange?: (val: boolean) => void;
 }
 
 type FileTypeCategory = 'pdf' | 'docx' | 'audio' | 'text';
@@ -119,6 +121,8 @@ export function DocumentUploader({
   onSuccess,
   onCancel,
   onSwitchToUrl,
+  initialMeticulousPhase,
+  onMeticulousChange,
 }: DocumentUploaderProps) {
   const { user } = useAuthStore();
   const { cards, createCard, fetchCardsByDeck } = useCardStore();
@@ -139,7 +143,18 @@ export function DocumentUploader({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successCount, setSuccessCount] = useState<number>(0);
   const [coreExhausted, setCoreExhausted] = useState<boolean>(false);
+  const [isMeticulousPhase, setIsMeticulousPhase] = useState<boolean>(
+    () => Boolean(initialMeticulousPhase) || cards.length >= 30
+  );
   const [generatedCardsPreview, setGeneratedCardsPreview] = useState<GeneratedCard[]>([]);
+  const [materialExhaustedNotice, setMaterialExhaustedNotice] = useState<{ generated: number; requested: number } | null>(null);
+
+  // Sincronizar fase minuciosa si el mazo ya cuenta con 30 o más tarjetas o viene activo por prop
+  useEffect(() => {
+    if (cards.length >= 30 || initialMeticulousPhase) {
+      setIsMeticulousPhase(true);
+    }
+  }, [cards.length, initialMeticulousPhase]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -296,8 +311,29 @@ export function DocumentUploader({
       await fetchCardsByDeck(deckId);
       await fetchDeckById(deckId);
 
+      // FASE 2: Notificación si el texto se agotó antes de alcanzar el tope solicitado
+      if (generatedCards.length < cardCount) {
+        setMaterialExhaustedNotice({
+          generated: generatedCards.length,
+          requested: cardCount,
+        });
+      } else {
+        setMaterialExhaustedNotice(null);
+      }
+
+      const isExhausted =
+        Boolean(result.core_exhausted) ||
+        generatedCards.length < cardCount ||
+        cards.length + generatedCards.length >= 30;
+
+      if (isExhausted) {
+        setIsMeticulousPhase(true);
+        if (onMeticulousChange) {
+          onMeticulousChange(true);
+        }
+      }
+      setCoreExhausted(isExhausted);
       setSuccessCount(generatedCards.length);
-      setCoreExhausted(Boolean(result.core_exhausted));
       setStatus('success');
 
       if (onSuccess) {
@@ -315,8 +351,8 @@ export function DocumentUploader({
     setSelectedFile(null);
     setStatus('idle');
     setErrorMessage(null);
-    setCoreExhausted(false);
     setGeneratedCardsPreview([]);
+    // Conservar isMeticulousPhase fijo una vez alcanzada la fase minuciosa o material agotado
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -368,8 +404,23 @@ export function DocumentUploader({
               {t('ai_uploader.success_title', '¡{count} Tarjetas Generadas y Guardadas!').replace('{count}', String(successCount))}
             </h3>
 
+            {/* FASE 2: Notificación si el texto no contenía más conceptos únicos */}
+            {materialExhaustedNotice && (
+              <div className="mt-3 p-3.5 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-200 text-xs text-left flex items-start gap-2.5 max-w-md mx-auto shadow-md animate-in fade-in">
+                <span className="text-base shrink-0">⚠️</span>
+                <p className="leading-relaxed font-medium">
+                  {t(
+                    'deck_detail.material_exhausted',
+                    'Material agotado: Se han generado {count} tarjetas. El texto no contenía más conceptos únicos para alcanzar las {requested} solicitadas.'
+                  )
+                    .replace('{count}', String(materialExhaustedNotice.generated))
+                    .replace('{requested}', String(materialExhaustedNotice.requested))}
+                </p>
+              </div>
+            )}
+
             {/* Banner de Feedback de Continuidad / Radar de Profundidad */}
-            {coreExhausted ? (
+            {(isMeticulousPhase || coreExhausted) ? (
               <div className="mt-3 p-3.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-200 text-xs text-left flex items-start gap-2.5 max-w-md mx-auto shadow-sm">
                 <span className="text-base shrink-0">🎯</span>
                 <p className="leading-relaxed">
@@ -414,12 +465,20 @@ export function DocumentUploader({
                 setStatus('idle');
                 handleProcessDocument();
               }}
-              className="px-4 py-2.5 text-xs rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-medium shadow-md shadow-violet-600/30 transition flex items-center gap-1.5 active:scale-95"
+              className={`px-4 py-2.5 text-xs rounded-xl ${
+                isMeticulousPhase
+                  ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-indigo-600 hover:from-amber-500 hover:to-indigo-500 shadow-amber-600/30'
+                  : 'bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 shadow-violet-600/30'
+              } text-white font-medium shadow-md transition flex items-center gap-1.5 active:scale-95`}
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
-              <span>{t('ai_uploader.next_block_btn', 'Generar siguiente bloque ({count} tarjetas)').replace('{count}', String(cardCount))}</span>
+              <span>
+                {isMeticulousPhase
+                  ? t('ai_uploader.next_block_meticulous_btn', 'Generar tarjetas detalladas ({count})').replace('{count}', String(cardCount))
+                  : t('ai_uploader.next_block_btn', 'Generar siguiente bloque ({count} tarjetas)').replace('{count}', String(cardCount))}
+              </span>
             </button>
             <button
               onClick={handleReset}
@@ -718,13 +777,33 @@ export function DocumentUploader({
                 />
               </div>
 
-              {/* Mensaje de ayuda visualmente atractivo (hint/banner) */}
-              <div className="p-2.5 rounded-lg bg-violet-50 dark:bg-violet-500/10 border border-violet-200 dark:border-violet-500/20 text-[11px] text-violet-800 dark:text-violet-200/90 flex items-start gap-2 leading-relaxed">
-                <span className="shrink-0 text-sm">💡</span>
-                <span>
-                  {t('deck_detail.batch_hint', 'Generamos por lotes para evitar saturación. Puedes pedir varios lotes seguidos del mismo documento: nuestra IA analiza tu mazo y extraerá conceptos 100% nuevos sin repetir preguntas anteriores.')}
-                </span>
-              </div>
+              {/* Mensaje de ayuda visualmente atractivo o banner de fase minuciosa si ya está activa */}
+              {isMeticulousPhase ? (
+                <div className="p-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-800 dark:text-amber-200 text-xs leading-relaxed flex items-start gap-2.5 shadow-sm">
+                  <span className="text-base shrink-0">🎯</span>
+                  <div className="flex-1">
+                    <p className="leading-relaxed">
+                      <strong className="font-semibold text-amber-700 dark:text-amber-300">
+                        {t('deck_detail.theory_covered_title', 'Teoría principal cubierta.')}
+                      </strong>{' '}
+                      {t(
+                        'deck_detail.theory_covered_desc',
+                        'Se han extraído los conceptos troncales. Si continúas generando, la IA rebuscará detalles minuciosos, datos estadísticos y excepciones del texto para un estudio de máxima profundidad.'
+                      )}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-2.5 rounded-lg bg-violet-50 dark:bg-violet-500/10 border border-violet-200 dark:border-violet-500/20 text-[11px] text-violet-800 dark:text-violet-200/90 flex items-start gap-2 leading-relaxed">
+                  <span className="shrink-0 text-sm">💡</span>
+                  <span>
+                    {t(
+                      'deck_detail.batch_hint',
+                      'Generamos por lotes para evitar saturación. Puedes pedir varios lotes seguidos del mismo documento: nuestra IA analiza tu mazo y extraerá conceptos 100% nuevos sin repetir preguntas anteriores.'
+                    )}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -768,7 +847,11 @@ export function DocumentUploader({
                   type="button"
                   disabled={isBusy || !selectedFile}
                   onClick={handleProcessDocument}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 disabled:opacity-50 text-white font-medium text-xs sm:text-sm transition-all duration-150 shadow-lg shadow-violet-600/25 active:scale-95 cursor-pointer"
+                  className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl ${
+                    isMeticulousPhase
+                      ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-indigo-600 hover:from-amber-500 hover:to-indigo-500 shadow-amber-600/25'
+                      : 'bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 shadow-violet-600/25'
+                  } disabled:opacity-50 text-white font-medium text-xs sm:text-sm transition-all duration-150 shadow-lg active:scale-95 cursor-pointer`}
                 >
                   {isBusy ? (
                     <>
@@ -780,7 +863,11 @@ export function DocumentUploader({
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                       </svg>
-                      <span>{t('ai_uploader.process_file', 'Generar {count} Tarjetas ({format})').replace('{count}', String(cardCount)).replace('{format}', cardFormat)}</span>
+                      <span>
+                        {isMeticulousPhase
+                          ? t('ai_uploader.process_file_meticulous', 'Generar tarjetas detalladas (hasta {count})').replace('{count}', String(cardCount))
+                          : t('ai_uploader.process_file', 'Generar hasta {count} tarjetas').replace('{count}', String(cardCount))}
+                      </span>
                     </>
                   )}
                 </button>

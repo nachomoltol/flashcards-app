@@ -23,6 +23,10 @@ interface CardState {
     cardFormat?: CardFormat
   ) => Promise<CardRow | null>;
   deleteCard: (cardId: string) => Promise<boolean>;
+  updateCard: (
+    cardId: string,
+    updates: Partial<Pick<CardRow, 'front' | 'back' | 'card_format' | 'cardFormat' | 'card_type' | 'notes'>>
+  ) => Promise<CardRow | null>;
   recordReview: (
     card: CardRow,
     rating: FSRSRating
@@ -124,6 +128,30 @@ export const useCardStore = create<CardState>((set) => ({
       console.error('Error deleting card:', err);
       set({ error: message });
       return false;
+    }
+  },
+
+  updateCard: async (cardId, updates) => {
+    try {
+      const { data, error } = await supabase
+        .from('cards')
+        .update(updates)
+        .eq('id', cardId)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      set((state) => ({
+        cards: state.cards.map((c) => (c.id === cardId ? data : c)),
+      }));
+
+      return data;
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Error al actualizar la tarjeta';
+      console.error('Error updating card:', err);
+      set({ error: message });
+      return null;
     }
   },
 

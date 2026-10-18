@@ -3,11 +3,12 @@
 import React, { useState, useEffect } from 'react';
 import type { CardFormat } from '@/types/database';
 import { useLanguageStore } from '@/stores';
-import { Volume2, Check, X } from 'lucide-react';
+import { Volume2, Check, X, Lightbulb } from 'lucide-react';
 
 export interface FormattedCardViewProps {
   front: string;
   back: string;
+  notes?: string | null;
   cardFormat?: CardFormat | string;
   isRevealed?: boolean;
   interactive?: boolean; // Permite al usuario seleccionar opciones durante el estudio
@@ -179,6 +180,7 @@ function renderMarkdownBold(text: string) {
 export function FormattedCardView({
   front,
   back,
+  notes,
   cardFormat = 'basic',
   isRevealed = false,
   interactive = true,
@@ -454,6 +456,18 @@ export function FormattedCardView({
           <div className="text-sm sm:text-base md:text-lg text-neutral-800 dark:text-neutral-200 leading-relaxed whitespace-pre-wrap bg-neutral-50 dark:bg-neutral-950/60 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-neutral-200 dark:border-neutral-800/90 shadow-inner">
             {renderMarkdownBold(back)}
           </div>
+
+          {notes && notes.trim() && (
+            <div className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-500/10 dark:bg-amber-950/20 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-xs sm:text-sm">
+              <Lightbulb className="w-4 h-4 text-amber-500 shrink-0 mt-0.5 fill-amber-400" />
+              <div className="flex-1 whitespace-pre-wrap">
+                <span className="font-semibold block text-[11px] uppercase tracking-wider text-amber-600 dark:text-amber-400 mb-0.5">
+                  {t('study.note_tooltip_title', 'Nota Aclaratoria')}
+                </span>
+                {notes.trim()}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

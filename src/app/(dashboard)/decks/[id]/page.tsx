@@ -1,7 +1,8 @@
 'use client';
 
-import { use, useEffect, useState } from 'react';
+import { use, useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
+import { Search, X } from 'lucide-react';
 import { useDeckStore, useCardStore, useProModalStore, useAuthStore, useLanguageStore } from '@/stores';
 import { CardEditor, DocumentUploader, FormattedCardView, UrlCardGenerator } from '@/components/cards';
 import { ShareDeckModal } from '@/components/decks';
@@ -22,6 +23,9 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
   const { user } = useAuthStore();
   const { language, t } = useLanguageStore();
 
+  // Estado para el buscador de tarjetas en el mazo
+  const [searchQuery, setSearchQuery] = useState('');
+
   // Estado para el modal de Generación con IA (Gemini Flash)
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [aiMode, setAiMode] = useState<'multimodal' | 'url' | 'topic'>('multimodal');
@@ -32,6 +36,14 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
   const [aiError, setAiError] = useState<string | null>(null);
   const [aiSuccessMessage, setAiSuccessMessage] = useState<string | null>(null);
   const [aiCoreExhausted, setAiCoreExhausted] = useState<boolean>(false);
+  const [isMeticulousPhase, setIsMeticulousPhase] = useState<boolean>(() => cards.length >= 30);
+
+  // Sincronizar fase minuciosa si el mazo ya cuenta con 30 o más tarjetas existentes
+  useEffect(() => {
+    if (cards.length >= 30) {
+      setIsMeticulousPhase(true);
+    }
+  }, [cards.length]);
 
   // Estado para el modal de Compartir Mazo
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
@@ -50,6 +62,17 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
       fetchDeckById(id);
     }
   };
+
+  // Filtrar dinámicamente el array de tarjetas por pregunta o respuesta
+  const filteredCards = useMemo(() => {
+    if (!searchQuery.trim()) return cards;
+    const q = searchQuery.toLowerCase().trim();
+    return cards.filter((card) => {
+      const matchFront = card.front ? card.front.toLowerCase().includes(q) : false;
+      const matchBack = card.back ? card.back.toLowerCase().includes(q) : false;
+      return matchFront || matchBack;
+    });
+  }, [cards, searchQuery]);
 
   const handleCardCreated = () => {
     fetchDeckById(id);
@@ -100,9 +123,26 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
       await fetchCardsByDeck(id);
       await fetchDeckById(id);
 
-      const isExhausted = Boolean(result.core_exhausted);
-      setAiCoreExhausted(isExhausted);
+      const isExhausted =
+        Boolean(result.core_exhausted) ||
+        result.cards.length < aiCardCount ||
+        cards.length + result.cards.length >= 30;
+
       if (isExhausted) {
+        setIsMeticulousPhase(true);
+      }
+      setAiCoreExhausted(isExhausted);
+
+      if (result.cards.length < aiCardCount) {
+        setAiSuccessMessage(
+          t(
+            'deck_detail.material_exhausted',
+            'Material agotado: Se han generado {count} tarjetas. El texto no contenía más conceptos únicos para alcanzar las {requested} solicitadas.'
+          )
+            .replace('{count}', String(result.cards.length))
+            .replace('{requested}', String(aiCardCount))
+        );
+      } else if (isExhausted || isMeticulousPhase) {
         setAiSuccessMessage(t('deck_detail.theory_covered_desc'));
       } else {
         setAiSuccessMessage(t('deck_detail.cards_added_desc'));
@@ -288,13 +328,39 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
 
         {/* Separador 2: Tarjetas en este mazo */}
         <div className="space-y-4 pt-1">
-          <div className="flex items-center justify-between pb-3 border-b border-neutral-200 dark:border-neutral-800/80">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-neutral-200 dark:border-neutral-800/80">
             <h2 className="text-base sm:text-lg font-bold text-neutral-900 dark:text-white tracking-tight flex items-center gap-2.5">
               <span>🃏 {t('deck_detail.cards_in_deck_title', 'Tarjetas en este mazo')}</span>
               <span className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-500/15 border border-indigo-500/30 text-indigo-700 dark:text-indigo-300 font-mono font-medium">
-                {cards.length}
+                {searchQuery.trim() ? `${filteredCards.length} / ${cards.length}` : cards.length}
               </span>
             </h2>
+
+            {/* Barra de Búsqueda Dinámica */}
+            {cards.length > 0 && (
+              <div className="relative w-full sm:w-72">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-neutral-400 dark:text-neutral-500">
+                  <Search className="w-4 h-4" />
+                </div>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={t('deck_detail.search_cards_placeholder', 'Buscar por pregunta o respuesta...')}
+                  className="w-full pl-9 pr-8 py-2 rounded-xl text-xs bg-neutral-100/80 dark:bg-neutral-800/60 border border-neutral-200 dark:border-neutral-700/70 text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition shadow-sm"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 cursor-pointer"
+                    title={t('common.clear', 'Limpiar')}
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {cardsLoading && cards.length === 0 ? (
@@ -337,10 +403,24 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                 {t('deck_detail.upload_multimodal_btn')}
               </button>
             </div>
+          ) : filteredCards.length === 0 ? (
+            /* No search results */
+            <div className="rounded-2xl border border-dashed border-neutral-300 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/20 p-8 text-center space-y-3">
+              <p className="text-xs text-neutral-600 dark:text-neutral-400">
+                {t('deck_detail.no_search_results', 'No se encontraron tarjetas que coincidan con')} &ldquo;<strong>{searchQuery}</strong>&rdquo;
+              </p>
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="px-3.5 py-1.5 rounded-xl text-xs font-medium text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 transition cursor-pointer"
+              >
+                {t('deck_detail.clear_search', 'Limpiar búsqueda')}
+              </button>
+            </div>
           ) : (
             /* Cards List with FormattedCardView Rendering */
             <div className="space-y-4">
-              {cards.map((card, index) => {
+              {filteredCards.map((card, index) => {
                 const fmt =
                   card.cardFormat ||
                   card.card_format ||
@@ -483,7 +563,6 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                   setAiMode('url');
                   setAiError(null);
                   setAiSuccessMessage(null);
-                  setAiCoreExhausted(false);
                 }}
                 className={`py-2 px-3 rounded-lg font-medium transition flex items-center justify-center gap-2 cursor-pointer ${
                   aiMode === 'url'
@@ -502,7 +581,6 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                   setAiMode('topic');
                   setAiError(null);
                   setAiSuccessMessage(null);
-                  setAiCoreExhausted(false);
                 }}
                 className={`py-2 px-3 rounded-lg font-medium transition flex items-center justify-center gap-2 cursor-pointer ${
                   aiMode === 'topic'
@@ -521,6 +599,8 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
             {aiMode === 'multimodal' ? (
               <DocumentUploader
                 deckId={id}
+                initialMeticulousPhase={isMeticulousPhase}
+                onMeticulousChange={setIsMeticulousPhase}
                 onSuccess={() => {
                   fetchDeckById(id);
                 }}
@@ -530,6 +610,8 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
             ) : aiMode === 'url' ? (
               <UrlCardGenerator
                 deckId={id}
+                initialMeticulousPhase={isMeticulousPhase}
+                onMeticulousChange={setIsMeticulousPhase}
                 onSuccess={() => {
                   fetchDeckById(id);
                 }}
@@ -542,6 +624,18 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                   {t('deck_detail.topic_desc', { count: aiCardCount })}
                 </p>
 
+                {/* Banner Persistente de Fase Minuciosa si ya está activa */}
+                {isMeticulousPhase && !aiSuccessMessage && (
+                  <div className="p-3.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-800 dark:text-amber-200 text-xs leading-relaxed flex items-start gap-2.5 shadow-sm">
+                    <span className="text-base shrink-0">🎯</span>
+                    <div className="flex-1">
+                      <p className="leading-relaxed">
+                        <strong className="font-semibold text-amber-700 dark:text-amber-300">{t('deck_detail.theory_covered_title')}</strong> {t('deck_detail.theory_covered_desc')}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 {aiError && (
                   <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-500 dark:text-rose-300 text-xs leading-relaxed">
                     {aiError}
@@ -549,7 +643,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                 )}
 
                 {aiSuccessMessage && (
-                  aiCoreExhausted ? (
+                  (isMeticulousPhase || aiCoreExhausted) ? (
                     <div className="p-3.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-800 dark:text-amber-200 text-xs leading-relaxed flex items-start gap-2.5 shadow-sm">
                       <span className="text-base shrink-0">🎯</span>
                       <div className="flex-1">
@@ -632,13 +726,15 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                     </div>
                   </div>
 
-                  {/* Mensaje de ayuda visualmente atractivo (hint/banner) */}
-                  <div className="p-2.5 rounded-lg bg-violet-50 dark:bg-violet-500/10 border border-violet-200 dark:border-violet-500/20 text-[11px] text-violet-800 dark:text-violet-200/90 flex items-start gap-2 leading-relaxed">
-                    <span className="shrink-0 text-sm">💡</span>
-                    <span>
-                      {t('deck_detail.batch_hint')}
-                    </span>
-                  </div>
+                  {/* Mensaje de ayuda visualmente atractivo cuando aún no está en fase minuciosa */}
+                  {!isMeticulousPhase && (
+                    <div className="p-2.5 rounded-lg bg-violet-50 dark:bg-violet-500/10 border border-violet-200 dark:border-violet-500/20 text-[11px] text-violet-800 dark:text-violet-200/90 flex items-start gap-2 leading-relaxed">
+                      <span className="shrink-0 text-sm">💡</span>
+                      <span>
+                        {t('deck_detail.batch_hint')}
+                      </span>
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1.5">
@@ -667,7 +763,11 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                     <button
                       type="submit"
                       disabled={isGenerating || !aiTopic.trim()}
-                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 disabled:opacity-50 text-white font-medium text-xs sm:text-sm transition-all duration-150 shadow-lg shadow-violet-600/25 active:scale-95 cursor-pointer"
+                      className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl ${
+                        isMeticulousPhase
+                          ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-indigo-600 hover:from-amber-500 hover:to-indigo-500 shadow-amber-600/25'
+                          : 'bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 shadow-violet-600/25'
+                      } disabled:opacity-50 text-white font-medium text-xs sm:text-sm transition-all duration-150 shadow-lg active:scale-95 cursor-pointer`}
                     >
                       {isGenerating ? (
                         <>
@@ -679,7 +779,11 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                           </svg>
-                          <span>{t('deck_detail.generate_btn', { count: aiCardCount, format: aiCardFormat })}</span>
+                          <span>
+                            {isMeticulousPhase
+                              ? t('deck_detail.generate_meticulous_btn', 'Generar tarjetas detalladas (hasta {count})').replace('{count}', String(aiCardCount))
+                              : t('deck_detail.generate_btn', 'Generar hasta {count} tarjetas').replace('{count}', String(aiCardCount))}
+                          </span>
                         </>
                       )}
                     </button>
