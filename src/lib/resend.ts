@@ -8,9 +8,9 @@ export const resend = new Resend(process.env.RESEND_API_KEY || 're_placeholder_f
 export const RESEND_FROM_EMAIL =
   process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
 
-// Destinatario oficial del equipo de soporte
+// Destinatario oficial del equipo de soporte de Flashmente
 export const ADMIN_FEEDBACK_EMAIL =
-  process.env.ADMIN_FEEDBACK_EMAIL || 'migarecetasredes@gmail.com';
+  process.env.ADMIN_FEEDBACK_EMAIL || 'support@flashmente.com';
 
 // Alias para mantener compatibilidad con imports existentes
 export const DEFAULT_FROM_EMAIL = RESEND_FROM_EMAIL;

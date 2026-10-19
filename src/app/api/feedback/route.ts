@@ -184,15 +184,15 @@ export async function POST(req: NextRequest) {
     }
 
     // 5. Configuración estricta de destinatario, remitente y cabeceras anti-spoofing
-    // - to: Estrictamente y únicamente migarecetasredes@gmail.com
+    // - to: Correo oficial del equipo de soporte de Flashmente
     // - from: Correo de sistema verificado (onboarding@resend.dev o dominio verificado configurado)
     // - reply_to: Correo del usuario logueado (userEmail) para respuesta directa en un clic
-    const toEmail = process.env.ADMIN_FEEDBACK_EMAIL || ADMIN_FEEDBACK_EMAIL || 'migarecetasredes@gmail.com';
+    const toEmail = process.env.ADMIN_FEEDBACK_EMAIL || ADMIN_FEEDBACK_EMAIL || 'support@flashmente.com';
     const fromEmail = process.env.RESEND_FROM_EMAIL || RESEND_FROM_EMAIL || 'onboarding@resend.dev';
     const replyToAddress = userEmail;
 
-    // Asunto estricto requerido: "[Soporte Miga] - {Categoría} - {Correo del Usuario}"
-    const emailSubject = `[Soporte Miga] - ${subject} - ${userEmail}`;
+    // Asunto estandarizado de soporte Flashmente
+    const emailSubject = `[Soporte Flashmente] - ${subject} - ${userEmail}`;
 
     const now = new Date();
     const formattedDate = new Intl.DateTimeFormat('es-ES', {
@@ -214,7 +214,7 @@ export async function POST(req: NextRequest) {
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <title>Soporte Miga - Nuevo Ticket</title>
+  <title>Soporte Flashmente - Nuevo Ticket</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body style="margin: 0; padding: 0; background-color: #0c0a09; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #f4f4f5; -webkit-font-smoothing: antialiased;">
@@ -224,14 +224,14 @@ export async function POST(req: NextRequest) {
         <!-- Contenedor Principal Dark Mode -->
         <table role="presentation" width="100%" style="max-width: 600px; background-color: #171717; border-radius: 16px; border: 1px solid #262626; overflow: hidden; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);">
           
-          <!-- Encabezado con degradado moderno -->
+          <!-- Encabezado con degradado moderno de Flashmente -->
           <tr>
             <td style="background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%); padding: 28px 32px; text-align: left;">
               <table role="presentation" width="100%">
                 <tr>
                   <td>
                     <span style="font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #e9d5ff; display: inline-block; margin-bottom: 6px;">
-                      SOPORTE MIGA • NUEVO TICKET RECIBIDO
+                      FLASHMENTE • NUEVO TICKET DE SOPORTE
                     </span>
                     <h1 style="margin: 0; font-size: 22px; font-weight: 800; color: #ffffff; letter-spacing: -0.5px;">
                       ${sanitizedSubject}
@@ -323,7 +323,7 @@ export async function POST(req: NextRequest) {
         <table role="presentation" width="100%" style="max-width: 600px; margin-top: 16px;">
           <tr>
             <td style="text-align: center; font-size: 11px; color: #52525b;">
-              [Soporte Miga] • Módulo de Feedback y Soporte • Resend API
+              Flashmente • Módulo de Feedback y Soporte • Resend API
             </td>
           </tr>
         </table>
@@ -337,7 +337,7 @@ export async function POST(req: NextRequest) {
 
     // Versión en texto plano para clientes de correo sin renderizado HTML
     const textEmail = `
-[SOPORTE MIGA]
+[FLASHMENTE - SOPORTE Y FEEDBACK]
 Asunto / Categoría: ${subject}
 De: ${userEmail} (${userName})
 Fecha: ${formattedDate}
