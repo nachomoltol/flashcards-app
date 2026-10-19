@@ -3,8 +3,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { useDeckStore, useAuthStore, useStreakStore, useLanguageStore, type DeckWithStats } from '@/stores';
+import { useDeckStore, useAuthStore, useStreakStore, useLanguageStore, useAtlasStore, type DeckWithStats } from '@/stores';
 import { ShareDeckModal } from './ShareDeckModal';
+import { NewMenuDropdown } from '@/components/ui/NewMenuDropdown';
 import {
   ChevronLeft,
   ChevronDown,
@@ -18,6 +19,7 @@ import {
   Settings,
   Check,
   Play,
+  Map,
 } from 'lucide-react';
 
 const COLOR_PALETTE = [
@@ -105,6 +107,7 @@ function DecksViewContent() {
   const searchParams = useSearchParams();
   const { user, isLoading: authLoading } = useAuthStore();
   const { decks, isLoading, error, fetchDecks, createDeck, deleteDeck, updateDeck, moveDeck } = useDeckStore();
+  const { atlasItems, fetchAtlasItems } = useAtlasStore();
   const { streak, fetchStreak } = useStreakStore();
   const { t } = useLanguageStore();
 
@@ -165,11 +168,12 @@ function DecksViewContent() {
   useEffect(() => {
     if (!authLoading) {
       fetchDecks();
+      fetchAtlasItems();
       if (user?.id) {
         fetchStreak(user.id);
       }
     }
-  }, [authLoading, user?.id, fetchDecks, fetchStreak]);
+  }, [authLoading, user?.id, fetchDecks, fetchStreak, fetchAtlasItems]);
 
   // Menú contextual de opciones por tarjeta (⋮)
   const [activeDropdownDeckId, setActiveDropdownDeckId] = useState<string | null>(null);
@@ -193,6 +197,24 @@ function DecksViewContent() {
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
+
+  // Escuchar parámetro de creación (?create=deck o ?create=folder)
+  useEffect(() => {
+    const createParam = searchParams.get('create');
+    if (createParam === 'deck') {
+      setCreateType('deck');
+      setNewColor('#6366f1');
+      setNewTitle('');
+      setNewDescription('');
+      setIsCreateModalOpen(true);
+    } else if (createParam === 'folder') {
+      setCreateType('folder');
+      setNewColor('#f59e0b');
+      setNewTitle('');
+      setNewDescription('');
+      setIsCreateModalOpen(true);
+    }
+  }, [searchParams]);
 
   // Resolver carpeta activa actual (priorizando estado y con fallback en searchParams)
   const activeFolderId = currentFolderId ?? searchParams.get('folder');
@@ -531,21 +553,23 @@ function DecksViewContent() {
             </button>
           )}
 
-          {/* Botón Principal "+ Nuevo" */}
-          <button
-            type="button"
-            onClick={() => {
-              setCreateType(currentFolder ? 'deck' : 'folder');
-              setNewColor(currentFolder ? '#6366f1' : '#f59e0b');
+          {/* Botón Principal "+ Nuevo" con Menú Desplegable */}
+          <NewMenuDropdown
+            onSelectDeck={() => {
+              setCreateType('deck');
+              setNewColor('#6366f1');
               setNewTitle('');
               setNewDescription('');
               setIsCreateModalOpen(true);
             }}
-            className="inline-flex items-center justify-center gap-1.5 sm:gap-2 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold text-xs sm:text-sm transition-all duration-150 shadow-lg shadow-indigo-600/25 active:scale-95 border border-indigo-400/20 shrink-0 cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>{t('dashboard.new_button', '+ Nuevo')}</span>
-          </button>
+            onSelectFolder={() => {
+              setCreateType('folder');
+              setNewColor('#f59e0b');
+              setNewTitle('');
+              setNewDescription('');
+              setIsCreateModalOpen(true);
+            }}
+          />
         </div>
       </div>
 
@@ -1171,6 +1195,115 @@ function DecksViewContent() {
         )}
       </section>
 
+      {/* Sección: Tus Atlas Visuales */}
+      {(!currentFolder || atlasItems.length > 0) && (
+        <section className="order-5 md:order-6 pt-6 border-t border-neutral-200 dark:border-neutral-800/80 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                <Map className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+              </div>
+              <div>
+                <h2 className="text-base sm:text-lg font-bold text-neutral-900 dark:text-white tracking-tight flex items-center gap-2">
+                  <span>{t('atlas.your_visual_atlases', 'Tus Atlas Visuales')}</span>
+                  {atlasItems.length > 0 && (
+                    <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
+                      {atlasItems.length}
+                    </span>
+                  )}
+                </h2>
+                <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                  {t('atlas.your_visual_atlases_sub', 'Esquemas y diagramas con oclusiones interactivas')}
+                </p>
+              </div>
+            </div>
+
+            <Link
+              href="/atlas/new"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 font-semibold text-xs transition active:scale-95 shrink-0 self-start sm:self-auto cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>{t('atlas.new_visual_atlas', 'Nuevo Atlas Visual')}</span>
+            </Link>
+          </div>
+
+          {atlasItems.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-neutral-300 dark:border-neutral-800 bg-white/50 dark:bg-neutral-900/30 p-8 text-center flex flex-col items-center justify-center space-y-3 shadow-sm">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500 text-xl shadow-inner">
+                🗺️
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">
+                  {t('atlas.no_atlases_created', 'Aún no tienes Atlas Visuales creados')}
+                </h3>
+                <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400 max-w-sm mx-auto leading-relaxed">
+                  {t(
+                    'atlas.no_atlases_desc',
+                    'Sube un esquema o imagen anatómica y tapa conceptos para memorizarlos visualmente.'
+                  )}
+                </p>
+              </div>
+              <Link
+                href="/atlas/new"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-medium text-xs shadow-md shadow-emerald-950/20 transition active:scale-95 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>{t('atlas.create_first_atlas', 'Crear mi primer Atlas Visual')}</span>
+              </Link>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4 md:gap-5">
+              {atlasItems.map((atlas) => {
+                const boxCount = Array.isArray(atlas.boxes) ? atlas.boxes.length : 0;
+                return (
+                  <Link
+                    key={atlas.id}
+                    href={`/atlas/${atlas.id}`}
+                    className="group rounded-2xl overflow-hidden border border-neutral-200/90 dark:border-neutral-800 bg-white dark:bg-neutral-900/70 hover:border-emerald-500/50 hover:shadow-xl hover:shadow-emerald-950/15 hover:-translate-y-1 transition-all duration-200 flex flex-col justify-between cursor-pointer"
+                  >
+                    {/* Thumbnail con imagen de fondo */}
+                    <div className="relative aspect-video w-full overflow-hidden bg-neutral-950 flex items-center justify-center">
+                      <img
+                        src={atlas.image_url}
+                        alt={atlas.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent" />
+
+                      {/* Badge superior derecho: Oclusiones */}
+                      <div className="absolute top-2.5 right-2.5 px-2.5 py-1 rounded-full bg-black/75 backdrop-blur-md border border-white/15 text-white font-mono text-[10px] font-semibold flex items-center gap-1.5 shadow-md">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        <span>
+                          {boxCount} {boxCount === 1 ? 'oclusión' : 'oclusiones'}
+                        </span>
+                      </div>
+
+                      {/* Título sobre el thumbnail */}
+                      <div className="absolute bottom-2.5 left-3 right-3">
+                        <h3 className="text-sm sm:text-base font-bold text-white tracking-tight line-clamp-1 drop-shadow-md group-hover:text-emerald-300 transition-colors">
+                          {atlas.title}
+                        </h3>
+                      </div>
+                    </div>
+
+                    {/* Pie de la tarjeta */}
+                    <div className="p-3 sm:p-3.5 flex items-center justify-between text-xs border-t border-neutral-100 dark:border-neutral-800/60 bg-white dark:bg-neutral-900/40">
+                      <span className="text-[11px] text-neutral-400 font-mono">
+                        {new Date(atlas.created_at).toLocaleDateString()}
+                      </span>
+                      <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold text-xs group-hover:translate-x-0.5 transition-transform">
+                        <span>{t('atlas.study_atlas_button', 'Estudiar Atlas')}</span>
+                        <span>→</span>
+                      </span>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      )}
+
       {/* Modal: Creación Contextual Inteligente (Carpeta vs Mazo) */}
       {isCreateModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/75 backdrop-blur-sm animate-in fade-in">
@@ -1260,6 +1393,26 @@ function DecksViewContent() {
                   </div>
                 </button>
               </div>
+
+              {/* Enlace directo a Nuevo Atlas Visual */}
+              <Link
+                href="/atlas/new"
+                onClick={() => setIsCreateModalOpen(false)}
+                className="flex items-center justify-between p-3 rounded-2xl border border-emerald-500/25 bg-emerald-500/10 hover:bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 transition text-xs font-medium cursor-pointer"
+              >
+                <div className="flex items-center gap-2.5">
+                  <span className="text-xl">🗺️</span>
+                  <div>
+                    <div className="font-semibold text-emerald-950 dark:text-emerald-200">
+                      {t('dashboard.new_visual_atlas', 'Nuevo Atlas Visual')}
+                    </div>
+                    <div className="text-[10px] text-emerald-700/80 dark:text-emerald-300/80">
+                      {t('dashboard.new_visual_atlas_desc', 'Oclusión de imágenes y diagramas interactivos')}
+                    </div>
+                  </div>
+                </div>
+                <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">→</span>
+              </Link>
 
               {/* Banner de Ubicación Contextual */}
               <div className="flex items-center justify-between p-2.5 rounded-xl bg-neutral-100 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 text-xs">

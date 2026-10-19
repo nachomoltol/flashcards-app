@@ -302,6 +302,41 @@ export type Database = {
           },
         ]
       }
+      interactive_images: {
+        Row: {
+          boxes: Json
+          created_at: string
+          id: string
+          image_url: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          boxes?: Json
+          created_at?: string
+          id?: string
+          image_url: string
+          title: string
+          user_id?: string
+        }
+        Update: {
+          boxes?: Json
+          created_at?: string
+          id?: string
+          image_url?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "interactive_images_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -475,3 +510,17 @@ export type TablesUpdate<
       ? U
       : never
     : never
+
+export interface AtlasBox {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  label: string;
+  note?: string;
+}
+
+export type InteractiveImageRow = Database['public']['Tables']['interactive_images']['Row'];
+export type InteractiveImageInsert = Database['public']['Tables']['interactive_images']['Insert'];
+export type InteractiveImageUpdate = Database['public']['Tables']['interactive_images']['Update'];

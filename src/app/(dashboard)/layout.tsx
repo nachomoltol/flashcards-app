@@ -28,6 +28,7 @@ import { ProModal } from '@/components/subscription/ProModal';
 import { DeleteAccountModal } from '@/components/auth/DeleteAccountModal';
 import { FeedbackModal } from '@/components/feedback/FeedbackModal';
 import { LanguageSelector } from '@/components/ui/LanguageSelector';
+import { NewMenuDropdown } from '@/components/ui/NewMenuDropdown';
 import { useProModalStore } from '@/stores/useProModalStore';
 import { useFeedbackModalStore } from '@/stores/useFeedbackModalStore';
 
@@ -405,6 +406,12 @@ export default function DashboardLayout({
       {/* Mobile Menu Drawer */}
       {!isStudyPage && mobileMenuOpen && (
         <div className="md:hidden border-b border-neutral-200 dark:border-neutral-800 bg-white/95 dark:bg-neutral-900/95 backdrop-blur px-4 py-3 space-y-3 z-30">
+          <div className="pb-1">
+            <NewMenuDropdown
+              className="w-full"
+              buttonClassName="w-full inline-flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-violet-600 text-white font-semibold text-xs transition shadow-md border border-indigo-400/20 cursor-pointer"
+            />
+          </div>
           <div className="space-y-1">
             {navItems.map((item) => {
               const isActive =
@@ -594,6 +601,14 @@ export default function DashboardLayout({
               </span>
             </div>
           </Link>
+
+          {/* Botón Principal "+ Nuevo" */}
+          <div className="pt-1">
+            <NewMenuDropdown
+              className="w-full"
+              buttonClassName="w-full inline-flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold text-xs sm:text-sm transition-all duration-150 shadow-md shadow-indigo-600/20 active:scale-95 border border-indigo-400/20 cursor-pointer"
+            />
+          </div>
 
           {/* Navigation Links */}
           <nav className="space-y-1.5">
