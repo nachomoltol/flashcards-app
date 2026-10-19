@@ -553,8 +553,9 @@ function DecksViewContent() {
             </button>
           )}
 
-          {/* Botón Principal "+ Nuevo" con Menú Desplegable */}
+          {/* Botón Principal "+ Nuevo" con Menú Desplegable (Visible SOLO en Móvil) */}
           <NewMenuDropdown
+            className="flex md:hidden ml-auto"
             onSelectDeck={() => {
               setCreateType('deck');
               setNewColor('#6366f1');
