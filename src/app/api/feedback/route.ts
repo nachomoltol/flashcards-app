@@ -183,11 +183,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 5. Configuración del destinatario, remitente y cabeceras
-    const toEmail = process.env.ADMIN_FEEDBACK_EMAIL || ADMIN_FEEDBACK_EMAIL;
-    const fromEmail = process.env.RESEND_FROM_EMAIL || RESEND_FROM_EMAIL;
-    const cleanUserName = userName.replace(/["]/g, '').trim();
-    const replyToAddress = `"${cleanUserName}" <${userEmail}>`;
+    // 5. Configuración estricta de destinatario, remitente y cabeceras anti-spoofing
+    // - to: Estrictamente y únicamente migarecetasredes@gmail.com
+    // - from: Correo de sistema verificado (onboarding@resend.dev o dominio verificado configurado)
+    // - reply_to: Correo del usuario logueado (userEmail) para respuesta directa en un clic
+    const toEmail = process.env.ADMIN_FEEDBACK_EMAIL || ADMIN_FEEDBACK_EMAIL || 'migarecetasredes@gmail.com';
+    const fromEmail = process.env.RESEND_FROM_EMAIL || RESEND_FROM_EMAIL || 'onboarding@resend.dev';
+    const replyToAddress = userEmail;
+
+    // Asunto estricto requerido: "[Soporte Miga] - {Categoría} - {Correo del Usuario}"
+    const emailSubject = `[Soporte Miga] - ${subject} - ${userEmail}`;
 
     const now = new Date();
     const formattedDate = new Intl.DateTimeFormat('es-ES', {
@@ -203,13 +208,13 @@ export async function POST(req: NextRequest) {
     const sanitizedUserEmail = escapeHtml(userEmail);
     const sanitizedUserId = escapeHtml(userId);
 
-    // 6. Diseño de Plantilla HTML "Dark Mode" Elegante
+    // 6. Diseño de Plantilla HTML "Dark Mode" Elegante con visualización clara de remitente, categoría y mensaje
     const htmlEmail = `
 <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <title>Soporte y Feedback - Flashmente</title>
+  <title>Soporte Miga - Nuevo Ticket</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body style="margin: 0; padding: 0; background-color: #0c0a09; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #f4f4f5; -webkit-font-smoothing: antialiased;">
@@ -219,17 +224,17 @@ export async function POST(req: NextRequest) {
         <!-- Contenedor Principal Dark Mode -->
         <table role="presentation" width="100%" style="max-width: 600px; background-color: #171717; border-radius: 16px; border: 1px solid #262626; overflow: hidden; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);">
           
-          <!-- Encabezado con degradado característico de Flashmente -->
+          <!-- Encabezado con degradado moderno -->
           <tr>
             <td style="background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%); padding: 28px 32px; text-align: left;">
               <table role="presentation" width="100%">
                 <tr>
                   <td>
                     <span style="font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #e9d5ff; display: inline-block; margin-bottom: 6px;">
-                      FLASHMENTE • SOPORTE AL ADMINISTRADOR
+                      SOPORTE MIGA • NUEVO TICKET RECIBIDO
                     </span>
                     <h1 style="margin: 0; font-size: 22px; font-weight: 800; color: #ffffff; letter-spacing: -0.5px;">
-                      Nuevo mensaje de soporte recibido
+                      ${sanitizedSubject}
                     </h1>
                   </td>
                 </tr>
@@ -237,12 +242,12 @@ export async function POST(req: NextRequest) {
             </td>
           </tr>
 
-          <!-- Insignia del Asunto / Tipo de Consulta -->
+          <!-- Insignia de Categoría -->
           <tr>
             <td style="padding: 24px 32px 12px 32px;">
               <div style="display: inline-block; background-color: ${badgeColors.bg}; border: 1px solid ${badgeColors.border}; border-radius: 9999px; padding: 6px 16px;">
                 <span style="color: ${badgeColors.text}; font-size: 13px; font-weight: 600; letter-spacing: 0.3px;">
-                  📌 ${sanitizedSubject}
+                  📌 Categoría: ${sanitizedSubject}
                 </span>
               </div>
             </td>
@@ -251,6 +256,9 @@ export async function POST(req: NextRequest) {
           <!-- Contenido del Mensaje del Usuario -->
           <tr>
             <td style="padding: 12px 32px 24px 32px;">
+              <p style="margin: 0 0 8px 0; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #a1a1aa;">
+                Mensaje detallado:
+              </p>
               <div style="background-color: #0f0f10; border: 1px solid #262626; border-left: 4px solid #7c3aed; border-radius: 12px; padding: 20px; line-height: 1.6; font-size: 15px; color: #f4f4f5;">
                 <p style="margin: 0; white-space: pre-wrap; word-break: break-word;">${sanitizedMessage}</p>
               </div>
@@ -264,25 +272,25 @@ export async function POST(req: NextRequest) {
             </td>
           </tr>
 
-          <!-- Información del Usuario Autenticado (Supabase Auth) -->
+          <!-- Información de Quién lo Envía (Usuario Autenticado) -->
           <tr>
             <td style="padding: 24px 32px;">
               <h2 style="margin: 0 0 16px 0; font-size: 12px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: #a1a1aa;">
-                Datos del Usuario (Supabase Auth Verificado)
+                Datos de Quién lo Envía (Usuario Autenticado)
               </h2>
               
               <table role="presentation" width="100%" style="border-collapse: collapse; font-size: 13px;">
                 <tr>
-                  <td style="padding: 8px 0; color: #71717a; width: 140px; vertical-align: top;">Nombre:</td>
-                  <td style="padding: 8px 0; color: #ffffff; font-weight: 600;">${sanitizedUserName}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0; color: #71717a; vertical-align: top;">Email:</td>
+                  <td style="padding: 8px 0; color: #71717a; width: 140px; vertical-align: top;">Remitente:</td>
                   <td style="padding: 8px 0;">
-                    <a href="mailto:${sanitizedUserEmail}" style="color: #c084fc; text-decoration: none; font-weight: 600;">
+                    <a href="mailto:${sanitizedUserEmail}" style="color: #c084fc; text-decoration: none; font-weight: 700;">
                       ${sanitizedUserEmail}
                     </a>
                   </td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; color: #71717a; vertical-align: top;">Nombre:</td>
+                  <td style="padding: 8px 0; color: #ffffff; font-weight: 600;">${sanitizedUserName}</td>
                 </tr>
                 <tr>
                   <td style="padding: 8px 0; color: #71717a; vertical-align: top;">User ID:</td>
@@ -302,9 +310,9 @@ export async function POST(req: NextRequest) {
               <p style="margin: 0 0 12px 0; font-size: 12px; color: #71717a;">
                 💡 Puedes responder directamente a este correo para escribir al usuario (<strong style="color: #d4d4d8;">${sanitizedUserEmail}</strong>).
               </p>
-              <a href="mailto:${sanitizedUserEmail}?subject=Re:%20[Flashmente]%20${encodeURIComponent(subject)}" 
+              <a href="mailto:${sanitizedUserEmail}?subject=Re:%20${encodeURIComponent(emailSubject)}" 
                  style="display: inline-block; background-color: #7c3aed; color: #ffffff; text-decoration: none; font-size: 13px; font-weight: 600; padding: 10px 22px; border-radius: 8px; box-shadow: 0 4px 12px rgba(124, 58, 237, 0.35);">
-                Responder al usuario
+                Responder al usuario (${sanitizedUserEmail})
               </a>
             </td>
           </tr>
@@ -315,7 +323,7 @@ export async function POST(req: NextRequest) {
         <table role="presentation" width="100%" style="max-width: 600px; margin-top: 16px;">
           <tr>
             <td style="text-align: center; font-size: 11px; color: #52525b;">
-              Flashmente • Módulo de Soporte y Feedback • Resend API
+              [Soporte Miga] • Módulo de Feedback y Soporte • Resend API
             </td>
           </tr>
         </table>
@@ -329,8 +337,9 @@ export async function POST(req: NextRequest) {
 
     // Versión en texto plano para clientes de correo sin renderizado HTML
     const textEmail = `
-[FLASHMENTE - SOPORTE Y FEEDBACK]
-Asunto / Tipo: ${subject}
+[SOPORTE MIGA]
+Asunto / Categoría: ${subject}
+De: ${userEmail} (${userName})
 Fecha: ${formattedDate}
 
 MENSAJE DEL USUARIO:
@@ -338,17 +347,15 @@ MENSAJE DEL USUARIO:
 ${message}
 ----------------------------------------
 
-DATOS IDENTIFICATIVOS (SUPABASE):
-Nombre: ${userName}
+DATOS IDENTIFICATIVOS:
 Email: ${userEmail}
+Nombre: ${userName}
 User ID: ${userId}
 
-(Puedes responder directamente a este email para contactar con el usuario).
+(Al pulsar "Responder" en tu cliente de correo responderás directamente a ${userEmail}).
     `.trim();
 
-    // 7. Envío del correo mediante Resend
-    const emailSubject = `[Feedback Flashmente] ${subject} - ${userName}`;
-
+    // 7. Envío del correo mediante Resend con cabeceras anti-spoofing verificadas
     const { data: resendData, error: resendError } = await resend.emails.send({
       from: fromEmail,
       to: toEmail,
