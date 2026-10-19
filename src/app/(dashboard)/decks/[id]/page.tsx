@@ -36,14 +36,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
   const [aiError, setAiError] = useState<string | null>(null);
   const [aiSuccessMessage, setAiSuccessMessage] = useState<string | null>(null);
   const [aiCoreExhausted, setAiCoreExhausted] = useState<boolean>(false);
-  const [isMeticulousPhase, setIsMeticulousPhase] = useState<boolean>(() => cards.length >= 30);
-
-  // Sincronizar fase minuciosa si el mazo ya cuenta con 30 o más tarjetas existentes
-  useEffect(() => {
-    if (cards.length >= 30) {
-      setIsMeticulousPhase(true);
-    }
-  }, [cards.length]);
+  const [isMeticulousPhase, setIsMeticulousPhase] = useState<boolean>(false);
 
   // Estado para el modal de Compartir Mazo
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
@@ -123,10 +116,10 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
       await fetchCardsByDeck(id);
       await fetchDeckById(id);
 
+      // Rigor en advertencias: Solo cuando la lista troncal se vacíe matemáticamente o el material se agote
       const isExhausted =
         Boolean(result.core_exhausted) ||
-        result.cards.length < aiCardCount ||
-        cards.length + result.cards.length >= 30;
+        (result.cards.length < aiCardCount && result.cards.length > 0);
 
       if (isExhausted) {
         setIsMeticulousPhase(true);

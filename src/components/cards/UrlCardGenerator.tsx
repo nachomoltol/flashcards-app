@@ -39,17 +39,17 @@ export function UrlCardGenerator({
   const [successCount, setSuccessCount] = useState<number>(0);
   const [coreExhausted, setCoreExhausted] = useState<boolean>(false);
   const [isMeticulousPhase, setIsMeticulousPhase] = useState<boolean>(
-    () => Boolean(initialMeticulousPhase) || cards.length >= 30
+    () => Boolean(initialMeticulousPhase)
   );
   const [generatedCardsPreview, setGeneratedCardsPreview] = useState<GeneratedCard[]>([]);
   const [materialExhaustedNotice, setMaterialExhaustedNotice] = useState<{ generated: number; requested: number } | null>(null);
 
-  // Sincronizar fase minuciosa si el mazo ya cuenta con 30 o más tarjetas o viene activo por prop
+  // Sincronizar fase minuciosa si viene activo por prop
   useEffect(() => {
-    if (cards.length >= 30 || initialMeticulousPhase) {
+    if (initialMeticulousPhase) {
       setIsMeticulousPhase(true);
     }
-  }, [cards.length, initialMeticulousPhase]);
+  }, [initialMeticulousPhase]);
 
   // Detectar dinámicamente si es YouTube o URL web
   const trimmedUrl = url.trim().toLowerCase();
@@ -143,10 +143,10 @@ export function UrlCardGenerator({
         setMaterialExhaustedNotice(null);
       }
 
+      // Rigor en advertencias: Solo cuando la lista troncal se vacíe matemáticamente o el material se agote
       const isExhausted =
         Boolean(result.core_exhausted) ||
-        result.cards.length < cardCount ||
-        cards.length + result.cards.length >= 30;
+        (result.cards.length < cardCount && result.cards.length > 0);
 
       if (isExhausted) {
         setIsMeticulousPhase(true);

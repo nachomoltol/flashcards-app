@@ -135,6 +135,8 @@ export function DocumentUploader({
   const [cardFormat, setCardFormat] = useState<CardFormat>('multiple_choice');
   const [cardCount, setCardCount] = useState<number>(10);
   const [customPrompt, setCustomPrompt] = useState('');
+  const [pageStart, setPageStart] = useState<string>('');
+  const [pageEnd, setPageEnd] = useState<string>('');
   
   // Status flow: idle -> uploading -> analyzing -> saving -> success | error
   const [status, setStatus] = useState<
@@ -144,17 +146,17 @@ export function DocumentUploader({
   const [successCount, setSuccessCount] = useState<number>(0);
   const [coreExhausted, setCoreExhausted] = useState<boolean>(false);
   const [isMeticulousPhase, setIsMeticulousPhase] = useState<boolean>(
-    () => Boolean(initialMeticulousPhase) || cards.length >= 30
+    () => Boolean(initialMeticulousPhase)
   );
   const [generatedCardsPreview, setGeneratedCardsPreview] = useState<GeneratedCard[]>([]);
   const [materialExhaustedNotice, setMaterialExhaustedNotice] = useState<{ generated: number; requested: number } | null>(null);
 
-  // Sincronizar fase minuciosa si el mazo ya cuenta con 30 o más tarjetas o viene activo por prop
+  // Sincronizar fase minuciosa si viene activa por prop
   useEffect(() => {
-    if (cards.length >= 30 || initialMeticulousPhase) {
+    if (initialMeticulousPhase) {
       setIsMeticulousPhase(true);
     }
-  }, [cards.length, initialMeticulousPhase]);
+  }, [initialMeticulousPhase]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -263,6 +265,8 @@ export function DocumentUploader({
           cardFormat,
           cardCount,
           existingQuestions: existingFronts,
+          pageStart: pageStart ? parseInt(pageStart, 10) : undefined,
+          pageEnd: pageEnd ? parseInt(pageEnd, 10) : undefined,
           language,
         });
       } catch (actionErr: unknown) {
@@ -321,10 +325,10 @@ export function DocumentUploader({
         setMaterialExhaustedNotice(null);
       }
 
+      // Rigor en advertencias: Solo cuando la lista troncal se vacíe matemáticamente o el material se agote por completo
       const isExhausted =
         Boolean(result.core_exhausted) ||
-        generatedCards.length < cardCount ||
-        cards.length + generatedCards.length >= 30;
+        (generatedCards.length < cardCount && generatedCards.length > 0);
 
       if (isExhausted) {
         setIsMeticulousPhase(true);
@@ -349,6 +353,8 @@ export function DocumentUploader({
 
   const handleReset = () => {
     setSelectedFile(null);
+    setPageStart('');
+    setPageEnd('');
     setStatus('idle');
     setErrorMessage(null);
     setGeneratedCardsPreview([]);
@@ -810,6 +816,56 @@ export function DocumentUploader({
           {/* 3. Instrucción adicional y Botones de Acción (visibles cuando hay un archivo cargado) */}
           {selectedFile && (
             <div className="space-y-4 pt-1">
+              {/* Chunking de Precisión para PDFs (Rango de Páginas) */}
+              {(selectedFile.name.toLowerCase().endsWith('.pdf') || selectedFile.type === 'application/pdf') && (
+                <div className="p-3.5 rounded-2xl bg-neutral-50 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5">
+                      <svg className="w-4 h-4 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                      </svg>
+                      <span>Chunking de Precisión (Rango de Páginas PDF)</span>
+                    </label>
+                    <span className="text-[10px] text-neutral-500 dark:text-neutral-400 font-mono">Aislamiento estricto</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-medium text-neutral-600 dark:text-neutral-400 mb-1">
+                        Desde página:
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        disabled={isBusy}
+                        value={pageStart}
+                        onChange={(e) => setPageStart(e.target.value)}
+                        placeholder="ej. 1"
+                        className="w-full text-xs font-medium px-3 py-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition disabled:opacity-50"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-medium text-neutral-600 dark:text-neutral-400 mb-1">
+                        Hasta página:
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        disabled={isBusy}
+                        value={pageEnd}
+                        onChange={(e) => setPageEnd(e.target.value)}
+                        placeholder="ej. 15"
+                        className="w-full text-xs font-medium px-3 py-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition disabled:opacity-50"
+                      />
+                    </div>
+                  </div>
+
+                  <p className="text-[11px] text-neutral-500 dark:text-neutral-400 leading-relaxed">
+                    Aísla estrictamente el contenido del rango de páginas solicitado antes de enviarlo a Gemini, evitando sobrecargar o desbordar la ventana de contexto.
+                  </p>
+                </div>
+              )}
+
               {/* Optional Custom Instructions / Focus Instruction - High-visibility callout box */}
               <div className="relative p-3.5 rounded-2xl bg-gradient-to-r from-purple-500/10 via-violet-500/5 to-indigo-500/10 dark:from-purple-950/40 dark:via-violet-950/30 dark:to-indigo-950/40 border border-purple-300 dark:border-purple-500/40 ring-2 ring-purple-500/50 shadow-[0_0_20px_rgba(168,85,247,0.25)] transition-all">
                 <div className="flex items-center justify-between mb-1.5">

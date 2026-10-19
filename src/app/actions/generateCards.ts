@@ -2,6 +2,7 @@
 
 import { GoogleGenAI, Type } from '@google/genai';
 import mammoth from 'mammoth';
+import { PDFParse } from 'pdf-parse';
 import { YoutubeTranscript } from 'youtube-transcript';
 import { supabase } from '@/lib/supabase';
 import { randomizeMultipleChoiceCard } from '@/lib/cardUtils';
@@ -20,7 +21,7 @@ const flashcardSchema = {
     core_exhausted: {
       type: Type.BOOLEAN,
       description:
-        'true si la teoría troncal y conceptos principales ya han sido extraídos en lotes anteriores; false si aún queda información troncal.',
+        'true ÚNICAMENTE si la LISTA TRONCAL se ha vaciado matemáticamente y todos los conceptos principales del material ya han sido extraídos en tarjetas existentes o en este lote; false si aún queda al menos un concepto troncal por evaluar.',
     },
     cards: {
       type: Type.ARRAY,
@@ -132,8 +133,34 @@ PROHIBIDO terminantemente generar opciones múltiples (a, b, c, d).
   }
 }
 
-const RADAR_DIRECTIVE = `RADAR DE PROFUNDIDAD DE CONTENIDO (RADAR, NO FRENO):
-Analiza el historial de tarjetas existentes frente al texto proporcionado. Si consideras que la teoría troncal y los conceptos principales del texto ya han sido extraídos en lotes anteriores, marca core_exhausted: true y CONTINÚA generando el número de tarjetas solicitado buscando detalles minuciosos, excepciones, datos muy específicos o notas al pie dentro del texto. Si aún queda información troncal por cubrir, marca false.`;
+/**
+ * PROTOCOLO OBLIGATORIO DE GENERACIÓN EN DOS FASES (MOTOR DE IA FLASHMENTE):
+ * Obliga a Gemini a ejecutar internamente primero una indexación (Troncal vs. Minucioso)
+ * y posteriormente una generación secuencial priorizando lo Troncal.
+ */
+const TWO_PHASE_SYSTEM_PROMPT = `PROTOCOLO OBLIGATORIO DE GENERACIÓN EN DOS FASES:
+Antes de generar el JSON definitivo, debes ejecutar obligatoria y rigurosamente de forma interna y secuencial las dos fases siguientes:
+
+FASE 1: INDEXACIÓN INTERNA (TRONCAL VS. MINUCIOSO)
+1. Analiza exhaustivamente el texto fuente proporcionado (o el rango exacto de páginas delimitado).
+2. Clasifica y separa mentalmente todos los conceptos del material en dos inventarios rigurosos:
+   - LISTA TRONCAL: Conceptos nucleares, definiciones esenciales, principios clave, mecanismos fisiológicos/técnicos primarios y clasificaciones directas que constituyen la base indispensable del tema.
+   - LISTA MINUCIOSA: Cifras secundarias, excepciones raras, notas al pie, clasificaciones accesorias y detalles periféricos.
+3. Si dispones de HISTORIAL DE PROGRESO (tarjetas existentes generadas previamente), cruza ambas listas y DESCARTA inmediatamente de la LISTA TRONCAL todo concepto que ya haya sido evaluado en tarjetas previas.
+
+FASE 2: GENERACIÓN SECUENCIAL PRIORIZADA
+1. Extrae y genera SECUENCIALMENTE las tarjetas solicitadas comenzando obligatoriamente por los conceptos pendientes de la LISTA TRONCAL, siguiendo el orden cronológico y pedagógico del material.
+2. Cada tarjeta debe centrarse en un concepto nuclear único, formulado según el formato solicitado.
+3. ÚNICAMENTE cuando la LISTA TRONCAL se vacíe matemáticamente (es decir, el 100% de la teoría nuclear ya ha sido cubierta por tarjetas existentes o por las primeras tarjetas de este lote), continúa la extracción con los conceptos de la LISTA MINUCIOSA.`;
+
+/**
+ * RIGOR MATEMÁTICO EN ADVERTENCIAS (core_exhausted):
+ * Solo se dispara cuando la lista Troncal se vacía matemáticamente.
+ */
+const RIGOR_WARNING_DIRECTIVE = `RIGOR MATEMÁTICO EN LA PROPIEDAD "core_exhausted":
+- core_exhausted DEBE ser TRUE ÚNICAMENTE cuando la LISTA TRONCAL se haya vaciado matemáticamente (el 100% de los conceptos nucleares del texto fuente ya han sido extraídos en tarjetas existentes o en este lote). Esto indica la transición obligatoria a la fase minuciosa o el agotamiento del contenido nuclear.
+- core_exhausted DEBE ser FALSE si todavía queda en el texto fuente al menos UN concepto o definición troncal sin evaluar.
+- BAJO NINGÚN CONCEPTO marques core_exhausted: true basándote en la cantidad total de tarjetas de forma arbitraria; debe responder exclusivamente al vaciado real de la materia troncal del material proporcionado.`;
 
 /**
  * System Prompt de Restricción Estricta (Grounding) y Extracción de Contenido (Estilo NotebookLM).
@@ -186,31 +213,158 @@ function getGlobalRules(format: CardFormat = 'multiple_choice'): string {
 6. INTEGRIDAD ESTRUCTURAL DEL JSON (PRIORIDAD ABSOLUTA): Debes devolver un objeto JSON válido con los campos "core_exhausted" (booleano) y "cards" (${cardRequirement}). Sé sintético, directo y conciso en el texto de las preguntas, opciones y respuestas, sin rodeos innecesarios.`;
 }
 
+export interface ParsedPageRange {
+  startPage?: number;
+  endPage?: number;
+  rangeLabel?: string;
+}
+
 /**
- * Recupera de forma segura el texto del front de todas las tarjetas ya existentes en el mazo.
- * Si se pasa deckId, consulta la base de datos Supabase para obtener las preguntas reales actuales
+ * CHUNKING DE PRECISIÓN:
+ * Parsea y aísla el rango de páginas solicitado a partir de inputs numéricos, strings de rango
+ * o instrucciones en lenguaje natural (ej. "páginas 5-12", "pág. 10 a 20", "capítulo 3 págs 15-30").
+ */
+export function parsePageRange(
+  pageRangeStr?: string,
+  pageStart?: number,
+  pageEnd?: number,
+  focusInstruction?: string
+): ParsedPageRange {
+  let start: number | undefined = pageStart && pageStart > 0 ? pageStart : undefined;
+  let end: number | undefined = pageEnd && pageEnd > 0 ? pageEnd : undefined;
+
+  // 1. Si se pasó string explícito de rango (ej. "5-12", "1 a 10")
+  if ((!start || !end) && pageRangeStr && pageRangeStr.trim()) {
+    const cleanStr = pageRangeStr.trim();
+    const match = cleanStr.match(/(\d+)\s*(?:-|–|—|a|al|hasta|to)\s*(\d+)/i);
+    if (match) {
+      start = start ?? parseInt(match[1], 10);
+      end = end ?? parseInt(match[2], 10);
+    } else {
+      const singleMatch = cleanStr.match(/(\d+)/);
+      if (singleMatch) {
+        start = start ?? parseInt(singleMatch[1], 10);
+        end = end ?? start;
+      }
+    }
+  }
+
+  // 2. Si no se especificó rango numérico, buscar menciones de páginas en focusInstruction
+  if ((!start || !end) && focusInstruction && focusInstruction.trim()) {
+    const rangeRegex = /(?:p[aá]ginas?|p[aá]gs?\.?|pages?|pp\.?)\s*(\d+)\s*(?:-|–|—|a|al|hasta|to)\s*(\d+)/i;
+    const match = focusInstruction.match(rangeRegex);
+    if (match) {
+      start = start ?? parseInt(match[1], 10);
+      end = end ?? parseInt(match[2], 10);
+    } else {
+      const singlePageRegex = /(?:p[aá]gina|p[aá]g\.?|page)\s*(\d+)/i;
+      const singleMatch = focusInstruction.match(singlePageRegex);
+      if (singleMatch) {
+        start = start ?? parseInt(singleMatch[1], 10);
+        end = end ?? start;
+      }
+    }
+  }
+
+  // Coherencia matemática
+  if (start && start < 1) start = 1;
+  if (start && end && end < start) {
+    const tmp = start;
+    start = end;
+    end = tmp;
+  }
+
+  let rangeLabel: string | undefined = undefined;
+  if (start && end) {
+    rangeLabel = start === end ? `Página ${start}` : `Páginas ${start} a ${end}`;
+  } else if (start) {
+    rangeLabel = `Desde página ${start}`;
+  } else if (end) {
+    rangeLabel = `Hasta página ${end}`;
+  }
+
+  return { startPage: start, endPage: end, rangeLabel };
+}
+
+/**
+ * CHUNKING DE PRECISIÓN:
+ * Aísla estrictamente el texto del rango de páginas solicitado de un PDF usando pdf-parse v2
+ * antes de enviarlo a Gemini, protegiendo el context window de sobrecargas y desbordamientos.
+ */
+async function extractPdfTextChunk(
+  pdfBuffer: Buffer,
+  pageRange: ParsedPageRange
+): Promise<{ text: string; totalPages: number; extractedRange: string } | null> {
+  let parser: PDFParse | null = null;
+  try {
+    parser = new PDFParse({ data: pdfBuffer });
+    const textOptions: { first?: number; last?: number; pageJoiner?: string } = {
+      pageJoiner: '\n--- PÁGINA page_number DE total_number ---\n',
+    };
+
+    if (pageRange.startPage) {
+      textOptions.first = pageRange.startPage;
+    }
+    if (pageRange.endPage) {
+      textOptions.last = pageRange.endPage;
+    }
+
+    const result = await parser.getText(textOptions);
+    const totalPages = result.total || 0;
+    const extractedText = (result.text || '').trim();
+
+    const rangeLabel =
+      pageRange.rangeLabel || (totalPages > 0 ? `Páginas 1 a ${totalPages}` : 'Documento completo');
+
+    return {
+      text: extractedText,
+      totalPages,
+      extractedRange: rangeLabel,
+    };
+  } catch (err) {
+    console.warn('Advertencia al extraer chunk de texto de PDF con pdf-parse:', err);
+    return null;
+  } finally {
+    if (parser) {
+      try {
+        await parser.destroy();
+      } catch {
+        // no-op
+      }
+    }
+  }
+}
+
+export interface ExistingCardHistoryItem {
+  front: string;
+  back?: string;
+}
+
+/**
+ * Recupera de forma segura el historial completo de tarjetas ya existentes en el mazo.
+ * Si se pasa deckId, consulta la base de datos Supabase para obtener las preguntas y respuestas
  * y las fusiona con cualquier pregunta adicional provista por el cliente, devolviendo un conjunto deduplicado.
  */
-async function fetchExistingCardFronts(
+async function fetchExistingCardsHistory(
   deckId?: string,
   clientProvided: string[] = []
-): Promise<string[]> {
-  const questionsMap = new Map<string, string>();
+): Promise<ExistingCardHistoryItem[]> {
+  const map = new Map<string, ExistingCardHistoryItem>();
 
   // 1. Incorporar preguntas pasadas por el cliente
   for (const q of clientProvided) {
     if (q && typeof q === 'string' && q.trim()) {
       const normalized = q.trim();
-      questionsMap.set(normalized.toLowerCase(), normalized);
+      map.set(normalized.toLowerCase(), { front: normalized });
     }
   }
 
-  // 2. Si se proporciona deckId, recuperar siempre las preguntas actuales de la base de datos Supabase
+  // 2. Si se proporciona deckId, recuperar siempre las tarjetas actuales de Supabase
   if (deckId) {
     try {
       const { data, error } = await supabase
         .from('cards')
-        .select('front')
+        .select('front, back')
         .eq('deck_id', deckId);
 
       if (error) {
@@ -219,7 +373,10 @@ async function fetchExistingCardFronts(
         for (const row of data) {
           if (row.front && typeof row.front === 'string' && row.front.trim()) {
             const normalized = row.front.trim();
-            questionsMap.set(normalized.toLowerCase(), normalized);
+            map.set(normalized.toLowerCase(), {
+              front: normalized,
+              back: row.back && typeof row.back === 'string' ? row.back.trim() : undefined,
+            });
           }
         }
       }
@@ -228,69 +385,39 @@ async function fetchExistingCardFronts(
     }
   }
 
-  return Array.from(questionsMap.values());
+  return Array.from(map.values());
 }
 
 /**
- * Extrae y sintetiza de forma concisa los conceptos o tópicos evaluados en tarjetas existentes.
- * Evita inyectar bloques JSON masivos o 120 preguntas completas con opciones que saturan el contexto de Gemini.
+ * MEMORIA DE PROGRESO Y REANUDACIÓN SECUENCIAL:
+ * Inyecta las tarjetas generadas previamente en el contexto de Gemini para que reanude
+ * la extracción donde lo dejó en el PDF/documento, garantizando avance continuo sin repeticiones.
  */
-function extractConceptsFromExistingCards(existingFronts: string[]): string[] {
-  if (!existingFronts || existingFronts.length === 0) {
-    return [];
-  }
-
-  const conceptsSet = new Set<string>();
-
-  for (const front of existingFronts) {
-    if (!front || typeof front !== 'string') continue;
-
-    // 1. Tomar únicamente la primera línea de la pregunta (descartar opciones a, b, c, d y saltos de línea)
-    const firstLine = front.split(/\r?\n/)[0].trim();
-    if (!firstLine || firstLine.length < 3) continue;
-
-    // 2. Limpiar numeraciones iniciales ("1.", "Q1:", "1)", etc.) y signos de interrogación
-    let cleaned = firstLine
-      .replace(/^(\d+[\.\)\-:]|\(?[a-dA-D]\)|\bQ\d+[:\.]?)\s*/i, '')
-      .replace(/^[¿\?¡\!]+|[¿\?¡\!]+$/g, '')
-      .trim();
-
-    // 3. Omitir preámbulos interrogativos genéricos para aislar el concepto clínico/académico
-    const genericPrefixRegex =
-      /^(?:cu[aá]l(?:es)?(?:\s+de\s+l[oa]s\s+siguientes)?(?:\s+afirmaci[oó]n(?:es)?|\s+opci[oó]n(?:es)?)?(?:\s+sobre|\s+respecto\s+a)?|qu[eé]\s+(?:es|caracteriza|indica|produce)|defina|explique|en\s+relaci[oó]n\s+con|respecto\s+a(?:l)?|seg[uú]n\s+el\s+texto)\s+/i;
-    cleaned = cleaned.replace(genericPrefixRegex, '').trim();
-
-    if (cleaned.length > 3) {
-      // Limitar a máximo 80 caracteres por concepto para economía de tokens
-      if (cleaned.length > 80) {
-        cleaned = cleaned.substring(0, 80).replace(/\s+\S*$/, '') + '...';
-      }
-      cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
-      conceptsSet.add(cleaned);
-    }
-  }
-
-  // Devolver los conceptos más relevantes (máximo 40 tópicos) para mantener el prompt compacto
-  return Array.from(conceptsSet).slice(-40);
-}
-
-/**
- * Construye la sección del prompt de Control de Repetición y Gestión de Contexto (Blindaje Estricto).
- * En lugar de enviar un JSON o texto completo de 120 preguntas previas, pasa una lista sintetizada de conceptos.
- */
-function buildAntiDuplicateSection(existingFronts: string[]): string {
-  const concepts = extractConceptsFromExistingCards(existingFronts);
-  if (concepts.length === 0) {
+function buildProgressMemorySection(existingCards: ExistingCardHistoryItem[]): string {
+  if (!existingCards || existingCards.length === 0) {
     return '';
   }
 
-  const list = concepts.map((c) => `- ${c}`).join('\n');
+  // Limitar al historial de hasta 60 tarjetas más relevantes para no saturar el prompt
+  const items = existingCards.slice(-60).map((card, idx) => {
+    const firstLine = card.front.split(/\r?\n/)[0].replace(/^(\d+[\.\)\-:]|\(?[a-dA-D]\))\s*/, '').trim();
+    const shortBack = card.back ? ` -> [Respuesta: ${card.back.replace(/\s+/g, ' ').slice(0, 70)}]` : '';
+    return `${idx + 1}. ${firstLine}${shortBack}`;
+  });
 
-  return `🚨 CONTROL DE REPETICIÓN (GESTIÓN DE CONTEXTO ESTRICTA):
-Evita formular preguntas sobre los siguientes conceptos que ya han sido evaluados:
-${list}
+  return `======================================================================
+MEMORIA DE PROGRESO Y REANUDACIÓN SECUENCIAL (PROGRESO DEL DOCUMENTO):
+======================================================================
+El usuario ya ha generado ${existingCards.length} tarjetas anteriormente a partir de este material/mazo.
+Historial secuencial de conceptos ya evaluados:
+${items.join('\n')}
 
-DIRECTIVA: Tienes terminantemente prohibido formular preguntas sobre estos mismos conceptos ya evaluados. Toda nueva tarjeta DEBE profundizar en conceptos, mecanismos, detalles o datos diferentes del material de origen.`;
+INSTRUCCIONES OBLIGATORIAS DE REANUDACIÓN:
+1. REANUDACIÓN EXACTA: Examina minuciosamente estas tarjetas existentes para determinar el punto exacto del documento o PDF donde se detuvo el lote anterior.
+2. AVANCE SECUENCIAL: Reanuda la extracción inmediatamente desde el siguiente concepto pendiente, avanzando hacia las partes subsiguientes del texto.
+3. PROHIBICIÓN ABSOLUTA DE REPETICIÓN: Bajo ninguna circunstancia formules preguntas redundantes, refraseadas o equivalentes sobre los conceptos cubiertos arriba.
+4. AGOTAMIENTO REAL: Si tras recorrer el texto completo ya no quedan conceptos troncales pendientes por extraer, genera tarjetas de la lista minuciosa o devuelve únicamente las tarjetas de conceptos nuevos posibles y marca "core_exhausted: true".
+======================================================================`;
 }
 
 /**
@@ -605,23 +732,25 @@ export async function generateCardsAction(
   const targetCount = Math.max(1, Math.min(30, cardCount || 10));
 
   try {
-    // 1. Consultar historial de tarjetas existentes en este mazo para la Memoria Anti-Duplicados
-    const existingFronts = await fetchExistingCardFronts(deckId, existingQuestions);
-    const antiDuplicatePrompt = buildAntiDuplicateSection(existingFronts);
+    // 1. Consultar historial de tarjetas existentes en este mazo para la Memoria de Progreso
+    const existingCards = await fetchExistingCardsHistory(deckId, existingQuestions);
+    const progressMemoryPrompt = buildProgressMemorySection(existingCards);
     const languageDirective = buildLanguageDirective(language);
 
     const ai = new GoogleGenAI({ apiKey });
 
     const prompt = `Eres un pedagogo experto en ciencias cognitivas y diseño de flashcards para el algoritmo de repetición espaciada FSRS.
-CANTIDAD MÁXIMA A GENERAR: ${targetCount}. Si el texto es corto, DEBES devolver menos tarjetas. PROHIBIDO inventar o repetir para llegar al límite. Cubre los conceptos clave sobre el tema: "${cleanTopic}".
+CANTIDAD MÁXIMA A GENERAR: ${targetCount}. Si el tema es acotado, DEBES devolver menos tarjetas. PROHIBIDO inventar o repetir para llegar al límite. Cubre los conceptos clave sobre el tema: "${cleanTopic}".
+
+${TWO_PHASE_SYSTEM_PROMPT}
+
+${RIGOR_WARNING_DIRECTIVE}
 
 ${getGlobalRules(cardFormat)}
 
 ${getFormatInstructions(cardFormat)}
 
-${RADAR_DIRECTIVE}
-
-${antiDuplicatePrompt ? `${antiDuplicatePrompt}\n\n` : ''}REGLA CRÍTICA DE INTEGRIDAD:
+${progressMemoryPrompt ? `${progressMemoryPrompt}\n\n` : ''}REGLA CRÍTICA DE INTEGRIDAD:
 La integridad estructural del JSON es prioridad absoluta y DEBES devolver un objeto con "core_exhausted" (booleano) y "cards" (array con hasta un máximo de ${targetCount} tarjetas únicas del formato "${cardFormat}"). Para asegurar que las tarjetas quepan dentro del límite sin truncarse, formula preguntas, textos, opciones (si aplica) y respuestas directas y concisas.
 
 ${languageDirective}`;
@@ -818,12 +947,34 @@ export async function generateCardsFromDocumentAction(
       }
     }
 
-    // 3. Consultar historial de tarjetas existentes en este mazo para la Memoria Anti-Duplicados
-    const existingFronts = await fetchExistingCardFronts(deckId, existingQuestions);
-    const antiDuplicatePrompt = buildAntiDuplicateSection(existingFronts);
+    // Identificar si es un documento PDF
+    const isPdfDocument =
+      normalizedMime === 'application/pdf' ||
+      Boolean(fileName && /\.pdf$/i.test(fileName));
 
-    // 4. Procesar instrucción de enfoque (focusInstruction) con prioridad absoluta
+    // 3. Procesar instrucción de enfoque y aislar rango de páginas para PDFs (Chunking de Precisión)
     const focusInstruction = (rawFocus || customPrompt || '').trim();
+    const parsedRange = parsePageRange(
+      input.pageRange,
+      input.pageStart,
+      input.pageEnd,
+      focusInstruction
+    );
+
+    // Si es un PDF, aislamos estrictamente el texto del rango de páginas con pdf-parse antes de enviarlo a Gemini
+    let extractedPdfChunk: { text: string; totalPages: number; extractedRange: string } | null = null;
+    if (isPdfDocument) {
+      try {
+        const fileBuffer = Buffer.from(base64Data, 'base64');
+        extractedPdfChunk = await extractPdfTextChunk(fileBuffer, parsedRange);
+      } catch (pdfErr) {
+        console.warn('Error al aislar chunk de páginas de PDF con pdf-parse:', pdfErr);
+      }
+    }
+
+    // 4. Consultar historial de tarjetas existentes en este mazo para la Memoria de Progreso
+    const existingCards = await fetchExistingCardsHistory(deckId, existingQuestions);
+    const progressMemoryPrompt = buildProgressMemorySection(existingCards);
 
     const focusRuleSection = focusInstruction
       ? `🚨 REGLA DE ENFOQUE CRÍTICA (PRIORIDAD ABSOLUTA):
@@ -833,45 +984,71 @@ REGLA ESTRICTA: Si el usuario proporciona una instrucción de enfoque (ej. un ca
 
     const maxAmountDirective = `CANTIDAD MÁXIMA A GENERAR: ${targetCount}. Si el texto es corto, DEBES devolver menos tarjetas. PROHIBIDO inventar o repetir para llegar al límite.`;
 
+    const rangeLabel = parsedRange.rangeLabel ? ` [${parsedRange.rangeLabel}]` : '';
     const coverageText = focusInstruction
-      ? `Debes analizar el documento dando PRIORIDAD ABSOLUTA a la sección solicitada ("${focusInstruction}"). ${maxAmountDirective} Extrae la información EXCLUSIVAMENTE de esa parte del documento.`
-      : `Debes analizar el documento completo. ${maxAmountDirective} Cubre los conceptos clave de forma equitativa desde el principio hasta el final del texto.`;
+      ? `Debes analizar el documento dando PRIORIDAD ABSOLUTA a la sección solicitada ("${focusInstruction}"${rangeLabel}). ${maxAmountDirective} Extrae la información EXCLUSIVAMENTE de esa parte del documento.`
+      : `Debes analizar el documento completo${rangeLabel}. ${maxAmountDirective} Cubre los conceptos clave de forma equitativa desde el principio hasta el final del texto.`;
 
-    // 5. Preparar llamada a Gemini 3.1 Flash-Lite con instrucciones de formato, cantidad, enfoque e historial
+    // 5. Preparar llamada a Gemini 3.1 Flash-Lite con el protocolo de dos fases, advertencia con rigor y memoria de progreso
     const ai = new GoogleGenAI({ apiKey });
 
     const promptText = `Eres un pedagogo experto en diseño pedagógico y repetición espaciada (algoritmo FSRS).
 ${coverageText}${fileName ? ` Documento de referencia: "${fileName}".` : ''}
 
+${TWO_PHASE_SYSTEM_PROMPT}
+
+${RIGOR_WARNING_DIRECTIVE}
+
 ${focusRuleSection ? `${focusRuleSection}\n\n` : ''}${getGlobalRules(cardFormat)}
 
 ${getFormatInstructions(cardFormat)}
 
-${RADAR_DIRECTIVE}
-
-${antiDuplicatePrompt ? `${antiDuplicatePrompt}\n\n` : ''}REGLA CRÍTICA DE INTEGRIDAD:
-La integridad estructural del JSON es prioridad absoluta y DEBES devolver un objeto con "core_exhausted" (booleano) y "cards" (array con hasta un máximo de ${targetCount} tarjetas únicas del formato "${cardFormat}"). Para garantizar que quepan las tarjetas dentro del límite de tokens sin que el JSON se corte, mantén cada pregunta, texto, opción (si aplica) y respuesta rigurosa pero concisa y directa.
+${progressMemoryPrompt ? `${progressMemoryPrompt}\n\n` : ''}REGLA CRÍTICA DE INTEGRIDAD:
+La integridad estructural del JSON es prioridad absoluta y DEBES devolver un objeto con "core_exhausted" (booleano con rigor matemático) y "cards" (array con hasta un máximo de ${targetCount} tarjetas únicas del formato "${cardFormat}"). Para garantizar que quepan las tarjetas dentro del límite de tokens sin que el JSON se corte, mantén cada pregunta, texto, opción (si aplica) y respuesta rigurosa pero concisa y directa.
 
 ${buildLanguageDirective(language)}`;
 
-    // Si es un documento de Word, pasamos el texto extraído directamente para evitar fallos de decodificación zip
-    const contents = isWordDocument
-      ? [
-          {
-            text: `${promptText}\n\nCONTENIDO DEL DOCUMENTO DE WORD:\n=========================================\n${extractedWordText}\n=========================================`,
+    // Configurar contenidos según la estrategia de chunking y tipo de documento:
+    // 1) Si es PDF y se aisló texto limpio: enviamos únicamente el chunk de texto correspondiente
+    // 2) Si es Word: enviamos el texto extraído con mammoth
+    // 3) Si es PDF escaneado (sin texto) o audio: enviamos inlineData
+    let contents: Array<
+      | { text: string }
+      | { inlineData: { mimeType: string; data: string } }
+    >;
+
+    if (isWordDocument) {
+      contents = [
+        {
+          text: `${promptText}\n\n=========================================\nCONTENIDO DEL DOCUMENTO DE WORD:\n=========================================\n${extractedWordText}\n=========================================`,
+        },
+      ];
+    } else if (isPdfDocument && extractedPdfChunk && extractedPdfChunk.text.length >= 40) {
+      // Chunking de Precisión: Gemini recibe estrictamente el texto aislado del rango solicitado
+      contents = [
+        {
+          text: `${promptText}\n\n=========================================\nCONTENIDO AISLADO DEL PDF (${extractedPdfChunk.extractedRange}):\n=========================================\n${extractedPdfChunk.text}\n=========================================`,
+        },
+      ];
+    } else {
+      // Audio o PDF escaneado sin capa OCR
+      const pageRestrictionWarning =
+        isPdfDocument && parsedRange.rangeLabel
+          ? `\n\n🚨 RESTRICCIÓN DE PÁGINAS SOLICITADAS: Analiza ÚNICA Y EXCLUSIVAMENTE el contenido visual y textual comprendido en ${parsedRange.rangeLabel}. Ignora cualquier otra página fuera de este rango.`
+          : '';
+
+      contents = [
+        {
+          inlineData: {
+            mimeType: normalizedMime,
+            data: base64Data,
           },
-        ]
-      : [
-          {
-            inlineData: {
-              mimeType: normalizedMime,
-              data: base64Data,
-            },
-          },
-          {
-            text: promptText,
-          },
-        ];
+        },
+        {
+          text: `${promptText}${pageRestrictionWarning}`,
+        },
+      ];
+    }
 
     const response = await ai.models.generateContent({
       model: GEMINI_MODEL,
@@ -1043,9 +1220,9 @@ export async function generateCardsFromUrlAction(
     const isYouTube = Boolean(youtubeVideoId);
     const canonicalYouTubeUrl = youtubeVideoId ? `https://www.youtube.com/watch?v=${youtubeVideoId}` : '';
 
-    // 1. Consultar historial de tarjetas existentes en este mazo para la Memoria Anti-Duplicados
-    const existingFronts = await fetchExistingCardFronts(deckId, existingQuestions);
-    const antiDuplicatePrompt = buildAntiDuplicateSection(existingFronts);
+    // 1. Consultar historial de tarjetas existentes en este mazo para la Memoria de Progreso
+    const existingCards = await fetchExistingCardsHistory(deckId, existingQuestions);
+    const progressMemoryPrompt = buildProgressMemorySection(existingCards);
 
     // 2. Procesar instrucción de enfoque
     const focusInstruction = (rawFocus || customPrompt || '').trim();
@@ -1067,14 +1244,16 @@ REGLA ESTRICTA: Debes ignorar el resto del contenido y extraer la información E
     const promptText = `Eres un pedagogo experto en diseño pedagógico y repetición espaciada (algoritmo FSRS).
 ${coverageText} Fuente: ${sourceLabel} ("${sourceRef}").
 
+${TWO_PHASE_SYSTEM_PROMPT}
+
+${RIGOR_WARNING_DIRECTIVE}
+
 ${focusRuleSection ? `${focusRuleSection}\n\n` : ''}${getGlobalRules(cardFormat)}
 
 ${getFormatInstructions(cardFormat)}
 
-${RADAR_DIRECTIVE}
-
-${antiDuplicatePrompt ? `${antiDuplicatePrompt}\n\n` : ''}REGLA CRÍTICA DE INTEGRIDAD:
-La integridad estructural del JSON es prioridad absoluta y DEBES devolver un objeto con "core_exhausted" (booleano) y "cards" (array con hasta un máximo de ${targetCount} tarjetas únicas del formato "${cardFormat}"). Para garantizar que quepan las tarjetas dentro del límite de tokens sin que el JSON se corte, mantén cada pregunta, texto, opción (si aplica) y respuesta rigurosa pero concisa y directa.
+${progressMemoryPrompt ? `${progressMemoryPrompt}\n\n` : ''}REGLA CRÍTICA DE INTEGRIDAD:
+La integridad estructural del JSON es prioridad absoluta y DEBES devolver un objeto con "core_exhausted" (booleano con rigor matemático) y "cards" (array con hasta un máximo de ${targetCount} tarjetas únicas del formato "${cardFormat}"). Para garantizar que quepan las tarjetas dentro del límite de tokens sin que el JSON se corte, mantén cada pregunta, texto, opción (si aplica) y respuesta rigurosa pero concisa y directa.
 
 ${buildLanguageDirective(language)}`;
 

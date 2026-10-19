@@ -29,6 +29,9 @@ export interface MultimodalDocumentInput {
   cardFormat?: CardFormat;
   cardCount?: number;
   existingQuestions?: string[];
+  pageStart?: number;
+  pageEnd?: number;
+  pageRange?: string;
   language?: string;
 }
 
