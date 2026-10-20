@@ -66,6 +66,32 @@ export function ProModal({
     tier?: string;
   } | null>(null);
 
+  // Estado de nivel y consumo para mensajes de límite duros (50 Free / 120 Pro)
+  const [userLimits, setUserLimits] = useState<{
+    tier: 'free' | 'pro' | 'vip';
+    count: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (isOpen && user?.id) {
+      import('@/lib/supabase').then(({ supabase }) => {
+        supabase
+          .from('api_limits')
+          .select('tier, generations_count')
+          .eq('user_id', user.id)
+          .maybeSingle()
+          .then(({ data }) => {
+            if (data) {
+              setUserLimits({
+                tier: (data.tier as 'free' | 'pro' | 'vip') || 'free',
+                count: data.generations_count || 0,
+              });
+            }
+          });
+      });
+    }
+  }, [isOpen, user?.id]);
+
   const handleClose = useCallback(() => {
     if (propOnClose) {
       propOnClose();
@@ -265,22 +291,20 @@ export function ProModal({
 
         {/* Contenido Principal */}
         <div className="space-y-6">
-          {/* Alerta de Cuota Agotada (10 generaciones mensuales) */}
+          {/* Alerta de Límite Mensual Duro (50 gratis con ads o 120 PRO) */}
           {isLimitReached && (
             <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-500/15 border border-amber-200 dark:border-amber-500/30 text-amber-900 dark:text-amber-200 text-xs sm:text-sm flex items-start gap-3 animate-in fade-in">
               <AlertTriangle className="w-5 h-5 text-amber-500 dark:text-amber-400 shrink-0 mt-0.5" />
               <div className="space-y-1">
                 <p className="font-semibold text-amber-950 dark:text-white">
-                  {t(
-                    'pro_modal.limit_reached_title',
-                    'Has agotado tu cuota de 10 generaciones mensuales'
-                  )}
+                  {userLimits?.tier === 'pro' || userLimits?.tier === 'vip'
+                    ? 'Has alcanzado el límite mensual de tu Plan PRO (120 generaciones)'
+                    : t('pro_modal.limit_reached_title', 'Has alcanzado el límite mensual de generaciones (50 generaciones)')}
                 </p>
                 <p className="text-amber-800 dark:text-amber-200/90 text-xs leading-relaxed">
-                  {t(
-                    'pro_modal.limit_reached_desc',
-                    'Has completado las 10 generaciones gratuitas de este mes. Elige una alternativa para continuar:'
-                  )}
+                  {userLimits?.tier === 'pro' || userLimits?.tier === 'vip'
+                    ? 'Has completado las 120 generaciones incluidas en tu suscripción PRO para este ciclo. Tu cuota se reiniciará automáticamente el primer día del próximo mes.'
+                    : 'Has completado el cupo mensual máximo de 50 generaciones gratuitas con anuncios. Para continuar generando inmediatamente sin esperar al próximo mes, suscríbete al Plan PRO (hasta 120 generaciones/mes).'}
                 </p>
               </div>
             </div>
@@ -317,7 +341,7 @@ export function ProModal({
           {/* =========================================================================
               BIFURCACIÓN DE ENTORNOS: ANDROID NATIVO vs. WEB / PC
               ========================================================================= */}
-          {platform.isNativeAndroid && isLimitReached ? (
+          {platform.isNativeAndroid && !isLimitReached && userLimits?.tier === 'free' ? (
             /* =======================================================
                FLUJO 1: ANDROID NATIVO (ADMOB REWARDED VIDEO + PLAN PRO)
                ======================================================= */
@@ -487,8 +511,8 @@ export function ProModal({
                 </div>
               </div>
 
-              {/* Si es Web/PC y se agotó la cuota, mostrar Alternativa 2 (App Android) */}
-              {isLimitReached && (
+              {/* Si es Web/PC y no ha agotado el límite mensual, mostrar Alternativa 2 (App Android) */}
+              {!isLimitReached && (
                 <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 space-y-2.5 animate-in fade-in">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">

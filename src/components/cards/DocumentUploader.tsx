@@ -1,9 +1,12 @@
 'use client';
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { PDFDocument } from 'pdf-lib';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore, useCardStore, useDeckStore, useProModalStore, useLanguageStore } from '@/stores';
 import { generateCardsFromDocumentAction } from '@/app/actions/generateCards';
+import { showAdMobRewardedAd } from '@/lib/admob';
+import { claimAdRewardAction } from '@/app/actions/claimAdReward';
 import type { CardFormat, GeneratedCard } from '@/types/cards';
 import { FormattedCardView } from './FormattedCardView';
 
@@ -137,6 +140,7 @@ export function DocumentUploader({
   const [customPrompt, setCustomPrompt] = useState('');
   const [pageStart, setPageStart] = useState<string>('');
   const [pageEnd, setPageEnd] = useState<string>('');
+  const [pdfTotalPages, setPdfTotalPages] = useState<number | null>(null);
   
   // Status flow: idle -> uploading -> analyzing -> saving -> success | error
   const [status, setStatus] = useState<
@@ -160,13 +164,27 @@ export function DocumentUploader({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileSelection = useCallback((file: File) => {
+  const handleFileSelection = useCallback(async (file: File) => {
     setErrorMessage(null);
+    setPdfTotalPages(null);
     const error = validateFile(file);
     if (error) {
       setErrorMessage(error);
       return;
     }
+
+    const isPdf = file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf';
+    if (isPdf) {
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const doc = await PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
+        const pagesCount = doc.getPageCount();
+        setPdfTotalPages(pagesCount);
+      } catch (pdfErr) {
+        console.warn('No se pudo determinar el número total de páginas del PDF:', pdfErr);
+      }
+    }
+
     setSelectedFile(file);
     setStatus('idle');
   }, []);
@@ -202,6 +220,54 @@ export function DocumentUploader({
     if (!user) {
       setErrorMessage('Debes haber iniciado sesión para subir documentos a Supabase Storage.');
       return;
+    }
+
+    const isPdf =
+      selectedFile.name.toLowerCase().endsWith('.pdf') || selectedFile.type === 'application/pdf';
+
+    // FASE 2: Validación estricta del rango de páginas para PDFs (anti-desbordamiento y control de costes)
+    if (isPdf) {
+      const parsedStart = pageStart.trim() ? parseInt(pageStart.trim(), 10) : undefined;
+      const parsedEnd = pageEnd.trim() ? parseInt(pageEnd.trim(), 10) : undefined;
+
+      // 1. Si el PDF cargado tiene más de 30 páginas totales, los campos "Desde página" y "Hasta página" se vuelven estrictamente OBLIGATORIOS
+      if (pdfTotalPages !== null && pdfTotalPages > 30) {
+        if (!parsedStart || !parsedEnd) {
+          setErrorMessage(
+            `El PDF cargado tiene ${pdfTotalPages} páginas (más de 30). Los campos "Desde página" y "Hasta página" son estrictamente OBLIGATORIOS.`
+          );
+          return;
+        }
+      }
+
+      // 2. Validación del rango si se especificó (o si era obligatorio): máximo 40 páginas
+      if (parsedStart !== undefined || parsedEnd !== undefined) {
+        if (!parsedStart || !parsedEnd) {
+          setErrorMessage('Debes especificar tanto "Desde página" como "Hasta página" para delimitar el bloque.');
+          return;
+        }
+        if (parsedStart < 1 || parsedEnd < 1) {
+          setErrorMessage('Las páginas deben ser números positivos mayores o iguales a 1.');
+          return;
+        }
+        if (parsedEnd < parsedStart) {
+          setErrorMessage('La página final ("Hasta página") no puede ser menor que la inicial ("Desde página").');
+          return;
+        }
+        const span = parsedEnd - parsedStart + 1;
+        if (span > 40) {
+          setErrorMessage(
+            `El rango de páginas seleccionado (${span} páginas: de la ${parsedStart} a la ${parsedEnd}) supera el límite máximo permitido de 40 páginas por petición.`
+          );
+          return;
+        }
+        if (pdfTotalPages !== null && parsedEnd > pdfTotalPages) {
+          setErrorMessage(
+            `La página final (${parsedEnd}) supera el total de páginas del PDF (${pdfTotalPages}).`
+          );
+          return;
+        }
+      }
     }
 
     try {
@@ -284,11 +350,35 @@ export function DocumentUploader({
 
       // Validar resultado de la IA sin lanzar errores fatales (throw new Error)
       if (!result.success || !result.cards || result.cards.length === 0) {
-        setStatus('idle');
         if (result.error === 'LIMIT_REACHED') {
+          setStatus('idle');
           openProModal(true);
           return;
         }
+
+        if (result.error === 'AD_REQUIRED') {
+          try {
+            const adResult = await showAdMobRewardedAd();
+            if (adResult.completed) {
+              const claim = await claimAdRewardAction(user?.id);
+              if (claim.success) {
+                // Reintentar automáticamente la generación de forma fluida tras completar el anuncio
+                return handleProcessDocument();
+              } else {
+                setErrorMessage(claim.message || (language === 'en' ? 'Could not claim ad reward.' : 'No se pudo reclamar la recompensa del anuncio.'));
+              }
+            } else if (adResult.error) {
+              setErrorMessage(adResult.error);
+            }
+          } catch (adErr) {
+            console.warn('Error en flujo de anuncio bonificado:', adErr);
+            setErrorMessage(language === 'en' ? 'Unexpected error during ad viewing.' : 'Error inesperado durante el anuncio.');
+          }
+          setStatus('idle');
+          return;
+        }
+
+        setStatus('idle');
         const errorDetail =
           result.error ||
           `El documento es demasiado denso para generar ${cardCount} tarjetas en este lote. Por favor, intenta generar una cantidad menor (ej. 10 tarjetas) para evitar sobrecargar la respuesta.`;
@@ -353,6 +443,7 @@ export function DocumentUploader({
 
   const handleReset = () => {
     setSelectedFile(null);
+    setPdfTotalPages(null);
     setPageStart('');
     setPageEnd('');
     setStatus('idle');
@@ -650,6 +741,7 @@ export function DocumentUploader({
                               {info.label}
                             </span>
                             <span className="text-[11px] text-neutral-500 dark:text-neutral-400 font-mono">
+                              {pdfTotalPages !== null ? `${pdfTotalPages} págs • ` : ''}
                               {formatFileSize(selectedFile.size)}
                             </span>
                           </div>
@@ -826,17 +918,29 @@ export function DocumentUploader({
                       </svg>
                       <span>Chunking de Precisión (Rango de Páginas PDF)</span>
                     </label>
-                    <span className="text-[10px] text-neutral-500 dark:text-neutral-400 font-mono">Aislamiento estricto</span>
+                    <span className="text-[10px] text-neutral-500 dark:text-neutral-400 font-mono">
+                      {pdfTotalPages !== null ? `${pdfTotalPages} págs totales` : 'Aislamiento estricto'}
+                    </span>
                   </div>
+
+                  {pdfTotalPages !== null && pdfTotalPages > 30 && (
+                    <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 text-xs flex items-start gap-2">
+                      <span className="shrink-0 text-sm">⚠️</span>
+                      <p className="leading-relaxed">
+                        <strong>PDF Extenso ({pdfTotalPages} páginas totales):</strong> Al superar las 30 páginas, y para asegurar la rigurosidad del mazo, los campos <strong>&quot;Desde página&quot;</strong> y <strong>&quot;Hasta página&quot;</strong> son estrictamente obligatorios (máximo 40 páginas por petición).
+                      </p>
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-[11px] font-medium text-neutral-600 dark:text-neutral-400 mb-1">
-                        Desde página:
+                        Desde página: {pdfTotalPages !== null && pdfTotalPages > 30 && <span className="text-rose-500 font-bold">* (Obligatorio)</span>}
                       </label>
                       <input
                         type="number"
                         min={1}
+                        max={pdfTotalPages || undefined}
                         disabled={isBusy}
                         value={pageStart}
                         onChange={(e) => setPageStart(e.target.value)}
@@ -846,44 +950,56 @@ export function DocumentUploader({
                     </div>
                     <div>
                       <label className="block text-[11px] font-medium text-neutral-600 dark:text-neutral-400 mb-1">
-                        Hasta página:
+                        Hasta página: {pdfTotalPages !== null && pdfTotalPages > 30 && <span className="text-rose-500 font-bold">* (Obligatorio)</span>}
                       </label>
                       <input
                         type="number"
                         min={1}
+                        max={pdfTotalPages || undefined}
                         disabled={isBusy}
                         value={pageEnd}
                         onChange={(e) => setPageEnd(e.target.value)}
-                        placeholder="ej. 15"
+                        placeholder={pdfTotalPages ? (pdfTotalPages > 40 ? 'ej. 40' : `ej. ${pdfTotalPages}`) : 'ej. 15'}
                         className="w-full text-xs font-medium px-3 py-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition disabled:opacity-50"
                       />
                     </div>
                   </div>
 
                   <p className="text-[11px] text-neutral-500 dark:text-neutral-400 leading-relaxed">
-                    Aísla estrictamente el contenido del rango de páginas solicitado antes de enviarlo a Gemini, evitando sobrecargar o desbordar la ventana de contexto.
+                    Aísla de 1 a 40 páginas por lote antes de enviarlas a Gemini. Procesa directamente tablas, gráficos y recuadros de forma multimodal.
                   </p>
                 </div>
               )}
 
-              {/* Optional Custom Instructions / Focus Instruction - High-visibility callout box */}
+              {/* Enfoque temático - High-visibility callout box */}
               <div className="relative p-3.5 rounded-2xl bg-gradient-to-r from-purple-500/10 via-violet-500/5 to-indigo-500/10 dark:from-purple-950/40 dark:via-violet-950/30 dark:to-indigo-950/40 border border-purple-300 dark:border-purple-500/40 ring-2 ring-purple-500/50 shadow-[0_0_20px_rgba(168,85,247,0.25)] transition-all">
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="text-xs font-bold text-purple-950 dark:text-purple-200 flex items-center gap-1.5">
-                    <span>{t('ai_uploader.custom_prompt_label', '🎯 Enfoque de las preguntas (Opcional)')}</span>
+                    <span>
+                      {t(
+                        'ai_uploader.custom_prompt_label',
+                        '🎯 Enfoque temático (Opcional - Aplica solo al rango seleccionado)'
+                      )}
+                    </span>
                   </label>
-                  <span className="text-purple-700/90 dark:text-purple-300/80 text-[10px] font-semibold">
-                    {t('ai_uploader.custom_prompt_sub', '(ej. Capítulo 3, Págs. 10-25 o fórmulas)')}
-                  </span>
                 </div>
                 <textarea
-                  rows={2}
+                  rows={3}
                   disabled={isBusy}
                   value={customPrompt}
                   onChange={(e) => setCustomPrompt(e.target.value)}
-                  placeholder={t('ai_uploader.custom_prompt_placeholder', 'ej. Extraer información EXCLUSIVAMENTE del Capítulo 2 o sección de conceptos clave...')}
+                  placeholder={t(
+                    'ai_uploader.custom_prompt_placeholder',
+                    'Centra la información que buscas para tu mazo, escribe por ejemplo: Extrae las preguntas EXCLUSIVAMENTE de los datos de las TABLAS, los cuadros estadísticos y las imágenes. Ignora el texto de los párrafos normales.'
+                  )}
                   className="w-full text-xs px-3.5 py-2.5 rounded-xl bg-white dark:bg-neutral-900 border border-purple-200 dark:border-purple-600/50 text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 ring-1 ring-purple-400/40 dark:ring-purple-500/40 shadow-inner transition disabled:opacity-50 resize-none"
                 />
+                <p className="text-[11px] text-purple-800 dark:text-purple-300/90 mt-1.5 leading-relaxed font-medium">
+                  {t(
+                    'ai_uploader.custom_prompt_help',
+                    'Usa este campo para guiar a la IA y filtrar la información EXCLUSIVAMENTE dentro de las páginas que has recortado arriba.'
+                  )}
+                </p>
               </div>
 
               {/* Action Buttons */}

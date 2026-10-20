@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuthStore, useCardStore, useDeckStore, useProModalStore, useLanguageStore } from '@/stores';
 import { generateCardsFromUrlAction } from '@/app/actions/generateCards';
+import { showAdMobRewardedAd } from '@/lib/admob';
+import { claimAdRewardAction } from '@/app/actions/claimAdReward';
 import type { CardFormat, GeneratedCard } from '@/types/cards';
 import { FormattedCardView } from './FormattedCardView';
 
@@ -68,8 +70,8 @@ export function UrlCardGenerator({
     }
   };
 
-  const handleGenerate = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleGenerate = async (e?: React.FormEvent) => {
+    e?.preventDefault?.();
     if (!url.trim()) {
       setErrorMessage(t('url_generator.notice_title', 'Aviso al procesar enlace:'));
       return;
@@ -101,8 +103,37 @@ export function UrlCardGenerator({
 
       if (!result.success || !result.cards) {
         if (result.error === 'LIMIT_REACHED') {
+          setStatus('idle');
           openProModal(true);
+          return;
         }
+
+        if (result.error === 'AD_REQUIRED') {
+          try {
+            const adResult = await showAdMobRewardedAd();
+            if (adResult.completed) {
+              const claim = await claimAdRewardAction(user?.id);
+              if (claim.success) {
+                // Disparar la generación automáticamente tras completar el anuncio
+                return handleGenerate();
+              } else {
+                setStatus('error');
+                setErrorMessage(claim.message || (language === 'en' ? 'Could not claim ad reward.' : 'No se pudo reclamar la recompensa del anuncio.'));
+              }
+            } else if (adResult.error) {
+              setStatus('error');
+              setErrorMessage(adResult.error);
+            } else {
+              setStatus('idle');
+            }
+          } catch (adErr) {
+            console.warn('Error en flujo de anuncio bonificado:', adErr);
+            setStatus('error');
+            setErrorMessage(language === 'en' ? 'Unexpected error during ad viewing.' : 'Error inesperado durante el anuncio.');
+          }
+          return;
+        }
+
         setStatus('error');
         setErrorMessage(result.error || (language === 'en' ? 'Could not generate cards from this link.' : 'No se pudieron generar tarjetas a partir de este enlace.'));
         return;

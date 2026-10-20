@@ -2,7 +2,7 @@
 
 import { GoogleGenAI, Type } from '@google/genai';
 import mammoth from 'mammoth';
-import { PDFParse } from 'pdf-parse';
+import { PDFDocument } from 'pdf-lib';
 import { YoutubeTranscript } from 'youtube-transcript';
 import { supabase } from '@/lib/supabase';
 import { randomizeMultipleChoiceCard } from '@/lib/cardUtils';
@@ -26,10 +26,15 @@ const flashcardSchema = {
     cards: {
       type: Type.ARRAY,
       description:
-        'Array con tarjetas de estudio de alta precisión según el formato solicitado (multiple_choice, basic, cloze o true_false).',
+        'Array dinámico con tarjetas de estudio de alta precisión según el formato solicitado (multiple_choice, basic, cloze o true_false). Puede contener cualquier número de tarjetas de 1 a 30 sin longitud fija obligatoria.',
       items: {
         type: Type.OBJECT,
         properties: {
+          generation_index: {
+            type: Type.INTEGER,
+            description:
+              'Índice secuencial estricto obligatorio de la tarjeta (1, 2, 3... del lote generado).',
+          },
           front: {
             type: Type.STRING,
             description:
@@ -52,7 +57,7 @@ const flashcardSchema = {
             },
           },
         },
-        required: ['front', 'back', 'cardFormat'],
+        required: ['generation_index', 'front', 'back', 'cardFormat'],
       },
     },
   },
@@ -151,7 +156,7 @@ FASE 1: INDEXACIÓN INTERNA (TRONCAL VS. MINUCIOSO)
 FASE 2: GENERACIÓN SECUENCIAL PRIORIZADA
 1. Extrae y genera SECUENCIALMENTE las tarjetas solicitadas comenzando obligatoriamente por los conceptos pendientes de la LISTA TRONCAL, siguiendo el orden cronológico y pedagógico del material.
 2. Cada tarjeta debe centrarse en un concepto nuclear único, formulado según el formato solicitado.
-3. ÚNICAMENTE cuando la LISTA TRONCAL se vacíe matemáticamente (es decir, el 100% de la teoría nuclear ya ha sido cubierta por tarjetas existentes o por las primeras tarjetas de este lote), continúa la extracción con los conceptos de la LISTA MINUCIOSA.`;
+3. ÚNICAMENTE cuando la LISTA TRONCAL se vacíe matemáticamente (es decir, el 100% de la teoría nuclear ya ha sido cubierta por tarjetas existentes o por las primeras tarjetas de este lote), continúa obligatoriamente la extracción con los conceptos de la LISTA MINUCIOSA hasta alcanzar exactamente el total de tarjetas solicitado.`;
 
 /**
  * RIGOR MATEMÁTICO EN ADVERTENCIAS (core_exhausted):
@@ -164,56 +169,93 @@ const RIGOR_WARNING_DIRECTIVE = `RIGOR MATEMÁTICO EN LA PROPIEDAD "core_exhaust
 
 /**
  * System Prompt de Restricción Estricta (Grounding) y Extracción de Contenido (Estilo NotebookLM).
- * Obliga a Gemini a actuar exclusivamente como un extractor fidedigno de conocimiento clínico y académico,
- * manteniendo inquebrantable el muro anti-alucinaciones, el límite dinámico (escape hatch)
- * y la inyección dinámica de la regla del formato solicitado.
+ * Adapta dinámicamente las instrucciones según si es la primera generación o una re-generación con historial.
  */
-function getSystemInstruction(format: CardFormat = 'multiple_choice'): string {
+function getSystemInstruction(
+  format: CardFormat = 'multiple_choice',
+  requestedCount?: number,
+  existingCardsCount: number = 0
+): string {
   const formatRule = getFormatRule(format);
+  const countStr = requestedCount ? String(requestedCount) : '{requested_count}';
+  const isReGeneration = existingCardsCount > 0;
+
   const contextSpecificRule =
     format === 'multiple_choice'
       ? '4. DISTRACTORES BASADOS EN EL TEXTO: En preguntas de opción múltiple (test), todos los distractores incorrectos deben ser técnicamente plausibles pero fundamentados en términos y conceptos del propio texto fuente, sin introducir elementos externos.'
       : '4. FIDELIDAD TERMINOLÓGICA Y RIGOR: Todo concepto, pregunta, afirmación o respuesta debe fundamentarse estricta y textualmente en el texto fuente, sin introducir terminología ajena ni elementos externos.';
+
+  const quotaDirective = isReGeneration
+    ? `DIRECTIVA DE EXPANSIÓN Y ANTI-DUPLICADOS (RE-GENERACIÓN):
+Intenta generar hasta ${countStr} tarjetas nuevas a partir de conceptos no cubiertos previamente en el material.
+Para cada tarjeta, asigna un \`generation_index\` estrictamente secuencial (1, 2, 3...). Detén la generación si se agota el material nuevo para evitar duplicados.`
+    : `DIRECTIVA CRÍTICA: DEBES GENERAR EXACTAMENTE ${countStr} TARJETAS. ES ESTRICTAMENTE PROHIBIDO DETENERSE ANTES. Si agotas los conceptos troncales, estás OBLIGADO a extraer detalles minuciosos, excepciones y estadísticas hasta alcanzar el objetivo exacto. Cerrar la respuesta con menos tarjetas de las solicitadas se considerará un fallo crítico.
+
+ÍNDICE DE SEGUIMIENTO OBLIGATORIO:
+Para cada tarjeta, asigna un \`generation_index\` estrictamente secuencial (1, 2, 3...). No puedes finalizar el proceso hasta que el \`generation_index\` coincida con el número total de tarjetas solicitado (${countStr}).`;
+
+  const completionRule = isReGeneration
+    ? `6. CONTROL DE LONGITUD DINÁMICA: El esquema JSON permite arrays dinámicos de 1 a 30 elementos. Devuelve sólo las tarjetas correspondientes a conceptos nuevos reales.`
+    : `6. CUMPLIMIENTO DEL TOTAL SOLICITADO: No puedes finalizar el proceso hasta que el \`generation_index\` coincida exactamente con ${countStr}. Si se agotan los conceptos troncales, estás obligado a extraer detalles minuciosos, excepciones y estadísticas hasta alcanzar el objetivo exacto.`;
+
+  const reGenerationFinalOrder = isReGeneration
+    ? `\n\nATENCIÓN: EL ESQUEMA JSON TE PERMITE DEVOLVER MENOS DE 30 TARJETAS. SI HAS AGOTADO EL MATERIAL NUEVO DEL TEXTO E IMÁGENES, DEBES DETENERTE Y DEVOLVER UN ARRAY MÁS CORTO (ej. 12, 18 o 25 tarjetas). NUNCA INVENTES NI REPITAS CONCEPTOS DEL HISTORIAL SÓLO PARA LLEGAR A LA CUOTA.`
+    : '';
 
   return `Eres un extractor de conocimiento clínico y académico estricto. Tu única fuente de verdad es el texto proporcionado.
 
 REGLA DE ORO (Estilo NotebookLM):
 NO inventes información. Tu única fuente de verdad es el texto. Si un concepto, dato o respuesta no se puede deducir directa y explícitamente del texto proporcionado, DEBES omitirlo. No uses conocimiento previo externo.
 
-LÍMITE DINÁMICO:
-Se te pide una cantidad máxima de tarjetas. Si el texto se agota y no hay MÁS DATOS ÚNICOS, DEBES DETENER LA GENERACIÓN INMEDIATAMENTE. Prohibido refrasear o repetir para llegar al máximo.
+${quotaDirective}
 
 ${formatRule}
 
 REGLAS INQUEBRANTABLES DE EXTRACCIÓN Y RESTRICCIÓN DE CONTEXTO (GROUNDING ESTRICTO):
 1. TU ÚNICA FUENTE DE VERDAD ES EL TEXTO PROPORCIONADO: Toda la información de las tarjetas DEBE extraerse EXCLUSIVA Y ESTRICTAMENTE de este texto.
 2. PROHIBICIÓN TERMINANTE DE CONOCIMIENTO EXTERNO: Tienes TERMINANTEMENTE PROHIBIDO utilizar conocimiento previo externo, asunciones no fundadas o datos que no aparezcan en la fuente proporcionada.
-3. SI UN CONCEPTO O DETALLE NO SE EXPLICA EXPLÍCITAMENTE EN EL DOCUMENTO, NO PUEDES GENERAR UNA TARJETA SOBRE ÉL: Actúa únicamente y exclusivamente como un extractor fidedigno. Si un dato no figura de forma explícitamente en el material de origen, para ti no existe y bajo ningún concepto debes inventarlo, completarlo o extrapolarlo.
+3. EXTRACCIÓN FIDEDIGNA: Actúa únicamente y exclusivamente como un extractor fidedigno de los conceptos, mecanismos, clasificaciones, datos y detalles presentes en el material de origen.
 ${contextSpecificRule}
 5. OBJETIVIDAD Y RIGOR CIENTÍFICO: Las preguntas y respuestas deben reflejar exactamente la definición, clasificación, mecanismo, dosis, valor o dato que el texto expone sin divagar.
-6. LÍMITE DINÁMICO DE GENERACIÓN: Si la información fidedigna del texto se agota antes de alcanzar el número máximo solicitado, detén la generación de inmediato con las tarjetas obtenidas. No dupliques ni refrasees contenido.`;
+${completionRule}${reGenerationFinalOrder}`;
 }
 
 /**
  * Reglas globales inquebrantables de blindaje (Estilo NotebookLM) con inyección dinámica de formato.
  */
-function getGlobalRules(format: CardFormat = 'multiple_choice'): string {
+function getGlobalRules(
+  format: CardFormat = 'multiple_choice',
+  requestedCount?: number,
+  existingCardsCount: number = 0
+): string {
   const formatRule = getFormatRule(format);
-  const cardRequirement =
-    format === 'multiple_choice'
-      ? 'array con tarjetas según formato multiple_choice con sus 4 opciones y respuesta correcta'
-      : `array con tarjetas formuladas estrictamente según el formato "${format}"`;
+  const countStr = requestedCount ? String(requestedCount) : '{requested_count}';
+  const isReGeneration = existingCardsCount > 0;
+
+  const cardRequirement = isReGeneration
+    ? (format === 'multiple_choice'
+        ? `array dinámico de hasta ${countStr} tarjetas según formato multiple_choice con sus 4 opciones, respuesta correcta y generation_index del 1 al N`
+        : `array dinámico de hasta ${countStr} tarjetas formuladas según el formato "${format}" y generation_index del 1 al N`)
+    : (format === 'multiple_choice'
+        ? `array con exactamente ${countStr} tarjetas según formato multiple_choice con sus 4 opciones, respuesta correcta y generation_index del 1 al ${countStr}`
+        : `array con exactamente ${countStr} tarjetas formuladas estrictamente según el formato "${format}" y generation_index del 1 al ${countStr}`);
+
+  const directiveRule = isReGeneration
+    ? `2. DIRECTIVA DE EXPANSIÓN Y ANTI-DUPLICADOS: Intenta alcanzar hasta ${countStr} tarjetas nuevas basándote en conceptos aún no evaluados y datos visuales. SIN EMBARGO, ATENCIÓN: EL ESQUEMA JSON TE PERMITE DEVOLVER MENOS DE 30 TARJETAS. SI HAS AGOTADO EL MATERIAL NUEVO DEL TEXTO E IMÁGENES, DEBES DETENERTE Y DEVOLVER UN ARRAY MÁS CORTO (ej. 12, 18 o 25 tarjetas). NUNCA INVENTES NI REPITAS CONCEPTOS DEL HISTORIAL SÓLO PARA LLEGAR A LA CUOTA.
+3. ÍNDICE DE SEGUIMIENTO: Para cada tarjeta, asigna un \`generation_index\` estrictamente secuencial (1, 2, 3...). Detén la generación cuando alcances las ${countStr} tarjetas o cuando hayas evaluado todos los conceptos únicos posibles sin duplicar nada del historial.`
+    : `2. DIRECTIVA CRÍTICA: DEBES GENERAR EXACTAMENTE ${countStr} TARJETAS. ES ESTRICTAMENTE PROHIBIDO DETENERSE ANTES. Si agotas los conceptos troncales, estás OBLIGADO a extraer detalles minuciosos, excepciones y estadísticas hasta alcanzar el objetivo exacto. Cerrar la respuesta con menos tarjetas de las solicitadas se considerará un fallo crítico.
+3. ÍNDICE DE SEGUIMIENTO OBLIGATORIO: Para cada tarjeta, asigna un \`generation_index\` estrictamente secuencial (1, 2, 3...). No puedes finalizar el proceso hasta que el \`generation_index\` coincida con el número total de tarjetas solicitado (${countStr}).`;
 
   return `REGLAS GLOBALES INQUEBRANTABLES DE BLINDAJE (ESTILO NOTEBOOKLM):
 1. REGLA DE ORO (Estilo NotebookLM): NO inventes información. Tu única fuente de verdad es el texto. Si un concepto, dato o respuesta no se puede deducir directa y explícitamente del texto proporcionado, DEBES omitirlo. No uses conocimiento previo externo.
-2. LÍMITE DINÁMICO: Se te pide una cantidad máxima de tarjetas. Si el texto se agota y no hay MÁS DATOS ÚNICOS, DEBES DETENER LA GENERACIÓN INMEDIATAMENTE. Prohibido refrasear o repetir para llegar al máximo.
-3. ${formatRule}
-4. PRECISIÓN Y GROUNDING: Toda pregunta, afirmación, distractor o respuesta debe estar basada estricta y textualmente en el texto fuente.
-5. ACRÓNIMOS: Todo acrónimo debe ir acompañado obligatoriamente de su nombre completo si figura en la fuente (ejemplo: "ARN (Ácido Ribonucleico)", "TCP (Transmission Control Protocol)").
-6. INTEGRIDAD ESTRUCTURAL DEL JSON (PRIORIDAD ABSOLUTA): Debes devolver un objeto JSON válido con los campos "core_exhausted" (booleano) y "cards" (${cardRequirement}). Sé sintético, directo y conciso en el texto de las preguntas, opciones y respuestas, sin rodeos innecesarios.`;
+${directiveRule}
+4. ${formatRule}
+5. PRECISIÓN Y GROUNDING: Toda pregunta, afirmación, distractor o respuesta debe estar basada estricta y textualmente en el texto fuente.
+6. ACRÓNIMOS: Todo acrónimo debe ir acompañado obligatoriamente de su nombre completo si figura en la fuente (ejemplo: "ARN (Ácido Ribonucleico)", "TCP (Transmission Control Protocol)").
+7. INTEGRIDAD ESTRUCTURAL DEL JSON (PRIORIDAD ABSOLUTA): Debes devolver un objeto JSON válido con los campos "core_exhausted" (booleano) y "cards" (${cardRequirement}). Sé sintético, directo y conciso en el texto de las preguntas, opciones y respuestas, sin rodeos innecesarios.`;
 }
 
-export interface ParsedPageRange {
+interface ParsedPageRange {
   startPage?: number;
   endPage?: number;
   rangeLabel?: string;
@@ -224,7 +266,7 @@ export interface ParsedPageRange {
  * Parsea y aísla el rango de páginas solicitado a partir de inputs numéricos, strings de rango
  * o instrucciones en lenguaje natural (ej. "páginas 5-12", "pág. 10 a 20", "capítulo 3 págs 15-30").
  */
-export function parsePageRange(
+function parsePageRange(
   pageRangeStr?: string,
   pageStart?: number,
   pageEnd?: number,
@@ -287,55 +329,112 @@ export function parsePageRange(
 }
 
 /**
- * CHUNKING DE PRECISIÓN:
- * Aísla estrictamente el texto del rango de páginas solicitado de un PDF usando pdf-parse v2
- * antes de enviarlo a Gemini, protegiendo el context window de sobrecargas y desbordamientos.
+ * SALVAVIDAS ANTI-DUPLICACIÓN (LÍMITE DINÁMICO RELAJADO):
+ * Construye la directiva de cuota de tarjetas para Gemini:
+ * - Si es la primera generación (historial vacío): Mantiene la directiva estricta de generar exactamente targetCount.
+ * - Si no es la primera generación (el array de historial tiene tarjetas): Relaja la cuota mediante la directiva de
+ *   expansión, autorizando a detenerse antes de la cuota si se agotaron los conceptos para erradicar duplicados.
  */
-async function extractPdfTextChunk(
+function buildTargetCountDirective(
+  targetCount: number,
+  existingCardsCount: number
+): { directive: string; integrityNote: string } {
+  const isFirstGeneration = existingCardsCount === 0;
+
+  if (isFirstGeneration) {
+    return {
+      directive: `DIRECTIVA CRÍTICA: DEBES GENERAR EXACTAMENTE ${targetCount} TARJETAS. ES ESTRICTAMENTE PROHIBIDO DETENERSE ANTES. Si agotas los conceptos troncales, estás OBLIGADO a extraer detalles minuciosos, excepciones y estadísticas hasta alcanzar el objetivo exacto. Cerrar la respuesta con menos tarjetas de las solicitadas se considerará un fallo crítico.
+
+ÍNDICE DE SEGUIMIENTO OBLIGATORIO:
+Para cada tarjeta, asigna un \`generation_index\` estrictamente secuencial (1, 2, 3...). No puedes finalizar el proceso hasta que el \`generation_index\` coincida con el número total de tarjetas solicitado (${targetCount}).`,
+      integrityNote: `array con EXACTAMENTE ${targetCount} tarjetas únicas del formato`,
+    };
+  }
+
+  return {
+    directive: `DIRECTIVA DE EXPANSIÓN (ANTI-DUPLICADOS): Intenta alcanzar hasta ${targetCount} tarjetas nuevas basándote en detalles minuciosos y datos de las imágenes. SIN EMBARGO:
+ATENCIÓN: EL ESQUEMA JSON TE PERMITE DEVOLVER MENOS DE 30 TARJETAS. SI HAS AGOTADO EL MATERIAL NUEVO DEL TEXTO E IMÁGENES, DEBES DETENERTE Y DEVOLVER UN ARRAY MÁS CORTO (ej. 12, 18 o 25 tarjetas). NUNCA INVENTES NI REPITAS CONCEPTOS DEL HISTORIAL SÓLO PARA LLEGAR A LA CUOTA.
+
+ÍNDICE DE SEGUIMIENTO:
+Para cada tarjeta, asigna un \`generation_index\` estrictamente secuencial (1, 2, 3...). Detén la generación cuando alcances las ${targetCount} tarjetas o cuando hayas evaluado todos los conceptos únicos posibles sin duplicar nada del historial.`,
+    integrityNote: `array dinámico de entre 1 y ${targetCount} tarjetas únicas no repetidas del formato (deteniéndote antes si el material se agota para evitar duplicar el historial)`,
+  };
+}
+
+/**
+ * AISLAMIENTO MULTIMODAL DE PDF (pdf-lib):
+ * Aísla el rango de páginas solicitado del PDF en memoria, genera un nuevo documento
+ * PDF recortado y lo convierte a Base64 para pasárselo a Gemini como parte multimodal nativa (inlineData).
+ * Permite a Gemini procesar directamente tablas, diagramas, esquemas e imágenes de las páginas seleccionadas.
+ */
+async function slicePdfDocument(
   pdfBuffer: Buffer,
   pageRange: ParsedPageRange
-): Promise<{ text: string; totalPages: number; extractedRange: string } | null> {
-  let parser: PDFParse | null = null;
+): Promise<{ base64Pdf: string; totalPages: number; pageCount: number; extractedRange: string }> {
   try {
-    parser = new PDFParse({ data: pdfBuffer });
-    const textOptions: { first?: number; last?: number; pageJoiner?: string } = {
-      pageJoiner: '\n--- PÁGINA page_number DE total_number ---\n',
-    };
+    const srcDoc = await PDFDocument.load(pdfBuffer, { ignoreEncryption: true });
+    const totalPages = srcDoc.getPageCount();
 
-    if (pageRange.startPage) {
-      textOptions.first = pageRange.startPage;
-    }
-    if (pageRange.endPage) {
-      textOptions.last = pageRange.endPage;
+    if (totalPages === 0) {
+      throw new Error('El PDF no contiene páginas válidas.');
     }
 
-    const result = await parser.getText(textOptions);
-    const totalPages = result.total || 0;
-    const extractedText = (result.text || '').trim();
+    // Validación de viabilidad económica y protección: Si el PDF tiene >30 páginas totales, el rango es estrictamente obligatorio
+    if (totalPages > 30 && !pageRange.startPage && !pageRange.endPage) {
+      throw new Error(
+        `El PDF tiene ${totalPages} páginas (más de 30 páginas totales). Por motivos de rendimiento y viabilidad económica, los campos "Desde página" y "Hasta página" son estrictamente obligatorios (máximo 40 páginas por petición).`
+      );
+    }
+
+    // Calcular páginas 1-indexadas solicitadas dentro del rango real del archivo
+    const start = Math.max(1, Math.min(pageRange.startPage || 1, totalPages));
+    const end = Math.max(start, Math.min(pageRange.endPage || totalPages, totalPages));
+    const rangeSpan = end - start + 1;
+
+    if (rangeSpan > 40) {
+      throw new Error(
+        `El rango de páginas solicitado (${rangeSpan} páginas: de la ${start} a la ${end}) supera el límite máximo permitido de 40 páginas por petición.`
+      );
+    }
+
+    const pageIndices: number[] = [];
+    for (let i = start - 1; i < end; i++) {
+      pageIndices.push(i);
+    }
 
     const rangeLabel =
-      pageRange.rangeLabel || (totalPages > 0 ? `Páginas 1 a ${totalPages}` : 'Documento completo');
+      pageRange.rangeLabel ||
+      (start === 1 && end === totalPages
+        ? `Documento completo (Páginas 1 a ${totalPages})`
+        : `Páginas ${start} a ${end}`);
+
+    // Construir sub-documento PDF limpio con únicamente las páginas deseadas
+    const subDoc = await PDFDocument.create();
+    const copiedPages = await subDoc.copyPages(srcDoc, pageIndices);
+    for (const page of copiedPages) {
+      subDoc.addPage(page);
+    }
+
+    const base64Pdf = await subDoc.saveAsBase64({ dataUri: false });
+
+    console.log(
+      `[PDF MULTIMODAL SLICER] Rango aislado: ${rangeLabel}. Páginas: ${pageIndices.length} de ${totalPages}. Tamaño Base64: ${base64Pdf.length} caracteres.`
+    );
 
     return {
-      text: extractedText,
+      base64Pdf,
       totalPages,
+      pageCount: pageIndices.length,
       extractedRange: rangeLabel,
     };
   } catch (err) {
-    console.warn('Advertencia al extraer chunk de texto de PDF con pdf-parse:', err);
-    return null;
-  } finally {
-    if (parser) {
-      try {
-        await parser.destroy();
-      } catch {
-        // no-op
-      }
-    }
+    console.error('Error al aislar páginas del PDF con pdf-lib:', err);
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(`No se pudo procesar el archivo PDF: ${msg}`);
   }
 }
 
-export interface ExistingCardHistoryItem {
+interface ExistingCardHistoryItem {
   front: string;
   back?: string;
 }
@@ -416,7 +515,7 @@ INSTRUCCIONES OBLIGATORIAS DE REANUDACIÓN:
 1. REANUDACIÓN EXACTA: Examina minuciosamente estas tarjetas existentes para determinar el punto exacto del documento o PDF donde se detuvo el lote anterior.
 2. AVANCE SECUENCIAL: Reanuda la extracción inmediatamente desde el siguiente concepto pendiente, avanzando hacia las partes subsiguientes del texto.
 3. PROHIBICIÓN ABSOLUTA DE REPETICIÓN: Bajo ninguna circunstancia formules preguntas redundantes, refraseadas o equivalentes sobre los conceptos cubiertos arriba.
-4. AGOTAMIENTO REAL: Si tras recorrer el texto completo ya no quedan conceptos troncales pendientes por extraer, genera tarjetas de la lista minuciosa o devuelve únicamente las tarjetas de conceptos nuevos posibles y marca "core_exhausted: true".
+4. AGOTAMIENTO Y PROFUNDIZACIÓN: Si tras recorrer el texto ya no quedan conceptos troncales pendientes por extraer, continúa con la LISTA MINUCIOSA (detalles, excepciones, clasificaciones secundarias y tablas). SI HAS AGOTADO EL MATERIAL NUEVO DEL TEXTO E IMÁGENES, DEBES DETENERTE Y DEVOLVER UN ARRAY MÁS CORTO (ej. 12, 18 o 25 tarjetas), marcando "core_exhausted: true". NUNCA INVENTES NI REPITAS CONCEPTOS DEL HISTORIAL SÓLO PARA LLEGAR A LA CUOTA.
 ======================================================================`;
 }
 
@@ -428,7 +527,7 @@ function processGeneratedCards(
   targetCount: number,
   cardFormat: CardFormat
 ): GeneratedCard[] {
-  return parsedCards.slice(0, targetCount).map((card) => {
+  return parsedCards.slice(0, targetCount).map((card, idx) => {
     let front = card.front.trim();
     const back = card.back.trim();
     const resolvedFormat = (card.cardFormat as CardFormat) || cardFormat;
@@ -452,6 +551,7 @@ function processGeneratedCards(
     }
 
     const cleaned: GeneratedCard = {
+      generation_index: typeof card.generation_index === 'number' ? card.generation_index : idx + 1,
       front,
       back,
       cardFormat: resolvedFormat,
@@ -476,11 +576,15 @@ const GEMINI_MODEL = 'gemini-3.1-flash-lite';
  * Configuración estricta de Gemini generada dinámicamente según el formato de tarjeta:
  * - temperature: 0.1 para forzar respuestas deterministas, eliminar la creatividad y evitar alucinaciones.
  * - responseMimeType: 'application/json' y responseJsonSchema: flashcardSchema para forzar la estructura de salida.
- * - systemInstruction: System Prompt adaptado dinámicamente con la regla del formato seleccionado.
+ * - systemInstruction: System Prompt adaptado dinámicamente con la regla del formato seleccionado y directiva de cantidad.
  */
-function getGeminiConfig(format: CardFormat = 'multiple_choice') {
+function getGeminiConfig(
+  format: CardFormat = 'multiple_choice',
+  requestedCount?: number,
+  existingCardsCount: number = 0
+) {
   return {
-    systemInstruction: getSystemInstruction(format),
+    systemInstruction: getSystemInstruction(format, requestedCount, existingCardsCount),
     temperature: 0.1,
     responseMimeType: 'application/json',
     responseJsonSchema: flashcardSchema,
@@ -559,18 +663,25 @@ interface ApiLimitCheck {
   tier: 'free' | 'pro' | 'vip';
   currentCount: number;
   bonusCredits?: number;
+  welcomeGenerations?: number;
+  phase?: 'welcome' | 'ads';
   userId: string;
 }
 
 /**
- * Valida la cuota de generación del usuario en api_limits antes de llamar a Gemini:
- * - Si tier es 'pro' o 'vip': omite límites (bypass ilimitado).
- * - Si tier es 'free': cuota de 10 generaciones mensuales. Si supera 10, consume
- *   créditos acumulables de anuncios (bonus_credits). Si ambos se agotan, devuelve { error: 'LIMIT_REACHED' }.
+ * Valida la cuota de generación del usuario en api_limits antes de llamar a Gemini según el modelo Freemium (5/50/120):
+ * 1. TIER 'pro' o 'vip': Límite de 120 mensuales. Si generations_count >= 120 -> { error: 'LIMIT_REACHED' }.
+ * 2. TIER 'free':
+ *    - Fase Bienvenida: Si welcome_generations < 5 -> Permite directamente sin ads.
+ *    - Fase Ads (Mensual, welcome_generations >= 5):
+ *      - Si generations_count >= 50 -> { error: 'LIMIT_REACHED' } (Límite mensual gratis superado).
+ *      - Si generations_count < 50:
+ *        - Si bonus_credits <= 0 -> { error: 'AD_REQUIRED' }.
+ *        - Si bonus_credits > 0 -> Permite la generación.
  */
 async function enforceApiLimit(
   userId: string
-): Promise<{ check: ApiLimitCheck } | { error: 'LIMIT_REACHED' }> {
+): Promise<{ check: ApiLimitCheck } | { error: 'LIMIT_REACHED' | 'AD_REQUIRED' }> {
   try {
     // Consultar y validar cuota atómicamente mediante RPC SECURITY DEFINER
     const { data: rpcData, error: rpcError } = await supabase.rpc('check_api_limit', {
@@ -583,10 +694,15 @@ async function enforceApiLimit(
         tier?: 'free' | 'pro' | 'vip';
         count?: number;
         bonus_credits?: number;
-        error?: string;
+        welcome_generations?: number;
+        phase?: 'welcome' | 'ads';
+        error?: 'LIMIT_REACHED' | 'AD_REQUIRED';
       };
 
-      if (res.allowed === false || res.error === 'LIMIT_REACHED') {
+      if (res.allowed === false) {
+        if (res.error === 'AD_REQUIRED') {
+          return { error: 'AD_REQUIRED' };
+        }
         return { error: 'LIMIT_REACHED' };
       }
 
@@ -596,6 +712,8 @@ async function enforceApiLimit(
           tier: res.tier || 'free',
           currentCount: typeof res.count === 'number' ? res.count : 0,
           bonusCredits: typeof res.bonus_credits === 'number' ? res.bonus_credits : 0,
+          welcomeGenerations: typeof res.welcome_generations === 'number' ? res.welcome_generations : 0,
+          phase: res.phase,
           userId,
         },
       };
@@ -618,38 +736,70 @@ async function enforceApiLimit(
         typeof directData.generations_count === 'number' ? directData.generations_count : 0;
       const bonusCredits =
         typeof directData.bonus_credits === 'number' ? directData.bonus_credits : 0;
+      const welcomeGenerations =
+        typeof directData.welcome_generations === 'number' ? directData.welcome_generations : 0;
       const lastDate = directData.last_generation_date
         ? String(directData.last_generation_date).slice(0, 10)
         : null;
-
-      if (tier === 'pro' || tier === 'vip') {
-        return {
-          check: {
-            allowed: true,
-            tier,
-            currentCount: generationsCount,
-            bonusCredits,
-            userId,
-          },
-        };
-      }
 
       const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
       const lastMonth = lastDate ? lastDate.slice(0, 7) : null;
       const isSameMonth = lastMonth === currentMonth;
       const count = isSameMonth ? generationsCount : 0;
 
-      // Si agotó las 10 mensuales y no tiene créditos bonus, bloquear
-      if (count >= 10 && bonusCredits <= 0) {
+      // 1. TIER 'pro' o 'vip': límite 120 mensuales
+      if (tier === 'pro' || tier === 'vip') {
+        if (count >= 120) {
+          return { error: 'LIMIT_REACHED' };
+        }
+        return {
+          check: {
+            allowed: true,
+            tier,
+            currentCount: count,
+            bonusCredits,
+            welcomeGenerations,
+            userId,
+          },
+        };
+      }
+
+      // 2. TIER 'free':
+      // Fase Bienvenida: Si welcome_generations < 5 -> permite directamente
+      if (welcomeGenerations < 5) {
+        return {
+          check: {
+            allowed: true,
+            tier: 'free',
+            phase: 'welcome',
+            currentCount: count,
+            bonusCredits,
+            welcomeGenerations,
+            userId,
+          },
+        };
+      }
+
+      // Fase Ads (welcome_generations >= 5):
+      // Si generations_count >= 50 -> LIMIT_REACHED
+      if (count >= 50) {
         return { error: 'LIMIT_REACHED' };
       }
 
+      // Si generations_count < 50: verificar bonus_credits
+      if (bonusCredits <= 0) {
+        return { error: 'AD_REQUIRED' };
+      }
+
+      // Si bonus_credits > 0, permite la generación
       return {
         check: {
           allowed: true,
           tier: 'free',
+          phase: 'ads',
           currentCount: count,
           bonusCredits,
+          welcomeGenerations,
           userId,
         },
       };
@@ -664,8 +814,10 @@ async function enforceApiLimit(
 }
 
 /**
- * Incrementa el uso en api_limits tras completarse la generación con la IA mediante RPC atómico.
- * Consume de la cuota mensual (hasta 10) o de los créditos bonificados acumulables.
+ * Incrementa el uso en api_limits tras completarse la generación con la IA mediante RPC atómico:
+ * - TIER 'pro'/'vip': suma 1 a generations_count (hasta 120).
+ * - TIER 'free' Fase Bienvenida (< 5): suma 1 a welcome_generations y NO altera generations_count.
+ * - TIER 'free' Fase Ads (>= 5): resta 1 a bonus_credits y suma 1 a generations_count.
  */
 async function recordApiUsage(userId: string) {
   try {
@@ -676,13 +828,51 @@ async function recordApiUsage(userId: string) {
     if (rpcErr) {
       console.error('Advertencia al invocar increment_api_generation RPC:', rpcErr);
       const todayStr = new Date().toISOString().slice(0, 10);
-      await supabase.from('api_limits').upsert({
-        user_id: userId,
-        generations_count: 1,
-        last_generation_date: todayStr,
-        tier: 'free',
-        updated_at: new Date().toISOString(),
-      });
+      const { data: rec } = await supabase
+        .from('api_limits')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (rec) {
+        const welcome = typeof rec.welcome_generations === 'number' ? rec.welcome_generations : 0;
+        const currentCount = typeof rec.generations_count === 'number' ? rec.generations_count : 0;
+        const bonus = typeof rec.bonus_credits === 'number' ? rec.bonus_credits : 0;
+        const tier = (rec.tier as 'free' | 'pro' | 'vip') || 'free';
+
+        if (tier === 'pro' || tier === 'vip') {
+          await supabase.from('api_limits').update({
+            generations_count: currentCount + 1,
+            last_generation_date: todayStr,
+            updated_at: new Date().toISOString(),
+          }).eq('user_id', userId);
+        } else if (welcome < 5) {
+          // Fase Bienvenida: suma 1 a welcome_generations y NO altera generations_count
+          await supabase.from('api_limits').update({
+            welcome_generations: welcome + 1,
+            last_generation_date: todayStr,
+            updated_at: new Date().toISOString(),
+          }).eq('user_id', userId);
+        } else {
+          // Fase Ads: resta 1 a bonus_credits y suma 1 a generations_count
+          await supabase.from('api_limits').update({
+            bonus_credits: Math.max(0, bonus - 1),
+            generations_count: currentCount + 1,
+            last_generation_date: todayStr,
+            updated_at: new Date().toISOString(),
+          }).eq('user_id', userId);
+        }
+      } else {
+        await supabase.from('api_limits').upsert({
+          user_id: userId,
+          welcome_generations: 1,
+          generations_count: 0,
+          last_generation_date: todayStr,
+          tier: 'free',
+          bonus_credits: 0,
+          updated_at: new Date().toISOString(),
+        });
+      }
     }
   } catch (err) {
     console.warn('Advertencia no bloqueante al actualizar api_limits:', err);
@@ -724,7 +914,7 @@ export async function generateCardsAction(
 
   const checkResult = await enforceApiLimit(resolvedUserId);
   if ('error' in checkResult) {
-    return { success: false, error: 'LIMIT_REACHED' };
+    return { success: false, error: checkResult.error };
   }
   const apiCheck = checkResult.check;
 
@@ -737,28 +927,36 @@ export async function generateCardsAction(
     const progressMemoryPrompt = buildProgressMemorySection(existingCards);
     const languageDirective = buildLanguageDirective(language);
 
+    // FASE 3: SALVAVIDAS ANTI-DUPLICACIÓN (LÍMITE DINÁMICO RELAJADO)
+    const { directive: targetCountDirective, integrityNote } = buildTargetCountDirective(
+      targetCount,
+      existingCards.length
+    );
+
     const ai = new GoogleGenAI({ apiKey });
 
     const prompt = `Eres un pedagogo experto en ciencias cognitivas y diseño de flashcards para el algoritmo de repetición espaciada FSRS.
-CANTIDAD MÁXIMA A GENERAR: ${targetCount}. Si el tema es acotado, DEBES devolver menos tarjetas. PROHIBIDO inventar o repetir para llegar al límite. Cubre los conceptos clave sobre el tema: "${cleanTopic}".
+${targetCountDirective}
+
+Cubre los conceptos clave sobre el tema: "${cleanTopic}".
 
 ${TWO_PHASE_SYSTEM_PROMPT}
 
 ${RIGOR_WARNING_DIRECTIVE}
 
-${getGlobalRules(cardFormat)}
+${getGlobalRules(cardFormat, targetCount, existingCards.length)}
 
 ${getFormatInstructions(cardFormat)}
 
 ${progressMemoryPrompt ? `${progressMemoryPrompt}\n\n` : ''}REGLA CRÍTICA DE INTEGRIDAD:
-La integridad estructural del JSON es prioridad absoluta y DEBES devolver un objeto con "core_exhausted" (booleano) y "cards" (array con hasta un máximo de ${targetCount} tarjetas únicas del formato "${cardFormat}"). Para asegurar que las tarjetas quepan dentro del límite sin truncarse, formula preguntas, textos, opciones (si aplica) y respuestas directas y concisas.
+La integridad estructural del JSON es prioridad absoluta y DEBES devolver un objeto con "core_exhausted" (booleano) y "cards" (${integrityNote} "${cardFormat}", numeradas estrictamente con generation_index del 1 al N). Para asegurar que las tarjetas quepan dentro del límite sin truncarse, formula preguntas, textos, opciones (si aplica) y respuestas directas y concisas.
 
 ${languageDirective}`;
 
     const response = await ai.models.generateContent({
       model: GEMINI_MODEL,
       contents: prompt,
-      config: getGeminiConfig(cardFormat),
+      config: getGeminiConfig(cardFormat, targetCount, existingCards.length),
     });
 
     const text = response.text;
@@ -863,7 +1061,7 @@ export async function generateCardsFromDocumentAction(
 
   const checkResult = await enforceApiLimit(resolvedUserId);
   if ('error' in checkResult) {
-    return { success: false, error: 'LIMIT_REACHED' };
+    return { success: false, error: checkResult.error };
   }
   const apiCheck = checkResult.check;
 
@@ -952,7 +1150,7 @@ export async function generateCardsFromDocumentAction(
       normalizedMime === 'application/pdf' ||
       Boolean(fileName && /\.pdf$/i.test(fileName));
 
-    // 3. Procesar instrucción de enfoque y aislar rango de páginas para PDFs (Chunking de Precisión)
+    // 3. Procesar instrucción de enfoque y aislar rango de páginas para PDFs (Aislamiento Multimodal con pdf-lib)
     const focusInstruction = (rawFocus || customPrompt || '').trim();
     const parsedRange = parsePageRange(
       input.pageRange,
@@ -961,14 +1159,15 @@ export async function generateCardsFromDocumentAction(
       focusInstruction
     );
 
-    // Si es un PDF, aislamos estrictamente el texto del rango de páginas con pdf-parse antes de enviarlo a Gemini
-    let extractedPdfChunk: { text: string; totalPages: number; extractedRange: string } | null = null;
+    // FASE 1: Si es un PDF, aislamos estrictamente el rango de páginas en un sub-documento binario con pdf-lib
+    let slicedPdf: { base64Pdf: string; totalPages: number; pageCount: number; extractedRange: string } | null = null;
     if (isPdfDocument) {
-      try {
-        const fileBuffer = Buffer.from(base64Data, 'base64');
-        extractedPdfChunk = await extractPdfTextChunk(fileBuffer, parsedRange);
-      } catch (pdfErr) {
-        console.warn('Error al aislar chunk de páginas de PDF con pdf-parse:', pdfErr);
+      const fileBuffer = Buffer.from(base64Data, 'base64');
+      slicedPdf = await slicePdfDocument(fileBuffer, parsedRange);
+      if (!slicedPdf || !slicedPdf.base64Pdf) {
+        throw new Error(
+          'No se pudo procesar el documento PDF. Asegúrate de que el archivo no esté dañado o protegido.'
+        );
       }
     }
 
@@ -976,45 +1175,55 @@ export async function generateCardsFromDocumentAction(
     const existingCards = await fetchExistingCardsHistory(deckId, existingQuestions);
     const progressMemoryPrompt = buildProgressMemorySection(existingCards);
 
+    // FASE 3: SALVAVIDAS ANTI-DUPLICACIÓN (LÍMITE DINÁMICO RELAJADO)
+    const { directive: targetCountDirective, integrityNote } = buildTargetCountDirective(
+      targetCount,
+      existingCards.length
+    );
+
     const focusRuleSection = focusInstruction
       ? `🚨 REGLA DE ENFOQUE CRÍTICA (PRIORIDAD ABSOLUTA):
 El usuario ha indicado la siguiente instrucción de enfoque: "${focusInstruction}".
 REGLA ESTRICTA: Si el usuario proporciona una instrucción de enfoque (ej. un capítulo o tema específico), DEBES ignorar el resto del documento y extraer la información EXCLUSIVAMENTE de la sección solicitada. Bajo ninguna circunstancia generes preguntas sobre partes o secciones ajenas a lo solicitado.`
       : '';
 
-    const maxAmountDirective = `CANTIDAD MÁXIMA A GENERAR: ${targetCount}. Si el texto es corto, DEBES devolver menos tarjetas. PROHIBIDO inventar o repetir para llegar al límite.`;
-
     const rangeLabel = parsedRange.rangeLabel ? ` [${parsedRange.rangeLabel}]` : '';
     const coverageText = focusInstruction
-      ? `Debes analizar el documento dando PRIORIDAD ABSOLUTA a la sección solicitada ("${focusInstruction}"${rangeLabel}). ${maxAmountDirective} Extrae la información EXCLUSIVAMENTE de esa parte del documento.`
-      : `Debes analizar el documento completo${rangeLabel}. ${maxAmountDirective} Cubre los conceptos clave de forma equitativa desde el principio hasta el final del texto.`;
+      ? `Debes analizar el documento dando PRIORIDAD ABSOLUTA a la sección solicitada ("${focusInstruction}"${rangeLabel}). ${targetCountDirective} Extrae la información EXCLUSIVAMENTE de esa parte del documento.`
+      : `Debes analizar el documento completo${rangeLabel}. ${targetCountDirective} Cubre los conceptos clave de forma equitativa desde el principio hasta el final del contenido.`;
+
+    // FASE 2: Directiva de lectura visual y multimodal para PDFs (Tablas, gráficos, esquemas, recuadros)
+    const pdfMultimodalDirective = isPdfDocument
+      ? `\n\n🚨 DIRECTIVA DE ANÁLISIS MULTIMODAL DE PDF:
+Analiza el documento PDF adjunto. Presta especial atención y extrae preguntas rigurosas de las TABLAS, GRÁFICOS, ESQUEMAS y RECUADROS que veas en las páginas, además del texto principal.`
+      : '';
 
     // 5. Preparar llamada a Gemini 3.1 Flash-Lite con el protocolo de dos fases, advertencia con rigor y memoria de progreso
     const ai = new GoogleGenAI({ apiKey });
 
     const promptText = `Eres un pedagogo experto en diseño pedagógico y repetición espaciada (algoritmo FSRS).
-${coverageText}${fileName ? ` Documento de referencia: "${fileName}".` : ''}
+${coverageText}${fileName ? ` Documento de referencia: "${fileName}".` : ''}${pdfMultimodalDirective}
 
 ${TWO_PHASE_SYSTEM_PROMPT}
 
 ${RIGOR_WARNING_DIRECTIVE}
 
-${focusRuleSection ? `${focusRuleSection}\n\n` : ''}${getGlobalRules(cardFormat)}
+${focusRuleSection ? `${focusRuleSection}\n\n` : ''}${getGlobalRules(cardFormat, targetCount, existingCards.length)}
 
 ${getFormatInstructions(cardFormat)}
 
 ${progressMemoryPrompt ? `${progressMemoryPrompt}\n\n` : ''}REGLA CRÍTICA DE INTEGRIDAD:
-La integridad estructural del JSON es prioridad absoluta y DEBES devolver un objeto con "core_exhausted" (booleano con rigor matemático) y "cards" (array con hasta un máximo de ${targetCount} tarjetas únicas del formato "${cardFormat}"). Para garantizar que quepan las tarjetas dentro del límite de tokens sin que el JSON se corte, mantén cada pregunta, texto, opción (si aplica) y respuesta rigurosa pero concisa y directa.
+La integridad estructural del JSON es prioridad absoluta y DEBES devolver un objeto con "core_exhausted" (booleano con rigor matemático) y "cards" (${integrityNote} "${cardFormat}", numeradas estrictamente con generation_index del 1 al N). Para garantizar que quepan las tarjetas dentro del límite de tokens sin que el JSON se corte, mantén cada pregunta, texto, opción (si aplica) y respuesta rigurosa pero concisa y directa.
 
 ${buildLanguageDirective(language)}`;
 
-    // Configurar contenidos según la estrategia de chunking y tipo de documento:
-    // 1) Si es PDF y se aisló texto limpio: enviamos únicamente el chunk de texto correspondiente
+    // Configurar contenidos según la estrategia multimodal y tipo de documento:
+    // 1) Si es PDF: enviamos directamente el PDF recortado como inlineData multimodal
     // 2) Si es Word: enviamos el texto extraído con mammoth
-    // 3) Si es PDF escaneado (sin texto) o audio: enviamos inlineData
+    // 3) Si es Audio: enviamos inlineData con el mimeType de audio correspondiente
     let contents: Array<
       | { text: string }
-      | { inlineData: { mimeType: string; data: string } }
+      | { inlineData: { data: string; mimeType: string } }
     >;
 
     if (isWordDocument) {
@@ -1023,37 +1232,47 @@ ${buildLanguageDirective(language)}`;
           text: `${promptText}\n\n=========================================\nCONTENIDO DEL DOCUMENTO DE WORD:\n=========================================\n${extractedWordText}\n=========================================`,
         },
       ];
-    } else if (isPdfDocument && extractedPdfChunk && extractedPdfChunk.text.length >= 40) {
-      // Chunking de Precisión: Gemini recibe estrictamente el texto aislado del rango solicitado
-      contents = [
-        {
-          text: `${promptText}\n\n=========================================\nCONTENIDO AISLADO DEL PDF (${extractedPdfChunk.extractedRange}):\n=========================================\n${extractedPdfChunk.text}\n=========================================`,
-        },
-      ];
-    } else {
-      // Audio o PDF escaneado sin capa OCR
-      const pageRestrictionWarning =
-        isPdfDocument && parsedRange.rangeLabel
-          ? `\n\n🚨 RESTRICCIÓN DE PÁGINAS SOLICITADAS: Analiza ÚNICA Y EXCLUSIVAMENTE el contenido visual y textual comprendido en ${parsedRange.rangeLabel}. Ignora cualquier otra página fuera de este rango.`
-          : '';
-
+    } else if (isPdfDocument && slicedPdf) {
+      // FASE 2: Enviar el PDF recortado directamente como parte multimodal (inlineData)
+      console.log(
+        `[DEBUG SERVER - GEMINI CALL MULTIMODAL] Enviando PDF recortado (${slicedPdf.extractedRange}, ${slicedPdf.pageCount} páginas, Base64: ${slicedPdf.base64Pdf.length} caracteres) como inlineData a Gemini.`
+      );
       contents = [
         {
           inlineData: {
-            mimeType: normalizedMime,
-            data: base64Data,
+            data: slicedPdf.base64Pdf,
+            mimeType: 'application/pdf',
           },
         },
         {
-          text: `${promptText}${pageRestrictionWarning}`,
+          text: promptText,
         },
       ];
+    } else {
+      // Audio u otros archivos multimedia
+      contents = [
+        {
+          inlineData: {
+            data: base64Data,
+            mimeType: normalizedMime,
+          },
+        },
+        {
+          text: promptText,
+        },
+      ];
+    }
+
+    if (isPdfDocument && slicedPdf) {
+      console.log(
+        `[DEBUG SERVER - GEMINI CALL] PDF multimodal enviado a Gemini: ${slicedPdf.extractedRange} (${slicedPdf.pageCount} páginas, Base64: ${slicedPdf.base64Pdf.length} caracteres). Objetivo máximo: ${targetCount} tarjetas.`
+      );
     }
 
     const response = await ai.models.generateContent({
       model: GEMINI_MODEL,
       contents,
-      config: getGeminiConfig(cardFormat),
+      config: getGeminiConfig(cardFormat, targetCount, existingCards.length),
     });
 
     const text = response.text;
@@ -1209,7 +1428,7 @@ export async function generateCardsFromUrlAction(
 
   const checkResult = await enforceApiLimit(resolvedUserId);
   if ('error' in checkResult) {
-    return { success: false, error: 'LIMIT_REACHED' };
+    return { success: false, error: checkResult.error };
   }
   const apiCheck = checkResult.check;
 
@@ -1224,6 +1443,12 @@ export async function generateCardsFromUrlAction(
     const existingCards = await fetchExistingCardsHistory(deckId, existingQuestions);
     const progressMemoryPrompt = buildProgressMemorySection(existingCards);
 
+    // FASE 3: SALVAVIDAS ANTI-DUPLICACIÓN (LÍMITE DINÁMICO RELAJADO)
+    const { directive: targetCountDirective, integrityNote } = buildTargetCountDirective(
+      targetCount,
+      existingCards.length
+    );
+
     // 2. Procesar instrucción de enfoque
     const focusInstruction = (rawFocus || customPrompt || '').trim();
     const focusRuleSection = focusInstruction
@@ -1235,11 +1460,9 @@ REGLA ESTRICTA: Debes ignorar el resto del contenido y extraer la información E
     const sourceLabel = isYouTube ? 'Vídeo de YouTube' : 'Enlace Web';
     const sourceRef = isYouTube ? canonicalYouTubeUrl : parsedUrl.href;
 
-    const maxAmountDirective = `CANTIDAD MÁXIMA A GENERAR: ${targetCount}. Si el texto es corto, DEBES devolver menos tarjetas. PROHIBIDO inventar o repetir para llegar al límite.`;
-
     const coverageText = focusInstruction
-      ? `Debes analizar el contenido dando PRIORIDAD ABSOLUTA a la sección solicitada ("${focusInstruction}"). ${maxAmountDirective} Extrae la información EXCLUSIVAMENTE de esa parte.`
-      : `Debes analizar el contenido completo. ${maxAmountDirective} Cubre los conceptos clave de forma equitativa desde el principio hasta el final del contenido.`;
+      ? `Debes analizar el contenido dando PRIORIDAD ABSOLUTA a la sección solicitada ("${focusInstruction}"). ${targetCountDirective} Extrae la información EXCLUSIVAMENTE de esa parte.`
+      : `Debes analizar el contenido completo. ${targetCountDirective} Cubre los conceptos clave de forma equitativa desde el principio hasta el final del contenido.`;
 
     const promptText = `Eres un pedagogo experto en diseño pedagógico y repetición espaciada (algoritmo FSRS).
 ${coverageText} Fuente: ${sourceLabel} ("${sourceRef}").
@@ -1248,12 +1471,12 @@ ${TWO_PHASE_SYSTEM_PROMPT}
 
 ${RIGOR_WARNING_DIRECTIVE}
 
-${focusRuleSection ? `${focusRuleSection}\n\n` : ''}${getGlobalRules(cardFormat)}
+${focusRuleSection ? `${focusRuleSection}\n\n` : ''}${getGlobalRules(cardFormat, targetCount, existingCards.length)}
 
 ${getFormatInstructions(cardFormat)}
 
 ${progressMemoryPrompt ? `${progressMemoryPrompt}\n\n` : ''}REGLA CRÍTICA DE INTEGRIDAD:
-La integridad estructural del JSON es prioridad absoluta y DEBES devolver un objeto con "core_exhausted" (booleano con rigor matemático) y "cards" (array con hasta un máximo de ${targetCount} tarjetas únicas del formato "${cardFormat}"). Para garantizar que quepan las tarjetas dentro del límite de tokens sin que el JSON se corte, mantén cada pregunta, texto, opción (si aplica) y respuesta rigurosa pero concisa y directa.
+La integridad estructural del JSON es prioridad absoluta y DEBES devolver un objeto con "core_exhausted" (booleano con rigor matemático) y "cards" (${integrityNote} "${cardFormat}", numeradas estrictamente con generation_index del 1 al N). Para garantizar que quepan las tarjetas dentro del límite de tokens sin que el JSON se corte, mantén cada pregunta, texto, opción (si aplica) y respuesta rigurosa pero concisa y directa.
 
 ${buildLanguageDirective(language)}`;
 
@@ -1281,7 +1504,7 @@ ${buildLanguageDirective(language)}`;
               text: promptText,
             },
           ],
-          config: getGeminiConfig(cardFormat),
+          config: getGeminiConfig(cardFormat, targetCount, existingCards.length),
         });
         responseText = nativeResponse.text;
       } catch (err: unknown) {
@@ -1318,7 +1541,7 @@ ${buildLanguageDirective(language)}`;
                 text: `${promptText}\n\nTRANSCRIPCIÓN DEL VÍDEO DE YOUTUBE:\n=========================================\n${truncatedTranscript}\n=========================================`,
               },
             ],
-            config: getGeminiConfig(cardFormat),
+            config: getGeminiConfig(cardFormat, targetCount, existingCards.length),
           });
           responseText = fallbackResponse.text;
         } else {
@@ -1387,7 +1610,7 @@ ${buildLanguageDirective(language)}`;
             text: `${promptText}\n\nCONTENIDO EXTRAÍDO DEL ENLACE WEB:\n=========================================\n${truncatedWebText}\n=========================================`,
           },
         ],
-        config: getGeminiConfig(cardFormat),
+        config: getGeminiConfig(cardFormat, targetCount, existingCards.length),
       });
       responseText = webResponse.text;
     }

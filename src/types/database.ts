@@ -23,6 +23,7 @@ export type Database = {
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           bonus_credits: number
+          welcome_generations: number
           created_at: string
           updated_at: string
         }
@@ -34,6 +35,7 @@ export type Database = {
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           bonus_credits?: number
+          welcome_generations?: number
           created_at?: string
           updated_at?: string
         }
@@ -45,6 +47,7 @@ export type Database = {
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           bonus_credits?: number
+          welcome_generations?: number
           created_at?: string
           updated_at?: string
         }

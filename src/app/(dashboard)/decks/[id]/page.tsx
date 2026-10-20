@@ -7,6 +7,8 @@ import { useDeckStore, useCardStore, useProModalStore, useAuthStore, useLanguage
 import { CardEditor, DocumentUploader, FormattedCardView, UrlCardGenerator } from '@/components/cards';
 import { ShareDeckModal } from '@/components/decks';
 import { generateCardsAction } from '@/app/actions/generateCards';
+import { showAdMobRewardedAd } from '@/lib/admob';
+import { claimAdRewardAction } from '@/app/actions/claimAdReward';
 import type { CardFormat } from '@/types/database';
 
 interface DeckPageProps {
@@ -72,8 +74,8 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
   };
 
   // Manejar generación con Gemini por tema y guardado automático en Supabase
-  const handleGenerateCardsByTopic = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleGenerateCardsByTopic = async (e?: React.FormEvent) => {
+    e?.preventDefault?.();
     if (!aiTopic.trim()) return;
 
     setIsGenerating(true);
@@ -92,11 +94,35 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
     );
 
     if (!result.success || !result.cards) {
-      setIsGenerating(false);
       if (result.error === 'LIMIT_REACHED') {
+        setIsGenerating(false);
         openProModal(true);
         return;
       }
+
+      if (result.error === 'AD_REQUIRED') {
+        try {
+          const adResult = await showAdMobRewardedAd();
+          if (adResult.completed) {
+            const claim = await claimAdRewardAction(user?.id);
+            if (claim.success) {
+              // Disparar la generación de las tarjetas automáticamente para que la experiencia sea fluida
+              return handleGenerateCardsByTopic();
+            } else {
+              setAiError(claim.message || t('deck_detail.unexpected_error'));
+            }
+          } else if (adResult.error) {
+            setAiError(adResult.error);
+          }
+        } catch (adErr) {
+          console.warn('Error en flujo de anuncio bonificado:', adErr);
+          setAiError(t('deck_detail.unexpected_error'));
+        }
+        setIsGenerating(false);
+        return;
+      }
+
+      setIsGenerating(false);
       setAiError(result.error || t('deck_detail.unexpected_error'));
       return;
     }
