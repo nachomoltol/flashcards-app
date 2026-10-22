@@ -753,6 +753,7 @@ export default function StudyPage({ params }: StudyPageProps) {
             className="flex-1 min-h-0 overflow-y-auto pr-2 sm:pr-3 py-1.5 overscroll-contain"
           >
             <FormattedCardView
+              cardId={currentCard.id}
               front={currentCard.front}
               back={currentCard.back}
               notes={currentCard.notes}

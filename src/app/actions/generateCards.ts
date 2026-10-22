@@ -139,12 +139,18 @@ const singlePageExtractionSchema = {
 
 /**
  * REGLA INQUEBRANTABLE DE RELEVANCIA COGNITIVA:
- * Erradica preguntas sobre artefactos de maquetación, notas al pie editoriales o símbolos tipográficos.
+ * Erradica preguntas sobre artefactos de maquetación, notas al pie editoriales, símbolos tipográficos,
+ * índices/glosarios marginales, datos biográficos ficticios o permisos editoriales.
  */
-const EDITORIAL_ARTIFACTS_DIRECTIVE = `PROHIBICIÓN ESTRICTA DE ARTEFACTOS EDITORIALES Y MAQUETACIÓN:
+const EDITORIAL_ARTIFACTS_DIRECTIVE = `REGLA DE EXCLUSIÓN DE METADATOS Y ESTRUCTURA EDITORIAL:
+- Queda estrictamente PROHIBIDO generar preguntas sobre cajas de 'Términos Clave', vocabularios al margen o listas de conceptos que sirvan de índice en el documento. La evaluación debe versar sobre la explicación teórica, la evidencia o los datos descritos en los párrafos, gráficos y tablas, NUNCA sobre la presencia o ausencia de palabras en un recuadro de términos.
+- Queda estrictamente PROHIBIDO generar preguntas sobre datos anecdóticos de personajes ficticios en casos de estudio (ej. peso en la infancia, pertenencia a equipos escolares de personajes ficticios) o notas de créditos editoriales (ej. 'reimpreso con permiso de...'). Concéntrate en la clínica, la patología, la intervención nutricional y el fundamento fisiológico.
+- PROHIBICIÓN ESTRICTA SOBRE MENÚS Y DATOS ANECTÓDICOS DE CASOS FICTICIOS:
+  * Queda terminantemente PROHIBIDO generar preguntas sobre detalles accesorios o gramaticales de platillos/menús de casos de estudio ficticios (ej. peso en gramos del pan de ajo, tamaño de las albóndigas, marcas de aderezos caseros o ingredientes secundarios de ejemplos narrativos).
+  * Las preguntas clínicas deben centrarse EXCLUSIVAMENTE en la patología médica, los requerimientos energéticos/nutricionales oficiales, la fisiología, el cálculo de gasto metabólico o los lineamientos dietéticos universales, NUNCA en la memorización de los gramos de comida descritos en un ejemplo narrativo de personaje.
 - Tienes TERMINANTEMENTE PROHIBIDO formular preguntas sobre la estructura editorial o gráfica del documento (por ejemplo: 'según el símbolo †', 'qué indica el asterisco', 'qué significan los números entre paréntesis en la tabla', 'en qué columna se encuentra X', 'según la nota al pie').
 - Si una tabla o pie de página contiene datos relevantes (ej. gramos de fibra, dosis clínicas, fechas, normativas), formula la pregunta DIRECTAMENTE sobre el concepto o hecho real (ej: '¿Cuántos gramos de fibra por ración aportan las frambuesas?' en lugar de '¿Qué fruta tiene el valor (4) según el Cuadro 4-3?').
-- Pregunta SIEMPRE por el conocimiento sustancial, nunca por cómo fue maquetado o simbolizado en el libro.`;
+- Pregunta SIEMPRE por el conocimiento sustancial, conceptual y factual, nunca por cómo fue maquetado, listado o simbolizado en el libro.`;
 
 /**
  * Regla de formato obligatoria inyectada dinámicamente en el System Prompt y Reglas Globales.
@@ -279,6 +285,8 @@ Genera tarjetas solo si encuentras este tipo de detalles minuciosos que no se ha
     prompt += `\nINSTRUCCIÓN DE CONTINUIDAD: Ya has evaluado los siguientes conceptos: ${topicsFormatted}. Te EXIJO que mires el texto original, identifiques conceptos, datos o relaciones que no estén en esta lista, y extraigas nuevas tarjetas sobre ellos.\n`;
   }
 
+  prompt += `\n${EDITORIAL_ARTIFACTS_DIRECTIVE}\n`;
+
   return prompt;
 };
 
@@ -315,8 +323,7 @@ ${directiveRule}
 5. PRECISIÓN Y GROUNDING: Toda pregunta, afirmación, distractor o respuesta debe estar basada estricta y textualmente en el texto fuente.
 6. ACRÓNIMOS: Todo acrónimo debe ir acompañado obligatoriamente de su nombre completo si figura en la fuente (ejemplo: "ARN (Ácido Ribonucleico)", "TCP (Transmission Control Protocol)").
 7. INTEGRIDAD ESTRUCTURAL DEL JSON (PRIORIDAD ABSOLUTA): Debes devolver un objeto JSON válido con los campos "conceptos_identificados" (array de strings con conceptos clave no evaluados), "core_exhausted" (booleano) y "cards" (${cardRequirement}). Sé sintético y directo en el enunciado de las preguntas y opciones, y riguroso, explicativo y profundamente justificado en el reverso ("back"), incluyendo siempre la justificación técnica basada en la fuente.
-8. REGLA INQUEBRANTABLE DE RELEVANCIA COGNITIVA (PROHIBICIÓN DE ARTEFACTOS EDITORIALES):
-${EDITORIAL_ARTIFACTS_DIRECTIVE}`;
+8. ${EDITORIAL_ARTIFACTS_DIRECTIVE}`;
 }
 
 interface ParsedPageRange {
@@ -675,13 +682,14 @@ function getGeminiConfig(
   requestedCount?: number,
   existingCardsCount: number = 0,
   coreExhaustedPrevious: boolean = false,
-  existingTopicsList: string = ''
+  existingTopicsList: string = '',
+  isExhaustiveMode: boolean = false
 ) {
   void format;
   void requestedCount;
   return {
     systemInstruction: buildSystemPrompt(existingCardsCount, coreExhaustedPrevious, existingTopicsList),
-    temperature: 0.1,
+    temperature: isExhaustiveMode ? 0.1 : 0.15,
     responseMimeType: 'application/json',
     responseJsonSchema: flashcardSchema,
     maxOutputTokens: 8192,
@@ -1592,7 +1600,7 @@ Esta instrucción tiene PRIORIDAD ABSOLUTA y actúa como un filtro estricto sobr
       singlePageSystemPrompt += `\n${getFormatInstructions(cardFormat)}`;
       singlePageSystemPrompt += `\n\nREGLA DE INTEGRIDAD: Devuelve un objeto JSON estructurado con "conceptos_identificados" (array de strings con los conceptos encontrados en esta página), "core_exhausted" (booleano) y "cards" (array dinámico con todas las tarjetas extraídas sin límite máximo ni mínimo artificial, formuladas según el formato "${cardFormat}").`;
       if (isExhaustiveMode) {
-        singlePageSystemPrompt += `\nRECORDATORIO MODO EXHAUSTIVO: Extrae cada celda, fila, columna y dato sin resumir ni abreviar. La prioridad es la exhaustividad total.`;
+        singlePageSystemPrompt += `\nRECORDATORIO MODO EXHAUSTIVO: Extrae cada celda, fila, columna y dato sustancial sin resumir ni abreviar, priorizando el conocimiento pedagógico real y respetando la prohibición estricta de metadatos o recuadros de vocabulario al margen.`;
       }
       singlePageSystemPrompt += buildLanguageDirective(language);
 
@@ -1618,6 +1626,19 @@ Esta instrucción tiene PRIORIDAD ABSOLUTA y actúa como un filtro estricto sobr
         // Cortar EXACTAMENTE 1 PÁGINA
         const singlePageBase64 = await sliceSinglePdfPage(srcDoc, currentPage);
 
+        const exhaustiveQuotaMandate = isExhaustiveMode
+          ? `\n\n🚨 DIRECTIVA DE COBERTURA Y CALIDAD (CUOTA RESTANTE: ${remainingToTarget} TARJETAS):
+- Si la página contiene tablas, matrices de datos o clasificaciones densas, extrae preguntas independientes de tantas filas y cruces numéricos como existan hasta cumplir la cuota requerida.
+- Si la página es texto continuo (prosa/teoría), extrae con rigor quirúrgico cada dato fáctico, definición, mecanismo y excepción relevante.
+- IMPORTANTE: No dupliques preguntas con diferente redacción ni inventes preguntas sobre listas de palabras al margen para alcanzar un número artificial. Si has extraído todos los hechos sustanciales de esta página, concluye tu respuesta; el motor secuencial del servidor continuará acumulando tarjetas en las siguientes páginas del documento hasta completar el objetivo.`
+          : '';
+
+        const currentPageSystemPrompt = `${singlePageSystemPrompt}${exhaustiveQuotaMandate}`;
+
+        const pageUserPrompt = isExhaustiveMode
+          ? `Analiza la Página ${currentPage} del documento adjunto aplicando la DIRECTIVA DE COBERTURA Y CALIDAD (cuota restante: ${remainingToTarget} tarjetas). Si hay tablas o matrices de datos, extrae preguntas independientes por cada fila o cruce numérico. Si es texto continuo, extrae hechos y definiciones sustanciales sin duplicar ni inventar preguntas sobre términos al margen, concluyendo cuando los datos sustanciales se agoten para que el servidor avance de página. Formato: "${cardFormat}".`
+          : `Analiza la Página ${currentPage} del documento adjunto y extrae todos los conceptos clave, datos precisos, normativas o hechos únicos posibles en formato "${cardFormat}".`;
+
         let pageCandidateCards: GeneratedCard[] = [];
 
         try {
@@ -1631,12 +1652,12 @@ Esta instrucción tiene PRIORIDAD ABSOLUTA y actúa como un filtro estricto sobr
                 },
               },
               {
-                text: `Analiza la Página ${currentPage} del documento adjunto y extrae todos los conceptos clave, datos precisos, normativas o hechos únicos posibles en formato "${cardFormat}".`,
+                text: pageUserPrompt,
               },
             ],
             config: {
-              systemInstruction: singlePageSystemPrompt,
-              temperature: 0.1,
+              systemInstruction: currentPageSystemPrompt,
+              temperature: isExhaustiveMode ? 0.1 : 0.15,
               responseMimeType: 'application/json',
               responseJsonSchema: singlePageExtractionSchema,
               maxOutputTokens: 8192,
@@ -1676,7 +1697,8 @@ Esta instrucción tiene PRIORIDAD ABSOLUTA y actúa como un filtro estricto sobr
             candidateCards: pageCandidateCards,
             existingCards: combinedHistory,
             apiKey,
-            similarityThreshold: 0.80,
+            similarityThreshold: isExhaustiveMode ? 0.92 : 0.80,
+            isExhaustiveMode,
           });
 
           if (duplicateCount > 0) {
@@ -1809,7 +1831,8 @@ REGLA ESTRICTA: Si el usuario proporciona una instrucción de enfoque (ej. un ca
             batch1Target,
             existingCards.length,
             coreExhaustedPrevious,
-            existingTopicsList
+            existingTopicsList,
+            isExhaustiveMode
           ),
         }),
         ai.models.generateContent({
@@ -1820,7 +1843,8 @@ REGLA ESTRICTA: Si el usuario proporciona una instrucción de enfoque (ej. un ca
             batch2Target,
             existingCards.length,
             coreExhaustedPrevious,
-            existingTopicsList
+            existingTopicsList,
+            isExhaustiveMode
           ),
         }),
       ]);
@@ -1926,7 +1950,8 @@ ${buildLanguageDirective(language)}`;
           requestCount,
           existingCards.length,
           coreExhaustedPrevious,
-          existingTopicsList
+          existingTopicsList,
+          isExhaustiveMode
         ),
       });
 
@@ -1952,8 +1977,9 @@ ${buildLanguageDirective(language)}`;
       candidateCards: candidateCards,
       existingCards,
       apiKey,
-      similarityThreshold: 0.80,
+      similarityThreshold: isExhaustiveMode ? 0.92 : 0.80,
       targetCount,
+      isExhaustiveMode,
     });
 
     if (duplicateCount > 0) {

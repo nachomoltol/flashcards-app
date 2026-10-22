@@ -319,10 +319,11 @@ export function UrlCardGenerator({
               <div className="max-h-72 overflow-y-auto space-y-2.5 pr-1 custom-scrollbar">
                 {generatedCardsPreview.map((card, idx) => (
                   <div
-                    key={idx}
+                    key={`url-card-${card.generation_index || idx}`}
                     className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-900/90 border border-neutral-200 dark:border-neutral-800 text-xs shadow-sm"
                   >
                     <FormattedCardView
+                      cardId={`url-preview-${card.generation_index || idx}`}
                       front={card.front}
                       back={card.back}
                       cardFormat={card.cardFormat}

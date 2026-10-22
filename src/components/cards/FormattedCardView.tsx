@@ -6,6 +6,7 @@ import { useLanguageStore } from '@/stores';
 import { Volume2, Check, X, Lightbulb } from 'lucide-react';
 
 export interface FormattedCardViewProps {
+  cardId?: string;
   front: string;
   back: string;
   notes?: string | null;
@@ -239,6 +240,7 @@ export function parseBackContent(
 }
 
 export function FormattedCardView({
+  cardId,
   front,
   back,
   notes,
@@ -368,7 +370,8 @@ export function FormattedCardView({
         {/* Renderizado específico para Opción Múltiple: Dibujar las 4 opciones */}
         {resolvedFormat === 'multiple_choice' && options.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 pt-1 sm:pt-2 transition-all duration-200">
-            {options.map((opt) => {
+            {options.map((opt, index) => {
+              const letter = opt.key;
               const isSelected = selectedOption === opt.key;
               const isCorrect = correctKey === opt.key;
 
@@ -397,7 +400,7 @@ export function FormattedCardView({
 
               return (
                 <button
-                  key={opt.key}
+                  key={`${cardId || 'card'}-opt-${index}-${letter}`}
                   type="button"
                   disabled={!interactive || isRevealed}
                   onClick={(e) => {

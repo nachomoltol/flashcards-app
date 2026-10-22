@@ -299,6 +299,7 @@ d) Cuarta opción plausible`;
             {showPreview && (
               <div className="p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950/70 shadow-inner">
                 <FormattedCardView
+                  cardId="editor-preview"
                   front={front}
                   back={back || (cardFormat === 'cloze' ? front : 'Esperando respuesta...')}
                   cardFormat={cardFormat}

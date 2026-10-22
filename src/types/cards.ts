@@ -3,6 +3,7 @@ import type { CardFormat } from './database';
 export type { CardFormat };
 
 export interface GeneratedCard {
+  id?: string;
   generation_index?: number;
   front: string;
   back: string;

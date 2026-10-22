@@ -178,13 +178,15 @@ export async function deduplicateCandidateCards(params: {
   apiKey?: string;
   similarityThreshold?: number;
   targetCount?: number;
+  isExhaustiveMode?: boolean;
 }): Promise<DeduplicationResult> {
   const {
     candidateCards,
     existingCards,
     apiKey,
-    similarityThreshold = 0.80,
+    similarityThreshold = params.isExhaustiveMode ? 0.92 : 0.80,
     targetCount,
+    isExhaustiveMode = false,
   } = params;
 
   if (!candidateCards || candidateCards.length === 0) {
@@ -204,7 +206,15 @@ export async function deduplicateCandidateCards(params: {
       const { jaccard, containment } = calculateLexicalSimilarity(card.front, accepted.front);
       const answerLex = calculateLexicalSimilarity(card.back, accepted.back);
 
-      if (jaccard >= 0.65 || (containment >= 0.75 && answerLex.jaccard >= 0.35)) {
+      // Criterio de duplicado léxico intra-lote:
+      // En modo exhaustivo, se preservan preguntas estructuradas similares de tablas/gráficas
+      // (ej. colesterol de huevo vs. colesterol de manteca) salvo que pregunten exactamente lo mismo
+      // o compartan también la misma respuesta/solución.
+      const isDuplicate = isExhaustiveMode
+        ? (jaccard >= 0.85 || (containment >= 0.88 && answerLex.jaccard >= 0.65))
+        : (jaccard >= 0.65 || (containment >= 0.75 && answerLex.jaccard >= 0.35));
+
+      if (isDuplicate) {
         isIntraDuplicate = true;
         duplicatesRemoved.push({
           candidateFront: card.front,
@@ -243,11 +253,13 @@ export async function deduplicateCandidateCards(params: {
       const qSim = calculateLexicalSimilarity(card.front, existing.front);
       const aSim = existing.back ? calculateLexicalSimilarity(card.back, existing.back) : { jaccard: 0, containment: 0 };
 
-      // Criterio de rechazo léxico estricto:
-      // a) Similitud Jaccard de preguntas >= 0.65
-      // b) Contención casi total de pregunta (>= 0.75) con coincidencia en respuesta (>= 0.35)
-      // c) Coincidencia idéntica de términos clave de la pregunta
-      if (qSim.jaccard >= 0.65 || (qSim.containment >= 0.75 && aSim.jaccard >= 0.35)) {
+      // Criterio de rechazo léxico:
+      // En modo exhaustivo, umbral elevado para permitir variantes de tablas con distintas respuestas.
+      const isDuplicate = isExhaustiveMode
+        ? (qSim.jaccard >= 0.85 || (qSim.containment >= 0.88 && aSim.jaccard >= 0.65))
+        : (qSim.jaccard >= 0.65 || (qSim.containment >= 0.75 && aSim.jaccard >= 0.35));
+
+      if (isDuplicate) {
         matchedExisting = existing;
         maxLexSim = Math.max(qSim.jaccard, qSim.containment);
         break;

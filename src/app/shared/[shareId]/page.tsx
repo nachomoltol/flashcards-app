@@ -296,6 +296,7 @@ export default function SharedDeckPage({ params }: SharedDeckPageProps) {
                   </div>
 
                   <FormattedCardView
+                    cardId={card.id}
                     front={card.front}
                     back={card.back}
                     cardFormat={card.card_format || 'basic'}

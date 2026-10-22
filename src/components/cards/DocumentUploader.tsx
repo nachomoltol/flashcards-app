@@ -17,6 +17,7 @@ interface DocumentUploaderProps {
   onSwitchToUrl?: () => void;
   initialMeticulousPhase?: boolean;
   onMeticulousChange?: (val: boolean) => void;
+  onStepChange?: (step: 1 | 2 | 3) => void;
 }
 
 type FileTypeCategory = 'pdf' | 'docx' | 'audio' | 'text';
@@ -119,6 +120,71 @@ function validateFile(file: File): string | null {
   return null;
 }
 
+interface InfoTooltipProps {
+  content: React.ReactNode;
+  title?: string;
+}
+
+function InfoTooltip({ content, title }: InfoTooltipProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [isOpen]);
+
+  return (
+    <span
+      ref={containerRef}
+      className="relative inline-flex items-center align-middle"
+      onMouseEnter={() => setIsOpen(true)}
+      onMouseLeave={() => setIsOpen(false)}
+    >
+      <button
+        type="button"
+        aria-label="Más información"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setIsOpen((prev) => !prev);
+        }}
+        className="w-4 h-4 rounded-full bg-neutral-200 dark:bg-neutral-800 hover:bg-neutral-300 dark:hover:bg-neutral-700 text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white flex items-center justify-center text-[10px] font-bold font-mono transition-colors cursor-pointer ml-1.5 focus:outline-none focus:ring-1 focus:ring-violet-500"
+      >
+        ?
+      </button>
+
+      {isOpen && (
+        <div
+          role="tooltip"
+          className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 sm:w-80 p-3 rounded-xl bg-neutral-900/95 dark:bg-neutral-950/95 text-neutral-200 border border-neutral-700/80 shadow-2xl backdrop-blur-md text-xs leading-relaxed animate-in fade-in zoom-in-95 pointer-events-auto"
+        >
+          {title && (
+            <div className="font-semibold text-neutral-100 text-[11px] mb-1.5 pb-1 border-b border-neutral-800 flex items-center gap-1.5">
+              <span>💡</span>
+              <span>{title}</span>
+            </div>
+          )}
+          <div className="text-[11px] leading-relaxed text-neutral-300 font-normal">
+            {content}
+          </div>
+          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-neutral-900 dark:border-t-neutral-950" />
+        </div>
+      )}
+    </span>
+  );
+}
+
 export function DocumentUploader({
   deckId,
   onSuccess,
@@ -126,13 +192,20 @@ export function DocumentUploader({
   onSwitchToUrl,
   initialMeticulousPhase,
   onMeticulousChange,
+  onStepChange,
 }: DocumentUploaderProps) {
   const { user } = useAuthStore();
   const { cards, createCard, fetchCardsByDeck } = useCardStore();
   const { fetchDeckById } = useDeckStore();
   const { openProModal } = useProModalStore();
   const { language, t } = useLanguageStore();
+  const isEn = language === 'en';
 
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
+
+  useEffect(() => {
+    onStepChange?.(currentStep);
+  }, [currentStep, onStepChange]);
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [cardFormat, setCardFormat] = useState<CardFormat>('multiple_choice');
@@ -473,6 +546,7 @@ export function DocumentUploader({
   };
 
   const handleReset = () => {
+    setCurrentStep(1);
     setSelectedFile(null);
     setPdfTotalPages(null);
     setPageStart('');
@@ -499,6 +573,12 @@ export function DocumentUploader({
   const parsedEndNum = pageEnd.trim() ? parseInt(pageEnd.trim(), 10) : undefined;
   const masterStart = parsedStartNum !== undefined && !isNaN(parsedStartNum) ? Math.max(1, parsedStartNum) : 1;
   const masterEnd = parsedEndNum !== undefined && !isNaN(parsedEndNum) ? parsedEndNum : (pdfTotalPages || 9999);
+  const isSinglePage = Boolean(
+    isPdf &&
+    pageStart.trim() !== '' &&
+    pageEnd.trim() !== '' &&
+    pageStart.trim() === pageEnd.trim()
+  );
 
   return (
     <div className="w-full space-y-5">
@@ -603,13 +683,14 @@ export function DocumentUploader({
           </div>
 
           {/* Cards Preview with FormattedCardView */}
-          <div className="max-h-56 overflow-y-auto space-y-3 text-left pr-1">
+          <div className="overflow-y-auto max-h-[55vh] sm:max-h-[60vh] pr-2 space-y-3 text-left">
             {generatedCardsPreview.map((card, i) => (
               <div
-                key={i}
+                key={card.id || `card-batch-${Date.now()}-${(card.front || '').slice(0, 15)}-${i}`}
                 className="p-3.5 rounded-xl bg-neutral-900/90 border border-neutral-800 text-xs shadow-sm"
               >
                 <FormattedCardView
+                  cardId={card.id || `preview-${(card.front || '').slice(0, 15)}-${i}`}
                   front={card.front}
                   back={card.back}
                   cardFormat={card.cardFormat}
@@ -620,7 +701,8 @@ export function DocumentUploader({
             ))}
           </div>
 
-          <div className="pt-2 flex flex-wrap items-center justify-center gap-2.5">
+          {/* Sticky Actions Footer */}
+          <div className="sticky bottom-0 z-10 bg-slate-900/95 backdrop-blur-sm border-t border-slate-800 p-3 mt-2 rounded-xl flex flex-wrap items-center justify-center gap-2.5 shadow-lg">
             {isPdf && typeof nextCursorPage === 'number' ? (
               <button
                 type="button"
@@ -675,7 +757,7 @@ export function DocumentUploader({
           </div>
         </div>
       ) : (
-        /* Dropzone & File Selection Area */
+        /* Stepper Flow (3 Pasos) */
         <div className="space-y-4">
           <input
             ref={fileInputRef}
@@ -689,249 +771,444 @@ export function DocumentUploader({
             }}
           />
 
-          {/* 1. Zona de Carga (Dropzone o Archivo Seleccionado) - POR ENCIMA de Formato y Cantidad */}
-          {!selectedFile ? (
-            /* Drag and drop zone */
-            <div
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-              className={`relative cursor-pointer rounded-2xl border-2 border-dashed p-6 sm:p-8 text-center transition-all duration-200 group ${
-                isDragging
-                  ? 'border-violet-500 bg-violet-600/10 scale-[1.01] shadow-xl shadow-violet-900/20'
-                  : 'border-neutral-300 dark:border-neutral-800 hover:border-violet-500/60 bg-neutral-50/70 dark:bg-neutral-950/60 hover:bg-neutral-100/80 dark:hover:bg-neutral-900/40'
-              }`}
-            >
-              {/* Background Glow */}
-              <div className="absolute inset-0 rounded-2xl bg-gradient-to-b from-violet-600/5 to-transparent pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity" />
-
-              <div className="relative z-10 flex flex-col items-center justify-center space-y-3">
-                <div
-                  className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center transition-transform duration-200 group-hover:scale-110 shadow-sm ${
-                    isDragging
-                      ? 'bg-violet-600 text-white shadow-violet-600/30'
-                      : 'bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-violet-600 dark:text-violet-400 group-hover:text-violet-500 group-hover:border-violet-500/40'
-                  }`}
-                >
-                  <svg className="w-6 h-6 sm:w-7 sm:h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.75}
-                      d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                    />
-                  </svg>
-                </div>
-
-                <div>
-                  <h4 className="text-sm font-semibold text-neutral-900 dark:text-white tracking-tight">
-                    {t('ai_uploader.drag_drop_title', 'Arrastra y suelta tu archivo aquí')}
-                  </h4>
-                  <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
-                    {t('ai_uploader.drag_drop_subtitle', 'o haz clic para explorar en tu dispositivo')}
-                  </p>
-                </div>
-
-                {/* Formats Pills */}
-                <div className="flex flex-wrap items-center justify-center gap-1.5 pt-1 sm:pt-2">
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-rose-500/10 border border-rose-500/25 text-rose-700 dark:text-rose-300">
-                    PDF (.pdf)
-                  </span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/25 text-blue-700 dark:text-blue-300">
-                    Word (.docx, .doc)
-                  </span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/25 text-emerald-700 dark:text-emerald-300">
-                    Audio (.mp3, .wav)
-                  </span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/25 text-amber-700 dark:text-amber-300">
-                    Texto (.txt)
-                  </span>
-                </div>
-
-                <div className="space-y-1.5 pt-1">
-                  <span className="text-[10px] text-neutral-500 block">
-                    {t('ai_uploader.max_file_size', 'Tamaño máximo por archivo: 50 MB • Almacenamiento privado seguro con Supabase RLS')}
-                  </span>
-                  <p className="text-[11px] text-amber-800 dark:text-amber-300/95 font-medium flex items-center justify-center gap-1.5">
-                    <span>💡</span>
-                    <span>
-                      {t('ai_uploader.video_hint', 'Para vídeos o clases grabadas,')}{' '}
-                      {onSwitchToUrl ? (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onSwitchToUrl();
-                          }}
-                          className="underline hover:text-amber-900 dark:hover:text-amber-100 font-semibold transition cursor-pointer"
-                        >
-                          {t('ai_uploader.video_hint_link', 'pega el enlace web')}
-                        </button>
-                      ) : (
-                        t('ai_uploader.video_hint_link', 'pega el enlace web')
-                      )}{' '}
-                      {t('ai_uploader.video_hint_audio', 'o sube el archivo de audio en .mp3')}
-                    </span>
-                  </p>
-                </div>
-              </div>
-            </div>
-          ) : (
-            /* Selected File Card */
-            <div>
-              {(() => {
-                const info = getFileTypeInfo(selectedFile);
+          {/* Stepper Header (3 Pasos) */}
+          <div className="w-full pb-3 border-b border-neutral-200 dark:border-neutral-800/80">
+            <div className="flex items-center justify-between max-w-sm sm:max-w-md mx-auto px-1">
+              {[
+                { id: 1, label: t('ai_uploader.step1_title', isEn ? 'Document' : 'Documento') },
+                { id: 2, label: t('ai_uploader.step2_title', isEn ? 'Range & Format' : 'Rango y Formato') },
+                { id: 3, label: t('ai_uploader.step3_title', isEn ? 'Mode & Focus' : 'Modo y Enfoque') },
+              ].map((s, idx) => {
+                const isActive = currentStep === s.id;
+                const isPassed = currentStep > s.id;
+                const canNavigate = !isBusy && (s.id === 1 || Boolean(selectedFile));
                 return (
-                  <div className="p-4 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950/80 space-y-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3 overflow-hidden">
-                        <div
-                          className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 border ${info.borderCol} ${info.iconBg}`}
-                        >
-                          {info.category === 'pdf' && (
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                            </svg>
-                          )}
-                          {info.category === 'docx' && (
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                          )}
-                          {info.category === 'audio' && (
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-                            </svg>
-                          )}
-                          {info.category === 'text' && (
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                          )}
-                        </div>
-
-                        <div className="min-w-0">
-                          <p className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white truncate" title={selectedFile.name}>
-                            {selectedFile.name}
-                          </p>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <span
-                              className={`text-[10px] font-mono px-2 py-0.2 rounded ${info.badgeBg} ${info.badgeText} border ${info.borderCol}`}
-                            >
-                              {info.label}
-                            </span>
-                            <span className="text-[11px] text-neutral-500 dark:text-neutral-400 font-mono">
-                              {pdfTotalPages !== null ? `${pdfTotalPages} págs • ` : ''}
-                              {formatFileSize(selectedFile.size)}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {!isBusy && (
-                        <button
-                          type="button"
-                          onClick={handleReset}
-                          title="Cambiar archivo"
-                          className="p-1.5 rounded-lg text-neutral-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-neutral-200 dark:hover:bg-neutral-800 transition cursor-pointer"
-                        >
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Progress Indicator */}
-                    {isBusy && (
-                      <div className="pt-2 border-t border-neutral-200 dark:border-neutral-800/80 space-y-2">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-neutral-800 dark:text-neutral-300 font-medium flex items-center gap-2">
-                            <div className="w-3.5 h-3.5 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
-                            {status === 'uploading' && t('ai_uploader.status_uploading', '1/3 Subiendo archivo a Supabase Storage...')}
-                            {status === 'analyzing' && t('ai_uploader.status_analyzing', '2/3 Gemini Flash generando {count} tarjetas ({format})...').replace('{count}', String(cardCount)).replace('{format}', cardFormat)}
-                            {status === 'saving' && t('ai_uploader.status_saving', '3/3 Guardando tarjetas generadas en Supabase...')}
-                          </span>
-                          <span className="text-[11px] text-violet-600 dark:text-violet-400 font-mono uppercase">
-                            {status === 'uploading' && 'Storage'}
-                            {status === 'analyzing' && 'Gemini Flash'}
-                            {status === 'saving' && 'Zustand / DB'}
-                          </span>
-                        </div>
-                        <div className="h-1.5 w-full bg-neutral-200 dark:bg-neutral-900 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full bg-gradient-to-r from-violet-600 via-indigo-500 to-emerald-400 transition-all duration-500 ${
-                              status === 'uploading'
-                                ? 'w-1/3'
-                                : status === 'analyzing'
-                                ? 'w-2/3'
-                                : 'w-full'
-                            }`}
-                          />
-                        </div>
-                      </div>
+                  <React.Fragment key={s.id}>
+                    {idx > 0 && (
+                      <div
+                        className={`flex-1 h-0.5 mx-2 transition-colors duration-200 ${
+                          isPassed ? 'bg-violet-600' : 'bg-neutral-200 dark:bg-neutral-800'
+                        }`}
+                      />
                     )}
-                  </div>
+                    <button
+                      type="button"
+                      disabled={!canNavigate}
+                      onClick={() => {
+                        if (canNavigate) {
+                          setCurrentStep(s.id as 1 | 2 | 3);
+                        }
+                      }}
+                      className={`group flex items-center gap-1.5 text-xs font-semibold transition-all ${
+                        isActive
+                          ? 'text-violet-600 dark:text-violet-400'
+                          : isPassed
+                          ? 'text-neutral-800 dark:text-neutral-200 hover:text-violet-600 dark:hover:text-violet-300'
+                          : canNavigate
+                          ? 'text-neutral-600 dark:text-neutral-400 hover:text-violet-600 dark:hover:text-violet-300'
+                          : 'text-neutral-400 dark:text-neutral-600 opacity-50 cursor-not-allowed'
+                      } ${canNavigate ? 'cursor-pointer active:scale-95' : ''}`}
+                    >
+                      <span
+                        className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold font-mono transition-all ${
+                          isActive
+                            ? 'bg-violet-600 text-white ring-2 ring-violet-500/30 shadow-sm shadow-violet-600/30'
+                            : isPassed
+                            ? 'bg-emerald-500 text-white group-hover:bg-emerald-600'
+                            : canNavigate
+                            ? 'bg-neutral-200 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 group-hover:bg-violet-100 dark:group-hover:bg-violet-900/50 group-hover:text-violet-600'
+                            : 'bg-neutral-200 dark:bg-neutral-800 text-neutral-400 dark:text-neutral-600'
+                        }`}
+                      >
+                        {isPassed ? '✓' : s.id}
+                      </span>
+                      <span className="hidden sm:inline">{s.label}</span>
+                    </button>
+                  </React.Fragment>
                 );
-              })()}
+              })}
+            </div>
+          </div>
+
+          {/* Progress Indicator durante proceso en background */}
+          {isBusy && (
+            <div className="p-4 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950/80 space-y-2 animate-in fade-in">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-neutral-800 dark:text-neutral-300 font-medium flex items-center gap-2">
+                  <div className="w-3.5 h-3.5 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+                  {status === 'uploading' && t('ai_uploader.status_uploading', '1/3 Subiendo archivo a Supabase Storage...')}
+                  {status === 'analyzing' && t('ai_uploader.status_analyzing', '2/3 Gemini Flash generando {count} tarjetas ({format})...').replace('{count}', String(cardCount)).replace('{format}', cardFormat)}
+                  {status === 'saving' && t('ai_uploader.status_saving', '3/3 Guardando tarjetas generadas en Supabase...')}
+                </span>
+                <span className="text-[11px] text-violet-600 dark:text-violet-400 font-mono uppercase">
+                  {status === 'uploading' && 'Storage'}
+                  {status === 'analyzing' && 'Gemini Flash'}
+                  {status === 'saving' && 'Zustand / DB'}
+                </span>
+              </div>
+              <div className="h-1.5 w-full bg-neutral-200 dark:bg-neutral-900 rounded-full overflow-hidden">
+                <div
+                  className={`h-full bg-gradient-to-r from-violet-600 via-indigo-500 to-emerald-400 transition-all duration-500 ${
+                    status === 'uploading'
+                      ? 'w-1/3'
+                      : status === 'analyzing'
+                      ? 'w-2/3'
+                      : 'w-full'
+                  }`}
+                />
+              </div>
             </div>
           )}
 
-          {/* 2. Selectores: Formato y Cantidad de Tarjetas (Situados debajo de la zona de subida) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {/* Card Format Selector Dropdown */}
-            <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 space-y-1.5">
-              <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 flex items-center justify-between">
-                <span className="flex items-center gap-2">
-                  <svg className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
-                  </svg>
-                  {t('ai_uploader.card_format_label', 'Formato de Tarjetas')}
-                </span>
-                <span className="text-[10px] font-mono text-violet-600 dark:text-violet-400 uppercase">{cardFormat}</span>
-              </label>
-
-              <div className="relative">
-                <select
-                  disabled={isBusy}
-                  value={cardFormat}
-                  onChange={(e) => setCardFormat(e.target.value as CardFormat)}
-                  className="w-full text-xs font-medium px-3.5 py-2.5 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition appearance-none cursor-pointer disabled:opacity-50 pr-10"
+          {/* ========================================================
+              PASO 1: Documento
+             ======================================================== */}
+          {currentStep === 1 && (
+            <div className="space-y-4 animate-in fade-in duration-150">
+              {!selectedFile ? (
+                /* Drag and drop zone */
+                <div
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`relative cursor-pointer rounded-2xl border-2 border-dashed p-6 sm:p-8 text-center transition-all duration-200 group ${
+                    isDragging
+                      ? 'border-violet-500 bg-violet-600/10 scale-[1.01] shadow-xl shadow-violet-900/20'
+                      : 'border-neutral-300 dark:border-neutral-800 hover:border-violet-500/60 bg-neutral-50/70 dark:bg-neutral-950/60 hover:bg-neutral-100/80 dark:hover:bg-neutral-900/40'
+                  }`}
                 >
-                  <option value="basic">🃏 {t('card_editor.format_basic', 'Básica')} — {t('url_generator.format_basic_desc', 'Pregunta directa y respuesta concisa')}</option>
-                  <option value="multiple_choice">📝 {t('card_editor.format_test', 'Opción Múltiple')} — {t('url_generator.format_mc_desc', 'Pregunta test con 4 alternativas y solución')}</option>
-                  <option value="cloze">🧩 {t('card_editor.format_cloze', 'Cloze')} — {t('url_generator.format_cloze_desc', 'Completar conceptos clave entre corchetes')}</option>
-                  <option value="true_false">⚖️ {t('card_editor.format_tf', 'Verdadero o Falso')}</option>
-                </select>
-                <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-neutral-400">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
+                  <div className="absolute inset-0 rounded-2xl bg-gradient-to-b from-violet-600/5 to-transparent pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity" />
+
+                  <div className="relative z-10 flex flex-col items-center justify-center space-y-3">
+                    <div
+                      className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center transition-transform duration-200 group-hover:scale-110 shadow-sm ${
+                        isDragging
+                          ? 'bg-violet-600 text-white shadow-violet-600/30'
+                          : 'bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-violet-600 dark:text-violet-400 group-hover:text-violet-500 group-hover:border-violet-500/40'
+                      }`}
+                    >
+                      <svg className="w-6 h-6 sm:w-7 sm:h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.75}
+                          d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                        />
+                      </svg>
+                    </div>
+
+                    <div>
+                      <h4 className="text-sm font-semibold text-neutral-900 dark:text-white tracking-tight">
+                        {t('ai_uploader.drag_drop_title', 'Arrastra y suelta tu archivo aquí')}
+                      </h4>
+                      <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                        {t('ai_uploader.drag_drop_subtitle', 'o haz clic para explorar en tu dispositivo')}
+                      </p>
+                    </div>
+
+                    {/* Formats Pills */}
+                    <div className="flex flex-wrap items-center justify-center gap-1.5 pt-1 sm:pt-2">
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-rose-500/10 border border-rose-500/25 text-rose-700 dark:text-rose-300">
+                        PDF (.pdf)
+                      </span>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/25 text-blue-700 dark:text-blue-300">
+                        Word (.docx, .doc)
+                      </span>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/25 text-emerald-700 dark:text-emerald-300">
+                        Audio (.mp3, .wav)
+                      </span>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/25 text-amber-700 dark:text-amber-300">
+                        Texto (.txt)
+                      </span>
+                    </div>
+
+                    <div className="space-y-1.5 pt-1">
+                      <span className="text-[10px] text-neutral-500 block">
+                        {t('ai_uploader.max_file_size', 'Tamaño máximo por archivo: 50 MB • Almacenamiento privado seguro con Supabase RLS')}
+                      </span>
+                      <p className="text-[11px] text-amber-800 dark:text-amber-300/95 font-medium flex items-center justify-center gap-1.5">
+                        <span>💡</span>
+                        <span>
+                          {t('ai_uploader.video_hint', 'Para vídeos o clases grabadas,')}{' '}
+                          {onSwitchToUrl ? (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onSwitchToUrl();
+                              }}
+                              className="underline hover:text-amber-900 dark:hover:text-amber-100 font-semibold transition cursor-pointer"
+                            >
+                              {t('ai_uploader.video_hint_link', 'pega el enlace web')}
+                            </button>
+                          ) : (
+                            t('ai_uploader.video_hint_link', 'pega el enlace web')
+                          )}{' '}
+                          {t('ai_uploader.video_hint_audio', 'o sube el archivo de audio en .mp3')}
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* Selected File Card */
+                <div className="space-y-4">
+                  {(() => {
+                    const info = getFileTypeInfo(selectedFile);
+                    return (
+                      <div className="p-4 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950/80 space-y-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-3 overflow-hidden">
+                            <div
+                              className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 border ${info.borderCol} ${info.iconBg}`}
+                            >
+                              {info.category === 'pdf' && (
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                </svg>
+                              )}
+                              {info.category === 'docx' && (
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                              )}
+                              {info.category === 'audio' && (
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                                </svg>
+                              )}
+                              {info.category === 'text' && (
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                              )}
+                            </div>
+
+                            <div className="min-w-0">
+                              <p className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white truncate" title={selectedFile.name}>
+                                {selectedFile.name}
+                              </p>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <span
+                                  className={`text-[10px] font-mono px-2 py-0.2 rounded ${info.badgeBg} ${info.badgeText} border ${info.borderCol}`}
+                                >
+                                  {info.label}
+                                </span>
+                                <span className="text-[11px] text-neutral-500 dark:text-neutral-400 font-mono">
+                                  {pdfTotalPages !== null ? `${pdfTotalPages} págs • ` : ''}
+                                  {formatFileSize(selectedFile.size)}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {!isBusy && (
+                            <button
+                              type="button"
+                              onClick={handleReset}
+                              title="Cambiar archivo"
+                              className="p-1.5 rounded-lg text-neutral-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-neutral-200 dark:hover:bg-neutral-800 transition cursor-pointer"
+                            >
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* Botones de navegación Paso 1 */}
+              <div className="flex items-center justify-between pt-2">
+                {onCancel && (
+                  <button
+                    type="button"
+                    onClick={onCancel}
+                    className="px-4 py-2 text-xs text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 transition cursor-pointer"
+                  >
+                    {t('common.cancel', 'Cancelar')}
+                  </button>
+                )}
+                {selectedFile && (
+                  <button
+                    type="button"
+                    onClick={() => setCurrentStep(2)}
+                    className="ml-auto inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-medium text-xs sm:text-sm transition shadow-lg shadow-violet-600/25 active:scale-95 cursor-pointer"
+                  >
+                    <span>{t('ai_uploader.continue_step2', isEn ? 'Continue to Step 2' : 'Continuar al Paso 2')}</span>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================
+              PASO 2: Rango y Formato
+             ======================================================== */}
+          {currentStep === 2 && selectedFile && (
+            <div className="space-y-3 sm:space-y-3.5 animate-in fade-in duration-150">
+              {/* Rango de Páginas si es PDF */}
+              {isPdf ? (
+                <div className="p-3 sm:p-3.5 rounded-2xl bg-neutral-50 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-neutral-800 dark:text-neutral-200 flex items-center">
+                      <span>{t('ai_uploader.page_range_pdf', isEn ? 'Page Range (PDF)' : 'Rango de Páginas (PDF)')}</span>
+                      <InfoTooltip
+                        title={t('ai_uploader.tooltip_page_range_title', isEn ? 'PDF Viewer vs. Printed Page Numbers' : 'Numeración de visor vs. libro impreso')}
+                        content={t(
+                          'ai_uploader.tooltip_page_range',
+                          isEn
+                            ? '⚠️ PDF Viewer vs. Printed Page Numbers: Enter the page number shown in your PDF reader\'s top bar (e.g., page 96 of 569). Covers and indexes often offset physical page numbers.'
+                            : '⚠️ Numeración de visor vs. libro impreso: Introduce el número que marca tu lector PDF en la barra superior (ej. pág. 96 de 569). Las portadas e índices suelen desfasar la numeración impresa en papel.'
+                        )}
+                      />
+                    </label>
+                    <span className="text-[10px] text-neutral-500 dark:text-neutral-400 font-mono">
+                      {pdfTotalPages !== null
+                        ? t('ai_uploader.total_pages', { count: pdfTotalPages }, isEn ? `${pdfTotalPages} total pages` : `${pdfTotalPages} págs totales`)
+                        : 'PDF'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-medium text-neutral-600 dark:text-neutral-400 mb-1">
+                        {t('ai_uploader.from_page', isEn ? 'Start page:' : 'Desde página:')}
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={pdfTotalPages || undefined}
+                        disabled={isBusy}
+                        value={pageStart}
+                        onChange={(e) => {
+                          setPageStart(e.target.value);
+                          setNextCursorPage(null);
+                          setLastStartPage(null);
+                        }}
+                        placeholder="ej. 1"
+                        className="w-full text-xs font-medium px-3 py-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition disabled:opacity-50"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-medium text-neutral-600 dark:text-neutral-400 mb-1">
+                        {t('ai_uploader.to_page', isEn ? 'End page:' : 'Hasta página:')}
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={pdfTotalPages || undefined}
+                        disabled={isBusy}
+                        value={pageEnd}
+                        onChange={(e) => {
+                          setPageEnd(e.target.value);
+                          setNextCursorPage(null);
+                          setLastStartPage(null);
+                        }}
+                        placeholder={pdfTotalPages ? (isEn ? `e.g. ${pdfTotalPages}` : `ej. ${pdfTotalPages}`) : (isEn ? 'e.g. 30' : 'ej. 30')}
+                        className="w-full text-xs font-medium px-3 py-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition disabled:opacity-50"
+                      />
+                    </div>
+                  </div>
+
+                  {typeof nextCursorPage === 'number' && (
+                    <div className="p-2 rounded-lg bg-indigo-500/10 border border-indigo-500/25 text-indigo-300 text-[11px] flex items-center justify-between gap-2">
+                      <span>{t('ai_uploader.bookmark_resume', { page: nextCursorPage }, isEn ? `🔖 Bookmark: Will resume from page ${nextCursorPage}` : `🔖 Marcapáginas: Retomará desde pág. ${nextCursorPage}`)}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNextCursorPage(null);
+                          setLastStartPage(null);
+                        }}
+                        className="text-[10px] text-indigo-400 hover:text-indigo-200 underline font-mono cursor-pointer"
+                      >
+                        {t('ai_uploader.bookmark_reset', isEn ? 'Reset' : 'Reiniciar')}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="p-3 rounded-xl bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-xs text-neutral-600 dark:text-neutral-400 flex items-center gap-2">
+                  <span>📄</span>
+                  <span>{t('ai_uploader.full_doc_notice', { name: selectedFile.name }, isEn ? `Full document: The engine will process the entire file (${selectedFile.name}).` : `Documento completo: El motor procesará la totalidad del archivo (${selectedFile.name}).`)}</span>
+                </div>
+              )}
+
+              {/* Formato de Tarjetas (Grid 2x2) */}
+              <div className="space-y-1.5 sm:space-y-2">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300">
+                  {t('ai_uploader.card_format_label', isEn ? 'Card Format' : 'Formato de Tarjetas')}
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5">
+                  {[
+                    {
+                      id: 'multiple_choice' as CardFormat,
+                      icon: '📝',
+                      title: t('card_editor.format_test', isEn ? 'Multiple Choice' : 'Opción Múltiple'),
+                      subtitle: t('ai_uploader.format_mc_sub', isEn ? '4-option test with solution' : 'Test con 4 alternativas y solución'),
+                    },
+                    {
+                      id: 'basic' as CardFormat,
+                      icon: '🃏',
+                      title: t('card_editor.format_basic', isEn ? 'Basic' : 'Básica'),
+                      subtitle: t('ai_uploader.format_basic_sub', isEn ? 'Direct question and concise answer' : 'Pregunta directa y respuesta concisa'),
+                    },
+                    {
+                      id: 'cloze' as CardFormat,
+                      icon: '🧩',
+                      title: t('card_editor.format_cloze', isEn ? 'Cloze' : 'Cloze'),
+                      subtitle: t('ai_uploader.format_cloze_sub', isEn ? 'Fill-in-the-blank brackets' : 'Completar conceptos entre corchetes'),
+                    },
+                    {
+                      id: 'true_false' as CardFormat,
+                      icon: '⚖️',
+                      title: t('card_editor.format_tf', isEn ? 'True or False' : 'Verdadero o Falso'),
+                      subtitle: t('ai_uploader.format_tf_sub', isEn ? 'Statements with strict justifications' : 'Afirmación con justificación rigurosa'),
+                    },
+                  ].map((opt) => {
+                    const isSelected = cardFormat === opt.id;
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        disabled={isBusy}
+                        onClick={() => setCardFormat(opt.id)}
+                        className={`p-2.5 sm:p-3 rounded-xl border text-left transition-all flex items-start gap-2.5 cursor-pointer active:scale-[0.99] ${
+                          isSelected
+                            ? 'border-violet-500 bg-violet-500/10 ring-1 ring-violet-500 text-neutral-900 dark:text-white shadow-sm'
+                            : 'border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/60 hover:border-neutral-300 dark:hover:border-neutral-700 text-neutral-700 dark:text-neutral-300'
+                        }`}
+                      >
+                        <span className="text-xl shrink-0 mt-0.5">{opt.icon}</span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-semibold">{opt.title}</p>
+                          <p className="text-[11px] sm:text-xs text-neutral-500 dark:text-slate-400 leading-snug line-clamp-2 mt-0.5">
+                            {opt.subtitle}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
-              <p className="text-[11px] text-neutral-500 dark:text-neutral-400 pt-0.5">
-                {cardFormat === 'basic' && (language === 'en' ? 'Direct questions with rigorous answers.' : 'Preguntas directas con respuestas rigurosas.')}
-                {cardFormat === 'multiple_choice' && (language === 'en' ? 'Quiz questions with 4 plausible options.' : 'Preguntas test con 4 opciones plausibles.')}
-                {cardFormat === 'cloze' && (language === 'en' ? 'Hide key concepts with [...].' : 'Oculta conceptos clave con [...].')}
-                {cardFormat === 'true_false' && (language === 'en' ? 'Statements with strict justifications.' : 'Afirmaciones con justificación estricta.')}
-              </p>
-            </div>
-
-            {/* Card Count Numeric Input con Límite Seguro y Hint Educativo */}
-            <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 space-y-1.5">
-              <label htmlFor="cardCount" className="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 flex items-center justify-between">
-                <span className="flex items-center gap-2">
-                  <svg className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                  </svg>
-                  {t('ai_uploader.card_count_label', 'Cantidad de Tarjetas')}
-                </span>
-                <span className="text-[10px] font-mono text-violet-600 dark:text-violet-400 font-bold">{cardCount} / 30 MÁX</span>
-              </label>
-
-              <div className="relative">
+              {/* Cantidad de Tarjetas (1 a 30) */}
+              <div className="p-3 sm:p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label htmlFor="cardCount" className="text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300">
+                    {t('ai_uploader.card_count_label', isEn ? 'Card Quantity' : 'Cantidad de Tarjetas')}
+                  </label>
+                  <span className="text-[10px] font-mono text-violet-600 dark:text-violet-400 font-bold">
+                    {cardCount} / 30 MÁX
+                  </span>
+                </div>
                 <input
                   id="cardCount"
                   name="cardCount"
@@ -951,166 +1228,131 @@ export function DocumentUploader({
                       setCardCount(Math.min(30, Math.max(1, val)));
                     }
                   }}
-                  className="w-full text-xs font-semibold px-3.5 py-2.5 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition disabled:opacity-50"
-                  placeholder="1 a 30 tarjetas"
+                  className="w-full text-xs font-semibold px-3.5 py-2 sm:py-2.5 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition disabled:opacity-50"
+                  placeholder={isEn ? "1 to 30 cards" : "1 a 30 tarjetas"}
                 />
               </div>
 
-              {/* Mensaje de ayuda visualmente atractivo o banner de fase minuciosa si ya está activa */}
-              {isMeticulousPhase ? (
-                <div className="p-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-800 dark:text-amber-200 text-xs leading-relaxed flex items-start gap-2.5 shadow-sm">
-                  <span className="text-base shrink-0">🎯</span>
-                  <div className="flex-1">
-                    <p className="leading-relaxed">
-                      <strong className="font-semibold text-amber-700 dark:text-amber-300">
-                        {t('deck_detail.theory_covered_title', 'Teoría principal cubierta.')}
-                      </strong>{' '}
-                      {t(
-                        'deck_detail.theory_covered_desc',
-                        'Se han extraído los conceptos troncales. Si continúas generando, la IA rebuscará detalles minuciosos, datos estadísticos y excepciones del texto para un estudio de máxima profundidad.'
-                      )}
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="p-2.5 rounded-lg bg-violet-50 dark:bg-violet-500/10 border border-violet-200 dark:border-violet-500/20 text-[11px] text-violet-800 dark:text-violet-200/90 flex items-start gap-2 leading-relaxed">
-                  <span className="shrink-0 text-sm">💡</span>
-                  <span>
+              {/* Alerta Preventiva Condicional (1 sola página y > 15 tarjetas) */}
+              {isSinglePage && cardCount > 15 && (
+                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-900 dark:text-amber-200 text-xs leading-relaxed flex items-start gap-2 shadow-sm animate-in fade-in">
+                  <span className="text-sm shrink-0 mt-0.5">⚠️</span>
+                  <p>
                     {t(
-                      'deck_detail.batch_hint',
-                      'Generamos por lotes para evitar saturación. Puedes pedir varios lotes seguidos del mismo documento: nuestra IA analiza tu mazo y extraerá conceptos 100% nuevos sin repetir preguntas anteriores.'
+                      'ai_uploader.density_warning',
+                      isEn
+                        ? 'You selected 1 page for a high card count. Unless it is a dense table, a single page typically yields 8–15 high-fidelity cards without hallucinating content.'
+                        : 'Has seleccionado 1 página para un lote alto. Salvo en tablas muy densas, una sola página suele rendir 8-15 tarjetas de alta fidelidad sin inventar.'
                     )}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* 3. Instrucción adicional y Botones de Acción (visibles cuando hay un archivo cargado) */}
-          {selectedFile && (
-            <div className="space-y-4 pt-1">
-              {/* Chunking de Precisión para PDFs (Ventana Deslizante) */}
-              {(selectedFile.name.toLowerCase().endsWith('.pdf') || selectedFile.type === 'application/pdf') && (
-                <div className="p-3.5 rounded-2xl bg-neutral-50 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5">
-                      <svg className="w-4 h-4 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                      </svg>
-                      <span>Ventana Deslizante (Rango Maestro del PDF)</span>
-                    </label>
-                    <span className="text-[10px] text-neutral-500 dark:text-neutral-400 font-mono">
-                      {pdfTotalPages !== null ? `${pdfTotalPages} págs totales` : 'PDF'}
-                    </span>
-                  </div>
-
-                  {/* Advertencia visual sobre la numeración del PDF */}
-                  <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-900 dark:text-amber-200 text-xs leading-relaxed flex items-start gap-2.5">
-                    <p className="font-medium">
-                      {t(
-                        'ai_uploader.pdf_page_warning',
-                        '⚠️ Atención a la numeración: Introduce el número de página que indica el contador superior de tu visor PDF (ej. 96 de 569), NO el número impreso en la esquina de la hoja. Las portadas y prólogos hacen que estos números no coincidan.'
-                      )}
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-[11px] font-medium text-neutral-600 dark:text-neutral-400 mb-1">
-                        Desde página:
-                      </label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={pdfTotalPages || undefined}
-                        disabled={isBusy}
-                        value={pageStart}
-                        onChange={(e) => {
-                          setPageStart(e.target.value);
-                          setNextCursorPage(null);
-                          setLastStartPage(null);
-                        }}
-                        placeholder="ej. 1"
-                        className="w-full text-xs font-medium px-3 py-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition disabled:opacity-50"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-medium text-neutral-600 dark:text-neutral-400 mb-1">
-                        Hasta página:
-                      </label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={pdfTotalPages || undefined}
-                        disabled={isBusy}
-                        value={pageEnd}
-                        onChange={(e) => {
-                          setPageEnd(e.target.value);
-                          setNextCursorPage(null);
-                          setLastStartPage(null);
-                        }}
-                        placeholder={pdfTotalPages ? `ej. ${pdfTotalPages}` : 'ej. 30'}
-                        className="w-full text-xs font-medium px-3 py-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition disabled:opacity-50"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Indicador visual en tiempo real del Marcapáginas */}
-                  <div className="p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-700 dark:text-indigo-300 text-xs flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm">🔖</span>
-                      <span className="font-medium">
-                        {isBusy
-                          ? 'Extrayendo minuciosamente página por página en el backend...'
-                          : typeof nextCursorPage === 'number'
-                          ? `Marcapáginas activo: Retomar desde pág. ${nextCursorPage} (Rango: ${masterStart} - ${masterEnd})`
-                          : `Inicio de extracción: Página ${masterStart} (Rango: ${masterStart} - ${masterEnd})`}
-                      </span>
-                    </div>
-                    {typeof nextCursorPage === 'number' && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setNextCursorPage(null);
-                          setLastStartPage(null);
-                        }}
-                        className="text-[10px] text-indigo-400 hover:text-indigo-200 underline font-mono cursor-pointer"
-                      >
-                        Reiniciar marcapáginas
-                      </button>
-                    )}
-                  </div>
-
-                  <p className="text-[11px] text-neutral-500 dark:text-neutral-400 leading-relaxed">
-                    Motor Secuencial: El backend analiza rigurosamente página por página extrayendo preguntas únicas y tablas, hasta acumular exactamente {cardCount} tarjetas deduplicadas, y recuerda la página exacta donde se detiene.
                   </p>
                 </div>
               )}
 
-              {/* Modo Exhaustivo - Toggle/Switch destacado */}
-              <div className={`p-4 rounded-2xl border transition-all ${
-                isExhaustiveMode
-                  ? 'bg-gradient-to-r from-violet-600/15 via-indigo-600/15 to-purple-600/15 dark:from-violet-950/50 dark:via-indigo-950/40 dark:to-purple-950/50 border-violet-500/50 ring-1 ring-violet-500/30 shadow-md shadow-violet-500/10'
-                  : 'bg-neutral-50 dark:bg-neutral-950/80 border-neutral-200 dark:border-neutral-800'
-              }`}>
+              {/* Botones de navegación Paso 2 */}
+              <div className="flex items-center justify-between pt-1 sm:pt-2">
+                <button
+                  type="button"
+                  onClick={() => setCurrentStep(1)}
+                  className="px-4 py-2 text-xs text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                  <span>{t('ai_uploader.back_btn', isEn ? 'Back' : 'Atrás')}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCurrentStep(3)}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-medium text-xs sm:text-sm transition shadow-lg shadow-violet-600/25 active:scale-95 cursor-pointer"
+                >
+                  <span>{t('ai_uploader.continue_step3', isEn ? 'Continue to Step 3' : 'Continuar al Paso 3')}</span>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================
+              PASO 3: Modo y Enfoque
+             ======================================================== */}
+          {currentStep === 3 && selectedFile && (
+            <div className="space-y-3 sm:space-y-3.5 animate-in fade-in duration-150">
+              {/* Modo Exhaustivo - Toggle/Switch destacado con Tooltip */}
+              <div
+                className={`p-3.5 sm:p-4 rounded-2xl border transition-all ${
+                  isExhaustiveMode
+                    ? 'bg-gradient-to-r from-violet-600/15 via-indigo-600/15 to-purple-600/15 dark:from-violet-950/50 dark:via-indigo-950/40 dark:to-purple-950/50 border-violet-500/50 ring-1 ring-violet-500/30 shadow-md shadow-violet-500/10'
+                    : 'bg-neutral-50 dark:bg-neutral-950/80 border-neutral-200 dark:border-neutral-800'
+                }`}
+              >
                 <div className="flex items-center justify-between gap-4">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <span className="text-base">⚡</span>
-                      <h4 className="text-xs font-bold text-neutral-900 dark:text-white tracking-tight">
-                        {t('ai_uploader.exhaustive_mode_title', 'Modo Exhaustivo (Destripar Tablas y Datos)')}
+                      <h4 className="text-xs font-bold text-neutral-900 dark:text-white tracking-tight flex items-center">
+                        <span>
+                          {t('ai_uploader.exhaustive_mode_label', isEn ? 'Exhaustive Mode' : 'Modo Exhaustivo')} (
+                          {isExhaustiveMode
+                            ? t('ai_uploader.mode_surgical', isEn ? 'Surgical' : 'Quirúrgico')
+                            : t('ai_uploader.mode_normal', isEn ? 'Normal' : 'Normal')}
+                          )
+                        </span>
+                        <InfoTooltip
+                          title={t('ai_uploader.tooltip_exhaustive_title', isEn ? 'Normal vs. Exhaustive Mode' : 'Modo Normal vs. Modo Exhaustivo')}
+                          content={
+                            <div className="space-y-2">
+                              <div>
+                                <strong className="text-white block font-semibold">
+                                  {t('ai_uploader.tooltip_exhaustive_normal_title', isEn ? '💡 Normal Mode:' : '💡 Modo Normal:')}
+                                </strong>
+                                <span className="text-neutral-300">
+                                  {t(
+                                    'ai_uploader.tooltip_exhaustive_normal_desc',
+                                    isEn
+                                      ? 'Extracts core concepts, causes, consequences, and key definitions (ideal for initial study rounds).'
+                                      : 'Extrae conceptos troncales, causas, consecuencias y definiciones clave (ideal para una primera vuelta de estudio).'
+                                  )}
+                                </span>
+                              </div>
+                              <div>
+                                <strong className="text-violet-300 block font-semibold">
+                                  {t('ai_uploader.tooltip_exhaustive_mode_title', isEn ? '⚡ Exhaustive Mode:' : '⚡ Modo Exhaustivo:')}
+                                </strong>
+                                <span className="text-neutral-300">
+                                  {t(
+                                    'ai_uploader.tooltip_exhaustive_mode_desc',
+                                    isEn
+                                      ? 'Surgically analyzes every table row, chart, numeric stat, legal deadline, and exception.'
+                                      : 'Analiza cada fila de tablas, gráficas, cifras, plazos legales y excepciones con precisión quirúrgica.'
+                                  )}
+                                </span>
+                              </div>
+                            </div>
+                          }
+                        />
                       </h4>
                       {isExhaustiveMode && (
                         <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-violet-600 text-white animate-pulse">
-                          ACTIVO
+                          {t('ai_uploader.mode_surgical', isEn ? 'SURGICAL' : 'QUIRÚRGICO').toUpperCase()}
                         </span>
                       )}
                     </div>
                     <p className="text-[11px] text-neutral-600 dark:text-neutral-400 leading-relaxed">
-                      {t(
-                        'ai_uploader.exhaustive_mode_subtitle',
-                        'Fuerza a la IA a extraer cada cruce de datos de tablas, gráficos y listas densas. Ideal para manuales técnicos y médicos.'
-                      )}
+                      {isExhaustiveMode
+                        ? t(
+                            'ai_uploader.exhaustive_desc_surgical',
+                            isEn
+                              ? 'Surgically analyzes every table row, chart, numeric stat, legal deadline, and exception without summarizing.'
+                              : 'Desglose exhaustivo de tablas, gráficos y listas densas sin resumir información.'
+                          )
+                        : t(
+                            'ai_uploader.exhaustive_desc_normal',
+                            isEn
+                              ? 'Standard extraction and synthesis of main core concepts.'
+                              : 'Extracción estándar y síntesis de los conceptos clave principales.'
+                          )}
                     </p>
                   </div>
 
@@ -1136,49 +1378,50 @@ export function DocumentUploader({
                 </div>
               </div>
 
-              {/* Enfoque temático - High-visibility callout box (Opción Avanzada) */}
-              <div className="relative p-3.5 rounded-2xl bg-gradient-to-r from-purple-500/10 via-violet-500/5 to-indigo-500/10 dark:from-purple-950/40 dark:via-violet-950/30 dark:to-indigo-950/40 border border-purple-300 dark:border-purple-500/40 ring-1 ring-purple-500/30 shadow-sm transition-all">
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs font-bold text-purple-950 dark:text-purple-200 flex items-center gap-1.5">
-                    <span>
-                      {t(
-                        'ai_uploader.custom_prompt_label',
-                        '🎯 Enfoque temático (Opcional - Aplica solo al rango seleccionado)'
+              {/* Enfoque Temático con Tooltip */}
+              <div className="p-3 sm:p-3.5 rounded-2xl bg-neutral-50 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-neutral-900 dark:text-white flex items-center">
+                    <span>{t('ai_uploader.thematic_focus_label', isEn ? '🎯 Thematic Focus (Optional)' : '🎯 Enfoque Temático (Opcional)')}</span>
+                    <InfoTooltip
+                      title={t('ai_uploader.tooltip_focus_title', isEn ? 'Filtering and Focus Examples' : 'Ejemplos de Filtrado y Enfoque')}
+                      content={t(
+                        'ai_uploader.tooltip_focus_content',
+                        isEn
+                          ? 'Use this field to guide the AI and filter information within the chosen pages. Example: \'Focus on Table 5-3 and extract drug dosages\' or \'Ignore historical introduction and only ask about current regulations\'.'
+                          : 'Usa este campo para guiar a la IA y filtrar la información dentro de las páginas elegidas. Ejemplo: \'Centrar en el Cuadro 5-3 y extraer dosis farmacológicas\' o \'Ignorar introducción histórica y preguntar solo por la normativa vigente\'.'
                       )}
-                    </span>
+                    />
                   </label>
                 </div>
                 <textarea
-                  rows={3}
+                  rows={2}
                   disabled={isBusy}
                   value={customPrompt}
                   onChange={(e) => setCustomPrompt(e.target.value)}
                   placeholder={t(
-                    'ai_uploader.custom_prompt_placeholder',
-                    'Centra la información que buscas para tu mazo, escribe por ejemplo: Extrae las preguntas EXCLUSIVAMENTE de los datos de las TABLAS, los cuadros estadísticos y las imágenes. Ignora el texto de los párrafos normales.'
+                    'ai_uploader.focus_prompt_placeholder',
+                    isEn
+                      ? "E.g., 'Extract data exclusively from Table 5-3 on fat content'..."
+                      : "Ej: 'Extrae exclusivamente datos del Cuadro 5-3 de contenido de grasa'..."
                   )}
-                  className="w-full text-xs px-3.5 py-2.5 rounded-xl bg-white dark:bg-neutral-900 border border-purple-200 dark:border-purple-600/50 text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 ring-1 ring-purple-400/40 dark:ring-purple-500/40 shadow-inner transition disabled:opacity-50 resize-none"
+                  className="w-full text-xs px-3.5 py-2 sm:py-2.5 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-1 focus:ring-violet-500 focus:border-violet-500 transition disabled:opacity-50 resize-none"
                 />
-                <p className="text-[11px] text-purple-800 dark:text-purple-300/90 mt-1.5 leading-relaxed font-medium">
-                  {t(
-                    'ai_uploader.custom_prompt_help',
-                    'Usa este campo para guiar a la IA y filtrar la información EXCLUSIVAMENTE dentro de las páginas que has recortado arriba.'
-                  )}
-                </p>
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex items-center justify-end gap-3 pt-2">
-                {onCancel && (
-                  <button
-                    type="button"
-                    disabled={isBusy}
-                    onClick={onCancel}
-                    className="px-4 py-2 text-xs text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 transition disabled:opacity-50 cursor-pointer"
-                  >
-                    {t('common.cancel', 'Cancelar')}
-                  </button>
-                )}
+              {/* Botones de navegación Paso 3 */}
+              <div className="flex items-center justify-between pt-1 sm:pt-2">
+                <button
+                  type="button"
+                  disabled={isBusy}
+                  onClick={() => setCurrentStep(2)}
+                  className="px-4 py-2 text-xs text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                  <span>{t('ai_uploader.back_btn', isEn ? 'Back' : 'Atrás')}</span>
+                </button>
 
                 <button
                   type="button"
@@ -1195,8 +1438,8 @@ export function DocumentUploader({
                       <div className="w-4 h-4 border-2 border-white/80 border-t-transparent rounded-full animate-spin" />
                       <span>
                         {isPdf
-                          ? 'Extrayendo minuciosamente página por página...'
-                          : t('ai_uploader.processing_file', 'Procesando archivo...')}
+                          ? (isEn ? 'Extracting meticulously...' : 'Extrayendo minuciosamente...')
+                          : t('ai_uploader.processing_file', isEn ? 'Processing file...' : 'Procesando archivo...')}
                       </span>
                     </>
                   ) : (
@@ -1207,11 +1450,11 @@ export function DocumentUploader({
                       <span>
                         {isPdf
                           ? (typeof nextCursorPage === 'number'
-                              ? `Continuar extrayendo (Retomar desde pág. ${nextCursorPage})`
-                              : `Extraer ${cardCount} tarjetas (desde pág. ${masterStart})`)
+                              ? t('ai_uploader.continue_extract_btn', { page: nextCursorPage }, isEn ? `Continue extracting (Resume p. ${nextCursorPage})` : `Continuar extrayendo (Retomar pág. ${nextCursorPage})`)
+                              : t('ai_uploader.extract_action_btn', { count: cardCount }, isEn ? `Extract ${cardCount} cards` : `Extraer ${cardCount} tarjetas`))
                           : (isMeticulousPhase
-                              ? t('ai_uploader.process_file_meticulous', 'Generar tarjetas detalladas (hasta {count})').replace('{count}', String(cardCount))
-                              : t('ai_uploader.process_file', 'Generar hasta {count} tarjetas').replace('{count}', String(cardCount)))}
+                              ? t('ai_uploader.process_file_meticulous', { count: cardCount }, isEn ? `Generate detailed cards (up to ${cardCount})` : `Generar tarjetas detalladas (hasta ${cardCount})`)
+                              : t('ai_uploader.process_file', { count: cardCount }, isEn ? `Generate up to ${cardCount} cards` : `Generar hasta ${cardCount} tarjetas`))}
                       </span>
                     </>
                   )}
