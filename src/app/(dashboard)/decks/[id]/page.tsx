@@ -90,7 +90,8 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
       id,
       existingFronts,
       user?.id,
-      language
+      language,
+      aiCoreExhausted || isMeticulousPhase
     );
 
     if (!result.success || !result.cards) {

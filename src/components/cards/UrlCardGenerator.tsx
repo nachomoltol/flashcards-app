@@ -99,6 +99,7 @@ export function UrlCardGenerator({
         customPrompt: customPrompt.trim() ? customPrompt.trim() : undefined,
         existingQuestions: existingCardsInDeck,
         language,
+        coreExhaustedPrevious: coreExhausted || isMeticulousPhase,
       });
 
       if (!result.success || !result.cards) {

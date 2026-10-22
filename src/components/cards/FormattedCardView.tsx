@@ -178,6 +178,66 @@ function renderMarkdownBold(text: string) {
   });
 }
 
+/**
+ * Estructura y separa el reverso en veredicto/respuesta clave y explicación técnica detallada.
+ */
+export function parseBackContent(
+  backText: string,
+  format: CardFormat = 'basic'
+): { verdict: string; explanation: string } {
+  const trimmed = (backText || '').trim();
+  if (!trimmed) return { verdict: '', explanation: '' };
+
+  // 1. Si contiene saltos de línea (doble o simple)
+  const lines = trimmed.split(/\r?\n+/).map((l) => l.trim()).filter(Boolean);
+  if (lines.length > 1) {
+    return {
+      verdict: lines[0],
+      explanation: lines.slice(1).join('\n\n'),
+    };
+  }
+
+  // 2. Si no hay saltos de línea pero contiene un marcador de explicación
+  const explanationSplit = trimmed.split(/(?:Explicación|Justificación|Fundamento|Razón):\s*/i);
+  if (explanationSplit.length > 1 && explanationSplit[0].trim()) {
+    return {
+      verdict: explanationSplit[0].trim(),
+      explanation: explanationSplit.slice(1).join(' ').trim(),
+    };
+  }
+
+  // 3. Para True/False en una sola línea (ej: "Verdadero. Porque las células...")
+  if (format === 'true_false') {
+    const tfMatch = trimmed.match(/^(Verdadero|Falso)[\.\,\:\s\-]+(.*)$/i);
+    if (tfMatch && tfMatch[2].trim()) {
+      return {
+        verdict: tfMatch[1],
+        explanation: tfMatch[2].trim(),
+      };
+    }
+  }
+
+  // 4. Para Multiple Choice en una sola línea (ej: "c) Mitocondria. Es el orgánulo...")
+  if (format === 'multiple_choice') {
+    const mcMatch = trimmed.match(/^(\(?[a-dA-D][\)\.\:\-]\s*[^.\n]+?\.)\s+([\s\S]+)$/);
+    if (mcMatch && mcMatch[2].trim()) {
+      return {
+        verdict: mcMatch[1].trim(),
+        explanation: mcMatch[2].trim(),
+      };
+    }
+    const mcDashMatch = trimmed.match(/^(\(?[a-dA-D][\)\.\:\-]\s*[^\-\–\n]+?)\s*[\-\–]\s+([\s\S]+)$/);
+    if (mcDashMatch && mcDashMatch[2].trim()) {
+      return {
+        verdict: mcDashMatch[1].trim(),
+        explanation: mcDashMatch[2].trim(),
+      };
+    }
+  }
+
+  return { verdict: trimmed, explanation: '' };
+}
+
 export function FormattedCardView({
   front,
   back,
@@ -209,6 +269,9 @@ export function FormattedCardView({
     resolvedFormat === 'multiple_choice'
       ? parseMultipleChoice(front)
       : { question: front, options: [] };
+
+  // Parser para el reverso clínico (veredicto vs explicación detallada)
+  const parsedBack = parseBackContent(back, resolvedFormat);
 
   // Identificar la clave correcta del Back (ej. "b) Respuesta" o "b")
   const correctKeyMatch = back.match(/^\s*([a-dA-D])[.)\]\-:]/);
@@ -266,73 +329,45 @@ export function FormattedCardView({
   };
 
   return (
-    <div className={`space-y-3.5 sm:space-y-6 ${className || ''}`}>
-      {/* Visual Header Badge for Format & TTS Speaker Button */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 flex-wrap">
-          {resolvedFormat === 'multiple_choice' && (
-            <span className="text-[11px] px-2.5 py-0.5 rounded-full font-semibold uppercase tracking-wider bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
-              {t('card_editor.format_test', 'Opción Múltiple (Test)')}
-            </span>
-          )}
-          {resolvedFormat === 'cloze' && (
-            <span className="text-[11px] px-2.5 py-0.5 rounded-full font-semibold uppercase tracking-wider bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-              {t('card_editor.format_cloze', 'Texto Cloze [...]')}
-            </span>
-          )}
-          {resolvedFormat === 'true_false' && (
-            <span className="text-[11px] px-2.5 py-0.5 rounded-full font-semibold uppercase tracking-wider bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-              {t('card_editor.format_tf', 'Verdadero o Falso')}
-            </span>
-          )}
-          {resolvedFormat === 'basic' && (
-            <span className="text-[11px] px-2.5 py-0.5 rounded-full font-semibold uppercase tracking-wider bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/30 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-              {t('card_editor.format_basic', 'Pregunta Directa')}
-            </span>
-          )}
-        </div>
-
-        {/* Botón de Altavoz discreto (Text-to-Speech) */}
-        <button
-          type="button"
-          onClick={handleSpeak}
-          aria-label={isSpeaking ? (language === 'en' ? 'Stop audio' : 'Detener lectura en voz alta') : (language === 'en' ? 'Read aloud' : 'Leer pregunta en voz alta')}
-          title={isSpeaking ? (language === 'en' ? 'Stop audio' : 'Detener audio') : (language === 'en' ? 'Read aloud' : 'Leer pregunta en voz alta')}
-          className={`px-2.5 py-1 rounded-xl border text-xs transition-all duration-150 flex items-center gap-1.5 shrink-0 cursor-pointer ${
-            isSpeaking
-              ? 'bg-indigo-600/30 text-indigo-700 dark:text-indigo-200 border-indigo-500/50 ring-1 ring-indigo-500/40 animate-pulse'
-              : 'bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-900/80 dark:hover:bg-neutral-800 text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 active:scale-95'
-          }`}
-        >
-          {isSpeaking ? (
-            <Volume2 className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 animate-bounce" />
-          ) : (
-            <Volume2 className="w-3.5 h-3.5 text-neutral-500 dark:text-neutral-400" />
-          )}
-          <span className="text-[11px] font-medium hidden sm:inline">
-            {isSpeaking ? t('formatted_card.reading', 'Leyendo...') : t('formatted_card.listen', 'Escuchar')}
-          </span>
-        </button>
-      </div>
-
+    <div className={`space-y-3 sm:space-y-5 ${className || ''}`}>
       {/* ANVERSO (FRONT) */}
-      <div className="space-y-3 sm:space-y-4">
-        {/* Pregunta principal */}
-        <div className="text-lg sm:text-xl md:text-2xl font-semibold text-neutral-900 dark:text-white leading-snug sm:leading-relaxed">
-          {resolvedFormat === 'cloze' ? (
-            renderClozeContent(question, isRevealed)
-          ) : (
-            <p className="whitespace-pre-wrap">{question}</p>
-          )}
+      <div className="mb-2 sm:mb-4 space-y-2.5 sm:space-y-3">
+        {/* Pregunta principal con botón TTS integrado sin fila redundante de badges */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 text-base sm:text-lg md:text-xl font-semibold text-neutral-900 dark:text-white leading-snug sm:leading-relaxed">
+            {resolvedFormat === 'cloze' ? (
+              renderClozeContent(question, isRevealed)
+            ) : (
+              <p className="whitespace-pre-wrap">{question}</p>
+            )}
+          </div>
+
+          {/* Botón de Altavoz discreto (Text-to-Speech) integrado */}
+          <button
+            type="button"
+            onClick={handleSpeak}
+            aria-label={isSpeaking ? (language === 'en' ? 'Stop audio' : 'Detener lectura en voz alta') : (language === 'en' ? 'Read aloud' : 'Leer pregunta en voz alta')}
+            title={isSpeaking ? (language === 'en' ? 'Stop audio' : 'Detener audio') : (language === 'en' ? 'Read aloud' : 'Leer pregunta en voz alta')}
+            className={`px-2.5 py-1 rounded-xl border text-xs transition-all duration-150 flex items-center gap-1.5 shrink-0 cursor-pointer mt-0.5 ${
+              isSpeaking
+                ? 'bg-indigo-600/30 text-indigo-700 dark:text-indigo-200 border-indigo-500/50 ring-1 ring-indigo-500/40 animate-pulse'
+                : 'bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-900/80 dark:hover:bg-neutral-800 text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 active:scale-95'
+            }`}
+          >
+            {isSpeaking ? (
+              <Volume2 className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 animate-bounce" />
+            ) : (
+              <Volume2 className="w-3.5 h-3.5 text-neutral-500 dark:text-neutral-400" />
+            )}
+            <span className="text-[11px] font-medium hidden sm:inline">
+              {isSpeaking ? t('formatted_card.reading', 'Leyendo...') : t('formatted_card.listen', 'Escuchar')}
+            </span>
+          </button>
         </div>
 
         {/* Renderizado específico para Opción Múltiple: Dibujar las 4 opciones */}
         {resolvedFormat === 'multiple_choice' && options.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 pt-1 sm:pt-2 transition-all duration-200">
             {options.map((opt) => {
               const isSelected = selectedOption === opt.key;
               const isCorrect = correctKey === opt.key;
@@ -369,10 +404,14 @@ export function FormattedCardView({
                     (e.currentTarget as HTMLElement)?.blur();
                     setSelectedOption(opt.key);
                   }}
-                  className={`p-3.5 sm:p-4 rounded-xl border text-left flex items-start gap-3 transition-all duration-150 group active:scale-[0.99] min-h-[52px] ${cardStyles}`}
+                  className={`${
+                    isRevealed ? 'p-2 sm:p-2.5 min-h-[40px]' : 'p-2.5 sm:p-3.5 min-h-[40px] sm:min-h-[48px]'
+                  } rounded-xl border text-left flex items-start gap-2 sm:gap-3 transition-all duration-150 group active:scale-[0.99] ${cardStyles}`}
                 >
                   <span
-                    className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg text-xs flex items-center justify-center shrink-0 uppercase font-mono border transition-colors ${badgeStyles}`}
+                    className={`${
+                      isRevealed ? 'w-5 h-5 sm:w-6 sm:h-6 text-[10px] sm:text-[11px]' : 'w-6 h-6 sm:w-7 sm:h-7 text-xs'
+                    } rounded-lg flex items-center justify-center shrink-0 uppercase font-mono border transition-all ${badgeStyles}`}
                   >
                     {opt.key}
                   </span>
@@ -380,10 +419,10 @@ export function FormattedCardView({
                     {opt.text}
                   </div>
                   {isRevealed && isCorrect && (
-                    <Check className="w-5 h-5 text-emerald-500 dark:text-emerald-400 shrink-0 mt-0.5" />
+                    <Check className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500 dark:text-emerald-400 shrink-0 mt-0.5" />
                   )}
                   {isRevealed && isSelected && !isCorrect && (
-                    <X className="w-5 h-5 text-rose-500 dark:text-rose-400 shrink-0 mt-0.5" />
+                    <X className="w-4 h-4 sm:w-5 sm:h-5 text-rose-500 dark:text-rose-400 shrink-0 mt-0.5" />
                   )}
                 </button>
               );
@@ -401,7 +440,9 @@ export function FormattedCardView({
                 (e.currentTarget as HTMLElement)?.blur();
                 setSelectedOption('true');
               }}
-              className={`flex-1 py-3.5 px-4 min-h-[48px] rounded-xl border font-semibold text-xs sm:text-sm transition-all flex items-center justify-center gap-2 ${
+              className={`flex-1 ${
+                isRevealed ? 'py-2.5 sm:py-3 min-h-[42px]' : 'py-3.5 px-4 min-h-[48px]'
+              } rounded-xl border font-semibold text-xs sm:text-sm transition-all flex items-center justify-center gap-2 ${
                 isRevealed && isTrue
                   ? 'border-emerald-500 bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 ring-1 ring-emerald-500'
                   : isRevealed && selectedOption === 'true' && !isTrue
@@ -422,7 +463,9 @@ export function FormattedCardView({
                 (e.currentTarget as HTMLElement)?.blur();
                 setSelectedOption('false');
               }}
-              className={`flex-1 py-3.5 px-4 min-h-[48px] rounded-xl border font-semibold text-xs sm:text-sm transition-all flex items-center justify-center gap-2 ${
+              className={`flex-1 ${
+                isRevealed ? 'py-2.5 sm:py-3 min-h-[42px]' : 'py-3.5 px-4 min-h-[48px]'
+              } rounded-xl border font-semibold text-xs sm:text-sm transition-all flex items-center justify-center gap-2 ${
                 isRevealed && isFalse
                   ? 'border-rose-500 bg-rose-500/20 text-rose-800 dark:text-rose-300 ring-1 ring-rose-500'
                   : isRevealed && selectedOption === 'false' && !isFalse
@@ -441,7 +484,7 @@ export function FormattedCardView({
 
       {/* REVERSO (BACK) */}
       {isRevealed && (
-        <div className="pt-3 sm:pt-6 border-t border-neutral-200 dark:border-neutral-800/80 space-y-2 sm:space-y-3 animate-in fade-in slide-in-from-top-3 duration-300">
+        <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-neutral-200 dark:border-neutral-800/80 space-y-2.5 sm:space-y-3 animate-in fade-in duration-200">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -449,29 +492,54 @@ export function FormattedCardView({
             </span>
 
             {resolvedFormat === 'multiple_choice' && correctKey && (
-              <span className="text-xs font-mono px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/30 uppercase">
+              <span className="text-xs font-mono px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/30 uppercase font-bold">
                 {t('formatted_card.correct_option', 'Opción Correcta: ({key})').replace('{key}', correctKey)}
               </span>
             )}
           </div>
 
-          <div className="text-sm sm:text-base md:text-lg text-neutral-800 dark:text-neutral-200 leading-relaxed whitespace-pre-wrap bg-neutral-50 dark:bg-neutral-950/60 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-neutral-200 dark:border-neutral-800/90 shadow-inner">
-            {renderMarkdownBold(back)}
-          </div>
+          {/* Bloque Clínico de Respuesta y Justificación */}
+          <div className="bg-neutral-50 dark:bg-neutral-900/60 border-l-4 border-indigo-500/80 dark:border-indigo-400 p-3.5 sm:p-4 rounded-r-xl border-y border-r border-neutral-200/80 dark:border-neutral-800/80 shadow-sm space-y-2.5">
+            {/* Veredicto / Respuesta Principal */}
+            <div>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 block mb-1">
+                {resolvedFormat === 'multiple_choice'
+                  ? t('formatted_card.verdict_option', 'Opción Correcta')
+                  : resolvedFormat === 'true_false'
+                  ? t('formatted_card.verdict_tf', 'Veredicto')
+                  : t('formatted_card.verdict_title', 'Respuesta / Veredicto')}
+              </span>
+              <div className="text-base sm:text-lg font-bold text-neutral-900 dark:text-white leading-relaxed">
+                {renderMarkdownBold(parsedBack.verdict)}
+              </div>
+            </div>
 
-          {Boolean((notes && notes.trim()) || noteImageUrl) && (
-            <div className="p-3 sm:p-3.5 rounded-xl bg-amber-500/10 dark:bg-amber-950/20 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-xs sm:text-sm space-y-2.5">
-              <div className="flex items-start gap-2.5">
-                <Lightbulb className="w-4 h-4 text-amber-500 shrink-0 mt-0.5 fill-amber-400" />
-                <div className="flex-1 whitespace-pre-wrap">
-                  <span className="font-semibold block text-[11px] uppercase tracking-wider text-amber-600 dark:text-amber-400 mb-0.5">
-                    {t('study.note_tooltip_title', 'Nota Aclaratoria')}
-                  </span>
-                  {notes && notes.trim()}
+            {/* Explicación Técnica Detallada (si existe) */}
+            {parsedBack.explanation && (
+              <div className="pt-2.5 border-t border-neutral-200/80 dark:border-neutral-800/80">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 block mb-1">
+                  {t('formatted_card.explanation_title', 'Fundamento / Explicación Detallada')}
+                </span>
+                <div className="text-sm sm:text-base text-neutral-700 dark:text-neutral-300 leading-relaxed whitespace-pre-wrap">
+                  {renderMarkdownBold(parsedBack.explanation)}
                 </div>
               </div>
+            )}
+          </div>
+
+          {/* Notas Adicionales o Fuente/Página al pie */}
+          {Boolean((notes && notes.trim()) || noteImageUrl) && (
+            <div className="space-y-2 pt-1">
+              {notes && notes.trim() && (
+                <div className="text-xs text-neutral-400 dark:text-neutral-500 font-mono flex items-start gap-1.5 bg-neutral-100/60 dark:bg-neutral-950/40 p-2.5 rounded-lg border border-neutral-200/60 dark:border-neutral-800/60">
+                  <Lightbulb className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5 fill-amber-400" />
+                  <span className="flex-1 whitespace-pre-wrap leading-relaxed">
+                    {notes.trim()}
+                  </span>
+                </div>
+              )}
               {noteImageUrl && (
-                <div className="rounded-xl overflow-hidden border border-amber-500/30 bg-black/40 max-h-56 flex items-center justify-center p-1">
+                <div className="rounded-xl overflow-hidden border border-neutral-200 dark:border-neutral-800 bg-black/40 max-h-56 flex items-center justify-center p-1">
                   <img
                     src={noteImageUrl}
                     alt="Nota visual"

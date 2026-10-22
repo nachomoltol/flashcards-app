@@ -60,6 +60,29 @@ export default function StudyPage({ params }: StudyPageProps) {
   const [isSavingQuickNote, setIsSavingQuickNote] = useState(false);
   const [isUploadingNoteImage, setIsUploadingNoteImage] = useState(false);
   const noteImageInputRef = useRef<HTMLInputElement>(null);
+  const cardScrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Función unificada para revelar respuesta
+  const handleReveal = useCallback(() => {
+    setIsAnswerRevealed(true);
+  }, []);
+
+  // Auto-scroll reactivo al revelar la respuesta para centrar la justificación técnica
+  useEffect(() => {
+    if (isAnswerRevealed && cardScrollContainerRef.current) {
+      const timer = setTimeout(() => {
+        if (cardScrollContainerRef.current) {
+          cardScrollContainerRef.current.scrollTo({
+            top: cardScrollContainerRef.current.scrollHeight,
+            behavior: 'smooth',
+          });
+        }
+      }, 50);
+      return () => clearTimeout(timer);
+    } else if (!isAnswerRevealed && cardScrollContainerRef.current) {
+      cardScrollContainerRef.current.scrollTo({ top: 0, behavior: 'instant' });
+    }
+  }, [isAnswerRevealed, currentIndex]);
 
   // Consultar cantidad de repasos guardados hoy en este mazo desde Supabase
   const fetchTodayReviewsCount = useCallback(async () => {
@@ -353,7 +376,7 @@ export default function StudyPage({ params }: StudyPageProps) {
       if (!isAnswerRevealed) {
         if (e.code === 'Space' || e.key === ' ' || e.code === 'Enter') {
           e.preventDefault();
-          setIsAnswerRevealed(true);
+          handleReveal();
         }
       } else {
         if (e.key === '1') {
@@ -374,7 +397,7 @@ export default function StudyPage({ params }: StudyPageProps) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isAnswerRevealed, handleRate, isEditModalOpen, isNoteModalOpen]);
+  }, [isAnswerRevealed, handleRate, handleReveal, isEditModalOpen, isNoteModalOpen]);
 
   // Estado de carga inicial
   if (isLoading && !isInitialized) {
@@ -602,7 +625,7 @@ export default function StudyPage({ params }: StudyPageProps) {
       </div>
 
       {/* Main Isolated Card Container */}
-      <div className="flex-1 min-h-0 flex flex-col justify-between rounded-2xl sm:rounded-3xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/60 backdrop-blur-xl p-3.5 sm:p-6 md:p-8 shadow-xl shadow-neutral-200/50 dark:shadow-2xl relative transition-all my-1.5 sm:my-3">
+      <div className="flex-1 min-h-0 flex flex-col justify-between rounded-2xl sm:rounded-3xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/60 backdrop-blur-xl p-3 sm:p-5 md:p-6 shadow-xl shadow-neutral-200/50 dark:shadow-2xl relative transition-all my-1.5 sm:my-3">
         {/* Card Header Information */}
         <div className="shrink-0 flex items-center justify-between pb-2 sm:pb-3 border-b border-neutral-200 dark:border-neutral-800/60 relative z-20">
           <div className="flex items-center gap-1.5 sm:gap-2">
@@ -725,7 +748,10 @@ export default function StudyPage({ params }: StudyPageProps) {
 
         {/* Dynamic Card Content Rendered according to Format - Internal Scroll for Long Content */}
         {currentCard && (
-          <div className="flex-1 min-h-0 overflow-y-auto pr-1 py-1.5 overscroll-contain">
+          <div
+            ref={cardScrollContainerRef}
+            className="flex-1 min-h-0 overflow-y-auto pr-2 sm:pr-3 py-1.5 overscroll-contain"
+          >
             <FormattedCardView
               front={currentCard.front}
               back={currentCard.back}
@@ -758,13 +784,13 @@ export default function StudyPage({ params }: StudyPageProps) {
               type="button"
               onClick={(e) => {
                 (e.currentTarget as HTMLElement)?.blur();
-                setIsAnswerRevealed(true);
+                handleReveal();
               }}
               className="w-full py-3 sm:py-3.5 px-4 min-h-[46px] sm:min-h-[52px] rounded-xl sm:rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm sm:base transition-all duration-150 shadow-xl shadow-indigo-600/25 active:scale-[0.99] flex items-center justify-center gap-2 group cursor-pointer"
             >
               <span>{t('study.show_answer')}</span>
-              <kbd className="hidden sm:inline-block px-2 py-0.5 rounded-md bg-indigo-700 text-indigo-200 text-xs font-mono font-normal">
-                {t('study.space_key')}
+              <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono rounded bg-neutral-200/60 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-300 ml-2">
+                {t('study.space_key') || 'Espacio'}
               </kbd>
             </button>
           ) : (
@@ -778,8 +804,11 @@ export default function StudyPage({ params }: StudyPageProps) {
                     (e.currentTarget as HTMLElement)?.blur();
                     handleRate(1);
                   }}
-                  className="p-1 sm:p-2.5 min-h-[52px] sm:min-h-[70px] rounded-xl sm:rounded-2xl bg-rose-500/10 hover:bg-rose-500/20 active:bg-rose-500/30 text-rose-700 dark:text-rose-300 border border-rose-500/30 hover:border-rose-500/50 transition-all duration-150 flex flex-col items-center justify-center gap-0.5 sm:gap-1.5 group active:scale-95 shadow-sm cursor-pointer"
+                  className="p-1 sm:p-2.5 min-h-[52px] sm:min-h-[70px] rounded-xl sm:rounded-2xl bg-rose-500/10 hover:bg-rose-500/20 active:bg-rose-500/30 text-rose-700 dark:text-rose-300 border border-rose-500/30 hover:border-rose-500/50 transition-all duration-150 flex flex-col items-center justify-center gap-0.5 sm:gap-1.5 group active:scale-95 shadow-sm cursor-pointer relative"
                 >
+                  <span className="absolute top-1 sm:top-1.5 right-1.5 sm:right-2 hidden sm:block">
+                    <kbd className="text-[10px] font-mono opacity-60">1</kbd>
+                  </span>
                   <span className="text-[10px] sm:text-xs font-mono font-bold px-1.5 sm:px-2 py-0 sm:py-0.5 rounded-full bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/30">
                     {nextIntervals ? formatInterval(nextIntervals[1].due) : '10m'}
                   </span>
@@ -795,8 +824,11 @@ export default function StudyPage({ params }: StudyPageProps) {
                     (e.currentTarget as HTMLElement)?.blur();
                     handleRate(2);
                   }}
-                  className="p-1 sm:p-2.5 min-h-[52px] sm:min-h-[70px] rounded-xl sm:rounded-2xl bg-amber-500/10 hover:bg-amber-500/20 active:bg-amber-500/30 text-amber-700 dark:text-amber-300 border border-amber-500/30 hover:border-amber-500/50 transition-all duration-150 flex flex-col items-center justify-center gap-0.5 sm:gap-1.5 group active:scale-95 shadow-sm cursor-pointer"
+                  className="p-1 sm:p-2.5 min-h-[52px] sm:min-h-[70px] rounded-xl sm:rounded-2xl bg-amber-500/10 hover:bg-amber-500/20 active:bg-amber-500/30 text-amber-700 dark:text-amber-300 border border-amber-500/30 hover:border-amber-500/50 transition-all duration-150 flex flex-col items-center justify-center gap-0.5 sm:gap-1.5 group active:scale-95 shadow-sm cursor-pointer relative"
                 >
+                  <span className="absolute top-1 sm:top-1.5 right-1.5 sm:right-2 hidden sm:block">
+                    <kbd className="text-[10px] font-mono opacity-60">2</kbd>
+                  </span>
                   <span className="text-[10px] sm:text-xs font-mono font-bold px-1.5 sm:px-2 py-0 sm:py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30">
                     {nextIntervals ? formatInterval(nextIntervals[2].due) : '3h'}
                   </span>
@@ -812,8 +844,11 @@ export default function StudyPage({ params }: StudyPageProps) {
                     (e.currentTarget as HTMLElement)?.blur();
                     handleRate(3);
                   }}
-                  className="p-1 sm:p-2.5 min-h-[52px] sm:min-h-[70px] rounded-xl sm:rounded-2xl bg-emerald-500/10 hover:bg-emerald-500/20 active:bg-emerald-500/30 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 hover:border-emerald-500/50 transition-all duration-150 flex flex-col items-center justify-center gap-0.5 sm:gap-1.5 group active:scale-95 shadow-sm cursor-pointer"
+                  className="p-1 sm:p-2.5 min-h-[52px] sm:min-h-[70px] rounded-xl sm:rounded-2xl bg-emerald-500/10 hover:bg-emerald-500/20 active:bg-emerald-500/30 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 hover:border-emerald-500/50 transition-all duration-150 flex flex-col items-center justify-center gap-0.5 sm:gap-1.5 group active:scale-95 shadow-sm cursor-pointer relative"
                 >
+                  <span className="absolute top-1 sm:top-1.5 right-1.5 sm:right-2 hidden sm:block">
+                    <kbd className="text-[10px] font-mono opacity-60">3</kbd>
+                  </span>
                   <span className="text-[10px] sm:text-xs font-mono font-bold px-1.5 sm:px-2 py-0 sm:py-0.5 rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
                     {nextIntervals ? formatInterval(nextIntervals[3].due) : '1d'}
                   </span>
@@ -829,8 +864,11 @@ export default function StudyPage({ params }: StudyPageProps) {
                     (e.currentTarget as HTMLElement)?.blur();
                     handleRate(4);
                   }}
-                  className="p-1 sm:p-2.5 min-h-[52px] sm:min-h-[70px] rounded-xl sm:rounded-2xl bg-sky-500/10 hover:bg-sky-500/20 active:bg-sky-500/30 text-sky-700 dark:text-sky-300 border border-sky-500/30 hover:border-sky-500/50 transition-all duration-150 flex flex-col items-center justify-center gap-0.5 sm:gap-1.5 group active:scale-95 shadow-sm cursor-pointer"
+                  className="p-1 sm:p-2.5 min-h-[52px] sm:min-h-[70px] rounded-xl sm:rounded-2xl bg-sky-500/10 hover:bg-sky-500/20 active:bg-sky-500/30 text-sky-700 dark:text-sky-300 border border-sky-500/30 hover:border-sky-500/50 transition-all duration-150 flex flex-col items-center justify-center gap-0.5 sm:gap-1.5 group active:scale-95 shadow-sm cursor-pointer relative"
                 >
+                  <span className="absolute top-1 sm:top-1.5 right-1.5 sm:right-2 hidden sm:block">
+                    <kbd className="text-[10px] font-mono opacity-60">4</kbd>
+                  </span>
                   <span className="text-[10px] sm:text-xs font-mono font-bold px-1.5 sm:px-2 py-0 sm:py-0.5 rounded-full bg-sky-500/20 text-sky-700 dark:text-sky-300 border border-sky-500/30">
                     {nextIntervals ? formatInterval(nextIntervals[4].due) : '4d'}
                   </span>

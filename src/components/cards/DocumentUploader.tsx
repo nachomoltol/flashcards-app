@@ -152,8 +152,18 @@ export function DocumentUploader({
   const [isMeticulousPhase, setIsMeticulousPhase] = useState<boolean>(
     () => Boolean(initialMeticulousPhase)
   );
+  const [isExhaustiveMode, setIsExhaustiveMode] = useState<boolean>(false);
   const [generatedCardsPreview, setGeneratedCardsPreview] = useState<GeneratedCard[]>([]);
   const [materialExhaustedNotice, setMaterialExhaustedNotice] = useState<{ generated: number; requested: number } | null>(null);
+
+  // Marcapáginas (Cursor) y Bucle Acumulador Backend
+  const [nextCursorPage, setNextCursorPage] = useState<number | null>(null);
+  const [lastStartPage, setLastStartPage] = useState<number | null>(null);
+  const [uploadedStorage, setUploadedStorage] = useState<{
+    storagePath: string;
+    signedUrl?: string;
+    fileKey: string;
+  } | null>(null);
 
   // Sincronizar fase minuciosa si viene activa por prop
   useEffect(() => {
@@ -167,6 +177,9 @@ export function DocumentUploader({
   const handleFileSelection = useCallback(async (file: File) => {
     setErrorMessage(null);
     setPdfTotalPages(null);
+    setNextCursorPage(null);
+    setLastStartPage(null);
+    setUploadedStorage(null);
     const error = validateFile(file);
     if (error) {
       setErrorMessage(error);
@@ -213,8 +226,8 @@ export function DocumentUploader({
     }
   }, [handleFileSelection]);
 
-  // Upload to Supabase Storage and process with Gemini Flash
-  const handleProcessDocument = async () => {
+  // Upload to Supabase Storage and process with Gemini Flash using Sliding Window
+  const handleProcessDocument = async (overrideCursor?: number) => {
     if (!selectedFile) return;
 
     if (!user) {
@@ -225,40 +238,22 @@ export function DocumentUploader({
     const isPdf =
       selectedFile.name.toLowerCase().endsWith('.pdf') || selectedFile.type === 'application/pdf';
 
-    // FASE 2: Validación estricta del rango de páginas para PDFs (anti-desbordamiento y control de costes)
+    let startPageForRun: number | undefined = undefined;
+    let endPageForRun: number | undefined = undefined;
+
+    // FASE 2: Validación y cálculo del Marcapáginas (Cursor) para PDFs
     if (isPdf) {
       const parsedStart = pageStart.trim() ? parseInt(pageStart.trim(), 10) : undefined;
       const parsedEnd = pageEnd.trim() ? parseInt(pageEnd.trim(), 10) : undefined;
 
-      // 1. Si el PDF cargado tiene más de 30 páginas totales, los campos "Desde página" y "Hasta página" se vuelven estrictamente OBLIGATORIOS
-      if (pdfTotalPages !== null && pdfTotalPages > 30) {
-        if (!parsedStart || !parsedEnd) {
-          setErrorMessage(
-            `El PDF cargado tiene ${pdfTotalPages} páginas (más de 30). Los campos "Desde página" y "Hasta página" son estrictamente OBLIGATORIOS.`
-          );
-          return;
-        }
-      }
-
-      // 2. Validación del rango si se especificó (o si era obligatorio): máximo 40 páginas
-      if (parsedStart !== undefined || parsedEnd !== undefined) {
-        if (!parsedStart || !parsedEnd) {
-          setErrorMessage('Debes especificar tanto "Desde página" como "Hasta página" para delimitar el bloque.');
-          return;
-        }
+      // Validación de coherencia si se especificó rango
+      if (parsedStart !== undefined && parsedEnd !== undefined) {
         if (parsedStart < 1 || parsedEnd < 1) {
           setErrorMessage('Las páginas deben ser números positivos mayores o iguales a 1.');
           return;
         }
         if (parsedEnd < parsedStart) {
           setErrorMessage('La página final ("Hasta página") no puede ser menor que la inicial ("Desde página").');
-          return;
-        }
-        const span = parsedEnd - parsedStart + 1;
-        if (span > 40) {
-          setErrorMessage(
-            `El rango de páginas seleccionado (${span} páginas: de la ${parsedStart} a la ${parsedEnd}) supera el límite máximo permitido de 40 páginas por petición.`
-          );
           return;
         }
         if (pdfTotalPages !== null && parsedEnd > pdfTotalPages) {
@@ -268,51 +263,81 @@ export function DocumentUploader({
           return;
         }
       }
+
+      const masterStart = parsedStart !== undefined && !isNaN(parsedStart) ? Math.max(1, parsedStart) : 1;
+      const masterEnd = parsedEnd !== undefined && !isNaN(parsedEnd) ? parsedEnd : (pdfTotalPages || 9999);
+
+      // Calcular cursor activo para el bucle acumulador
+      const effectiveCursor = typeof overrideCursor === 'number'
+        ? overrideCursor
+        : (nextCursorPage !== null ? nextCursorPage : masterStart);
+
+      if (effectiveCursor > masterEnd) {
+        setErrorMessage(
+          `Has alcanzado el final del temario delimitado (página ${masterEnd}). Modifica el rango para seguir extrayendo.`
+        );
+        return;
+      }
+
+      startPageForRun = effectiveCursor;
+      endPageForRun = masterEnd;
+      setLastStartPage(startPageForRun);
     }
 
     try {
       setErrorMessage(null);
-      setStatus('uploading');
 
-      // 1. Subir archivo al bucket 'user-documents' bajo la carpeta del usuario según RLS
-      const sanitizedName = selectedFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-      const timestamp = Date.now();
-      const storagePath = `${user.id}/${timestamp}-${sanitizedName}`;
-
-      // Resolver MIME type exacto para la subida a Supabase
       const fileInfo = getFileTypeInfo(selectedFile);
-      let uploadContentType = selectedFile.type;
-      const fileExt = '.' + (selectedFile.name.split('.').pop()?.toLowerCase() || '');
-      if (fileExt === '.docx') {
-        uploadContentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-      } else if (fileExt === '.doc') {
-        uploadContentType = 'application/msword';
-      } else if (!uploadContentType) {
-        uploadContentType = fileInfo.mime || 'application/octet-stream';
-      }
+      const fileKey = `${selectedFile.name}-${selectedFile.size}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from('user-documents')
-        .upload(storagePath, selectedFile, {
-          contentType: uploadContentType,
-          upsert: false,
+      let storagePath = uploadedStorage?.fileKey === fileKey ? uploadedStorage.storagePath : '';
+      let signedUrl = uploadedStorage?.fileKey === fileKey ? uploadedStorage.signedUrl : undefined;
+
+      // 1. Subir archivo al bucket 'user-documents' (reutilizando si ya está subido para este archivo)
+      if (!storagePath) {
+        setStatus('uploading');
+        const sanitizedName = selectedFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const timestamp = Date.now();
+        storagePath = `${user.id}/${timestamp}-${sanitizedName}`;
+
+        let uploadContentType = selectedFile.type;
+        const fileExt = '.' + (selectedFile.name.split('.').pop()?.toLowerCase() || '');
+        if (fileExt === '.docx') {
+          uploadContentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+        } else if (fileExt === '.doc') {
+          uploadContentType = 'application/msword';
+        } else if (!uploadContentType) {
+          uploadContentType = fileInfo.mime || 'application/octet-stream';
+        }
+
+        const { error: uploadError } = await supabase.storage
+          .from('user-documents')
+          .upload(storagePath, selectedFile, {
+            contentType: uploadContentType,
+            upsert: false,
+          });
+
+        if (uploadError) {
+          throw new Error(`Error al subir a Supabase Storage: ${uploadError.message}`);
+        }
+
+        const { data: signedData, error: signedError } = await supabase.storage
+          .from('user-documents')
+          .createSignedUrl(storagePath, 300);
+
+        signedUrl = signedData?.signedUrl;
+        if (signedError) {
+          console.warn('Advertencia al generar signedUrl, se utilizará fallback de descarga:', signedError);
+        }
+
+        setUploadedStorage({
+          storagePath,
+          signedUrl,
+          fileKey,
         });
-
-      if (uploadError) {
-        throw new Error(`Error al subir a Supabase Storage: ${uploadError.message}`);
       }
 
-      // 2. Crear URL firmada temporal (5 minutos) para lectura segura
-      const { data: signedData, error: signedError } = await supabase.storage
-        .from('user-documents')
-        .createSignedUrl(storagePath, 300);
-
-      const signedUrl = signedData?.signedUrl;
-      if (signedError) {
-        console.warn('Advertencia al generar signedUrl, se utilizará fallback de descarga:', signedError);
-      }
-
-      // 3. Procesar archivo con Gemini 3.8 Flash nativo multimodal con el formato elegido
+      // 2. Procesar micro-chunk con Gemini Flash nativo multimodal
       setStatus('analyzing');
 
       const existingFronts = cards && cards.length > 0 ? cards.map((c) => c.front) : [];
@@ -331,9 +356,12 @@ export function DocumentUploader({
           cardFormat,
           cardCount,
           existingQuestions: existingFronts,
-          pageStart: pageStart ? parseInt(pageStart, 10) : undefined,
-          pageEnd: pageEnd ? parseInt(pageEnd, 10) : undefined,
+          cursorPage: startPageForRun,
+          pageStart: startPageForRun,
+          pageEnd: endPageForRun,
           language,
+          coreExhaustedPrevious: coreExhausted || isMeticulousPhase,
+          isExhaustiveMode,
         });
       } catch (actionErr: unknown) {
         const actionErrMsg =
@@ -348,7 +376,7 @@ export function DocumentUploader({
         return;
       }
 
-      // Validar resultado de la IA sin lanzar errores fatales (throw new Error)
+      // Validar resultado de la IA sin lanzar errores fatales
       if (!result.success || !result.cards || result.cards.length === 0) {
         if (result.error === 'LIMIT_REACHED') {
           setStatus('idle');
@@ -362,8 +390,7 @@ export function DocumentUploader({
             if (adResult.completed) {
               const claim = await claimAdRewardAction(user?.id);
               if (claim.success) {
-                // Reintentar automáticamente la generación de forma fluida tras completar el anuncio
-                return handleProcessDocument();
+                return handleProcessDocument(startPageForRun);
               } else {
                 setErrorMessage(claim.message || (language === 'en' ? 'Could not claim ad reward.' : 'No se pudo reclamar la recompensa del anuncio.'));
               }
@@ -381,12 +408,12 @@ export function DocumentUploader({
         setStatus('idle');
         const errorDetail =
           result.error ||
-          `El documento es demasiado denso para generar ${cardCount} tarjetas en este lote. Por favor, intenta generar una cantidad menor (ej. 10 tarjetas) para evitar sobrecargar la respuesta.`;
+          `El fragmento es demasiado denso para generar ${cardCount} tarjetas en este lote. Por favor, intenta generar una cantidad menor (ej. 10 tarjetas).`;
         setErrorMessage(errorDetail);
         return;
       }
 
-      // 4. Guardar las tarjetas generadas en Supabase mediante el store de Zustand
+      // 3. Guardar las tarjetas generadas en Supabase mediante el store de Zustand
       setStatus('saving');
       const generatedCards = result.cards;
       setGeneratedCardsPreview(generatedCards);
@@ -405,7 +432,7 @@ export function DocumentUploader({
       await fetchCardsByDeck(deckId);
       await fetchDeckById(deckId);
 
-      // FASE 2: Notificación si el texto se agotó antes de alcanzar el tope solicitado
+      // Notificación si el texto se agotó antes de alcanzar el tope solicitado
       if (generatedCards.length < cardCount) {
         setMaterialExhaustedNotice({
           generated: generatedCards.length,
@@ -415,7 +442,6 @@ export function DocumentUploader({
         setMaterialExhaustedNotice(null);
       }
 
-      // Rigor en advertencias: Solo cuando la lista troncal se vacíe matemáticamente o el material se agote por completo
       const isExhausted =
         Boolean(result.core_exhausted) ||
         (generatedCards.length < cardCount && generatedCards.length > 0);
@@ -428,6 +454,11 @@ export function DocumentUploader({
       }
       setCoreExhausted(isExhausted);
       setSuccessCount(generatedCards.length);
+
+      if (typeof result.nextCursorPage === 'number') {
+        setNextCursorPage(result.nextCursorPage);
+      }
+
       setStatus('success');
 
       if (onSuccess) {
@@ -449,13 +480,25 @@ export function DocumentUploader({
     setStatus('idle');
     setErrorMessage(null);
     setGeneratedCardsPreview([]);
-    // Conservar isMeticulousPhase fijo una vez alcanzada la fase minuciosa o material agotado
+    setNextCursorPage(null);
+    setLastStartPage(null);
+    setUploadedStorage(null);
+    setMaterialExhaustedNotice(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
   const isBusy = status === 'uploading' || status === 'analyzing' || status === 'saving';
+
+  const isPdf = selectedFile
+    ? selectedFile.name.toLowerCase().endsWith('.pdf') || selectedFile.type === 'application/pdf'
+    : false;
+
+  const parsedStartNum = pageStart.trim() ? parseInt(pageStart.trim(), 10) : undefined;
+  const parsedEndNum = pageEnd.trim() ? parseInt(pageEnd.trim(), 10) : undefined;
+  const masterStart = parsedStartNum !== undefined && !isNaN(parsedStartNum) ? Math.max(1, parsedStartNum) : 1;
+  const masterEnd = parsedEndNum !== undefined && !isNaN(parsedEndNum) ? parsedEndNum : (pdfTotalPages || 9999);
 
   return (
     <div className="w-full space-y-5">
@@ -517,7 +560,7 @@ export function DocumentUploader({
             )}
 
             {/* Banner de Feedback de Continuidad / Radar de Profundidad */}
-            {(isMeticulousPhase || coreExhausted) ? (
+            {((isMeticulousPhase || coreExhausted) ? (
               <div className="mt-3 p-3.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-200 text-xs text-left flex items-start gap-2.5 max-w-md mx-auto shadow-sm">
                 <span className="text-base shrink-0">🎯</span>
                 <p className="leading-relaxed">
@@ -531,11 +574,32 @@ export function DocumentUploader({
                   <strong className="font-semibold text-emerald-300">{t('deck_detail.cards_added_title', 'Tarjetas añadidas con éxito.')}</strong> {t('deck_detail.cards_added_desc', '¿El temario es largo? Dale a generar de nuevo para extraer el siguiente bloque de conocimientos.')}
                 </p>
               </div>
-            )}
+            ))}
 
             <p className="text-[11px] text-neutral-400 mt-2 max-w-sm mx-auto">
-              {t('ai_uploader.document_label', 'Documento:')} &ldquo;{selectedFile?.name}&rdquo; ({cardFormat}) • {t('ai_uploader.anti_duplicate_active', 'Memoria Anti-Duplicados activa para los siguientes bloques.')}
+              {t('ai_uploader.document_label', 'Documento:')} &ldquo;{selectedFile?.name}&rdquo; ({cardFormat})
             </p>
+            {isPdf && typeof nextCursorPage === 'number' && (
+              <div className="mt-2.5 p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/25 text-indigo-300 text-xs text-center max-w-md mx-auto shadow-sm">
+                <div className="flex items-center justify-center gap-2">
+                  <span className="text-sm">📖</span>
+                  <span className="font-medium text-neutral-200">
+                    Páginas consumidas por el motor:{' '}
+                    <strong className="text-white font-semibold">
+                      {lastStartPage && lastStartPage !== nextCursorPage
+                        ? `de la ${lastStartPage} a la ${nextCursorPage}`
+                        : `página ${nextCursorPage}`}
+                    </strong>
+                    {pdfTotalPages && (
+                      <span className="text-neutral-400"> (de {pdfTotalPages} págs totales)</span>
+                    )}
+                  </span>
+                </div>
+                <span className="block text-[11px] text-indigo-400/80 mt-1">
+                  Marcapáginas guardado en pág. {nextCursorPage} • El motor retomará desde aquí en el siguiente clic
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Cards Preview with FormattedCardView */}
@@ -557,26 +621,43 @@ export function DocumentUploader({
           </div>
 
           <div className="pt-2 flex flex-wrap items-center justify-center gap-2.5">
-            <button
-              onClick={() => {
-                setStatus('idle');
-                handleProcessDocument();
-              }}
-              className={`px-4 py-2.5 text-xs rounded-xl ${
-                isMeticulousPhase
-                  ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-indigo-600 hover:from-amber-500 hover:to-indigo-500 shadow-amber-600/30'
-                  : 'bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 shadow-violet-600/30'
-              } text-white font-medium shadow-md transition flex items-center gap-1.5 active:scale-95`}
-            >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-              <span>
-                {isMeticulousPhase
-                  ? t('ai_uploader.next_block_meticulous_btn', 'Generar tarjetas detalladas ({count})').replace('{count}', String(cardCount))
-                  : t('ai_uploader.next_block_btn', 'Generar siguiente bloque ({count} tarjetas)').replace('{count}', String(cardCount))}
-              </span>
-            </button>
+            {isPdf && typeof nextCursorPage === 'number' ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setStatus('idle');
+                  handleProcessDocument(nextCursorPage);
+                }}
+                className="px-5 py-2.5 text-xs rounded-xl bg-gradient-to-r from-violet-600 via-indigo-600 to-purple-600 hover:from-violet-500 hover:to-indigo-500 text-white font-semibold shadow-lg shadow-indigo-600/30 transition flex items-center gap-2 active:scale-95 cursor-pointer"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                </svg>
+                <span>Continuar extrayendo (Retomar desde pág. {nextCursorPage})</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setStatus('idle');
+                  handleProcessDocument();
+                }}
+                className={`px-4 py-2.5 text-xs rounded-xl ${
+                  isMeticulousPhase
+                    ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-indigo-600 hover:from-amber-500 hover:to-indigo-500 shadow-amber-600/30'
+                    : 'bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 shadow-violet-600/30'
+                } text-white font-medium shadow-md transition flex items-center gap-1.5 active:scale-95 cursor-pointer`}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                <span>
+                  {isMeticulousPhase
+                    ? t('ai_uploader.next_block_meticulous_btn', 'Generar tarjetas detalladas ({count})').replace('{count}', String(cardCount))
+                    : t('ai_uploader.next_block_btn', 'Generar siguiente bloque ({count} tarjetas)').replace('{count}', String(cardCount))}
+                </span>
+              </button>
+            )}
             <button
               onClick={handleReset}
               className="px-3.5 py-2.5 text-xs rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-800 dark:bg-neutral-800 dark:hover:bg-neutral-700 dark:text-neutral-300 dark:hover:text-white font-medium transition cursor-pointer"
@@ -908,7 +989,7 @@ export function DocumentUploader({
           {/* 3. Instrucción adicional y Botones de Acción (visibles cuando hay un archivo cargado) */}
           {selectedFile && (
             <div className="space-y-4 pt-1">
-              {/* Chunking de Precisión para PDFs (Rango de Páginas) */}
+              {/* Chunking de Precisión para PDFs (Ventana Deslizante) */}
               {(selectedFile.name.toLowerCase().endsWith('.pdf') || selectedFile.type === 'application/pdf') && (
                 <div className="p-3.5 rounded-2xl bg-neutral-50 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 space-y-2.5">
                   <div className="flex items-center justify-between">
@@ -916,26 +997,27 @@ export function DocumentUploader({
                       <svg className="w-4 h-4 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                       </svg>
-                      <span>Chunking de Precisión (Rango de Páginas PDF)</span>
+                      <span>Ventana Deslizante (Rango Maestro del PDF)</span>
                     </label>
                     <span className="text-[10px] text-neutral-500 dark:text-neutral-400 font-mono">
-                      {pdfTotalPages !== null ? `${pdfTotalPages} págs totales` : 'Aislamiento estricto'}
+                      {pdfTotalPages !== null ? `${pdfTotalPages} págs totales` : 'PDF'}
                     </span>
                   </div>
 
-                  {pdfTotalPages !== null && pdfTotalPages > 30 && (
-                    <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 text-xs flex items-start gap-2">
-                      <span className="shrink-0 text-sm">⚠️</span>
-                      <p className="leading-relaxed">
-                        <strong>PDF Extenso ({pdfTotalPages} páginas totales):</strong> Al superar las 30 páginas, y para asegurar la rigurosidad del mazo, los campos <strong>&quot;Desde página&quot;</strong> y <strong>&quot;Hasta página&quot;</strong> son estrictamente obligatorios (máximo 40 páginas por petición).
-                      </p>
-                    </div>
-                  )}
+                  {/* Advertencia visual sobre la numeración del PDF */}
+                  <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-900 dark:text-amber-200 text-xs leading-relaxed flex items-start gap-2.5">
+                    <p className="font-medium">
+                      {t(
+                        'ai_uploader.pdf_page_warning',
+                        '⚠️ Atención a la numeración: Introduce el número de página que indica el contador superior de tu visor PDF (ej. 96 de 569), NO el número impreso en la esquina de la hoja. Las portadas y prólogos hacen que estos números no coincidan.'
+                      )}
+                    </p>
+                  </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-[11px] font-medium text-neutral-600 dark:text-neutral-400 mb-1">
-                        Desde página: {pdfTotalPages !== null && pdfTotalPages > 30 && <span className="text-rose-500 font-bold">* (Obligatorio)</span>}
+                        Desde página:
                       </label>
                       <input
                         type="number"
@@ -943,14 +1025,18 @@ export function DocumentUploader({
                         max={pdfTotalPages || undefined}
                         disabled={isBusy}
                         value={pageStart}
-                        onChange={(e) => setPageStart(e.target.value)}
+                        onChange={(e) => {
+                          setPageStart(e.target.value);
+                          setNextCursorPage(null);
+                          setLastStartPage(null);
+                        }}
                         placeholder="ej. 1"
                         className="w-full text-xs font-medium px-3 py-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition disabled:opacity-50"
                       />
                     </div>
                     <div>
                       <label className="block text-[11px] font-medium text-neutral-600 dark:text-neutral-400 mb-1">
-                        Hasta página: {pdfTotalPages !== null && pdfTotalPages > 30 && <span className="text-rose-500 font-bold">* (Obligatorio)</span>}
+                        Hasta página:
                       </label>
                       <input
                         type="number"
@@ -958,21 +1044,100 @@ export function DocumentUploader({
                         max={pdfTotalPages || undefined}
                         disabled={isBusy}
                         value={pageEnd}
-                        onChange={(e) => setPageEnd(e.target.value)}
-                        placeholder={pdfTotalPages ? (pdfTotalPages > 40 ? 'ej. 40' : `ej. ${pdfTotalPages}`) : 'ej. 15'}
+                        onChange={(e) => {
+                          setPageEnd(e.target.value);
+                          setNextCursorPage(null);
+                          setLastStartPage(null);
+                        }}
+                        placeholder={pdfTotalPages ? `ej. ${pdfTotalPages}` : 'ej. 30'}
                         className="w-full text-xs font-medium px-3 py-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition disabled:opacity-50"
                       />
                     </div>
                   </div>
 
+                  {/* Indicador visual en tiempo real del Marcapáginas */}
+                  <div className="p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-700 dark:text-indigo-300 text-xs flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm">🔖</span>
+                      <span className="font-medium">
+                        {isBusy
+                          ? 'Extrayendo minuciosamente página por página en el backend...'
+                          : typeof nextCursorPage === 'number'
+                          ? `Marcapáginas activo: Retomar desde pág. ${nextCursorPage} (Rango: ${masterStart} - ${masterEnd})`
+                          : `Inicio de extracción: Página ${masterStart} (Rango: ${masterStart} - ${masterEnd})`}
+                      </span>
+                    </div>
+                    {typeof nextCursorPage === 'number' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNextCursorPage(null);
+                          setLastStartPage(null);
+                        }}
+                        className="text-[10px] text-indigo-400 hover:text-indigo-200 underline font-mono cursor-pointer"
+                      >
+                        Reiniciar marcapáginas
+                      </button>
+                    )}
+                  </div>
+
                   <p className="text-[11px] text-neutral-500 dark:text-neutral-400 leading-relaxed">
-                    Aísla de 1 a 40 páginas por lote antes de enviarlas a Gemini. Procesa directamente tablas, gráficos y recuadros de forma multimodal.
+                    Motor Secuencial: El backend analiza rigurosamente página por página extrayendo preguntas únicas y tablas, hasta acumular exactamente {cardCount} tarjetas deduplicadas, y recuerda la página exacta donde se detiene.
                   </p>
                 </div>
               )}
 
-              {/* Enfoque temático - High-visibility callout box */}
-              <div className="relative p-3.5 rounded-2xl bg-gradient-to-r from-purple-500/10 via-violet-500/5 to-indigo-500/10 dark:from-purple-950/40 dark:via-violet-950/30 dark:to-indigo-950/40 border border-purple-300 dark:border-purple-500/40 ring-2 ring-purple-500/50 shadow-[0_0_20px_rgba(168,85,247,0.25)] transition-all">
+              {/* Modo Exhaustivo - Toggle/Switch destacado */}
+              <div className={`p-4 rounded-2xl border transition-all ${
+                isExhaustiveMode
+                  ? 'bg-gradient-to-r from-violet-600/15 via-indigo-600/15 to-purple-600/15 dark:from-violet-950/50 dark:via-indigo-950/40 dark:to-purple-950/50 border-violet-500/50 ring-1 ring-violet-500/30 shadow-md shadow-violet-500/10'
+                  : 'bg-neutral-50 dark:bg-neutral-950/80 border-neutral-200 dark:border-neutral-800'
+              }`}>
+                <div className="flex items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">⚡</span>
+                      <h4 className="text-xs font-bold text-neutral-900 dark:text-white tracking-tight">
+                        {t('ai_uploader.exhaustive_mode_title', 'Modo Exhaustivo (Destripar Tablas y Datos)')}
+                      </h4>
+                      {isExhaustiveMode && (
+                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-violet-600 text-white animate-pulse">
+                          ACTIVO
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-neutral-600 dark:text-neutral-400 leading-relaxed">
+                      {t(
+                        'ai_uploader.exhaustive_mode_subtitle',
+                        'Fuerza a la IA a extraer cada cruce de datos de tablas, gráficos y listas densas. Ideal para manuales técnicos y médicos.'
+                      )}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={isExhaustiveMode}
+                    disabled={isBusy}
+                    onClick={() => setIsExhaustiveMode(!isExhaustiveMode)}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 ${
+                      isExhaustiveMode
+                        ? 'bg-violet-600 dark:bg-violet-500'
+                        : 'bg-neutral-300 dark:bg-neutral-700'
+                    } disabled:opacity-50`}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                        isExhaustiveMode ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+
+              {/* Enfoque temático - High-visibility callout box (Opción Avanzada) */}
+              <div className="relative p-3.5 rounded-2xl bg-gradient-to-r from-purple-500/10 via-violet-500/5 to-indigo-500/10 dark:from-purple-950/40 dark:via-violet-950/30 dark:to-indigo-950/40 border border-purple-300 dark:border-purple-500/40 ring-1 ring-purple-500/30 shadow-sm transition-all">
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="text-xs font-bold text-purple-950 dark:text-purple-200 flex items-center gap-1.5">
                     <span>
@@ -1018,7 +1183,7 @@ export function DocumentUploader({
                 <button
                   type="button"
                   disabled={isBusy || !selectedFile}
-                  onClick={handleProcessDocument}
+                  onClick={() => handleProcessDocument()}
                   className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl ${
                     isMeticulousPhase
                       ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-indigo-600 hover:from-amber-500 hover:to-indigo-500 shadow-amber-600/25'
@@ -1028,7 +1193,11 @@ export function DocumentUploader({
                   {isBusy ? (
                     <>
                       <div className="w-4 h-4 border-2 border-white/80 border-t-transparent rounded-full animate-spin" />
-                      <span>{t('ai_uploader.processing_file', 'Procesando archivo...')}</span>
+                      <span>
+                        {isPdf
+                          ? 'Extrayendo minuciosamente página por página...'
+                          : t('ai_uploader.processing_file', 'Procesando archivo...')}
+                      </span>
                     </>
                   ) : (
                     <>
@@ -1036,9 +1205,13 @@ export function DocumentUploader({
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                       </svg>
                       <span>
-                        {isMeticulousPhase
-                          ? t('ai_uploader.process_file_meticulous', 'Generar tarjetas detalladas (hasta {count})').replace('{count}', String(cardCount))
-                          : t('ai_uploader.process_file', 'Generar hasta {count} tarjetas').replace('{count}', String(cardCount))}
+                        {isPdf
+                          ? (typeof nextCursorPage === 'number'
+                              ? `Continuar extrayendo (Retomar desde pág. ${nextCursorPage})`
+                              : `Extraer ${cardCount} tarjetas (desde pág. ${masterStart})`)
+                          : (isMeticulousPhase
+                              ? t('ai_uploader.process_file_meticulous', 'Generar tarjetas detalladas (hasta {count})').replace('{count}', String(cardCount))
+                              : t('ai_uploader.process_file', 'Generar hasta {count} tarjetas').replace('{count}', String(cardCount)))}
                       </span>
                     </>
                   )}

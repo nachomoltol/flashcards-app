@@ -4,8 +4,10 @@ import { GoogleGenAI, Type } from '@google/genai';
 import mammoth from 'mammoth';
 import { PDFDocument } from 'pdf-lib';
 import { YoutubeTranscript } from 'youtube-transcript';
+import { createClient } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { randomizeMultipleChoiceCard } from '@/lib/cardUtils';
+import { deduplicateCandidateCards } from '@/lib/cardDeduplication';
 import type {
   CardFormat,
   GeneratedCard,
@@ -16,8 +18,16 @@ import type {
 
 const flashcardSchema = {
   type: Type.OBJECT,
-  description: 'Objeto con tarjetas de estudio clínico y académico y radar de profundidad',
+  description: 'Objeto con tarjetas de estudio de alta precisión y radar de profundidad',
   properties: {
+    conceptos_identificados: {
+      type: Type.ARRAY,
+      description:
+        'Antes de crear las tarjetas, analiza el texto y haz un listado interno de conceptos clave, datos numéricos o hechos únicos presentes en el texto que NO estén en el historial de tarjetas previas. Usa esta lista como mapa para generar el array de cards.',
+      items: {
+        type: Type.STRING,
+      },
+    },
     core_exhausted: {
       type: Type.BOOLEAN,
       description:
@@ -42,7 +52,8 @@ const flashcardSchema = {
           },
           back: {
             type: Type.STRING,
-            description: 'Reverso de la tarjeta con la respuesta exacta según el formato indicado.',
+            description:
+              'Respuesta exacta seguida obligatoriamente de la explicación y justificación técnica basada en el documento.',
           },
           cardFormat: {
             type: Type.STRING,
@@ -61,8 +72,79 @@ const flashcardSchema = {
       },
     },
   },
-  required: ['core_exhausted', 'cards'],
+  required: ['conceptos_identificados', 'core_exhausted', 'cards'],
 };
+
+/**
+ * Esquema de extracción universal página por página (sin límites artificiales mínimos ni máximos)
+ */
+const singlePageExtractionSchema = {
+  type: Type.OBJECT,
+  description: 'Objeto de extracción universal de conocimiento por página',
+  properties: {
+    conceptos_identificados: {
+      type: Type.ARRAY,
+      description:
+        'Listado de conceptos clave, datos precisos, normativas o hechos únicos identificados en esta página.',
+      items: {
+        type: Type.STRING,
+      },
+    },
+    core_exhausted: {
+      type: Type.BOOLEAN,
+      description:
+        'true si la página está casi vacía o se han extraído absolutamente todos sus conceptos relevantes; false si aún contiene información.',
+    },
+    cards: {
+      type: Type.ARRAY,
+      description:
+        'Array dinámico con todas las tarjetas de estudio extraídas de esta página según el formato solicitado, sin límite máximo ni mínimo artificial.',
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          generation_index: {
+            type: Type.INTEGER,
+            description:
+              'Índice secuencial estricto obligatorio de la tarjeta (1, 2, 3... de la página procesada).',
+          },
+          front: {
+            type: Type.STRING,
+            description:
+              'Anverso de la tarjeta según el formato solicitado (pregunta directa para basic, texto con [...] para cloze, afirmación categórica para true_false, o pregunta con opciones a-d para multiple_choice).',
+          },
+          back: {
+            type: Type.STRING,
+            description:
+              'Respuesta exacta seguida obligatoriamente de la explicación y justificación técnica basada en el documento.',
+          },
+          cardFormat: {
+            type: Type.STRING,
+            description: 'Formato de la tarjeta: "multiple_choice", "basic", "cloze" o "true_false"',
+          },
+          options: {
+            type: Type.ARRAY,
+            description:
+              'Array con las 4 opciones de respuesta exclusivas para preguntas de opción múltiple: [a, b, c, d]. En formatos true_false, basic y cloze este campo DEBE OMITIRSE o dejarse vacío ([]).',
+            items: {
+              type: Type.STRING,
+            },
+          },
+        },
+        required: ['generation_index', 'front', 'back', 'cardFormat'],
+      },
+    },
+  },
+  required: ['conceptos_identificados', 'cards'],
+};
+
+/**
+ * REGLA INQUEBRANTABLE DE RELEVANCIA COGNITIVA:
+ * Erradica preguntas sobre artefactos de maquetación, notas al pie editoriales o símbolos tipográficos.
+ */
+const EDITORIAL_ARTIFACTS_DIRECTIVE = `PROHIBICIÓN ESTRICTA DE ARTEFACTOS EDITORIALES Y MAQUETACIÓN:
+- Tienes TERMINANTEMENTE PROHIBIDO formular preguntas sobre la estructura editorial o gráfica del documento (por ejemplo: 'según el símbolo †', 'qué indica el asterisco', 'qué significan los números entre paréntesis en la tabla', 'en qué columna se encuentra X', 'según la nota al pie').
+- Si una tabla o pie de página contiene datos relevantes (ej. gramos de fibra, dosis clínicas, fechas, normativas), formula la pregunta DIRECTAMENTE sobre el concepto o hecho real (ej: '¿Cuántos gramos de fibra por ración aportan las frambuesas?' en lugar de '¿Qué fruta tiene el valor (4) según el Cuadro 4-3?').
+- Pregunta SIEMPRE por el conocimiento sustancial, nunca por cómo fue maquetado o simbolizado en el libro.`;
 
 /**
  * Regla de formato obligatoria inyectada dinámicamente en el System Prompt y Reglas Globales.
@@ -70,17 +152,17 @@ const flashcardSchema = {
 function getFormatRule(format: CardFormat = 'multiple_choice'): string {
   switch (format) {
     case 'multiple_choice':
-      return 'FORMATO OBLIGATORIO: Múltiple opción con exactamente 4 alternativas (a, b, c, d). Cada tarjeta DEBE incluir obligatoriamente el array "options" con las 4 opciones de respuesta.';
+      return 'FORMATO OBLIGATORIO: Múltiple opción con exactamente 4 alternativas (a, b, c, d). Cada tarjeta DEBE incluir obligatoriamente el array "options" con las 4 opciones de respuesta. El campo "back" DEBE incluir obligatoriamente la opción correcta seguida de una explicación y justificación técnica profunda.';
     case 'true_false':
       return `FORMATO OBLIGATORIO: Afirmación categórica. 
 - El campo 'front' DEBE contener la afirmación.
-- El campo 'back' DEBE ser exactamente la palabra 'Verdadero' o 'Falso'.
+- El campo 'back' DEBE contener dos partes obligatorias: 1) La palabra 'Verdadero' o 'Falso' en negrita al inicio. 2) Una línea en blanco seguida de: 'Explicación: [Fundamento científico/técnico que justifica inequívocamente la veracidad o falsedad de la afirmación basándose en el documento]'. NUNCA devuelvas solo 'Verdadero' o 'Falso'.
 - REGLA CRÍTICA: El array 'options' DEBE SER OMITIDO o estar VACÍO ([]). BAJO NINGÚN CONCEPTO generes opciones A, B, C, D.`;
     case 'cloze':
-      return 'FORMATO OBLIGATORIO: Texto con una palabra clave o concepto fundamental oculto (ej. usando corchetes [...] o el estándar que utilice el frontend). PROHIBIDO terminantemente generar 4 opciones de respuesta o formato de test múltiple. REGLA CRÍTICA: El array \'options\' DEBE SER OMITIDO o estar VACÍO ([]).';
+      return 'FORMATO OBLIGATORIO: Texto con una palabra clave o concepto fundamental oculto (ej. usando corchetes [...] o el estándar que utilice el frontend). Asegura que el reverso proporcione el fundamento conceptual completo y contextualizado del dato consultado, sin respuestas monosilábicas. PROHIBIDO terminantemente generar 4 opciones de respuesta o formato de test múltiple. REGLA CRÍTICA: El array \'options\' DEBE SER OMITIDO o estar VACÍO ([]).';
     case 'basic':
     default:
-      return 'FORMATO OBLIGATORIO: Pregunta directa y concisa en el anverso, y respuesta exacta en el reverso. PROHIBIDO terminantemente generar 4 opciones de respuesta o formato de test múltiple. REGLA CRÍTICA: El array \'options\' DEBE SER OMITIDO o estar VACÍO ([]).';
+      return 'FORMATO OBLIGATORIO: Pregunta directa en el anverso. Asegura que el reverso proporcione el fundamento conceptual completo y contextualizado del dato consultado, sin respuestas monosilábicas. PROHIBIDO terminantemente generar 4 opciones de respuesta o formato de test múltiple. REGLA CRÍTICA: El array \'options\' DEBE SER OMITIDO o estar VACÍO ([]).';
   }
 }
 
@@ -102,12 +184,18 @@ c) [Texto de la opción C]
 d) [Texto de la opción D]
 
 REGLAS CRÍTICAS PARA "front":
-1. Primero coloca ÚNICAMENTE el enunciado de la pregunta limpia, directo, clínico y riguroso.
+1. Primero coloca ÚNICAMENTE el enunciado de la pregunta limpia, directo y riguroso.
 2. Añade obligatoriamente un salto de línea doble antes de empezar las opciones.
 3. Cada una de las exactamente 4 opciones (a, b, c, d) DEBE ir en su propia línea independiente separada por un salto de línea (\\n).
 4. NUNCA mezcles las letras a), b), c), d) dentro del enunciado de la pregunta.
 5. La opción correcta DEBE estar posicionada de manera aleatoria entre a, b, c o d. Los 3 distractores deben ser técnicamente plausibles y extraídos estrictamente de términos y conceptos presentes en el texto fuente.
-- "back": SOLAMENTE la respuesta correcta indicando letra y texto (ejemplo: "b) Texto de la opción correcta"). No agregues texto innecesario.
+6. ${EDITORIAL_ARTIFACTS_DIRECTIVE}
+
+REGLAS CRÍTICAS PARA "back":
+El campo 'back' DEBE contener dos partes obligatorias:
+1) La opción correcta exacta con su letra y texto (ej: 'd) El germen').
+2) Una línea en blanco seguida de: 'Explicación: [Justificación técnica rigurosa extraída del texto, indicando con precisión por qué esta opción es la correcta y desglosando o contextualizando por qué los distractores no aplican según los datos o tablas del documento]'. NUNCA devuelvas solo la letra o frase corta.
+
 - "cardFormat": "multiple_choice"
 - "options": Array con exactamente las 4 alternativas [opción A, opción B, opción C, opción D].`;
 
@@ -115,7 +203,7 @@ REGLAS CRÍTICAS PARA "front":
       return `FORMATO OBLIGATORIO: cloze (Texto para rellenar / Cloze):
 PROHIBIDO terminantemente generar opciones múltiples (a, b, c, d).
 - "front": Un texto explicativo riguroso con una palabra o frase clave oculta usando obligatoriamente la notación [...] (ejemplo: "El proceso mediante el cual las plantas convierten la luz solar en energía química se denomina [...]").
-- "back": El texto completo donde la palabra o frase clave revelada esté claramente resaltada con doble asterisco (ejemplo: "El proceso mediante el cual las plantas convierten la luz solar en energía química se denomina **fotosíntesis**").
+- "back": El texto completo donde la palabra o frase clave revelada esté claramente resaltada con doble asterisco (ejemplo: "El proceso mediante el cual las plantas convierten la luz solar en energía química se denomina **fotosíntesis**"). Asegura que el reverso proporcione el fundamento conceptual completo y contextualizado del dato consultado, sin respuestas monosilábicas.
 - "cardFormat": "cloze"
 - REGLA CRÍTICA: El array 'options' DEBE SER OMITIDO o estar VACÍO ([]).`;
 
@@ -123,7 +211,9 @@ PROHIBIDO terminantemente generar opciones múltiples (a, b, c, d).
       return `FORMATO OBLIGATORIO: true_false (Verdadero o Falso):
 PROHIBIDO terminantemente generar 4 opciones múltiples (a, b, c, d).
 - "front": Una afirmación técnica o conceptual rotunda (que puede ser verdadera o falsa según el temario).
-- "back": Debe ser exactamente la palabra "Verdadero" o "Falso".
+- "back": El campo 'back' DEBE contener dos partes obligatorias:
+1) La palabra 'Verdadero' o 'Falso' en negrita al inicio (ej: '**Verdadero**' o '**Falso**').
+2) Una línea en blanco seguida de: 'Explicación: [Fundamento científico/técnico que justifica inequívocamente la veracidad o falsedad de la afirmación basándose en el documento]'. NUNCA devuelvas solo 'Verdadero' o 'Falso'.
 - "cardFormat": "true_false"
 - REGLA CRÍTICA: El array 'options' DEBE SER OMITIDO o estar VACÍO ([]). BAJO NINGÚN CONCEPTO generes opciones A, B, C, D.`;
 
@@ -131,32 +221,12 @@ PROHIBIDO terminantemente generar 4 opciones múltiples (a, b, c, d).
     default:
       return `FORMATO OBLIGATORIO: basic (Pregunta y Respuesta Directa):
 PROHIBIDO terminantemente generar opciones múltiples (a, b, c, d).
-- "front": Pregunta directa, específica y concisa para evaluar el concepto.
-- "back": Respuesta rigurosa, comprensiva y directa.
+- "front": Pregunta directa, específica y rigurosa para evaluar el concepto.
+- "back": Respuesta rigurosa y directa seguida obligatoriamente de una explicación que proporcione el fundamento conceptual completo y contextualizado del dato consultado, sin respuestas monosilábicas.
 - "cardFormat": "basic"
 - REGLA CRÍTICA: El array 'options' DEBE SER OMITIDO o estar VACÍO ([]).`;
   }
 }
-
-/**
- * PROTOCOLO OBLIGATORIO DE GENERACIÓN EN DOS FASES (MOTOR DE IA FLASHMENTE):
- * Obliga a Gemini a ejecutar internamente primero una indexación (Troncal vs. Minucioso)
- * y posteriormente una generación secuencial priorizando lo Troncal.
- */
-const TWO_PHASE_SYSTEM_PROMPT = `PROTOCOLO OBLIGATORIO DE GENERACIÓN EN DOS FASES:
-Antes de generar el JSON definitivo, debes ejecutar obligatoria y rigurosamente de forma interna y secuencial las dos fases siguientes:
-
-FASE 1: INDEXACIÓN INTERNA (TRONCAL VS. MINUCIOSO)
-1. Analiza exhaustivamente el texto fuente proporcionado (o el rango exacto de páginas delimitado).
-2. Clasifica y separa mentalmente todos los conceptos del material en dos inventarios rigurosos:
-   - LISTA TRONCAL: Conceptos nucleares, definiciones esenciales, principios clave, mecanismos fisiológicos/técnicos primarios y clasificaciones directas que constituyen la base indispensable del tema.
-   - LISTA MINUCIOSA: Cifras secundarias, excepciones raras, notas al pie, clasificaciones accesorias y detalles periféricos.
-3. Si dispones de HISTORIAL DE PROGRESO (tarjetas existentes generadas previamente), cruza ambas listas y DESCARTA inmediatamente de la LISTA TRONCAL todo concepto que ya haya sido evaluado en tarjetas previas.
-
-FASE 2: GENERACIÓN SECUENCIAL PRIORIZADA
-1. Extrae y genera SECUENCIALMENTE las tarjetas solicitadas comenzando obligatoriamente por los conceptos pendientes de la LISTA TRONCAL, siguiendo el orden cronológico y pedagógico del material.
-2. Cada tarjeta debe centrarse en un concepto nuclear único, formulado según el formato solicitado.
-3. ÚNICAMENTE cuando la LISTA TRONCAL se vacíe matemáticamente (es decir, el 100% de la teoría nuclear ya ha sido cubierta por tarjetas existentes o por las primeras tarjetas de este lote), continúa obligatoriamente la extracción con los conceptos de la LISTA MINUCIOSA hasta alcanzar exactamente el total de tarjetas solicitado.`;
 
 /**
  * RIGOR MATEMÁTICO EN ADVERTENCIAS (core_exhausted):
@@ -167,58 +237,50 @@ const RIGOR_WARNING_DIRECTIVE = `RIGOR MATEMÁTICO EN LA PROPIEDAD "core_exhaust
 - core_exhausted DEBE ser FALSE si todavía queda en el texto fuente al menos UN concepto o definición troncal sin evaluar.
 - BAJO NINGÚN CONCEPTO marques core_exhausted: true basándote en la cantidad total de tarjetas de forma arbitraria; debe responder exclusivamente al vaciado real de la materia troncal del material proporcionado.`;
 
-/**
- * System Prompt de Restricción Estricta (Grounding) y Extracción de Contenido (Estilo NotebookLM).
- * Adapta dinámicamente las instrucciones según si es la primera generación o una re-generación con historial.
- */
-function getSystemInstruction(
-  format: CardFormat = 'multiple_choice',
-  requestedCount?: number,
-  existingCardsCount: number = 0
-): string {
-  const formatRule = getFormatRule(format);
-  const countStr = requestedCount ? String(requestedCount) : '{requested_count}';
-  const isReGeneration = existingCardsCount > 0;
+const buildSystemPrompt = (
+  existingCardsLength: number,
+  coreExhaustedPrevious: boolean,
+  existingTopicsList: string = ''
+) => {
+  // 1. EL NÚCLEO DEL COMPORTAMIENTO (Universal y Exhaustivo)
+  let prompt = `Eres Flashmente, un motor de extracción de conocimiento de alto rendimiento. Tu objetivo es diseccionar el texto proporcionado y generar tarjetas de estudio (flashcards) rigurosas. No resumas el texto. Actúa como un interrogador minucioso.
 
-  const contextSpecificRule =
-    format === 'multiple_choice'
-      ? '4. DISTRACTORES BASADOS EN EL TEXTO: En preguntas de opción múltiple (test), todos los distractores incorrectos deben ser técnicamente plausibles pero fundamentados en términos y conceptos del propio texto fuente, sin introducir elementos externos.'
-      : '4. FIDELIDAD TERMINOLÓGICA Y RIGOR: Todo concepto, pregunta, afirmación o respuesta debe fundamentarse estricta y textualmente en el texto fuente, sin introducir terminología ajena ni elementos externos.';
+REGLA DE EXHAUSTIVIDAD Y DUPLICADOS (CRÍTICA):
+Está PERMITIDO y FOMENTADO extraer múltiples tarjetas sobre el mismo concepto o tema central, siempre y cuando evalúen EJES DIFERENTES. Es decir, puedes crear una tarjeta sobre la causa/origen, otra sobre la consecuencia/efecto, otra sobre la excepción, otra sobre los valores numéricos o fechas, y otra sobre la definición general de ese mismo tema. 
+Un duplicado ES SOLO una pregunta que se repite casi de forma literal y que tiene exactamente la misma respuesta literal que otra anterior. Disecciona el texto de forma exhaustiva, no dejes ningún dato preguntable atrás.
 
-  const quotaDirective = isReGeneration
-    ? `DIRECTIVA DE EXPANSIÓN Y ANTI-DUPLICADOS (RE-GENERACIÓN):
-Intenta generar hasta ${countStr} tarjetas nuevas a partir de conceptos no cubiertos previamente en el material.
-Para cada tarjeta, asigna un \`generation_index\` estrictamente secuencial (1, 2, 3...). Detén la generación si se agota el material nuevo para evitar duplicados.`
-    : `DIRECTIVA CRÍTICA: DEBES GENERAR EXACTAMENTE ${countStr} TARJETAS. ES ESTRICTAMENTE PROHIBIDO DETENERSE ANTES. Si agotas los conceptos troncales, estás OBLIGADO a extraer detalles minuciosos, excepciones y estadísticas hasta alcanzar el objetivo exacto. Cerrar la respuesta con menos tarjetas de las solicitadas se considerará un fallo crítico.
+ADAPTACIÓN UNIVERSAL AL CONTEXTO:
+El texto puede ser de cualquier temática (ciencias, derecho, historia, tecnología, humanidades). Adapta tu análisis a la naturaleza del texto buscando activamente:
+- Relaciones causa-efecto o condicionales (si ocurre X, entonces Y).
+- Clasificaciones, tipologías y listas estructuradas.
+- Excepciones a reglas generales, notas al pie y datos estadísticos/numéricos.
+- Conceptos técnicos, definiciones y normativas.
+No asumas conocimientos externos. Extrae la información estrictamente del texto provisto.
+\n`;
 
-ÍNDICE DE SEGUIMIENTO OBLIGATORIO:
-Para cada tarjeta, asigna un \`generation_index\` estrictamente secuencial (1, 2, 3...). No puedes finalizar el proceso hasta que el \`generation_index\` coincida con el número total de tarjetas solicitado (${countStr}).`;
+  // 2. LÓGICA DINÁMICA DE ENFOQUE (Tiradas)
+  // En lugar de asumir en qué "tirada" estamos por un número, nos basamos en 
+  // si la IA reportó previamente que el núcleo estaba agotado.
+  
+  if (!coreExhaustedPrevious) {
+    prompt += `ENFOQUE ACTUAL: EXTRACCIÓN TRONCAL. Sigue extrayendo definiciones y procesos. EXTREMADAMENTE IMPORTANTE: Es matemáticamente imposible que agotes la teoría principal de un documento denso en un solo lote. TIENES PROHIBIDO marcar "core_exhausted: true" a menos que el texto sea minúsculo o estés 100% seguro de que no puedes formular NI UNA SOLA PREGUNTA MÁS sobre los conceptos base. Ante la duda, devuelve "core_exhausted: false" para permitir más lotes troncales.\n`;
+  } else {
+    prompt += `ENFOQUE ACTUAL: EXTRACCIÓN MINUCIOSA DE DETALLES (LENTE PROFUNDA).
+Ya has extraído los conceptos troncales en generaciones anteriores. Ahora debes hacer una lectura de máximo escrutinio. Céntrate exclusivamente en datos muy específicos: 
+- Datos ocultos en tablas, gráficos o cuadros anexos.
+- Fechas exactas, porcentajes, medidas o rangos numéricos.
+- Casos atípicos o excepciones muy raras mencionadas en el texto.
+Genera tarjetas solo si encuentras este tipo de detalles minuciosos que no se hayan preguntado antes.\n`;
+  }
 
-  const completionRule = isReGeneration
-    ? `6. CONTROL DE LONGITUD DINÁMICA: El esquema JSON permite arrays dinámicos de 1 a 30 elementos. Devuelve sólo las tarjetas correspondientes a conceptos nuevos reales.`
-    : `6. CUMPLIMIENTO DEL TOTAL SOLICITADO: No puedes finalizar el proceso hasta que el \`generation_index\` coincida exactamente con ${countStr}. Si se agotan los conceptos troncales, estás obligado a extraer detalles minuciosos, excepciones y estadísticas hasta alcanzar el objetivo exacto.`;
+  // 3. INYECCIÓN DEL RADAR ANTI-DUPLICADOS (INSTRUCCIÓN DE CONTINUIDAD CON TÓPICOS)
+  if (existingCardsLength > 0) {
+    const topicsFormatted = existingTopicsList ? existingTopicsList.trim() : `${existingCardsLength} conceptos previos`;
+    prompt += `\nINSTRUCCIÓN DE CONTINUIDAD: Ya has evaluado los siguientes conceptos: ${topicsFormatted}. Te EXIJO que mires el texto original, identifiques conceptos, datos o relaciones que no estén en esta lista, y extraigas nuevas tarjetas sobre ellos.\n`;
+  }
 
-  const reGenerationFinalOrder = isReGeneration
-    ? `\n\nATENCIÓN: EL ESQUEMA JSON TE PERMITE DEVOLVER MENOS DE 30 TARJETAS. SI HAS AGOTADO EL MATERIAL NUEVO DEL TEXTO E IMÁGENES, DEBES DETENERTE Y DEVOLVER UN ARRAY MÁS CORTO (ej. 12, 18 o 25 tarjetas). NUNCA INVENTES NI REPITAS CONCEPTOS DEL HISTORIAL SÓLO PARA LLEGAR A LA CUOTA.`
-    : '';
-
-  return `Eres un extractor de conocimiento clínico y académico estricto. Tu única fuente de verdad es el texto proporcionado.
-
-REGLA DE ORO (Estilo NotebookLM):
-NO inventes información. Tu única fuente de verdad es el texto. Si un concepto, dato o respuesta no se puede deducir directa y explícitamente del texto proporcionado, DEBES omitirlo. No uses conocimiento previo externo.
-
-${quotaDirective}
-
-${formatRule}
-
-REGLAS INQUEBRANTABLES DE EXTRACCIÓN Y RESTRICCIÓN DE CONTEXTO (GROUNDING ESTRICTO):
-1. TU ÚNICA FUENTE DE VERDAD ES EL TEXTO PROPORCIONADO: Toda la información de las tarjetas DEBE extraerse EXCLUSIVA Y ESTRICTAMENTE de este texto.
-2. PROHIBICIÓN TERMINANTE DE CONOCIMIENTO EXTERNO: Tienes TERMINANTEMENTE PROHIBIDO utilizar conocimiento previo externo, asunciones no fundadas o datos que no aparezcan en la fuente proporcionada.
-3. EXTRACCIÓN FIDEDIGNA: Actúa únicamente y exclusivamente como un extractor fidedigno de los conceptos, mecanismos, clasificaciones, datos y detalles presentes en el material de origen.
-${contextSpecificRule}
-5. OBJETIVIDAD Y RIGOR CIENTÍFICO: Las preguntas y respuestas deben reflejar exactamente la definición, clasificación, mecanismo, dosis, valor o dato que el texto expone sin divagar.
-${completionRule}${reGenerationFinalOrder}`;
-}
+  return prompt;
+};
 
 /**
  * Reglas globales inquebrantables de blindaje (Estilo NotebookLM) con inyección dinámica de formato.
@@ -252,7 +314,9 @@ ${directiveRule}
 4. ${formatRule}
 5. PRECISIÓN Y GROUNDING: Toda pregunta, afirmación, distractor o respuesta debe estar basada estricta y textualmente en el texto fuente.
 6. ACRÓNIMOS: Todo acrónimo debe ir acompañado obligatoriamente de su nombre completo si figura en la fuente (ejemplo: "ARN (Ácido Ribonucleico)", "TCP (Transmission Control Protocol)").
-7. INTEGRIDAD ESTRUCTURAL DEL JSON (PRIORIDAD ABSOLUTA): Debes devolver un objeto JSON válido con los campos "core_exhausted" (booleano) y "cards" (${cardRequirement}). Sé sintético, directo y conciso en el texto de las preguntas, opciones y respuestas, sin rodeos innecesarios.`;
+7. INTEGRIDAD ESTRUCTURAL DEL JSON (PRIORIDAD ABSOLUTA): Debes devolver un objeto JSON válido con los campos "conceptos_identificados" (array de strings con conceptos clave no evaluados), "core_exhausted" (booleano) y "cards" (${cardRequirement}). Sé sintético y directo en el enunciado de las preguntas y opciones, y riguroso, explicativo y profundamente justificado en el reverso ("back"), incluyendo siempre la justificación técnica basada en la fuente.
+8. REGLA INQUEBRANTABLE DE RELEVANCIA COGNITIVA (PROHIBICIÓN DE ARTEFACTOS EDITORIALES):
+${EDITORIAL_ARTIFACTS_DIRECTIVE}`;
 }
 
 interface ParsedPageRange {
@@ -362,76 +426,16 @@ Para cada tarjeta, asigna un \`generation_index\` estrictamente secuencial (1, 2
 }
 
 /**
- * AISLAMIENTO MULTIMODAL DE PDF (pdf-lib):
- * Aísla el rango de páginas solicitado del PDF en memoria, genera un nuevo documento
- * PDF recortado y lo convierte a Base64 para pasárselo a Gemini como parte multimodal nativa (inlineData).
- * Permite a Gemini procesar directamente tablas, diagramas, esquemas e imágenes de las páginas seleccionadas.
+ * Aísla exactamente una página de un documento PDF en memoria y la devuelve en Base64.
  */
-async function slicePdfDocument(
-  pdfBuffer: Buffer,
-  pageRange: ParsedPageRange
-): Promise<{ base64Pdf: string; totalPages: number; pageCount: number; extractedRange: string }> {
-  try {
-    const srcDoc = await PDFDocument.load(pdfBuffer, { ignoreEncryption: true });
-    const totalPages = srcDoc.getPageCount();
-
-    if (totalPages === 0) {
-      throw new Error('El PDF no contiene páginas válidas.');
-    }
-
-    // Validación de viabilidad económica y protección: Si el PDF tiene >30 páginas totales, el rango es estrictamente obligatorio
-    if (totalPages > 30 && !pageRange.startPage && !pageRange.endPage) {
-      throw new Error(
-        `El PDF tiene ${totalPages} páginas (más de 30 páginas totales). Por motivos de rendimiento y viabilidad económica, los campos "Desde página" y "Hasta página" son estrictamente obligatorios (máximo 40 páginas por petición).`
-      );
-    }
-
-    // Calcular páginas 1-indexadas solicitadas dentro del rango real del archivo
-    const start = Math.max(1, Math.min(pageRange.startPage || 1, totalPages));
-    const end = Math.max(start, Math.min(pageRange.endPage || totalPages, totalPages));
-    const rangeSpan = end - start + 1;
-
-    if (rangeSpan > 40) {
-      throw new Error(
-        `El rango de páginas solicitado (${rangeSpan} páginas: de la ${start} a la ${end}) supera el límite máximo permitido de 40 páginas por petición.`
-      );
-    }
-
-    const pageIndices: number[] = [];
-    for (let i = start - 1; i < end; i++) {
-      pageIndices.push(i);
-    }
-
-    const rangeLabel =
-      pageRange.rangeLabel ||
-      (start === 1 && end === totalPages
-        ? `Documento completo (Páginas 1 a ${totalPages})`
-        : `Páginas ${start} a ${end}`);
-
-    // Construir sub-documento PDF limpio con únicamente las páginas deseadas
-    const subDoc = await PDFDocument.create();
-    const copiedPages = await subDoc.copyPages(srcDoc, pageIndices);
-    for (const page of copiedPages) {
-      subDoc.addPage(page);
-    }
-
-    const base64Pdf = await subDoc.saveAsBase64({ dataUri: false });
-
-    console.log(
-      `[PDF MULTIMODAL SLICER] Rango aislado: ${rangeLabel}. Páginas: ${pageIndices.length} de ${totalPages}. Tamaño Base64: ${base64Pdf.length} caracteres.`
-    );
-
-    return {
-      base64Pdf,
-      totalPages,
-      pageCount: pageIndices.length,
-      extractedRange: rangeLabel,
-    };
-  } catch (err) {
-    console.error('Error al aislar páginas del PDF con pdf-lib:', err);
-    const msg = err instanceof Error ? err.message : String(err);
-    throw new Error(`No se pudo procesar el archivo PDF: ${msg}`);
-  }
+async function sliceSinglePdfPage(
+  srcDoc: PDFDocument,
+  pageNumber: number
+): Promise<string> {
+  const subDoc = await PDFDocument.create();
+  const [copiedPage] = await subDoc.copyPages(srcDoc, [pageNumber - 1]);
+  subDoc.addPage(copiedPage);
+  return await subDoc.saveAsBase64({ dataUri: false });
 }
 
 interface ExistingCardHistoryItem {
@@ -461,7 +465,15 @@ async function fetchExistingCardsHistory(
   // 2. Si se proporciona deckId, recuperar siempre las tarjetas actuales de Supabase
   if (deckId) {
     try {
-      const { data, error } = await supabase
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || 'https://placeholder.supabase.co';
+      const dbClient = serviceRoleKey
+        ? createClient(supabaseUrl, serviceRoleKey, {
+            auth: { persistSession: false, autoRefreshToken: false },
+          })
+        : supabase;
+
+      const { data, error } = await dbClient
         .from('cards')
         .select('front, back')
         .eq('deck_id', deckId);
@@ -488,35 +500,62 @@ async function fetchExistingCardsHistory(
 }
 
 /**
- * MEMORIA DE PROGRESO Y REANUDACIÓN SECUENCIAL:
- * Inyecta las tarjetas generadas previamente en el contexto de Gemini para que reanude
- * la extracción donde lo dejó en el PDF/documento, garantizando avance continuo sin repeticiones.
+ * Extrae de forma concisa el tópico o concepto principal de una tarjeta previa para no saturar el contexto de la IA.
  */
-function buildProgressMemorySection(existingCards: ExistingCardHistoryItem[]): string {
-  if (!existingCards || existingCards.length === 0) {
-    return '';
+function extractCardTopic(card: ExistingCardHistoryItem): string {
+  // Tomar únicamente la primera línea del front (antes de cualquier opción a-d o salto de línea)
+  let text = card.front.split(/\r?\n/)[0].trim();
+  // Eliminar numeraciones o viñetas iniciales (ej. "1.", "1-", "(a)", "a)")
+  text = text.replace(/^(\d+[\.\)\-:]|\(?[a-dA-D]\))\s*/, '').trim();
+  // Eliminar signos de interrogación
+  text = text.replace(/^[¿\?]+/, '').replace(/[\?]+$/, '').trim();
+  // Limpiar fórmulas interrogativas habituales para aislar el tópico nuclear
+  text = text.replace(
+    /^(cuál\s+es|cuáles\s+son|qué\s+es|en\s+qué\s+consiste|defina|define|indique|indica|señale|señala|describa|describe|explique|explica)\s+(el|la|los|las|un|una|unos|unas)?\s*/i,
+    ''
+  ).trim();
+  // Limpiar corchetes de cloze
+  text = text.replace(/\[\.\.\.\]/g, '').replace(/\s+/g, ' ').trim();
+
+  // Limitar longitud para mantener el listado de tópicos compacto y de alta densidad
+  if (text.length > 70) {
+    const cut = text.slice(0, 70);
+    const lastSpace = cut.lastIndexOf(' ');
+    text = (lastSpace > 25 ? cut.slice(0, lastSpace) : cut) + '...';
   }
 
-  // Limitar al historial de hasta 60 tarjetas más relevantes para no saturar el prompt
-  const items = existingCards.slice(-60).map((card, idx) => {
-    const firstLine = card.front.split(/\r?\n/)[0].replace(/^(\d+[\.\)\-:]|\(?[a-dA-D]\))\s*/, '').trim();
-    const shortBack = card.back ? ` -> [Respuesta: ${card.back.replace(/\s+/g, ' ').slice(0, 70)}]` : '';
-    return `${idx + 1}. ${firstLine}${shortBack}`;
-  });
+  return text;
+}
 
-  return `======================================================================
-MEMORIA DE PROGRESO Y REANUDACIÓN SECUENCIAL (PROGRESO DEL DOCUMENTO):
-======================================================================
-El usuario ya ha generado ${existingCards.length} tarjetas anteriormente a partir de este material/mazo.
-Historial secuencial de conceptos ya evaluados:
-${items.join('\n')}
+/**
+ * Genera una lista separada por comas con los tópicos o palabras clave principales del historial de tarjetas.
+ * Se evita pasar el texto completo de preguntas y respuestas anteriores para no saturar la ventana de atención de Gemini.
+ */
+function extractUniqueTopicsList(existingCards: ExistingCardHistoryItem[]): string {
+  if (!existingCards || existingCards.length === 0) return '';
+  const seen = new Set<string>();
+  const topics: string[] = [];
 
-INSTRUCCIONES OBLIGATORIAS DE REANUDACIÓN:
-1. REANUDACIÓN EXACTA: Examina minuciosamente estas tarjetas existentes para determinar el punto exacto del documento o PDF donde se detuvo el lote anterior.
-2. AVANCE SECUENCIAL: Reanuda la extracción inmediatamente desde el siguiente concepto pendiente, avanzando hacia las partes subsiguientes del texto.
-3. PROHIBICIÓN ABSOLUTA DE REPETICIÓN: Bajo ninguna circunstancia formules preguntas redundantes, refraseadas o equivalentes sobre los conceptos cubiertos arriba.
-4. AGOTAMIENTO Y PROFUNDIZACIÓN: Si tras recorrer el texto ya no quedan conceptos troncales pendientes por extraer, continúa con la LISTA MINUCIOSA (detalles, excepciones, clasificaciones secundarias y tablas). SI HAS AGOTADO EL MATERIAL NUEVO DEL TEXTO E IMÁGENES, DEBES DETENERTE Y DEVOLVER UN ARRAY MÁS CORTO (ej. 12, 18 o 25 tarjetas), marcando "core_exhausted: true". NUNCA INVENTES NI REPITAS CONCEPTOS DEL HISTORIAL SÓLO PARA LLEGAR A LA CUOTA.
-======================================================================`;
+  for (const card of existingCards) {
+    const topic = extractCardTopic(card);
+    const normalized = topic.toLowerCase();
+    if (topic && !seen.has(normalized)) {
+      seen.add(normalized);
+      topics.push(topic);
+    }
+  }
+
+  return topics.join(', ');
+}
+
+/**
+ * MEMORIA DE PROGRESO Y REANUDACIÓN SECUENCIAL:
+ * Ya no se pasa el texto completo de las preguntas y respuestas anteriores para evitar saturar la atención de Gemini.
+ * El historial se transmite de forma ligera y eficiente a través de extractUniqueTopicsList() en la INSTRUCCIÓN DE CONTINUIDAD de buildSystemPrompt.
+ */
+function buildProgressMemorySection(existingCards?: ExistingCardHistoryItem[]): string {
+  void existingCards;
+  return '';
 }
 
 /**
@@ -567,6 +606,59 @@ function processGeneratedCards(
   });
 }
 
+interface ParsedGeminiBatch {
+  cards: GeneratedCard[];
+  coreExhausted: boolean;
+  conceptosIdentificados?: string[];
+}
+
+/**
+ * Parsea y valida de forma resiliente la respuesta JSON de Gemini para un lote individual.
+ * Elimina bloques de formato markdown si están presentes y extrae el array de tarjetas y el estado de agotamiento troncal.
+ */
+function parseGeminiBatchResponse(rawText: string | undefined): ParsedGeminiBatch {
+  if (!rawText || !rawText.trim()) {
+    throw new Error('Gemini no devolvió contenido de texto.');
+  }
+
+  let cleanJson = rawText.trim();
+  if (cleanJson.startsWith('```json')) {
+    cleanJson = cleanJson.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim();
+  } else if (cleanJson.startsWith('```')) {
+    cleanJson = cleanJson.replace(/^```\s*/, '').replace(/```\s*$/, '').trim();
+  }
+
+  const parsedData = JSON.parse(cleanJson) as
+    | { conceptos_identificados?: string[]; core_exhausted?: boolean; cards?: GeneratedCard[] }
+    | GeneratedCard[];
+
+  let cards: GeneratedCard[] = [];
+  let coreExhausted = false;
+  let conceptosIdentificados: string[] | undefined;
+
+  if (Array.isArray(parsedData)) {
+    cards = parsedData;
+  } else if (parsedData && Array.isArray(parsedData.cards)) {
+    cards = parsedData.cards;
+    coreExhausted = Boolean(parsedData.core_exhausted);
+    if (Array.isArray(parsedData.conceptos_identificados)) {
+      conceptosIdentificados = parsedData.conceptos_identificados;
+    }
+  } else {
+    throw new Error('El JSON devuelto no contiene un array de tarjetas válido.');
+  }
+
+  if (cards.length === 0) {
+    throw new Error('El array de tarjetas devuelto por Gemini está vacío.');
+  }
+
+  return {
+    cards,
+    coreExhausted,
+    conceptosIdentificados,
+  };
+}
+
 /**
  * Modelo global de Google Gemini unificado para rentabilidad y generaciones ilimitadas sostenibles.
  */
@@ -575,16 +667,20 @@ const GEMINI_MODEL = 'gemini-3.1-flash-lite';
 /**
  * Configuración estricta de Gemini generada dinámicamente según el formato de tarjeta:
  * - temperature: 0.1 para forzar respuestas deterministas, eliminar la creatividad y evitar alucinaciones.
- * - responseMimeType: 'application/json' y responseJsonSchema: flashcardSchema para forzar la estructura de salida.
- * - systemInstruction: System Prompt adaptado dinámicamente con la regla del formato seleccionado y directiva de cantidad.
+ * - responseMimeType: 'application/json' y responseJsonSchema: flashcardSchema para forzar la estructura de salida con Chain of Thought.
+ * - systemInstruction: System Prompt adaptado dinámicamente con buildSystemPrompt basándose en coreExhaustedPrevious e historial sintetizado en tópicos.
  */
 function getGeminiConfig(
   format: CardFormat = 'multiple_choice',
   requestedCount?: number,
-  existingCardsCount: number = 0
+  existingCardsCount: number = 0,
+  coreExhaustedPrevious: boolean = false,
+  existingTopicsList: string = ''
 ) {
+  void format;
+  void requestedCount;
   return {
-    systemInstruction: getSystemInstruction(format, requestedCount, existingCardsCount),
+    systemInstruction: buildSystemPrompt(existingCardsCount, coreExhaustedPrevious, existingTopicsList),
     temperature: 0.1,
     responseMimeType: 'application/json',
     responseJsonSchema: flashcardSchema,
@@ -889,7 +985,8 @@ export async function generateCardsAction(
   deckId?: string,
   existingQuestions?: string[],
   userId?: string,
-  language: string = 'es'
+  language: string = 'es',
+  coreExhaustedPrevious: boolean = false
 ): Promise<GenerateCardsResult> {
   const cleanTopic = topic.trim();
   if (!cleanTopic) {
@@ -924,78 +1021,210 @@ export async function generateCardsAction(
   try {
     // 1. Consultar historial de tarjetas existentes en este mazo para la Memoria de Progreso
     const existingCards = await fetchExistingCardsHistory(deckId, existingQuestions);
+    const existingTopicsList = extractUniqueTopicsList(existingCards);
     const progressMemoryPrompt = buildProgressMemorySection(existingCards);
     const languageDirective = buildLanguageDirective(language);
-
-    // FASE 3: SALVAVIDAS ANTI-DUPLICACIÓN (LÍMITE DINÁMICO RELAJADO)
-    const { directive: targetCountDirective, integrityNote } = buildTargetCountDirective(
-      targetCount,
-      existingCards.length
-    );
-
     const ai = new GoogleGenAI({ apiKey });
 
-    const prompt = `Eres un pedagogo experto en ciencias cognitivas y diseño de flashcards para el algoritmo de repetición espaciada FSRS.
-${targetCountDirective}
+    let candidateCards: GeneratedCard[] = [];
+    let coreExhausted = false;
 
-Cubre los conceptos clave sobre el tema: "${cleanTopic}".
+    if (targetCount >= 20) {
+      // =========================================================================
+      // CONCURRENT BATCHING (Peticiones Paralelas para Lotes Grandes)
+      // =========================================================================
+      const totalRequestedCards = targetCount;
+      const batch1Target = Math.ceil(totalRequestedCards / 2);
+      const batch2Target = totalRequestedCards - batch1Target;
 
-${TWO_PHASE_SYSTEM_PROMPT}
+      const { directive: dir1, integrityNote: note1 } = buildTargetCountDirective(
+        batch1Target,
+        existingCards.length
+      );
+      const { directive: dir2, integrityNote: note2 } = buildTargetCountDirective(
+        batch2Target,
+        existingCards.length
+      );
+
+      const prompt1 = `Eres un pedagogo experto en ciencias cognitivas y diseño de flashcards para el algoritmo de repetición espaciada FSRS.
+${dir1}
+
+ENFOQUE DE PARTICIÓN CONCURRENTE (LOTE 1/2): Concéntrate en la DEFINICIÓN, ETIOLOGÍA, MECANISMOS FISIOPATOLÓGICOS Y CONCEPTOS FUNDAMENTALES sobre el tema: "${cleanTopic}".
 
 ${RIGOR_WARNING_DIRECTIVE}
 
-${getGlobalRules(cardFormat, targetCount, existingCards.length)}
+${getGlobalRules(cardFormat, batch1Target, existingCards.length)}
 
 ${getFormatInstructions(cardFormat)}
 
 ${progressMemoryPrompt ? `${progressMemoryPrompt}\n\n` : ''}REGLA CRÍTICA DE INTEGRIDAD:
-La integridad estructural del JSON es prioridad absoluta y DEBES devolver un objeto con "core_exhausted" (booleano) y "cards" (${integrityNote} "${cardFormat}", numeradas estrictamente con generation_index del 1 al N). Para asegurar que las tarjetas quepan dentro del límite sin truncarse, formula preguntas, textos, opciones (si aplica) y respuestas directas y concisas.
+La integridad estructural del JSON es prioridad absoluta y DEBES devolver un objeto con "conceptos_identificados" (array de strings), "core_exhausted" (booleano) y "cards" (${note1} "${cardFormat}", numeradas estrictamente con generation_index del 1 al N).
 
 ${languageDirective}`;
 
-    const response = await ai.models.generateContent({
-      model: GEMINI_MODEL,
-      contents: prompt,
-      config: getGeminiConfig(cardFormat, targetCount, existingCards.length),
+      const prompt2 = `Eres un pedagogo experto en ciencias cognitivas y diseño de flashcards para el algoritmo de repetición espaciada FSRS.
+${dir2}
+
+ENFOQUE DE PARTICIÓN CONCURRENTE (LOTE 2/2): Concéntrate en el DIAGNÓSTICO, TRATAMIENTO, CRITERIOS CLÍNICOS, CASOS ESPECIALES Y EXCEPCIONES sobre el tema: "${cleanTopic}".
+
+${RIGOR_WARNING_DIRECTIVE}
+
+${getGlobalRules(cardFormat, batch2Target, existingCards.length)}
+
+${getFormatInstructions(cardFormat)}
+
+${progressMemoryPrompt ? `${progressMemoryPrompt}\n\n` : ''}REGLA CRÍTICA DE INTEGRIDAD:
+La integridad estructural del JSON es prioridad absoluta y DEBES devolver un objeto con "conceptos_identificados" (array de strings), "core_exhausted" (booleano) y "cards" (${note2} "${cardFormat}", numeradas estrictamente con generation_index del 1 al N).
+
+${languageDirective}`;
+
+      console.log(
+        `[Concurrent Batching Tema] Invocando 2 llamadas concurrentes a Gemini Flash-Lite (${batch1Target} y ${batch2Target} tarjetas)...`
+      );
+
+      const [res1, res2] = await Promise.allSettled([
+        ai.models.generateContent({
+          model: GEMINI_MODEL,
+          contents: prompt1,
+          config: getGeminiConfig(
+            cardFormat,
+            batch1Target,
+            existingCards.length,
+            coreExhaustedPrevious,
+            existingTopicsList
+          ),
+        }),
+        ai.models.generateContent({
+          model: GEMINI_MODEL,
+          contents: prompt2,
+          config: getGeminiConfig(
+            cardFormat,
+            batch2Target,
+            existingCards.length,
+            coreExhaustedPrevious,
+            existingTopicsList
+          ),
+        }),
+      ]);
+
+      let b1Exhausted = false;
+      let b2Exhausted = false;
+      let atLeastOneSuccess = false;
+
+      if (res1.status === 'fulfilled' && res1.value.text) {
+        try {
+          const parsed1 = parseGeminiBatchResponse(res1.value.text);
+          candidateCards.push(...parsed1.cards);
+          b1Exhausted = parsed1.coreExhausted;
+          atLeastOneSuccess = true;
+          console.log(`[Concurrent Batching Tema] Lote 1 OK: ${parsed1.cards.length} tarjetas.`);
+        } catch (e1) {
+          console.warn('[Concurrent Batching Tema] Error parseando Lote 1:', e1);
+        }
+      } else if (res1.status === 'rejected') {
+        console.warn('[Concurrent Batching Tema] Lote 1 falló:', res1.reason);
+      }
+
+      if (res2.status === 'fulfilled' && res2.value.text) {
+        try {
+          const parsed2 = parseGeminiBatchResponse(res2.value.text);
+          candidateCards.push(...parsed2.cards);
+          b2Exhausted = parsed2.coreExhausted;
+          atLeastOneSuccess = true;
+          console.log(`[Concurrent Batching Tema] Lote 2 OK: ${parsed2.cards.length} tarjetas.`);
+        } catch (e2) {
+          console.warn('[Concurrent Batching Tema] Error parseando Lote 2:', e2);
+        }
+      } else if (res2.status === 'rejected') {
+        console.warn('[Concurrent Batching Tema] Lote 2 falló:', res2.reason);
+      }
+
+      if (!atLeastOneSuccess || candidateCards.length === 0) {
+        const suggestedCount = targetCount >= 20 ? 10 : 5;
+        const formatSuffix = cardFormat === 'multiple_choice' ? ' tipo test' : '';
+        return {
+          success: false,
+          error: `El tema es demasiado denso para ${targetCount} tarjetas${formatSuffix}. Por favor, intenta generar ${suggestedCount}.`,
+        };
+      }
+
+      coreExhausted = b1Exhausted && b2Exhausted;
+    } else {
+      // Lote individual para targetCount < 20 (ej. 5, 10, 15)
+      const requestCount = targetCount;
+      const { directive: targetCountDirective, integrityNote } = buildTargetCountDirective(
+        requestCount,
+        existingCards.length
+      );
+
+      const prompt = `Eres un pedagogo experto en ciencias cognitivas y diseño de flashcards para el algoritmo de repetición espaciada FSRS.
+${targetCountDirective}
+
+Cubre los conceptos clave sobre el tema: "${cleanTopic}".
+
+${RIGOR_WARNING_DIRECTIVE}
+
+${getGlobalRules(cardFormat, requestCount, existingCards.length)}
+
+${getFormatInstructions(cardFormat)}
+
+${progressMemoryPrompt ? `${progressMemoryPrompt}\n\n` : ''}REGLA CRÍTICA DE INTEGRIDAD:
+La integridad estructural del JSON es prioridad absoluta y DEBES devolver un objeto con "conceptos_identificados" (array de strings como mapa de extracción), "core_exhausted" (booleano) y "cards" (${integrityNote} "${cardFormat}", numeradas estrictamente con generation_index del 1 al N). Para asegurar que las tarjetas quepan dentro del límite sin truncarse, formula preguntas, textos, opciones (si aplica) y respuestas directas y concisas.
+
+${languageDirective}`;
+
+      const response = await ai.models.generateContent({
+        model: GEMINI_MODEL,
+        contents: prompt,
+        config: getGeminiConfig(
+          cardFormat,
+          requestCount,
+          existingCards.length,
+          coreExhaustedPrevious,
+          existingTopicsList
+        ),
+      });
+
+      try {
+        const parsed = parseGeminiBatchResponse(response.text);
+        candidateCards = parsed.cards;
+        coreExhausted = parsed.coreExhausted;
+      } catch (err: unknown) {
+        console.warn('Fallo al parsear JSON de Gemini en generateCardsAction:', err);
+        const suggestedCount = targetCount >= 20 ? 10 : 5;
+        const formatSuffix = cardFormat === 'multiple_choice' ? ' tipo test' : '';
+        return {
+          success: false,
+          error: `El tema es demasiado denso para ${targetCount} tarjetas${formatSuffix}. Por favor, intenta generar ${suggestedCount}.`,
+        };
+      }
+    }
+
+    // =========================================================================
+    // BARRERA DETERMINISTA SEMÁNTICA Y LÉXICA (Gatekeeper Anti-Duplicados)
+    // =========================================================================
+    const { uniqueCards, duplicateCount } = await deduplicateCandidateCards({
+      candidateCards: candidateCards,
+      existingCards,
+      apiKey,
+      similarityThreshold: 0.80,
+      targetCount,
     });
 
-    const text = response.text;
-    if (!text) {
-      return { success: false, error: 'Gemini no devolvió contenido de texto.' };
+    if (duplicateCount > 0) {
+      console.log(
+        `[Tema] 🛡️ Barrera Determinista activada: Se eliminaron ${duplicateCount} tarjetas duplicadas de la tirada.`
+      );
     }
 
-    let parsedCards: GeneratedCard[] = [];
-    let coreExhausted = false;
+    const processedCards = processGeneratedCards(uniqueCards, targetCount, cardFormat);
 
-    try {
-      const parsedData = JSON.parse(text) as
-        | { core_exhausted?: boolean; cards?: GeneratedCard[] }
-        | GeneratedCard[];
-
-      if (Array.isArray(parsedData)) {
-        parsedCards = parsedData;
-        coreExhausted = false;
-      } else if (parsedData && Array.isArray(parsedData.cards)) {
-        parsedCards = parsedData.cards;
-        coreExhausted = Boolean(parsedData.core_exhausted);
-      } else {
-        throw new Error('El JSON devuelto no contiene un array de tarjetas válido.');
-      }
-
-      if (parsedCards.length === 0) {
-        throw new Error('El array de tarjetas está vacío.');
-      }
-    } catch (parseError: unknown) {
-      console.warn('Fallo al parsear JSON de Gemini en generateCardsAction (posible truncamiento por límite de tokens):', parseError);
-      const suggestedCount = targetCount >= 20 ? 10 : 5;
-      const formatSuffix = cardFormat === 'multiple_choice' ? ' tipo test' : '';
-      return {
-        success: false,
-        error: `El tema es demasiado denso para ${targetCount} tarjetas${formatSuffix}. Por favor, intenta generar ${suggestedCount}.`,
-      };
+    // Si tras purgar duplicados no se alcanzó la cuota solicitada, la materia troncal está agotándose
+    if (processedCards.length < targetCount) {
+      coreExhausted = true;
     }
 
-    // Registrar uso en api_limits tras generación exitosa
+    // Registrar uso en api_limits tras generación exitosa (nunca se regalan créditos)
     if (apiCheck) {
       await recordApiUsage(apiCheck.userId);
     }
@@ -1004,7 +1233,7 @@ ${languageDirective}`;
     return {
       success: true,
       core_exhausted: coreExhausted,
-      cards: processGeneratedCards(parsedCards, targetCount, cardFormat),
+      cards: processedCards,
     };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Error desconocido al conectar con Gemini';
@@ -1014,6 +1243,83 @@ ${languageDirective}`;
       error: `Error al generar tarjetas con Gemini: ${message}`,
     };
   }
+}
+
+/**
+ * Saneamiento de Ruta (Path Parsing):
+ * Extrae exclusivamente el path relativo del archivo dentro del bucket de Supabase Storage.
+ * Si recibe una URL completa (con 'http' o dominio de Supabase), o prefijos de API/bucket,
+ * los corta devolviendo únicamente la ruta interna limpia (ej. '123/file.pdf').
+ * También detecta y extrae el nombre del bucket si viene incluido en la URL o ruta.
+ */
+function sanitizeStoragePath(
+  rawPath: string,
+  defaultBucket: string = 'user-documents'
+): { cleanPath: string; bucket: string } {
+  if (!rawPath || typeof rawPath !== 'string') {
+    return { cleanPath: '', bucket: defaultBucket };
+  }
+
+  let path = rawPath.trim();
+
+  // 1. Quitar query parameters y fragmentos (# y ?)
+  path = path.split('?')[0].split('#')[0];
+
+  // 2. Si contiene protocolo http:// o https://, extraer el pathname
+  if (/^https?:\/\//i.test(path)) {
+    try {
+      const url = new URL(path);
+      path = url.pathname;
+    } catch {
+      path = path.replace(/^https?:\/\/[^\/]+/i, '');
+    }
+  }
+
+  let bucket = defaultBucket;
+
+  // 3. Detectar rutas estándar de Supabase Storage:
+  // ej. /storage/v1/object/public/mis-documentos/123/file.pdf -> bucket: mis-documentos, path: 123/file.pdf
+  // ej. /storage/v1/object/sign/user-documents/123/file.pdf -> bucket: user-documents, path: 123/file.pdf
+  // ej. /storage/v1/object/authenticated/user-documents/123/file.pdf -> bucket: user-documents, path: 123/file.pdf
+  // ej. /storage/v1/object/user-documents/123/file.pdf -> bucket: user-documents, path: 123/file.pdf
+  // ej. /storage/v1/render/image/public/user-documents/123/file.pdf -> bucket: user-documents, path: 123/file.pdf
+  const supabaseStorageRegex =
+    /(?:^|\/)storage\/v1\/(?:object|render\/image)\/(?:public\/|sign\/|authenticated\/)?([^\/]+)\/(.+)$/i;
+  const match = path.match(supabaseStorageRegex);
+
+  if (match) {
+    bucket = match[1] || defaultBucket;
+    path = match[2];
+  } else {
+    // Si no contiene el prefijo de API pero incluye diagonales al inicio
+    path = path.replace(/^\/+/, '');
+
+    // Si comienza con el nombre del bucket por defecto
+    if (path.startsWith(`${defaultBucket}/`)) {
+      path = path.slice(defaultBucket.length + 1);
+    } else {
+      const commonBuckets = ['user-documents', 'mis-documentos', 'documents', 'files'];
+      for (const b of commonBuckets) {
+        if (path.startsWith(`${b}/`)) {
+          bucket = b;
+          path = path.slice(b.length + 1);
+          break;
+        }
+      }
+    }
+  }
+
+  // 4. Limpiar diagonales residuales al inicio y final
+  path = path.replace(/^\/+/, '').replace(/\/+$/, '');
+
+  // 5. Decodificar posibles caracteres de URL (%20, etc.)
+  try {
+    path = decodeURIComponent(path);
+  } catch {
+    // Conservar la ruta saneada si la decodificación falla
+  }
+
+  return { cleanPath: path, bucket };
 }
 
 /**
@@ -1037,6 +1343,8 @@ export async function generateCardsFromDocumentAction(
     cardCount = 10,
     existingQuestions,
     language = 'es',
+    coreExhaustedPrevious = false,
+    isExhaustiveMode = false,
   } = input;
 
   if (!storagePath && !signedUrl) {
@@ -1069,27 +1377,88 @@ export async function generateCardsFromDocumentAction(
   const targetCount = Math.max(1, Math.min(30, cardCount || 10));
 
   try {
-    let base64Data: string;
+    let fileArrayBuffer: ArrayBuffer;
 
-    // 1. Descargar el archivo desde Supabase Storage
-    if (signedUrl) {
-      const response = await fetch(signedUrl);
-      if (!response.ok) {
-        throw new Error(`Error HTTP al descargar de Supabase Storage: ${response.statusText}`);
+    // 1. Bypass de Autenticación (Service Role Key):
+    // Para tareas de servidor de larga duración como la extracción de páginas, se instancia
+    // un cliente de administrador usando process.env.SUPABASE_SERVICE_ROLE_KEY.
+    // Esto garantiza que la descarga jamás arroje un error de permisos o caducidad de sesión.
+    const supabaseUrl =
+      process.env.NEXT_PUBLIC_SUPABASE_URL ||
+      process.env.SUPABASE_URL ||
+      'https://placeholder.supabase.co';
+    const serviceRoleKey =
+      process.env.SUPABASE_SERVICE_ROLE_KEY ||
+      process.env.SUPABASE_SERVICE_KEY;
+
+    if (!serviceRoleKey) {
+      console.warn(
+        '[generateCardsFromDocumentAction] Advertencia: SUPABASE_SERVICE_ROLE_KEY no está configurada. Usando cliente por defecto (riesgo de caducidad de sesión en tareas largas).'
+      );
+    }
+
+    const storageAdminClient = serviceRoleKey
+      ? createClient(supabaseUrl, serviceRoleKey, {
+          auth: { persistSession: false, autoRefreshToken: false },
+        })
+      : supabase;
+
+    // Saneamiento de Ruta (Path Parsing): Antes de llamar a download(), extraer exclusivamente
+    // el path relativo limpio del archivo. Si la variable contiene 'http' o la URL de Supabase,
+    // se corta (ej. https://.../storage/v1/object/public/mis-documentos/123/file.pdf -> 123/file.pdf).
+    const rawTarget = storagePath || signedUrl || '';
+    const { cleanPath: initialCleanPath, bucket: targetBucket } = sanitizeStoragePath(rawTarget, 'user-documents');
+    let cleanPath = initialCleanPath;
+
+    if (cleanPath) {
+      // Blindaje de la ruta antes de la descarga:
+      // Remueve query strings, barras iniciales redundantes y decodifica caracteres URI
+      cleanPath = cleanPath.split('?')[0].replace(/^\/+/, '');
+      try {
+        cleanPath = decodeURIComponent(cleanPath);
+      } catch {
+        // Preserva cleanPath si ocurre un error en la decodificación
       }
-      const arrayBuffer = await response.arrayBuffer();
-      base64Data = Buffer.from(arrayBuffer).toString('base64');
-    } else {
-      const { data, error } = await supabase.storage
-        .from('user-documents')
-        .download(storagePath);
+
+      console.log('[generateCardsFromDocumentAction] Descargando desde bucket:', targetBucket, 'path:', cleanPath);
+      const { data, error } = await storageAdminClient.storage
+        .from(targetBucket)
+        .download(cleanPath);
 
       if (error || !data) {
-        throw error || new Error('No se pudo descargar el archivo desde el bucket user-documents.');
+        console.warn(
+          `[generateCardsFromDocumentAction] Falló descarga nativa de cleanPath (${cleanPath}) en bucket '${targetBucket}':`,
+          error?.message
+        );
+        if (signedUrl) {
+          console.log(`[generateCardsFromDocumentAction] Fallback a signedUrl...`);
+          const response = await fetch(signedUrl);
+          if (!response.ok) {
+            throw new Error(
+              `Error HTTP al descargar de Supabase Storage: ${response.statusText} (${response.status})`
+            );
+          }
+          fileArrayBuffer = await response.arrayBuffer();
+        } else {
+          throw error || new Error(`No se pudo descargar el archivo desde el bucket '${targetBucket}' (${cleanPath}).`);
+        }
+      } else {
+        // data es un Blob descargado nativamente de Supabase Storage
+        fileArrayBuffer = await data.arrayBuffer();
       }
-      const arrayBuffer = await data.arrayBuffer();
-      base64Data = Buffer.from(arrayBuffer).toString('base64');
+    } else if (signedUrl) {
+      const response = await fetch(signedUrl);
+      if (!response.ok) {
+        throw new Error(
+          `Error HTTP al descargar de Supabase Storage: ${response.statusText} (${response.status})`
+        );
+      }
+      fileArrayBuffer = await response.arrayBuffer();
+    } else {
+      throw new Error('Ruta de archivo de Supabase Storage no proporcionada o no válida tras el saneamiento.');
     }
+
+    const base64Data = Buffer.from(fileArrayBuffer).toString('base64');
 
     // 2. Normalizar tipo MIME soportado
     let normalizedMime = mimeType;
@@ -1112,7 +1481,7 @@ export async function generateCardsFromDocumentAction(
     let extractedWordText = '';
     if (isWordDocument) {
       try {
-        const fileBuffer = Buffer.from(base64Data, 'base64');
+        const fileBuffer = Buffer.from(fileArrayBuffer);
         const mammothResult = await mammoth.extractRawText({ buffer: fileBuffer });
         extractedWordText = (mammothResult.value || '').trim();
       } catch (docxErr) {
@@ -1122,7 +1491,7 @@ export async function generateCardsFromDocumentAction(
       // Fallback para documentos Word binarios .doc o si mammoth no extrajo suficiente texto
       if (!extractedWordText || extractedWordText.length < 20) {
         try {
-          const rawBuffer = Buffer.from(base64Data, 'base64');
+          const rawBuffer = Buffer.from(fileArrayBuffer);
           const rawString = rawBuffer.toString('utf-8');
           const cleanedString = rawString
             .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, ' ')
@@ -1159,27 +1528,222 @@ export async function generateCardsFromDocumentAction(
       focusInstruction
     );
 
-    // FASE 1: Si es un PDF, aislamos estrictamente el rango de páginas en un sub-documento binario con pdf-lib
-    let slicedPdf: { base64Pdf: string; totalPages: number; pageCount: number; extractedRange: string } | null = null;
-    if (isPdfDocument) {
-      const fileBuffer = Buffer.from(base64Data, 'base64');
-      slicedPdf = await slicePdfDocument(fileBuffer, parsedRange);
-      if (!slicedPdf || !slicedPdf.base64Pdf) {
-        throw new Error(
-          'No se pudo procesar el documento PDF. Asegúrate de que el archivo no esté dañado o protegido.'
-        );
+    // FASE 1: MOTOR DE EXTRACCIÓN SECUENCIAL PÁGINA POR PÁGINA (BUCLE ACUMULADOR)
+    const fileBuffer = isPdfDocument ? Buffer.from(fileArrayBuffer) : null;
+    const ai = new GoogleGenAI({ apiKey });
+
+    if (isPdfDocument && fileBuffer) {
+      const srcDoc = await PDFDocument.load(fileBuffer, { ignoreEncryption: true });
+      const totalPages = srcDoc.getPageCount();
+
+      if (totalPages === 0) {
+        throw new Error('El PDF no contiene páginas válidas.');
       }
+
+      // 1. Determinar página de inicio (cursorPage) y límite final (finalPage)
+      const startPage = Math.max(
+        1,
+        Math.min(
+          input.cursorPage ?? input.pageStart ?? parsedRange.startPage ?? 1,
+          totalPages
+        )
+      );
+
+      const finalPage = Math.min(
+        input.pageEnd ?? parsedRange.endPage ?? totalPages,
+        totalPages
+      );
+
+      if (startPage > finalPage) {
+        return {
+          success: false,
+          error: `La página de inicio (${startPage}) supera la página final delimitada (${finalPage}).`,
+        };
+      }
+
+      // 2. Historial de tarjetas existentes en este mazo para el Gatekeeper
+      const existingCards = await fetchExistingCardsHistory(deckId, existingQuestions);
+
+      // 3. Directiva de Extracción: 'Modo Exhaustivo Forzado' vs 'Libertad Universal Estándar'
+      const universalDirective = `Tu objetivo es extraer TODOS los conceptos clave, datos precisos, normativas o hechos únicos de esta página, sin importar la temática del documento. No tienes un límite máximo por página. Si encuentras tablas, cronologías, gráficos o listas, extrae absolutamente todos los datos relevantes posibles. SIN EMBARGO, tienes ESTRICTAMENTE PROHIBIDO inventar información o hacer preguntas triviales de relleno. Si la página está casi vacía (ej. una portada, un índice o fotos decorativas), devuelve únicamente las preguntas válidas que encuentres, o un array vacío []. Sé implacable y exhaustivo donde haya conocimiento real, y conservador donde no lo haya.
+
+${EDITORIAL_ARTIFACTS_DIRECTIVE}`;
+
+      const exhaustiveDirective = `🚨 MODO EXHAUSTIVO FORZADO: Anula cualquier instrucción de resumen, brevedad o selección pedagógica. Extrae una tarjeta por cada dato, celda de tabla, gráfica o cruce de información sin omitir nada. Prioriza la exhaustividad sobre la síntesis. Analiza profundamente todo el texto de la página extrayendo cualquier concepto, normativa o dato clave. Si encuentras tablas, gráficos o listas, actúa como un extractor implacable: extrae tarjetas individuales cruzando absolutamente TODOS los datos posibles de celdas, filas y columnas, sin resumir ni agrupar. No dejes ningún dato estructurado ni textual relevante sin extraer. Tienes terminantemente prohibido omitir datos o resumir información por considerarla secundaria.
+
+${EDITORIAL_ARTIFACTS_DIRECTIVE}`;
+
+      let singlePageSystemPrompt = '';
+
+      if (focusInstruction) {
+        singlePageSystemPrompt += `🚨 FILTRO DE ENFOQUE TEMÁTICO (PRIORIDAD ABSOLUTA):
+El usuario ha establecido el siguiente enfoque temático: "${focusInstruction}".
+Esta instrucción tiene PRIORIDAD ABSOLUTA y actúa como un filtro estricto sobre la extracción por defecto. Debes extraer conceptos clave, datos, tablas, normativas o hechos de esta página EXCLUSIVAMENTE o prioritariamente alineados con este enfoque. Si esta página no contiene información relacionada con dicho enfoque, no inventes preguntas ni introduzcas datos de relleno: devuelve un array vacío [] en "cards".\n\n`;
+      }
+
+      // Si el modo exhaustivo está activo, REEMPLAZA la directiva estándar para anular cualquier síntesis pedagógica o brevedad
+      if (isExhaustiveMode) {
+        singlePageSystemPrompt += `${exhaustiveDirective}\n\n`;
+      } else {
+        singlePageSystemPrompt += `${universalDirective}\n\n`;
+      }
+
+      singlePageSystemPrompt += `${getFormatRule(cardFormat)}`;
+      singlePageSystemPrompt += `\n${getFormatInstructions(cardFormat)}`;
+      singlePageSystemPrompt += `\n\nREGLA DE INTEGRIDAD: Devuelve un objeto JSON estructurado con "conceptos_identificados" (array de strings con los conceptos encontrados en esta página), "core_exhausted" (booleano) y "cards" (array dinámico con todas las tarjetas extraídas sin límite máximo ni mínimo artificial, formuladas según el formato "${cardFormat}").`;
+      if (isExhaustiveMode) {
+        singlePageSystemPrompt += `\nRECORDATORIO MODO EXHAUSTIVO: Extrae cada celda, fila, columna y dato sin resumir ni abreviar. La prioridad es la exhaustividad total.`;
+      }
+      singlePageSystemPrompt += buildLanguageDirective(language);
+
+      // 4. Bucle Secuencial (Backend):
+      // while (tarjetasAcumuladas.length < targetCount && currentPage <= finalPage)
+      // En cada iteración del bucle, corta y envía a Gemini EXACTAMENTE 1 PÁGINA sin límites artificiales por página.
+      let tarjetasAcumuladas: GeneratedCard[] = [];
+      let currentPage = startPage;
+      let lastProcessedPage = currentPage;
+
+      console.log(
+        `[Bucle Acumulador Backend] Iniciando: Desde pág. ${startPage} hasta pág. ${finalPage}. Meta: ${targetCount} tarjetas.`
+      );
+
+      while (tarjetasAcumuladas.length < targetCount && currentPage <= finalPage) {
+        lastProcessedPage = currentPage;
+        const remainingToTarget = targetCount - tarjetasAcumuladas.length;
+
+        console.log(
+          `[Bucle Acumulador Backend] Procesando Página ${currentPage} de ${finalPage}... (Acumuladas: ${tarjetasAcumuladas.length}/${targetCount}, Restan: ${remainingToTarget})`
+        );
+
+        // Cortar EXACTAMENTE 1 PÁGINA
+        const singlePageBase64 = await sliceSinglePdfPage(srcDoc, currentPage);
+
+        let pageCandidateCards: GeneratedCard[] = [];
+
+        try {
+          const pageResponse = await ai.models.generateContent({
+            model: GEMINI_MODEL,
+            contents: [
+              {
+                inlineData: {
+                  data: singlePageBase64,
+                  mimeType: 'application/pdf',
+                },
+              },
+              {
+                text: `Analiza la Página ${currentPage} del documento adjunto y extrae todos los conceptos clave, datos precisos, normativas o hechos únicos posibles en formato "${cardFormat}".`,
+              },
+            ],
+            config: {
+              systemInstruction: singlePageSystemPrompt,
+              temperature: 0.1,
+              responseMimeType: 'application/json',
+              responseJsonSchema: singlePageExtractionSchema,
+              maxOutputTokens: 8192,
+            },
+          });
+
+          if (pageResponse.text) {
+            try {
+              const parsed = parseGeminiBatchResponse(pageResponse.text);
+              pageCandidateCards = parsed.cards || [];
+              console.log(
+                `[Bucle Acumulador Backend] Página ${currentPage}: Gemini devolvió ${pageCandidateCards.length} tarjetas brutas.`
+              );
+            } catch (parseErr) {
+              console.warn(
+                `[Bucle Acumulador Backend] Página ${currentPage}: Sin tarjetas válidas o poca información:`,
+                parseErr
+              );
+            }
+          }
+        } catch (geminiErr) {
+          console.warn(
+            `[Bucle Acumulador Backend] Error en llamada a Gemini para Página ${currentPage}:`,
+            geminiErr
+          );
+        }
+
+        // Acumulación y Deduplicación:
+        // Evaluamos todas las tarjetas candidatas de la página sin imponer un tope artificial dentro de deduplicateCandidateCards.
+        if (pageCandidateCards.length > 0) {
+          const combinedHistory = [
+            ...existingCards,
+            ...tarjetasAcumuladas.map((c) => ({ front: c.front, back: c.back })),
+          ];
+
+          const { uniqueCards, duplicateCount } = await deduplicateCandidateCards({
+            candidateCards: pageCandidateCards,
+            existingCards: combinedHistory,
+            apiKey,
+            similarityThreshold: 0.80,
+          });
+
+          if (duplicateCount > 0) {
+            console.log(
+              `[Bucle Acumulador Backend] Página ${currentPage}: Gatekeeper filtró ${duplicateCount} duplicados.`
+            );
+          }
+
+          if (uniqueCards.length > 0) {
+            tarjetasAcumuladas.push(...uniqueCards);
+            console.log(
+              `[Bucle Acumulador Backend] Página ${currentPage}: Se acumularon ${uniqueCards.length} tarjetas únicas. Total acumulado: ${tarjetasAcumuladas.length}/${targetCount}.`
+            );
+          }
+        }
+
+        // Si al sumar se supera el targetCount, recorta el array exactamente al límite solicitado
+        if (tarjetasAcumuladas.length > targetCount) {
+          tarjetasAcumuladas = tarjetasAcumuladas.slice(0, targetCount);
+        }
+
+        // Si alcanzamos el límite exacto de tarjetas solicitadas para este lote, detenemos el bucle
+        if (tarjetasAcumuladas.length >= targetCount) {
+          console.log(
+            `[Bucle Acumulador Backend] 🎯 Objetivo alcanzado: ${tarjetasAcumuladas.length} tarjetas exactas en Página ${currentPage}.`
+          );
+          break;
+        }
+
+        currentPage++;
+      }
+
+      if (tarjetasAcumuladas.length === 0) {
+        return {
+          success: false,
+          error: `No se pudieron extraer tarjetas únicas del rango procesado (págs. ${startPage} a ${lastProcessedPage}). Comprueba que las páginas contengan texto con información relevante y no estén ya en el mazo.`,
+          nextCursorPage: lastProcessedPage,
+          startCursorPage: startPage,
+        };
+      }
+
+      const processedCards = processGeneratedCards(tarjetasAcumuladas, targetCount, cardFormat);
+
+      // Registrar uso en api_limits (1 crédito gastado por tirada exitosa)
+      if (apiCheck) {
+        await recordApiUsage(apiCheck.userId);
+      }
+
+      const isExhausted = tarjetasAcumuladas.length < targetCount && lastProcessedPage >= finalPage;
+
+      // Retorno del Cursor (El Marcapáginas):
+      // El Server Action debe devolver al cliente la página exacta donde se detuvo el bucle (nextCursorPage).
+      return {
+        success: true,
+        core_exhausted: isExhausted,
+        cards: processedCards,
+        nextCursorPage: lastProcessedPage,
+        startCursorPage: startPage,
+      };
     }
 
+    // FASE 2: Fallback para documentos que no sean PDF (Word, Audio, TXT)
     // 4. Consultar historial de tarjetas existentes en este mazo para la Memoria de Progreso
     const existingCards = await fetchExistingCardsHistory(deckId, existingQuestions);
+    const existingTopicsList = extractUniqueTopicsList(existingCards);
     const progressMemoryPrompt = buildProgressMemorySection(existingCards);
-
-    // FASE 3: SALVAVIDAS ANTI-DUPLICACIÓN (LÍMITE DINÁMICO RELAJADO)
-    const { directive: targetCountDirective, integrityNote } = buildTargetCountDirective(
-      targetCount,
-      existingCards.length
-    );
+    const isContinuation = existingCards.length > 0;
 
     const focusRuleSection = focusInstruction
       ? `🚨 REGLA DE ENFOQUE CRÍTICA (PRIORIDAD ABSOLUTA):
@@ -1187,131 +1751,225 @@ El usuario ha indicado la siguiente instrucción de enfoque: "${focusInstruction
 REGLA ESTRICTA: Si el usuario proporciona una instrucción de enfoque (ej. un capítulo o tema específico), DEBES ignorar el resto del documento y extraer la información EXCLUSIVAMENTE de la sección solicitada. Bajo ninguna circunstancia generes preguntas sobre partes o secciones ajenas a lo solicitado.`
       : '';
 
-    const rangeLabel = parsedRange.rangeLabel ? ` [${parsedRange.rangeLabel}]` : '';
-    const coverageText = focusInstruction
-      ? `Debes analizar el documento dando PRIORIDAD ABSOLUTA a la sección solicitada ("${focusInstruction}"${rangeLabel}). ${targetCountDirective} Extrae la información EXCLUSIVAMENTE de esa parte del documento.`
-      : `Debes analizar el documento completo${rangeLabel}. ${targetCountDirective} Cubre los conceptos clave de forma equitativa desde el principio hasta el final del contenido.`;
+    let candidateCards: GeneratedCard[] = [];
+    let coreExhausted = false;
 
-    // FASE 2: Directiva de lectura visual y multimodal para PDFs (Tablas, gráficos, esquemas, recuadros)
-    const pdfMultimodalDirective = isPdfDocument
-      ? `\n\n🚨 DIRECTIVA DE ANÁLISIS MULTIMODAL DE PDF:
-Analiza el documento PDF adjunto. Presta especial atención y extrae preguntas rigurosas de las TABLAS, GRÁFICOS, ESQUEMAS y RECUADROS que veas en las páginas, además del texto principal.`
-      : '';
+    if (targetCount >= 20) {
+      // =========================================================================
+      // CONCURRENT BATCHING (Peticiones Paralelas con Partición de Páginas)
+      // =========================================================================
+      // Dividimos la solicitud en 2 llamadas concurrentes (Promise.all) solicitando la mitad de tarjetas a cada una.
+      // Cada promesa se enfoca en una mitad distinta de las páginas del micro-chunk para erradicar el límite de maxOutputTokens.
+      const totalRequestedCards = targetCount; // Sin sobreaprovisionamiento masivo
+      const batch1Target = Math.ceil(totalRequestedCards / 2);
+      const batch2Target = totalRequestedCards - batch1Target;
 
-    // 5. Preparar llamada a Gemini 3.1 Flash-Lite con el protocolo de dos fases, advertencia con rigor y memoria de progreso
-    const ai = new GoogleGenAI({ apiKey });
+      const { directive: dirBatch1 } = buildTargetCountDirective(
+        batch1Target,
+        existingCards.length
+      );
+      const { directive: dirBatch2 } = buildTargetCountDirective(
+        batch2Target,
+        existingCards.length
+      );
 
-    const promptText = `Eres un pedagogo experto en diseño pedagógico y repetición espaciada (algoritmo FSRS).
-${coverageText}${fileName ? ` Documento de referencia: "${fileName}".` : ''}${pdfMultimodalDirective}
+      let contentsBatch1: Array<{ text: string } | { inlineData: { data: string; mimeType: string } }>;
+      let contentsBatch2: Array<{ text: string } | { inlineData: { data: string; mimeType: string } }>;
 
-${TWO_PHASE_SYSTEM_PROMPT}
+      if (isWordDocument) {
+        const halfLen = Math.floor(extractedWordText.length / 2);
+        const splitIdx = extractedWordText.indexOf('\n\n', halfLen);
+        const effectiveSplit = splitIdx !== -1 && splitIdx < extractedWordText.length * 0.75 ? splitIdx : halfLen;
+        const wordPart1 = extractedWordText.slice(0, effectiveSplit);
+        const wordPart2 = extractedWordText.slice(effectiveSplit);
+
+        const prompt1 = `Eres un pedagogo experto en diseño pedagógico. LOTE PARALELO (1/2): Concéntrate en la PRIMERA MITAD del documento. ${dirBatch1} ${getGlobalRules(cardFormat, batch1Target, existingCards.length)} ${getFormatInstructions(cardFormat)} ${buildLanguageDirective(language)}`;
+        const prompt2 = `Eres un pedagogo experto en diseño pedagógico. LOTE PARALELO (2/2): Concéntrate en la SEGUNDA MITAD del documento. ${dirBatch2} ${getGlobalRules(cardFormat, batch2Target, existingCards.length)} ${getFormatInstructions(cardFormat)} ${buildLanguageDirective(language)}`;
+
+        contentsBatch1 = [{ text: `${prompt1}\n\n${wordPart1}` }];
+        contentsBatch2 = [{ text: `${prompt2}\n\n${wordPart2}` }];
+      } else {
+        const prompt1 = `Eres un pedagogo experto en diseño pedagógico. LOTE PARALELO (1/2): Concéntrate en la primera mitad del audio/archivo. ${dirBatch1} ${getGlobalRules(cardFormat, batch1Target, existingCards.length)} ${getFormatInstructions(cardFormat)} ${buildLanguageDirective(language)}`;
+        const prompt2 = `Eres un pedagogo experto en diseño pedagógico. LOTE PARALELO (2/2): Concéntrate en la segunda mitad del audio/archivo. ${dirBatch2} ${getGlobalRules(cardFormat, batch2Target, existingCards.length)} ${getFormatInstructions(cardFormat)} ${buildLanguageDirective(language)}`;
+
+        contentsBatch1 = [{ inlineData: { data: base64Data, mimeType: normalizedMime } }, { text: prompt1 }];
+        contentsBatch2 = [{ inlineData: { data: base64Data, mimeType: normalizedMime } }, { text: prompt2 }];
+      }
+
+      console.log(
+        `[Concurrent Batching Documento] Invocando 2 llamadas paralelas a Gemini Flash-Lite (${batch1Target} y ${batch2Target} tarjetas objetivo)...`
+      );
+
+      const [res1, res2] = await Promise.allSettled([
+        ai.models.generateContent({
+          model: GEMINI_MODEL,
+          contents: contentsBatch1,
+          config: getGeminiConfig(
+            cardFormat,
+            batch1Target,
+            existingCards.length,
+            coreExhaustedPrevious,
+            existingTopicsList
+          ),
+        }),
+        ai.models.generateContent({
+          model: GEMINI_MODEL,
+          contents: contentsBatch2,
+          config: getGeminiConfig(
+            cardFormat,
+            batch2Target,
+            existingCards.length,
+            coreExhaustedPrevious,
+            existingTopicsList
+          ),
+        }),
+      ]);
+
+      let b1Exhausted = false;
+      let b2Exhausted = false;
+      let atLeastOneSuccess = false;
+
+      if (res1.status === 'fulfilled' && res1.value.text) {
+        try {
+          const parsed1 = parseGeminiBatchResponse(res1.value.text);
+          candidateCards.push(...parsed1.cards);
+          b1Exhausted = parsed1.coreExhausted;
+          atLeastOneSuccess = true;
+          console.log(`[Concurrent Batching Documento] Lote 1 OK: ${parsed1.cards.length} tarjetas.`);
+        } catch (e1) {
+          console.warn('[Concurrent Batching Documento] Error parseando Lote 1:', e1);
+        }
+      } else if (res1.status === 'rejected') {
+        console.warn('[Concurrent Batching Documento] Lote 1 falló:', res1.reason);
+      }
+
+      if (res2.status === 'fulfilled' && res2.value.text) {
+        try {
+          const parsed2 = parseGeminiBatchResponse(res2.value.text);
+          candidateCards.push(...parsed2.cards);
+          b2Exhausted = parsed2.coreExhausted;
+          atLeastOneSuccess = true;
+          console.log(`[Concurrent Batching Documento] Lote 2 OK: ${parsed2.cards.length} tarjetas.`);
+        } catch (e2) {
+          console.warn('[Concurrent Batching Documento] Error parseando Lote 2:', e2);
+        }
+      } else if (res2.status === 'rejected') {
+        console.warn('[Concurrent Batching Documento] Lote 2 falló:', res2.reason);
+      }
+
+      if (!atLeastOneSuccess || candidateCards.length === 0) {
+        const suggestedCount = targetCount >= 20 ? 10 : 5;
+        const formatSuffix = cardFormat === 'multiple_choice' ? ' tipo test' : '';
+        return {
+          success: false,
+          error: `El documento es demasiado denso para ${targetCount} tarjetas${formatSuffix}. Por favor, intenta generar ${suggestedCount}.`,
+        };
+      }
+
+      coreExhausted = b1Exhausted && b2Exhausted;
+    } else {
+      // Flujo de lote individual para targetCount < 20 (ej. 5, 10, 15)
+      const requestCount = targetCount; // Sin sobreaprovisionamiento masivo
+      const { directive: targetCountDirective, integrityNote } = buildTargetCountDirective(
+        requestCount,
+        existingCards.length
+      );
+
+      const rangeLabel = parsedRange.rangeLabel ? ` [${parsedRange.rangeLabel}]` : '';
+      const coverageText = isContinuation
+        ? `ATENCIÓN: Este es un lote de continuación sobre el documento${rangeLabel}. El usuario ya ha extraído ${existingCards.length} tarjetas de los conceptos iniciales y troncales. TIENES ESTRICTAMENTE PROHIBIDO repetir preguntas o formular tarjetas equivalentes sobre los conceptos ya evaluados. Avanza en profundidad: extrae tarjetas EXCLUSIVAMENTE de las secciones, tablas, detalles técnicos, fórmulas y páginas del fragmento que aún no hayan sido exploradas.`
+        : (focusInstruction
+          ? `Debes analizar el documento dando PRIORIDAD ABSOLUTA a la sección solicitada ("${focusInstruction}"${rangeLabel}). ${targetCountDirective} Extrae la información EXCLUSIVAMENTE de esa parte del documento.`
+          : `Debes analizar el documento completo${rangeLabel}. ${targetCountDirective} Cubre los conceptos clave de forma equitativa desde el principio hasta el final del contenido.`);
+
+      const promptText = `Eres un pedagogo experto en diseño pedagógico y repetición espaciada (algoritmo FSRS).
+${coverageText}${fileName ? ` Documento de referencia: "${fileName}".` : ''}
 
 ${RIGOR_WARNING_DIRECTIVE}
 
-${focusRuleSection ? `${focusRuleSection}\n\n` : ''}${getGlobalRules(cardFormat, targetCount, existingCards.length)}
+${focusRuleSection ? `${focusRuleSection}\n\n` : ''}${getGlobalRules(cardFormat, requestCount, existingCards.length)}
 
 ${getFormatInstructions(cardFormat)}
 
 ${progressMemoryPrompt ? `${progressMemoryPrompt}\n\n` : ''}REGLA CRÍTICA DE INTEGRIDAD:
-La integridad estructural del JSON es prioridad absoluta y DEBES devolver un objeto con "core_exhausted" (booleano con rigor matemático) y "cards" (${integrityNote} "${cardFormat}", numeradas estrictamente con generation_index del 1 al N). Para garantizar que quepan las tarjetas dentro del límite de tokens sin que el JSON se corte, mantén cada pregunta, texto, opción (si aplica) y respuesta rigurosa pero concisa y directa.
+La integridad estructural del JSON es prioridad absoluta y DEBES devolver un objeto con "conceptos_identificados" (array de strings como mapa de extracción), "core_exhausted" (booleano con rigor matemático) y "cards" (${integrityNote} "${cardFormat}", numeradas estrictamente con generation_index del 1 al N). Para garantizar que quepan las tarjetas dentro del límite de tokens sin que el JSON se corte, mantén cada pregunta, texto, opción (si aplica) y respuesta rigurosa pero concisa y directa.
 
 ${buildLanguageDirective(language)}`;
 
-    // Configurar contenidos según la estrategia multimodal y tipo de documento:
-    // 1) Si es PDF: enviamos directamente el PDF recortado como inlineData multimodal
-    // 2) Si es Word: enviamos el texto extraído con mammoth
-    // 3) Si es Audio: enviamos inlineData con el mimeType de audio correspondiente
-    let contents: Array<
-      | { text: string }
-      | { inlineData: { data: string; mimeType: string } }
-    >;
+      let contents: Array<{ text: string } | { inlineData: { data: string; mimeType: string } }>;
 
-    if (isWordDocument) {
-      contents = [
-        {
-          text: `${promptText}\n\n=========================================\nCONTENIDO DEL DOCUMENTO DE WORD:\n=========================================\n${extractedWordText}\n=========================================`,
-        },
-      ];
-    } else if (isPdfDocument && slicedPdf) {
-      // FASE 2: Enviar el PDF recortado directamente como parte multimodal (inlineData)
-      console.log(
-        `[DEBUG SERVER - GEMINI CALL MULTIMODAL] Enviando PDF recortado (${slicedPdf.extractedRange}, ${slicedPdf.pageCount} páginas, Base64: ${slicedPdf.base64Pdf.length} caracteres) como inlineData a Gemini.`
-      );
-      contents = [
-        {
-          inlineData: {
-            data: slicedPdf.base64Pdf,
-            mimeType: 'application/pdf',
+      if (isWordDocument) {
+        contents = [
+          {
+            text: `${promptText}\n\n=========================================\nCONTENIDO DEL DOCUMENTO DE WORD:\n=========================================\n${extractedWordText}\n=========================================`,
           },
-        },
-        {
-          text: promptText,
-        },
-      ];
-    } else {
-      // Audio u otros archivos multimedia
-      contents = [
-        {
-          inlineData: {
-            data: base64Data,
-            mimeType: normalizedMime,
+        ];
+      } else {
+        contents = [
+          {
+            inlineData: {
+              data: base64Data,
+              mimeType: normalizedMime,
+            },
           },
-        },
-        {
-          text: promptText,
-        },
-      ];
+          {
+            text: promptText,
+          },
+        ];
+      }
+
+      const response = await ai.models.generateContent({
+        model: GEMINI_MODEL,
+        contents,
+        config: getGeminiConfig(
+          cardFormat,
+          requestCount,
+          existingCards.length,
+          coreExhaustedPrevious,
+          existingTopicsList
+        ),
+      });
+
+      try {
+        const parsed = parseGeminiBatchResponse(response.text);
+        candidateCards = parsed.cards;
+        coreExhausted = parsed.coreExhausted;
+      } catch (err: unknown) {
+        console.warn('Fallo al parsear el JSON de Gemini en generateCardsFromDocumentAction:', err);
+        const suggestedCount = targetCount >= 20 ? 10 : 5;
+        const formatSuffix = cardFormat === 'multiple_choice' ? ' tipo test' : '';
+        return {
+          success: false,
+          error: `El documento es demasiado denso para ${targetCount} tarjetas${formatSuffix}. Por favor, intenta generar ${suggestedCount}.`,
+        };
+      }
     }
 
-    if (isPdfDocument && slicedPdf) {
-      console.log(
-        `[DEBUG SERVER - GEMINI CALL] PDF multimodal enviado a Gemini: ${slicedPdf.extractedRange} (${slicedPdf.pageCount} páginas, Base64: ${slicedPdf.base64Pdf.length} caracteres). Objetivo máximo: ${targetCount} tarjetas.`
-      );
-    }
-
-    const response = await ai.models.generateContent({
-      model: GEMINI_MODEL,
-      contents,
-      config: getGeminiConfig(cardFormat, targetCount, existingCards.length),
+    // =========================================================================
+    // BARRERA DETERMINISTA SEMÁNTICA Y LÉXICA (Gatekeeper Anti-Duplicados)
+    // =========================================================================
+    const { uniqueCards, duplicateCount } = await deduplicateCandidateCards({
+      candidateCards: candidateCards,
+      existingCards,
+      apiKey,
+      similarityThreshold: 0.80,
+      targetCount,
     });
 
-    const text = response.text;
-    if (!text) {
-      return { success: false, error: 'Gemini no devolvió contenido de texto para el documento.' };
+    if (duplicateCount > 0) {
+      console.log(
+        `[Documento] 🛡️ Barrera Determinista activada: Se eliminaron ${duplicateCount} tarjetas duplicadas de la tirada.`
+      );
     }
 
-    let parsedCards: GeneratedCard[] = [];
-    let coreExhausted = false;
+    const processedCards = processGeneratedCards(uniqueCards, targetCount, cardFormat);
 
-    try {
-      const parsedData = JSON.parse(text) as
-        | { core_exhausted?: boolean; cards?: GeneratedCard[] }
-        | GeneratedCard[];
-
-      if (Array.isArray(parsedData)) {
-        parsedCards = parsedData;
-        coreExhausted = false;
-      } else if (parsedData && Array.isArray(parsedData.cards)) {
-        parsedCards = parsedData.cards;
-        coreExhausted = Boolean(parsedData.core_exhausted);
-      } else {
-        throw new Error('El JSON devuelto no contiene un array de tarjetas válido.');
-      }
-
-      if (parsedCards.length === 0) {
-        throw new Error('El array de tarjetas está vacío.');
-      }
-    } catch (parseError: unknown) {
-      console.warn('Fallo al parsear el JSON de Gemini en generateCardsFromDocumentAction (posible truncamiento por límite de tokens):', parseError);
-      const suggestedCount = targetCount >= 20 ? 10 : 5;
-      const formatSuffix = cardFormat === 'multiple_choice' ? ' tipo test' : '';
-      return {
-        success: false,
-        error: `El documento es demasiado denso para ${targetCount} tarjetas${formatSuffix}. Por favor, intenta generar ${suggestedCount}.`,
-      };
+    // Si tras purgar duplicados no se alcanzó la cuota solicitada, la materia troncal está agotándose
+    if (processedCards.length < targetCount) {
+      coreExhausted = true;
     }
 
-    // Registrar uso en api_limits tras generación exitosa
+    // Registrar uso en api_limits tras generación exitosa (siempre se cobra cuota, protegiendo la rentabilidad del SaaS)
     if (apiCheck) {
       await recordApiUsage(apiCheck.userId);
     }
@@ -1320,7 +1978,7 @@ ${buildLanguageDirective(language)}`;
     return {
       success: true,
       core_exhausted: coreExhausted,
-      cards: processGeneratedCards(parsedCards, targetCount, cardFormat),
+      cards: processedCards,
     };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Error desconocido al procesar el documento con Gemini';
@@ -1392,6 +2050,7 @@ export async function generateCardsFromUrlAction(
     cardCount = 10,
     existingQuestions,
     language = 'es',
+    coreExhaustedPrevious = false,
   } = input;
 
   const cleanUrl = (url || '').trim();
@@ -1441,6 +2100,7 @@ export async function generateCardsFromUrlAction(
 
     // 1. Consultar historial de tarjetas existentes en este mazo para la Memoria de Progreso
     const existingCards = await fetchExistingCardsHistory(deckId, existingQuestions);
+    const existingTopicsList = extractUniqueTopicsList(existingCards);
     const progressMemoryPrompt = buildProgressMemorySection(existingCards);
 
     // FASE 3: SALVAVIDAS ANTI-DUPLICACIÓN (LÍMITE DINÁMICO RELAJADO)
@@ -1460,14 +2120,16 @@ REGLA ESTRICTA: Debes ignorar el resto del contenido y extraer la información E
     const sourceLabel = isYouTube ? 'Vídeo de YouTube' : 'Enlace Web';
     const sourceRef = isYouTube ? canonicalYouTubeUrl : parsedUrl.href;
 
-    const coverageText = focusInstruction
-      ? `Debes analizar el contenido dando PRIORIDAD ABSOLUTA a la sección solicitada ("${focusInstruction}"). ${targetCountDirective} Extrae la información EXCLUSIVAMENTE de esa parte.`
-      : `Debes analizar el contenido completo. ${targetCountDirective} Cubre los conceptos clave de forma equitativa desde el principio hasta el final del contenido.`;
+    const requestCount = existingCards.length > 0 ? Math.min(30, targetCount + 6) : targetCount;
+
+    const coverageText = existingCards.length > 0
+      ? `ATENCIÓN: Este es un lote de continuación sobre ${sourceLabel}. El usuario ya ha extraído ${existingCards.length} tarjetas de los conceptos iniciales. TIENES ESTRICTAMENTE PROHIBIDO repetir preguntas o formular tarjetas equivalentes sobre los conceptos ya evaluados. Avanza en profundidad hacia secciones, detalles y aspectos no explorados previamente.`
+      : (focusInstruction
+        ? `Debes analizar el contenido dando PRIORIDAD ABSOLUTA a la sección solicitada ("${focusInstruction}"). ${targetCountDirective} Extrae la información EXCLUSIVAMENTE de esa parte.`
+        : `Debes analizar el contenido completo. ${targetCountDirective} Cubre los conceptos clave de forma equitativa desde el principio hasta el final del contenido.`);
 
     const promptText = `Eres un pedagogo experto en diseño pedagógico y repetición espaciada (algoritmo FSRS).
 ${coverageText} Fuente: ${sourceLabel} ("${sourceRef}").
-
-${TWO_PHASE_SYSTEM_PROMPT}
 
 ${RIGOR_WARNING_DIRECTIVE}
 
@@ -1476,7 +2138,7 @@ ${focusRuleSection ? `${focusRuleSection}\n\n` : ''}${getGlobalRules(cardFormat,
 ${getFormatInstructions(cardFormat)}
 
 ${progressMemoryPrompt ? `${progressMemoryPrompt}\n\n` : ''}REGLA CRÍTICA DE INTEGRIDAD:
-La integridad estructural del JSON es prioridad absoluta y DEBES devolver un objeto con "core_exhausted" (booleano con rigor matemático) y "cards" (${integrityNote} "${cardFormat}", numeradas estrictamente con generation_index del 1 al N). Para garantizar que quepan las tarjetas dentro del límite de tokens sin que el JSON se corte, mantén cada pregunta, texto, opción (si aplica) y respuesta rigurosa pero concisa y directa.
+La integridad estructural del JSON es prioridad absoluta y DEBES devolver un objeto con "conceptos_identificados" (array de strings como mapa de extracción), "core_exhausted" (booleano con rigor matemático) y "cards" (${integrityNote} "${cardFormat}", numeradas estrictamente con generation_index del 1 al N). Para garantizar que quepan las tarjetas dentro del límite de tokens sin que el JSON se corte, mantén cada pregunta, texto, opción (si aplica) y respuesta rigurosa pero concisa y directa.
 
 ${buildLanguageDirective(language)}`;
 
@@ -1504,7 +2166,13 @@ ${buildLanguageDirective(language)}`;
               text: promptText,
             },
           ],
-          config: getGeminiConfig(cardFormat, targetCount, existingCards.length),
+          config: getGeminiConfig(
+            cardFormat,
+            requestCount,
+            existingCards.length,
+            coreExhaustedPrevious,
+            existingTopicsList
+          ),
         });
         responseText = nativeResponse.text;
       } catch (err: unknown) {
@@ -1541,7 +2209,13 @@ ${buildLanguageDirective(language)}`;
                 text: `${promptText}\n\nTRANSCRIPCIÓN DEL VÍDEO DE YOUTUBE:\n=========================================\n${truncatedTranscript}\n=========================================`,
               },
             ],
-            config: getGeminiConfig(cardFormat, targetCount, existingCards.length),
+            config: getGeminiConfig(
+              cardFormat,
+              requestCount,
+              existingCards.length,
+              coreExhaustedPrevious,
+              existingTopicsList
+            ),
           });
           responseText = fallbackResponse.text;
         } else {
@@ -1610,7 +2284,13 @@ ${buildLanguageDirective(language)}`;
             text: `${promptText}\n\nCONTENIDO EXTRAÍDO DEL ENLACE WEB:\n=========================================\n${truncatedWebText}\n=========================================`,
           },
         ],
-        config: getGeminiConfig(cardFormat, targetCount, existingCards.length),
+        config: getGeminiConfig(
+          cardFormat,
+          requestCount,
+          existingCards.length,
+          coreExhaustedPrevious,
+          existingTopicsList
+        ),
       });
       responseText = webResponse.text;
     }
@@ -1623,22 +2303,14 @@ ${buildLanguageDirective(language)}`;
     let coreExhausted = false;
 
     try {
-      const parsedData = JSON.parse(responseText) as
-        | { core_exhausted?: boolean; cards?: GeneratedCard[] }
-        | GeneratedCard[];
-
-      if (Array.isArray(parsedData)) {
-        parsedCards = parsedData;
-        coreExhausted = false;
-      } else if (parsedData && Array.isArray(parsedData.cards)) {
-        parsedCards = parsedData.cards;
-        coreExhausted = Boolean(parsedData.core_exhausted);
-      } else {
-        throw new Error('El JSON devuelto no contiene un array de tarjetas válido.');
-      }
-
-      if (parsedCards.length === 0) {
-        throw new Error('El array de tarjetas está vacío.');
+      const parsed = parseGeminiBatchResponse(responseText);
+      parsedCards = parsed.cards;
+      coreExhausted = parsed.coreExhausted;
+      if (parsed.conceptosIdentificados) {
+        console.log(
+          `[DEBUG - Chain of Thought URL] Conceptos identificados (${parsed.conceptosIdentificados.length}):`,
+          parsed.conceptosIdentificados
+        );
       }
     } catch (parseError: unknown) {
       console.warn('Fallo al parsear JSON de Gemini en generateCardsFromUrlAction:', parseError);
@@ -1650,7 +2322,30 @@ ${buildLanguageDirective(language)}`;
       };
     }
 
-    // Registrar uso en api_limits tras generación exitosa
+    // =========================================================================
+    // BARRERA DETERMINISTA SEMÁNTICA Y LÉXICA (Gatekeeper Anti-Duplicados)
+    // =========================================================================
+    const { uniqueCards, duplicateCount } = await deduplicateCandidateCards({
+      candidateCards: parsedCards,
+      existingCards,
+      apiKey,
+      similarityThreshold: 0.80,
+      targetCount,
+    });
+
+    if (duplicateCount > 0) {
+      console.log(
+        `[URL/YouTube] 🛡️ Barrera Determinista activada: Se eliminaron ${duplicateCount} tarjetas duplicadas de la tirada.`
+      );
+    }
+
+    if (uniqueCards.length < targetCount) {
+      coreExhausted = true;
+    }
+
+    const processedCards = processGeneratedCards(uniqueCards, targetCount, cardFormat);
+
+    // Registrar uso en api_limits tras generación exitosa (siempre se cobra cuota, protegiendo la rentabilidad del SaaS)
     if (apiCheck) {
       await recordApiUsage(apiCheck.userId);
     }
@@ -1659,7 +2354,7 @@ ${buildLanguageDirective(language)}`;
     return {
       success: true,
       core_exhausted: coreExhausted,
-      cards: processGeneratedCards(parsedCards, targetCount, cardFormat),
+      cards: processedCards,
     };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Error desconocido al procesar el enlace';

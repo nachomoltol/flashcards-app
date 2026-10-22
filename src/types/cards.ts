@@ -15,7 +15,10 @@ export interface GenerateCardsResult {
   success: boolean;
   cards?: GeneratedCard[];
   core_exhausted?: boolean;
+  isRefunded?: boolean;
   error?: string;
+  nextCursorPage?: number;
+  startCursorPage?: number;
 }
 
 export interface MultimodalDocumentInput {
@@ -33,7 +36,10 @@ export interface MultimodalDocumentInput {
   pageStart?: number;
   pageEnd?: number;
   pageRange?: string;
+  cursorPage?: number;
   language?: string;
+  coreExhaustedPrevious?: boolean;
+  isExhaustiveMode?: boolean;
 }
 
 export interface UrlCardInput {
@@ -46,6 +52,7 @@ export interface UrlCardInput {
   cardCount?: number;
   existingQuestions?: string[];
   language?: string;
+  coreExhaustedPrevious?: boolean;
 }
 
 
