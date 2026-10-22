@@ -243,10 +243,24 @@ const RIGOR_WARNING_DIRECTIVE = `RIGOR MATEMÁTICO EN LA PROPIEDAD "core_exhaust
 - core_exhausted DEBE ser FALSE si todavía queda en el texto fuente al menos UN concepto o definición troncal sin evaluar.
 - BAJO NINGÚN CONCEPTO marques core_exhausted: true basándote en la cantidad total de tarjetas de forma arbitraria; debe responder exclusivamente al vaciado real de la materia troncal del material proporcionado.`;
 
+/**
+ * DIRECTIVA EXCLUSIVA PARA MODO DOCENTE / DIDÁCTICO:
+ * Diseñada para profesores que preparan baterías de ejercicios para sus alumnos a partir de fichas,
+ * ejercicios o vocabularios, eliminando referencias de aula y transformando listas en problemas prácticos.
+ */
+const DIDACTIC_MODE_DIRECTIVE = `DIRECTIVA EXCLUSIVA PARA MODO DOCENTE / DIDÁCTICO:
+- Este modo está diseñado para profesores que preparan exámenes y ejercicios para sus estudiantes a partir de fichas de clase, ejercicios o vocabularios.
+- PROHIBICIÓN ABSOLUTA DE METADATOS DE AULA: Queda terminantemente PROHIBIDO utilizar fórmulas como 'Según el Bloque X', 'En la Unidad Y', 'En el Ejercicio Z', '¿Cuál es la frase de ejemplo del autor?' o hacer referencia a partes físicas de la ficha. La pregunta debe formularse como un examen directo e independiente.
+- TRANSFORMACIÓN EN CASOS PRÁCTICOS Y HUECOS (FILL-IN-THE-BLANK):
+  * Si el material contiene vocabulario o idiomas, transforma los ejemplos en frases incompletas con huecos ('______') para que el alumno demuestre el uso real del término en contexto, o formula preguntas de significado/traducción directa e inversa.
+  * Queda terminantemente PROHIBIDO generar preguntas sobre símbolos fonéticos o pronunciación figurada escrita (ej. /tiː.tʃər/).
+  * Si el material es de ciencias o humanidades, transforma las listas y ejemplos en problemas o preguntas de razonamiento competencial ('¿Qué ocurre si...?', 'Identifica el caso en el que...').`;
+
 const buildSystemPrompt = (
   existingCardsLength: number,
   coreExhaustedPrevious: boolean,
-  existingTopicsList: string = ''
+  existingTopicsList: string = '',
+  pedagogicalMode?: 'academic' | 'didactic'
 ) => {
   // 1. EL NÚCLEO DEL COMPORTAMIENTO (Universal y Exhaustivo)
   let prompt = `Eres Flashmente, un motor de extracción de conocimiento de alto rendimiento. Tu objetivo es diseccionar el texto proporcionado y generar tarjetas de estudio (flashcards) rigurosas. No resumas el texto. Actúa como un interrogador minucioso.
@@ -285,6 +299,10 @@ Genera tarjetas solo si encuentras este tipo de detalles minuciosos que no se ha
     prompt += `\nINSTRUCCIÓN DE CONTINUIDAD: Ya has evaluado los siguientes conceptos: ${topicsFormatted}. Te EXIJO que mires el texto original, identifiques conceptos, datos o relaciones que no estén en esta lista, y extraigas nuevas tarjetas sobre ellos.\n`;
   }
 
+  if (pedagogicalMode === 'didactic') {
+    prompt += `\n${DIDACTIC_MODE_DIRECTIVE}\n`;
+  }
+
   prompt += `\n${EDITORIAL_ARTIFACTS_DIRECTIVE}\n`;
 
   return prompt;
@@ -296,7 +314,8 @@ Genera tarjetas solo si encuentras este tipo de detalles minuciosos que no se ha
 function getGlobalRules(
   format: CardFormat = 'multiple_choice',
   requestedCount?: number,
-  existingCardsCount: number = 0
+  existingCardsCount: number = 0,
+  pedagogicalMode?: 'academic' | 'didactic'
 ): string {
   const formatRule = getFormatRule(format);
   const countStr = requestedCount ? String(requestedCount) : '{requested_count}';
@@ -316,6 +335,8 @@ function getGlobalRules(
     : `2. DIRECTIVA CRÍTICA: DEBES GENERAR EXACTAMENTE ${countStr} TARJETAS. ES ESTRICTAMENTE PROHIBIDO DETENERSE ANTES. Si agotas los conceptos troncales, estás OBLIGADO a extraer detalles minuciosos, excepciones y estadísticas hasta alcanzar el objetivo exacto. Cerrar la respuesta con menos tarjetas de las solicitadas se considerará un fallo crítico.
 3. ÍNDICE DE SEGUIMIENTO OBLIGATORIO: Para cada tarjeta, asigna un \`generation_index\` estrictamente secuencial (1, 2, 3...). No puedes finalizar el proceso hasta que el \`generation_index\` coincida con el número total de tarjetas solicitado (${countStr}).`;
 
+  const didacticRule = pedagogicalMode === 'didactic' ? `\n\n9. ${DIDACTIC_MODE_DIRECTIVE}` : '';
+
   return `REGLAS GLOBALES INQUEBRANTABLES DE BLINDAJE (ESTILO NOTEBOOKLM):
 1. REGLA DE ORO (Estilo NotebookLM): NO inventes información. Tu única fuente de verdad es el texto. Si un concepto, dato o respuesta no se puede deducir directa y explícitamente del texto proporcionado, DEBES omitirlo. No uses conocimiento previo externo.
 ${directiveRule}
@@ -323,7 +344,7 @@ ${directiveRule}
 5. PRECISIÓN Y GROUNDING: Toda pregunta, afirmación, distractor o respuesta debe estar basada estricta y textualmente en el texto fuente.
 6. ACRÓNIMOS: Todo acrónimo debe ir acompañado obligatoriamente de su nombre completo si figura en la fuente (ejemplo: "ARN (Ácido Ribonucleico)", "TCP (Transmission Control Protocol)").
 7. INTEGRIDAD ESTRUCTURAL DEL JSON (PRIORIDAD ABSOLUTA): Debes devolver un objeto JSON válido con los campos "conceptos_identificados" (array de strings con conceptos clave no evaluados), "core_exhausted" (booleano) y "cards" (${cardRequirement}). Sé sintético y directo en el enunciado de las preguntas y opciones, y riguroso, explicativo y profundamente justificado en el reverso ("back"), incluyendo siempre la justificación técnica basada en la fuente.
-8. ${EDITORIAL_ARTIFACTS_DIRECTIVE}`;
+8. ${EDITORIAL_ARTIFACTS_DIRECTIVE}${didacticRule}`;
 }
 
 interface ParsedPageRange {
@@ -683,12 +704,13 @@ function getGeminiConfig(
   existingCardsCount: number = 0,
   coreExhaustedPrevious: boolean = false,
   existingTopicsList: string = '',
-  isExhaustiveMode: boolean = false
+  isExhaustiveMode: boolean = false,
+  pedagogicalMode?: 'academic' | 'didactic'
 ) {
   void format;
   void requestedCount;
   return {
-    systemInstruction: buildSystemPrompt(existingCardsCount, coreExhaustedPrevious, existingTopicsList),
+    systemInstruction: buildSystemPrompt(existingCardsCount, coreExhaustedPrevious, existingTopicsList, pedagogicalMode),
     temperature: isExhaustiveMode ? 0.1 : 0.15,
     responseMimeType: 'application/json',
     responseJsonSchema: flashcardSchema,
@@ -994,7 +1016,8 @@ export async function generateCardsAction(
   existingQuestions?: string[],
   userId?: string,
   language: string = 'es',
-  coreExhaustedPrevious: boolean = false
+  coreExhaustedPrevious: boolean = false,
+  pedagogicalMode: 'academic' | 'didactic' = 'academic'
 ): Promise<GenerateCardsResult> {
   const cleanTopic = topic.trim();
   if (!cleanTopic) {
@@ -1061,7 +1084,7 @@ ENFOQUE DE PARTICIÓN CONCURRENTE (LOTE 1/2): Concéntrate en la DEFINICIÓN, ET
 
 ${RIGOR_WARNING_DIRECTIVE}
 
-${getGlobalRules(cardFormat, batch1Target, existingCards.length)}
+${getGlobalRules(cardFormat, batch1Target, existingCards.length, pedagogicalMode)}
 
 ${getFormatInstructions(cardFormat)}
 
@@ -1077,7 +1100,7 @@ ENFOQUE DE PARTICIÓN CONCURRENTE (LOTE 2/2): Concéntrate en el DIAGNÓSTICO, T
 
 ${RIGOR_WARNING_DIRECTIVE}
 
-${getGlobalRules(cardFormat, batch2Target, existingCards.length)}
+${getGlobalRules(cardFormat, batch2Target, existingCards.length, pedagogicalMode)}
 
 ${getFormatInstructions(cardFormat)}
 
@@ -1099,7 +1122,9 @@ ${languageDirective}`;
             batch1Target,
             existingCards.length,
             coreExhaustedPrevious,
-            existingTopicsList
+            existingTopicsList,
+            false,
+            pedagogicalMode
           ),
         }),
         ai.models.generateContent({
@@ -1110,7 +1135,9 @@ ${languageDirective}`;
             batch2Target,
             existingCards.length,
             coreExhaustedPrevious,
-            existingTopicsList
+            existingTopicsList,
+            false,
+            pedagogicalMode
           ),
         }),
       ]);
@@ -1172,7 +1199,7 @@ Cubre los conceptos clave sobre el tema: "${cleanTopic}".
 
 ${RIGOR_WARNING_DIRECTIVE}
 
-${getGlobalRules(cardFormat, requestCount, existingCards.length)}
+${getGlobalRules(cardFormat, requestCount, existingCards.length, pedagogicalMode)}
 
 ${getFormatInstructions(cardFormat)}
 
@@ -1189,7 +1216,9 @@ ${languageDirective}`;
           requestCount,
           existingCards.length,
           coreExhaustedPrevious,
-          existingTopicsList
+          existingTopicsList,
+          false,
+          pedagogicalMode
         ),
       });
 
@@ -1353,6 +1382,7 @@ export async function generateCardsFromDocumentAction(
     language = 'es',
     coreExhaustedPrevious = false,
     isExhaustiveMode = false,
+    pedagogicalMode = 'academic',
   } = input;
 
   if (!storagePath && !signedUrl) {
@@ -1589,6 +1619,10 @@ El usuario ha establecido el siguiente enfoque temático: "${focusInstruction}".
 Esta instrucción tiene PRIORIDAD ABSOLUTA y actúa como un filtro estricto sobre la extracción por defecto. Debes extraer conceptos clave, datos, tablas, normativas o hechos de esta página EXCLUSIVAMENTE o prioritariamente alineados con este enfoque. Si esta página no contiene información relacionada con dicho enfoque, no inventes preguntas ni introduzcas datos de relleno: devuelve un array vacío [] en "cards".\n\n`;
       }
 
+      if (pedagogicalMode === 'didactic') {
+        singlePageSystemPrompt += `${DIDACTIC_MODE_DIRECTIVE}\n\n`;
+      }
+
       // Si el modo exhaustivo está activo, REEMPLAZA la directiva estándar para anular cualquier síntesis pedagógica o brevedad
       if (isExhaustiveMode) {
         singlePageSystemPrompt += `${exhaustiveDirective}\n\n`;
@@ -1599,6 +1633,9 @@ Esta instrucción tiene PRIORIDAD ABSOLUTA y actúa como un filtro estricto sobr
       singlePageSystemPrompt += `${getFormatRule(cardFormat)}`;
       singlePageSystemPrompt += `\n${getFormatInstructions(cardFormat)}`;
       singlePageSystemPrompt += `\n\nREGLA DE INTEGRIDAD: Devuelve un objeto JSON estructurado con "conceptos_identificados" (array de strings con los conceptos encontrados en esta página), "core_exhausted" (booleano) y "cards" (array dinámico con todas las tarjetas extraídas sin límite máximo ni mínimo artificial, formuladas según el formato "${cardFormat}").`;
+      if (pedagogicalMode === 'didactic') {
+        singlePageSystemPrompt += `\nRECORDATORIO MODO DOCENTE / DIDÁCTICO: Transforma el contenido en ejercicios y preguntas de examen prácticas para alumnos, omitiendo metadatos de aula (ejercicios, bloques, unidades) y omitiendo preguntas sobre transcripciones fonéticas.`;
+      }
       if (isExhaustiveMode) {
         singlePageSystemPrompt += `\nRECORDATORIO MODO EXHAUSTIVO: Extrae cada celda, fila, columna y dato sustancial sin resumir ni abreviar, priorizando el conocimiento pedagógico real y respetando la prohibición estricta de metadatos o recuadros de vocabulario al margen.`;
       }
@@ -1636,8 +1673,8 @@ Esta instrucción tiene PRIORIDAD ABSOLUTA y actúa como un filtro estricto sobr
         const currentPageSystemPrompt = `${singlePageSystemPrompt}${exhaustiveQuotaMandate}`;
 
         const pageUserPrompt = isExhaustiveMode
-          ? `Analiza la Página ${currentPage} del documento adjunto aplicando la DIRECTIVA DE COBERTURA Y CALIDAD (cuota restante: ${remainingToTarget} tarjetas). Si hay tablas o matrices de datos, extrae preguntas independientes por cada fila o cruce numérico. Si es texto continuo, extrae hechos y definiciones sustanciales sin duplicar ni inventar preguntas sobre términos al margen, concluyendo cuando los datos sustanciales se agoten para que el servidor avance de página. Formato: "${cardFormat}".`
-          : `Analiza la Página ${currentPage} del documento adjunto y extrae todos los conceptos clave, datos precisos, normativas o hechos únicos posibles en formato "${cardFormat}".`;
+          ? `Analiza la Página ${currentPage} del documento adjunto aplicando la DIRECTIVA DE COBERTURA Y CALIDAD (cuota restante: ${remainingToTarget} tarjetas). ${pedagogicalMode === 'didactic' ? 'Aplica la DIRECTIVA DE MODO DOCENTE / DIDÁCTICO para crear ejercicios prácticos de evaluación sin metadatos de aula. ' : ''}Si hay tablas o matrices de datos, extrae preguntas independientes por cada fila o cruce numérico. Si es texto continuo, extrae hechos y definiciones sustanciales sin duplicar ni inventar preguntas sobre términos al margen, concluyendo cuando los datos sustanciales se agoten para que el servidor avance de página. Formato: "${cardFormat}".`
+          : `Analiza la Página ${currentPage} del documento adjunto y extrae todos los conceptos clave, datos precisos, normativas o hechos únicos posibles en formato "${cardFormat}".${pedagogicalMode === 'didactic' ? ' Aplica el Modo Docente / Didáctico: preguntas prácticas de examen sin metadatos de aula.' : ''}`;
 
         let pageCandidateCards: GeneratedCard[] = [];
 
@@ -1805,14 +1842,14 @@ REGLA ESTRICTA: Si el usuario proporciona una instrucción de enfoque (ej. un ca
         const wordPart1 = extractedWordText.slice(0, effectiveSplit);
         const wordPart2 = extractedWordText.slice(effectiveSplit);
 
-        const prompt1 = `Eres un pedagogo experto en diseño pedagógico. LOTE PARALELO (1/2): Concéntrate en la PRIMERA MITAD del documento. ${dirBatch1} ${getGlobalRules(cardFormat, batch1Target, existingCards.length)} ${getFormatInstructions(cardFormat)} ${buildLanguageDirective(language)}`;
-        const prompt2 = `Eres un pedagogo experto en diseño pedagógico. LOTE PARALELO (2/2): Concéntrate en la SEGUNDA MITAD del documento. ${dirBatch2} ${getGlobalRules(cardFormat, batch2Target, existingCards.length)} ${getFormatInstructions(cardFormat)} ${buildLanguageDirective(language)}`;
+        const prompt1 = `Eres un pedagogo experto en diseño pedagógico. LOTE PARALELO (1/2): Concéntrate en la PRIMERA MITAD del documento. ${dirBatch1} ${getGlobalRules(cardFormat, batch1Target, existingCards.length, pedagogicalMode)} ${getFormatInstructions(cardFormat)} ${buildLanguageDirective(language)}`;
+        const prompt2 = `Eres un pedagogo experto en diseño pedagógico. LOTE PARALELO (2/2): Concéntrate en la SEGUNDA MITAD del documento. ${dirBatch2} ${getGlobalRules(cardFormat, batch2Target, existingCards.length, pedagogicalMode)} ${getFormatInstructions(cardFormat)} ${buildLanguageDirective(language)}`;
 
         contentsBatch1 = [{ text: `${prompt1}\n\n${wordPart1}` }];
         contentsBatch2 = [{ text: `${prompt2}\n\n${wordPart2}` }];
       } else {
-        const prompt1 = `Eres un pedagogo experto en diseño pedagógico. LOTE PARALELO (1/2): Concéntrate en la primera mitad del audio/archivo. ${dirBatch1} ${getGlobalRules(cardFormat, batch1Target, existingCards.length)} ${getFormatInstructions(cardFormat)} ${buildLanguageDirective(language)}`;
-        const prompt2 = `Eres un pedagogo experto en diseño pedagógico. LOTE PARALELO (2/2): Concéntrate en la segunda mitad del audio/archivo. ${dirBatch2} ${getGlobalRules(cardFormat, batch2Target, existingCards.length)} ${getFormatInstructions(cardFormat)} ${buildLanguageDirective(language)}`;
+        const prompt1 = `Eres un pedagogo experto en diseño pedagógico. LOTE PARALELO (1/2): Concéntrate en la primera mitad del audio/archivo. ${dirBatch1} ${getGlobalRules(cardFormat, batch1Target, existingCards.length, pedagogicalMode)} ${getFormatInstructions(cardFormat)} ${buildLanguageDirective(language)}`;
+        const prompt2 = `Eres un pedagogo experto en diseño pedagógico. LOTE PARALELO (2/2): Concéntrate en la segunda mitad del audio/archivo. ${dirBatch2} ${getGlobalRules(cardFormat, batch2Target, existingCards.length, pedagogicalMode)} ${getFormatInstructions(cardFormat)} ${buildLanguageDirective(language)}`;
 
         contentsBatch1 = [{ inlineData: { data: base64Data, mimeType: normalizedMime } }, { text: prompt1 }];
         contentsBatch2 = [{ inlineData: { data: base64Data, mimeType: normalizedMime } }, { text: prompt2 }];
@@ -1832,7 +1869,8 @@ REGLA ESTRICTA: Si el usuario proporciona una instrucción de enfoque (ej. un ca
             existingCards.length,
             coreExhaustedPrevious,
             existingTopicsList,
-            isExhaustiveMode
+            isExhaustiveMode,
+            pedagogicalMode
           ),
         }),
         ai.models.generateContent({
@@ -1844,7 +1882,8 @@ REGLA ESTRICTA: Si el usuario proporciona una instrucción de enfoque (ej. un ca
             existingCards.length,
             coreExhaustedPrevious,
             existingTopicsList,
-            isExhaustiveMode
+            isExhaustiveMode,
+            pedagogicalMode
           ),
         }),
       ]);
@@ -1911,7 +1950,7 @@ ${coverageText}${fileName ? ` Documento de referencia: "${fileName}".` : ''}
 
 ${RIGOR_WARNING_DIRECTIVE}
 
-${focusRuleSection ? `${focusRuleSection}\n\n` : ''}${getGlobalRules(cardFormat, requestCount, existingCards.length)}
+${focusRuleSection ? `${focusRuleSection}\n\n` : ''}${getGlobalRules(cardFormat, requestCount, existingCards.length, pedagogicalMode)}
 
 ${getFormatInstructions(cardFormat)}
 
@@ -1951,7 +1990,8 @@ ${buildLanguageDirective(language)}`;
           existingCards.length,
           coreExhaustedPrevious,
           existingTopicsList,
-          isExhaustiveMode
+          isExhaustiveMode,
+          pedagogicalMode
         ),
       });
 
@@ -2077,6 +2117,7 @@ export async function generateCardsFromUrlAction(
     existingQuestions,
     language = 'es',
     coreExhaustedPrevious = false,
+    pedagogicalMode = 'academic',
   } = input;
 
   const cleanUrl = (url || '').trim();
@@ -2159,7 +2200,7 @@ ${coverageText} Fuente: ${sourceLabel} ("${sourceRef}").
 
 ${RIGOR_WARNING_DIRECTIVE}
 
-${focusRuleSection ? `${focusRuleSection}\n\n` : ''}${getGlobalRules(cardFormat, targetCount, existingCards.length)}
+${focusRuleSection ? `${focusRuleSection}\n\n` : ''}${getGlobalRules(cardFormat, targetCount, existingCards.length, pedagogicalMode)}
 
 ${getFormatInstructions(cardFormat)}
 
@@ -2197,7 +2238,9 @@ ${buildLanguageDirective(language)}`;
             requestCount,
             existingCards.length,
             coreExhaustedPrevious,
-            existingTopicsList
+            existingTopicsList,
+            false,
+            pedagogicalMode
           ),
         });
         responseText = nativeResponse.text;
@@ -2315,7 +2358,9 @@ ${buildLanguageDirective(language)}`;
           requestCount,
           existingCards.length,
           coreExhaustedPrevious,
-          existingTopicsList
+          existingTopicsList,
+          false,
+          pedagogicalMode
         ),
       });
       responseText = webResponse.text;

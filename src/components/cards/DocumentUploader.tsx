@@ -226,6 +226,7 @@ export function DocumentUploader({
     () => Boolean(initialMeticulousPhase)
   );
   const [isExhaustiveMode, setIsExhaustiveMode] = useState<boolean>(false);
+  const [pedagogicalMode, setPedagogicalMode] = useState<'academic' | 'didactic'>('academic');
   const [generatedCardsPreview, setGeneratedCardsPreview] = useState<GeneratedCard[]>([]);
   const [materialExhaustedNotice, setMaterialExhaustedNotice] = useState<{ generated: number; requested: number } | null>(null);
 
@@ -435,6 +436,7 @@ export function DocumentUploader({
           language,
           coreExhaustedPrevious: coreExhausted || isMeticulousPhase,
           isExhaustiveMode,
+          pedagogicalMode,
         });
       } catch (actionErr: unknown) {
         const actionErrMsg =
@@ -558,6 +560,7 @@ export function DocumentUploader({
     setLastStartPage(null);
     setUploadedStorage(null);
     setMaterialExhaustedNotice(null);
+    setPedagogicalMode('academic');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -1279,6 +1282,96 @@ export function DocumentUploader({
              ======================================================== */}
           {currentStep === 3 && selectedFile && (
             <div className="space-y-3 sm:space-y-3.5 animate-in fade-in duration-150">
+              {/* Selector Enfoque Pedagógico: Académico vs Docente */}
+              <div className="p-3.5 sm:p-4 rounded-2xl bg-neutral-50 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">🎓</span>
+                    <h4 className="text-xs font-bold text-neutral-900 dark:text-white tracking-tight flex items-center">
+                      <span>{t('ai_uploader.pedagogical_mode_label', isEn ? 'Pedagogical Focus' : 'Enfoque Pedagógico')}</span>
+                      <InfoTooltip
+                        title={t('ai_uploader.tooltip_pedagogical_title', isEn ? 'Academic vs. Teaching Mode' : 'Modo Estudio vs. Modo Docente')}
+                        content={
+                          <div className="space-y-2">
+                            <div>
+                              <strong className="text-white block font-semibold">
+                                {t('ai_uploader.pedagogical_academic_title', isEn ? '📚 Academic / Study Mode:' : '📚 Modo Estudio / Académico:')}
+                              </strong>
+                              <span className="text-neutral-300">
+                                {t(
+                                  'ai_uploader.pedagogical_academic_desc',
+                                  isEn
+                                    ? 'Competitive exams, university, technical manuals, and law.'
+                                    : 'Oposiciones, universidad, manuales técnicos y leyes.'
+                                )}
+                              </span>
+                            </div>
+                            <div>
+                              <strong className="text-amber-300 block font-semibold">
+                                {t('ai_uploader.pedagogical_didactic_title', isEn ? '👨‍🏫 Teaching / Didactic Mode:' : '👨‍🏫 Modo Docente / Didáctico:')}
+                              </strong>
+                              <span className="text-neutral-300">
+                                {t(
+                                  'ai_uploader.pedagogical_didactic_desc',
+                                  isEn
+                                    ? 'Exclusive for teachers: transforms worksheets, exercises, and lists into practical application questions for students.'
+                                    : 'Exclusivo para profesores: transforma fichas, ejercicios y listas en preguntas de aplicación práctica para alumnos.'
+                                )}
+                              </span>
+                            </div>
+                          </div>
+                        }
+                      />
+                    </h4>
+                  </div>
+                </div>
+
+                {/* Segmented Control */}
+                <div className="grid grid-cols-2 gap-1.5 p-1 bg-neutral-200/60 dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-800">
+                  <button
+                    type="button"
+                    disabled={isBusy}
+                    onClick={() => setPedagogicalMode('academic')}
+                    className={`py-2 px-2.5 rounded-lg text-xs font-medium transition-all flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 text-center cursor-pointer ${
+                      pedagogicalMode === 'academic'
+                        ? 'bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-sm ring-1 ring-black/5 dark:ring-white/10 font-semibold'
+                        : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200'
+                    } disabled:opacity-50`}
+                  >
+                    <span>📚</span>
+                    <span className="truncate">{t('ai_uploader.mode_academic', isEn ? 'Study / Academic' : 'Estudio / Académico')}</span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isBusy}
+                    onClick={() => setPedagogicalMode('didactic')}
+                    className={`py-2 px-2.5 rounded-lg text-xs font-medium transition-all flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 text-center cursor-pointer ${
+                      pedagogicalMode === 'didactic'
+                        ? 'bg-amber-500/15 dark:bg-amber-500/20 text-amber-900 dark:text-amber-300 border border-amber-500/40 shadow-sm font-semibold'
+                        : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200'
+                    } disabled:opacity-50`}
+                  >
+                    <span>👨‍🏫</span>
+                    <span className="truncate">{t('ai_uploader.mode_didactic', isEn ? 'Teacher / Didactic' : 'Docente / Didáctico')}</span>
+                  </button>
+                </div>
+
+                {/* Micro-texto explicativo cuando esté en Modo Docente */}
+                {pedagogicalMode === 'didactic' && (
+                  <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 text-[11px] leading-relaxed flex items-start gap-2 animate-in fade-in">
+                    <span className="text-xs shrink-0 mt-0.5">💡</span>
+                    <p>
+                      {t(
+                        'ai_uploader.pedagogical_didactic_notice',
+                        isEn
+                          ? 'Optimized for teachers: transforms worksheets and lists into practical assessment exercises without references to document structure.'
+                          : 'Optimizado para profesores: transforma fichas y listas en ejercicios prácticos de evaluación sin referencias a la estructura del documento.'
+                      )}
+                    </p>
+                  </div>
+                )}
+              </div>
+
               {/* Modo Exhaustivo - Toggle/Switch destacado con Tooltip */}
               <div
                 className={`p-3.5 sm:p-4 rounded-2xl border transition-all ${

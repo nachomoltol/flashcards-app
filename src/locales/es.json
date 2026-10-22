@@ -335,7 +335,16 @@
     "format_mc_sub": "Test con 4 alternativas y solución",
     "format_basic_sub": "Pregunta directa y respuesta concisa",
     "format_cloze_sub": "Completar conceptos entre corchetes",
-    "format_tf_sub": "Afirmación con justificación rigurosa"
+    "format_tf_sub": "Afirmación con justificación rigurosa",
+    "pedagogical_mode_label": "Enfoque Pedagógico",
+    "tooltip_pedagogical_title": "Modo Estudio vs. Modo Docente",
+    "pedagogical_academic_title": "📚 Modo Estudio / Académico:",
+    "pedagogical_academic_desc": "Oposiciones, universidad, manuales técnicos y leyes.",
+    "pedagogical_didactic_title": "👨‍🏫 Modo Docente / Didáctico:",
+    "pedagogical_didactic_desc": "Exclusivo para profesores: transforma fichas, ejercicios y listas en preguntas de aplicación práctica para alumnos.",
+    "mode_academic": "Estudio / Académico",
+    "mode_didactic": "Docente / Didáctico",
+    "pedagogical_didactic_notice": "Optimizado para profesores: transforma fichas y listas en ejercicios prácticos de evaluación sin referencias a la estructura del documento."
   },
   "url_generator": {
     "url_label": "Enlace Web o Vídeo de YouTube",

@@ -41,6 +41,7 @@ export interface MultimodalDocumentInput {
   language?: string;
   coreExhaustedPrevious?: boolean;
   isExhaustiveMode?: boolean;
+  pedagogicalMode?: 'academic' | 'didactic';
 }
 
 export interface UrlCardInput {
@@ -54,6 +55,7 @@ export interface UrlCardInput {
   existingQuestions?: string[];
   language?: string;
   coreExhaustedPrevious?: boolean;
+  pedagogicalMode?: 'academic' | 'didactic';
 }
 
 

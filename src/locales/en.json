@@ -336,7 +336,16 @@
     "format_mc_sub": "4-option test with solution",
     "format_basic_sub": "Direct question and concise answer",
     "format_cloze_sub": "Fill-in-the-blank brackets",
-    "format_tf_sub": "Statements with strict justifications"
+    "format_tf_sub": "Statements with strict justifications",
+    "pedagogical_mode_label": "Pedagogical Focus",
+    "tooltip_pedagogical_title": "Academic vs. Teaching Mode",
+    "pedagogical_academic_title": "📚 Academic / Study Mode:",
+    "pedagogical_academic_desc": "Competitive exams, university, technical manuals, and law.",
+    "pedagogical_didactic_title": "👨‍🏫 Teaching / Didactic Mode:",
+    "pedagogical_didactic_desc": "Exclusive for teachers: transforms worksheets, exercises, and lists into practical application questions for students.",
+    "mode_academic": "Study / Academic",
+    "mode_didactic": "Teacher / Didactic",
+    "pedagogical_didactic_notice": "Optimized for teachers: transforms worksheets and lists into practical assessment exercises without references to document structure."
   },
   "url_generator": {
     "url_label": "Web Link or YouTube Video",
