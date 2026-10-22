@@ -2,6 +2,8 @@
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { PDFDocument } from 'pdf-lib';
+import mammoth from 'mammoth';
+import { segmentDocxIntoVirtualPages } from '@/lib/docxPagination';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore, useCardStore, useDeckStore, useProModalStore, useLanguageStore } from '@/stores';
 import { generateCardsFromDocumentAction } from '@/app/actions/generateCards';
@@ -214,6 +216,7 @@ export function DocumentUploader({
   const [pageStart, setPageStart] = useState<string>('');
   const [pageEnd, setPageEnd] = useState<string>('');
   const [pdfTotalPages, setPdfTotalPages] = useState<number | null>(null);
+  const [docxTotalPages, setDocxTotalPages] = useState<number | null>(null);
   
   // Status flow: idle -> uploading -> analyzing -> saving -> success | error
   const [status, setStatus] = useState<
@@ -251,6 +254,7 @@ export function DocumentUploader({
   const handleFileSelection = useCallback(async (file: File) => {
     setErrorMessage(null);
     setPdfTotalPages(null);
+    setDocxTotalPages(null);
     setNextCursorPage(null);
     setLastStartPage(null);
     setUploadedStorage(null);
@@ -269,6 +273,39 @@ export function DocumentUploader({
         setPdfTotalPages(pagesCount);
       } catch (pdfErr) {
         console.warn('No se pudo determinar el número total de páginas del PDF:', pdfErr);
+      }
+    }
+
+    const isDocx =
+      file.name.toLowerCase().endsWith('.docx') ||
+      file.name.toLowerCase().endsWith('.doc') ||
+      file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+      file.type === 'application/msword';
+    if (isDocx) {
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        let rawText = '';
+        try {
+          const res = await mammoth.extractRawText({ arrayBuffer });
+          rawText = (res && res.value) || '';
+        } catch (mammothErr) {
+          console.warn('Aviso: mammoth client extraction fallback:', mammothErr);
+        }
+
+        if (!rawText || rawText.trim().length < 20) {
+          const decoder = new TextDecoder('utf-8', { fatal: false });
+          const rawString = decoder.decode(arrayBuffer);
+          rawText = rawString
+            .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, ' ')
+            .replace(/\s{2,}/g, ' ')
+            .trim();
+        }
+
+        const virtualPages = segmentDocxIntoVirtualPages(rawText);
+        const docxPagesCount = Math.max(1, virtualPages.length);
+        setDocxTotalPages(docxPagesCount);
+      } catch (docxErr) {
+        console.warn('No se pudo determinar el número total de páginas virtuales del DOCX:', docxErr);
       }
     }
 
@@ -311,12 +348,19 @@ export function DocumentUploader({
 
     const isPdf =
       selectedFile.name.toLowerCase().endsWith('.pdf') || selectedFile.type === 'application/pdf';
+    const isDocx =
+      selectedFile.name.toLowerCase().endsWith('.docx') ||
+      selectedFile.name.toLowerCase().endsWith('.doc') ||
+      selectedFile.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+      selectedFile.type === 'application/msword';
+    const isPageable = isPdf || isDocx;
+    const totalPagesForRun = isPdf ? pdfTotalPages : docxTotalPages;
 
     let startPageForRun: number | undefined = undefined;
     let endPageForRun: number | undefined = undefined;
 
-    // FASE 2: Validación y cálculo del Marcapáginas (Cursor) para PDFs
-    if (isPdf) {
+    // FASE 2: Validación y cálculo del Marcapáginas (Cursor) para PDFs y páginas virtuales de Word (.docx)
+    if (isPageable) {
       const parsedStart = pageStart.trim() ? parseInt(pageStart.trim(), 10) : undefined;
       const parsedEnd = pageEnd.trim() ? parseInt(pageEnd.trim(), 10) : undefined;
 
@@ -330,16 +374,16 @@ export function DocumentUploader({
           setErrorMessage('La página final ("Hasta página") no puede ser menor que la inicial ("Desde página").');
           return;
         }
-        if (pdfTotalPages !== null && parsedEnd > pdfTotalPages) {
+        if (totalPagesForRun !== null && parsedEnd > totalPagesForRun) {
           setErrorMessage(
-            `La página final (${parsedEnd}) supera el total de páginas del PDF (${pdfTotalPages}).`
+            `La página final (${parsedEnd}) supera el total de páginas (${totalPagesForRun}).`
           );
           return;
         }
       }
 
       const masterStart = parsedStart !== undefined && !isNaN(parsedStart) ? Math.max(1, parsedStart) : 1;
-      const masterEnd = parsedEnd !== undefined && !isNaN(parsedEnd) ? parsedEnd : (pdfTotalPages || 9999);
+      const masterEnd = parsedEnd !== undefined && !isNaN(parsedEnd) ? parsedEnd : (totalPagesForRun || 9999);
 
       // Calcular cursor activo para el bucle acumulador
       const effectiveCursor = typeof overrideCursor === 'number'
@@ -551,6 +595,7 @@ export function DocumentUploader({
     setCurrentStep(1);
     setSelectedFile(null);
     setPdfTotalPages(null);
+    setDocxTotalPages(null);
     setPageStart('');
     setPageEnd('');
     setStatus('idle');
@@ -571,13 +616,17 @@ export function DocumentUploader({
   const isPdf = selectedFile
     ? selectedFile.name.toLowerCase().endsWith('.pdf') || selectedFile.type === 'application/pdf'
     : false;
+  const isDocx = selectedFile
+    ? selectedFile.name.toLowerCase().endsWith('.docx') ||
+      selectedFile.name.toLowerCase().endsWith('.doc') ||
+      selectedFile.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+      selectedFile.type === 'application/msword'
+    : false;
+  const isPageableDoc = isPdf || isDocx;
+  const effectiveTotalPages = isPdf ? pdfTotalPages : docxTotalPages;
 
-  const parsedStartNum = pageStart.trim() ? parseInt(pageStart.trim(), 10) : undefined;
-  const parsedEndNum = pageEnd.trim() ? parseInt(pageEnd.trim(), 10) : undefined;
-  const masterStart = parsedStartNum !== undefined && !isNaN(parsedStartNum) ? Math.max(1, parsedStartNum) : 1;
-  const masterEnd = parsedEndNum !== undefined && !isNaN(parsedEndNum) ? parsedEndNum : (pdfTotalPages || 9999);
   const isSinglePage = Boolean(
-    isPdf &&
+    isPageableDoc &&
     pageStart.trim() !== '' &&
     pageEnd.trim() !== '' &&
     pageStart.trim() === pageEnd.trim()
@@ -662,7 +711,7 @@ export function DocumentUploader({
             <p className="text-[11px] text-neutral-400 mt-2 max-w-sm mx-auto">
               {t('ai_uploader.document_label', 'Documento:')} &ldquo;{selectedFile?.name}&rdquo; ({cardFormat})
             </p>
-            {isPdf && typeof nextCursorPage === 'number' && (
+            {isPageableDoc && typeof nextCursorPage === 'number' && (
               <div className="mt-2.5 p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/25 text-indigo-300 text-xs text-center max-w-md mx-auto shadow-sm">
                 <div className="flex items-center justify-center gap-2">
                   <span className="text-sm">📖</span>
@@ -673,8 +722,8 @@ export function DocumentUploader({
                         ? `de la ${lastStartPage} a la ${nextCursorPage}`
                         : `página ${nextCursorPage}`}
                     </strong>
-                    {pdfTotalPages && (
-                      <span className="text-neutral-400"> (de {pdfTotalPages} págs totales)</span>
+                    {effectiveTotalPages && (
+                      <span className="text-neutral-400"> (de {effectiveTotalPages} págs {isPdf ? 'totales' : 'virtuales'})</span>
                     )}
                   </span>
                 </div>
@@ -706,7 +755,7 @@ export function DocumentUploader({
 
           {/* Sticky Actions Footer */}
           <div className="sticky bottom-0 z-10 bg-slate-900/95 backdrop-blur-sm border-t border-slate-800 p-3 mt-2 rounded-xl flex flex-wrap items-center justify-center gap-2.5 shadow-lg">
-            {isPdf && typeof nextCursorPage === 'number' ? (
+            {isPageableDoc && typeof nextCursorPage === 'number' ? (
               <button
                 type="button"
                 onClick={() => {
@@ -1057,26 +1106,42 @@ export function DocumentUploader({
              ======================================================== */}
           {currentStep === 2 && selectedFile && (
             <div className="space-y-3 sm:space-y-3.5 animate-in fade-in duration-150">
-              {/* Rango de Páginas si es PDF */}
-              {isPdf ? (
+              {/* Rango de Páginas si es PDF o DOCX */}
+              {isPageableDoc ? (
                 <div className="p-3 sm:p-3.5 rounded-2xl bg-neutral-50 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 space-y-2.5">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-semibold text-neutral-800 dark:text-neutral-200 flex items-center">
-                      <span>{t('ai_uploader.page_range_pdf', isEn ? 'Page Range (PDF)' : 'Rango de Páginas (PDF)')}</span>
+                      <span>
+                        {isPdf
+                          ? t('ai_uploader.page_range_pdf', isEn ? 'Page Range (PDF)' : 'Rango de Páginas (PDF)')
+                          : (isEn ? 'Virtual Page Range (DOCX)' : 'Rango de Páginas Virtuales (DOCX)')}
+                      </span>
                       <InfoTooltip
-                        title={t('ai_uploader.tooltip_page_range_title', isEn ? 'PDF Viewer vs. Printed Page Numbers' : 'Numeración de visor vs. libro impreso')}
-                        content={t(
-                          'ai_uploader.tooltip_page_range',
-                          isEn
-                            ? '⚠️ PDF Viewer vs. Printed Page Numbers: Enter the page number shown in your PDF reader\'s top bar (e.g., page 96 of 569). Covers and indexes often offset physical page numbers.'
-                            : '⚠️ Numeración de visor vs. libro impreso: Introduce el número que marca tu lector PDF en la barra superior (ej. pág. 96 de 569). Las portadas e índices suelen desfasar la numeración impresa en papel.'
-                        )}
+                        title={
+                          isPdf
+                            ? t('ai_uploader.tooltip_page_range_title', isEn ? 'PDF Viewer vs. Printed Page Numbers' : 'Numeración de visor vs. libro impreso')
+                            : (isEn ? 'Virtual Page Pagination' : 'Paginación Virtual de Documento')
+                        }
+                        content={
+                          isPdf
+                            ? t(
+                                'ai_uploader.tooltip_page_range',
+                                isEn
+                                  ? '⚠️ PDF Viewer vs. Printed Page Numbers: Enter the page number shown in your PDF reader\'s top bar (e.g., page 96 of 569). Covers and indexes often offset physical page numbers.'
+                                  : '⚠️ Numeración de visor vs. libro impreso: Introduce el número que marca tu lector PDF en la barra superior (ej. pág. 96 de 569). Las portadas e índices suelen desfasar la numeración impresa en papel.'
+                              )
+                            : (isEn
+                                ? '📄 Virtual Pages: The Word document has been divided into virtual pages of ~400 words (~2,200 characters) so it can be processed section by section just like a PDF.'
+                                : '📄 Páginas Virtuales: El documento Word ha sido dividido en páginas virtuales homogéneas de ~400 palabras (~2.200 caracteres) para procesarse sección por sección exactamente igual que un PDF.')
+                        }
                       />
                     </label>
                     <span className="text-[10px] text-neutral-500 dark:text-neutral-400 font-mono">
-                      {pdfTotalPages !== null
-                        ? t('ai_uploader.total_pages', { count: pdfTotalPages }, isEn ? `${pdfTotalPages} total pages` : `${pdfTotalPages} págs totales`)
-                        : 'PDF'}
+                      {effectiveTotalPages !== null
+                        ? (isPdf
+                            ? t('ai_uploader.total_pages', { count: effectiveTotalPages }, isEn ? `${effectiveTotalPages} total pages` : `${effectiveTotalPages} págs totales`)
+                            : (isEn ? `${effectiveTotalPages} virtual pages` : `${effectiveTotalPages} págs virtuales`))
+                        : (isPdf ? 'PDF' : 'DOCX')}
                     </span>
                   </div>
 
@@ -1088,7 +1153,7 @@ export function DocumentUploader({
                       <input
                         type="number"
                         min={1}
-                        max={pdfTotalPages || undefined}
+                        max={effectiveTotalPages || undefined}
                         disabled={isBusy}
                         value={pageStart}
                         onChange={(e) => {
@@ -1107,7 +1172,7 @@ export function DocumentUploader({
                       <input
                         type="number"
                         min={1}
-                        max={pdfTotalPages || undefined}
+                        max={effectiveTotalPages || undefined}
                         disabled={isBusy}
                         value={pageEnd}
                         onChange={(e) => {
@@ -1115,7 +1180,7 @@ export function DocumentUploader({
                           setNextCursorPage(null);
                           setLastStartPage(null);
                         }}
-                        placeholder={pdfTotalPages ? (isEn ? `e.g. ${pdfTotalPages}` : `ej. ${pdfTotalPages}`) : (isEn ? 'e.g. 30' : 'ej. 30')}
+                        placeholder={effectiveTotalPages ? (isEn ? `e.g. ${effectiveTotalPages}` : `ej. ${effectiveTotalPages}`) : (isEn ? 'e.g. 30' : 'ej. 30')}
                         className="w-full text-xs font-medium px-3 py-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition disabled:opacity-50"
                       />
                     </div>
@@ -1530,7 +1595,7 @@ export function DocumentUploader({
                     <>
                       <div className="w-4 h-4 border-2 border-white/80 border-t-transparent rounded-full animate-spin" />
                       <span>
-                        {isPdf
+                        {isPageableDoc
                           ? (isEn ? 'Extracting meticulously...' : 'Extrayendo minuciosamente...')
                           : t('ai_uploader.processing_file', isEn ? 'Processing file...' : 'Procesando archivo...')}
                       </span>
@@ -1541,7 +1606,7 @@ export function DocumentUploader({
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                       </svg>
                       <span>
-                        {isPdf
+                        {isPageableDoc
                           ? (typeof nextCursorPage === 'number'
                               ? t('ai_uploader.continue_extract_btn', { page: nextCursorPage }, isEn ? `Continue extracting (Resume p. ${nextCursorPage})` : `Continuar extrayendo (Retomar pág. ${nextCursorPage})`)
                               : t('ai_uploader.extract_action_btn', { count: cardCount }, isEn ? `Extract ${cardCount} cards` : `Extraer ${cardCount} tarjetas`))

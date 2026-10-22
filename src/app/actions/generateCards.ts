@@ -2,6 +2,7 @@
 
 import { GoogleGenAI, Type } from '@google/genai';
 import mammoth from 'mammoth';
+import { segmentDocxIntoVirtualPages } from '@/lib/docxPagination';
 import { PDFDocument } from 'pdf-lib';
 import { YoutubeTranscript } from 'youtube-transcript';
 import { createClient } from '@supabase/supabase-js';
@@ -1552,6 +1553,11 @@ export async function generateCardsFromDocumentAction(
       }
     }
 
+    let wordPages: string[] = [];
+    if (isWordDocument && extractedWordText) {
+      wordPages = segmentDocxIntoVirtualPages(extractedWordText);
+    }
+
     // Identificar si es un documento PDF
     const isPdfDocument =
       normalizedMime === 'application/pdf' ||
@@ -1797,7 +1803,221 @@ Esta instrucción tiene PRIORIDAD ABSOLUTA y actúa como un filtro estricto sobr
       };
     }
 
-    // FASE 2: Fallback para documentos que no sean PDF (Word, Audio, TXT)
+    // FASE 1-DOCX: MOTOR DE EXTRACCIÓN SECUENCIAL PÁGINA VIRTUAL POR PÁGINA VIRTUAL PARA DOCUMENTOS WORD (.docx / .doc)
+    if (isWordDocument && wordPages.length > 0) {
+      const totalPages = wordPages.length;
+
+      // 1. Determinar página de inicio (cursorPage) y límite final (finalPage)
+      const startPage = Math.max(
+        1,
+        Math.min(
+          input.cursorPage ?? input.pageStart ?? parsedRange.startPage ?? 1,
+          totalPages
+        )
+      );
+
+      const finalPage = Math.min(
+        input.pageEnd ?? parsedRange.endPage ?? totalPages,
+        totalPages
+      );
+
+      if (startPage > finalPage) {
+        return {
+          success: false,
+          error: `La página virtual de inicio (${startPage}) supera la página final delimitada (${finalPage}).`,
+        };
+      }
+
+      // 2. Historial de tarjetas existentes en este mazo para el Gatekeeper
+      const existingCards = await fetchExistingCardsHistory(deckId, existingQuestions);
+
+      // 3. Directiva de Extracción: 'Modo Exhaustivo Forzado' vs 'Libertad Universal Estándar'
+      const universalDirective = `Tu objetivo es extraer TODOS los conceptos clave, datos precisos, normativas o hechos únicos de esta página virtual, sin importar la temática del documento. No tienes un límite máximo por página. Si encuentras tablas, cronologías o listas, extrae absolutamente todos los datos relevantes posibles. SIN EMBARGO, tienes ESTRICTAMENTE PROHIBIDO inventar información o hacer preguntas triviales de relleno. Si la página virtual contiene poco contenido relevante, devuelve únicamente las preguntas válidas que encuentres, o un array vacío []. Sé implacable y exhaustivo donde haya conocimiento real, y conservador donde no lo haya.
+
+${EDITORIAL_ARTIFACTS_DIRECTIVE}`;
+
+      const exhaustiveDirective = `🚨 MODO EXHAUSTIVO FORZADO: Anula cualquier instrucción de resumen, brevedad o selección pedagógica. Extrae una tarjeta por cada dato, celda de tabla, gráfica o cruce de información sin omitir nada. Prioriza la exhaustividad sobre la síntesis. Analiza profundamente todo el texto de la página virtual extrayendo cualquier concepto, normativa o dato clave. Si encuentras tablas, gráficos o listas, actúa como un extractor implacable: extrae tarjetas individuales cruzando absolutamente TODOS los datos posibles de celdas, filas y columnas, sin resumir ni agrupar. No dejes ningún dato estructurado ni textual relevante sin extraer. Tienes terminantemente prohibido omitir datos o resumir información por considerarla secundaria.
+
+${EDITORIAL_ARTIFACTS_DIRECTIVE}`;
+
+      let singlePageSystemPrompt = '';
+
+      if (focusInstruction) {
+        singlePageSystemPrompt += `🚨 FILTRO DE ENFOQUE TEMÁTICO (PRIORIDAD ABSOLUTA):
+El usuario ha establecido el siguiente enfoque temático: "${focusInstruction}".
+Esta instrucción tiene PRIORIDAD ABSOLUTA y actúa como un filtro estricto sobre la extracción por defecto. Debes extraer conceptos clave, datos, tablas, normativas o hechos de esta página virtual EXCLUSIVAMENTE o prioritariamente alineados con este enfoque. Si esta página virtual no contiene información relacionada con dicho enfoque, no inventes preguntas ni introduzcas datos de relleno: devuelve un array vacío [] en "cards".\n\n`;
+      }
+
+      if (pedagogicalMode === 'didactic') {
+        singlePageSystemPrompt += `${DIDACTIC_MODE_DIRECTIVE}\n\n`;
+      }
+
+      // Si el modo exhaustivo está activo, REEMPLAZA la directiva estándar para anular cualquier síntesis pedagógica o brevedad
+      if (isExhaustiveMode) {
+        singlePageSystemPrompt += `${exhaustiveDirective}\n\n`;
+      } else {
+        singlePageSystemPrompt += `${universalDirective}\n\n`;
+      }
+
+      singlePageSystemPrompt += `${getFormatRule(cardFormat)}`;
+      singlePageSystemPrompt += `\n${getFormatInstructions(cardFormat)}`;
+      singlePageSystemPrompt += `\n\nREGLA DE INTEGRIDAD: Devuelve un objeto JSON estructurado con "conceptos_identificados" (array de strings con los conceptos encontrados en esta página virtual), "core_exhausted" (booleano) y "cards" (array dinámico con todas las tarjetas extraídas sin límite máximo ni mínimo artificial, formuladas según el formato "${cardFormat}").`;
+      if (pedagogicalMode === 'didactic') {
+        singlePageSystemPrompt += `\nRECORDATORIO MODO DOCENTE / DIDÁCTICO: Transforma el contenido en ejercicios y preguntas de examen prácticas para alumnos, omitiendo metadatos de aula (ejercicios, bloques, unidades) y omitiendo preguntas sobre transcripciones fonéticas.`;
+      }
+      if (isExhaustiveMode) {
+        singlePageSystemPrompt += `\nRECORDATORIO MODO EXHAUSTIVO: Extrae cada celda, fila, columna y dato sustancial sin resumir ni abreviar, priorizando el conocimiento pedagógico real y respetando la prohibición estricta de metadatos o recuadros de vocabulario al margen.`;
+      }
+      singlePageSystemPrompt += buildLanguageDirective(language);
+
+      // 4. Bucle Secuencial Virtual (Backend):
+      // while (tarjetasAcumuladas.length < targetCount && currentPage <= finalPage)
+      let tarjetasAcumuladas: GeneratedCard[] = [];
+      let currentPage = startPage;
+      let lastProcessedPage = currentPage;
+
+      console.log(
+        `[Bucle Acumulador Backend DOCX] Iniciando: Desde pág. virtual ${startPage} hasta pág. virtual ${finalPage}. Meta: ${targetCount} tarjetas.`
+      );
+
+      while (tarjetasAcumuladas.length < targetCount && currentPage <= finalPage) {
+        lastProcessedPage = currentPage;
+        const remainingToTarget = targetCount - tarjetasAcumuladas.length;
+        const currentPageText = wordPages[currentPage - 1] || '';
+
+        console.log(
+          `[Bucle Acumulador Backend DOCX] Procesando Página Virtual ${currentPage} de ${finalPage}... (Acumuladas: ${tarjetasAcumuladas.length}/${targetCount}, Restan: ${remainingToTarget})`
+        );
+
+        const exhaustiveQuotaMandate = isExhaustiveMode
+          ? `\n\n🚨 DIRECTIVA DE COBERTURA Y CALIDAD (CUOTA RESTANTE: ${remainingToTarget} TARJETAS):
+- Si la sección contiene tablas o clasificaciones densas, extrae preguntas independientes de tantas filas y cruces como existan hasta cumplir la cuota requerida.
+- Si la sección es texto continuo (prosa/teoría), extrae con rigor quirúrgico cada dato fáctico, definición, mecanismo y excepción relevante.
+- IMPORTANTE: No dupliques preguntas con diferente redacción ni inventes preguntas sobre listas de palabras al margen para alcanzar un número artificial. Si has extraído todos los hechos sustanciales de esta página virtual, concluye tu respuesta; el motor secuencial del servidor continuará acumulando tarjetas en las siguientes páginas del documento hasta completar el objetivo.`
+          : '';
+
+        const currentPageSystemPrompt = `${singlePageSystemPrompt}${exhaustiveQuotaMandate}`;
+
+        const pageUserPrompt = isExhaustiveMode
+          ? `Analiza el contenido de la Página Virtual ${currentPage} del documento Word adjunto aplicando la DIRECTIVA DE COBERTURA Y CALIDAD (cuota restante: ${remainingToTarget} tarjetas). ${pedagogicalMode === 'didactic' ? 'Aplica la DIRECTIVA DE MODO DOCENTE / DIDÁCTICO para crear ejercicios prácticos de evaluación sin metadatos de aula. ' : ''}Si hay tablas o datos estructurados, extrae preguntas independientes por cada dato relevante. Si es texto continuo, extrae hechos y definiciones sustanciales sin duplicar ni inventar preguntas sobre términos al margen, concluyendo cuando los datos sustanciales se agoten para que el servidor avance de página. Formato: "${cardFormat}".
+
+--- TEXTO DE LA PÁGINA VIRTUAL ${currentPage} (${fileName || 'documento.docx'}) ---
+${currentPageText}`
+          : `Analiza el contenido de la Página Virtual ${currentPage} del documento Word adjunto y extrae todos los conceptos clave, datos precisos, normativas o hechos únicos posibles en formato "${cardFormat}".${pedagogicalMode === 'didactic' ? ' Aplica el Modo Docente / Didáctico: preguntas prácticas de examen sin metadatos de aula.' : ''}
+
+--- TEXTO DE LA PÁGINA VIRTUAL ${currentPage} (${fileName || 'documento.docx'}) ---
+${currentPageText}`;
+
+        let pageCandidateCards: GeneratedCard[] = [];
+
+        try {
+          const pageResponse = await ai.models.generateContent({
+            model: GEMINI_MODEL,
+            contents: [
+              {
+                text: pageUserPrompt,
+              },
+            ],
+            config: {
+              systemInstruction: currentPageSystemPrompt,
+              temperature: isExhaustiveMode ? 0.1 : 0.15,
+              responseMimeType: 'application/json',
+              responseJsonSchema: singlePageExtractionSchema,
+              maxOutputTokens: 8192,
+            },
+          });
+
+          if (pageResponse.text) {
+            try {
+              const parsed = parseGeminiBatchResponse(pageResponse.text);
+              pageCandidateCards = parsed.cards || [];
+              console.log(
+                `[Bucle Acumulador Backend DOCX] Página Virtual ${currentPage}: Gemini devolvió ${pageCandidateCards.length} tarjetas brutas.`
+              );
+            } catch (parseErr) {
+              console.warn(
+                `[Bucle Acumulador Backend DOCX] Página Virtual ${currentPage}: Sin tarjetas válidas o poca información:`,
+                parseErr
+              );
+            }
+          }
+        } catch (geminiErr) {
+          console.warn(
+            `[Bucle Acumulador Backend DOCX] Error en llamada a Gemini para Página Virtual ${currentPage}:`,
+            geminiErr
+          );
+        }
+
+        // Acumulación y Deduplicación
+        if (pageCandidateCards.length > 0) {
+          const combinedHistory = [
+            ...existingCards,
+            ...tarjetasAcumuladas.map((c) => ({ front: c.front, back: c.back })),
+          ];
+
+          const { uniqueCards, duplicateCount } = await deduplicateCandidateCards({
+            candidateCards: pageCandidateCards,
+            existingCards: combinedHistory,
+            apiKey,
+            similarityThreshold: isExhaustiveMode ? 0.92 : 0.80,
+            isExhaustiveMode,
+          });
+
+          if (duplicateCount > 0) {
+            console.log(
+              `[Bucle Acumulador Backend DOCX] Página Virtual ${currentPage}: Gatekeeper filtró ${duplicateCount} duplicados.`
+            );
+          }
+
+          if (uniqueCards.length > 0) {
+            tarjetasAcumuladas.push(...uniqueCards);
+            console.log(
+              `[Bucle Acumulador Backend DOCX] Página Virtual ${currentPage}: Se acumularon ${uniqueCards.length} tarjetas únicas. Total acumulado: ${tarjetasAcumuladas.length}/${targetCount}.`
+            );
+          }
+        }
+
+        if (tarjetasAcumuladas.length > targetCount) {
+          tarjetasAcumuladas = tarjetasAcumuladas.slice(0, targetCount);
+        }
+
+        if (tarjetasAcumuladas.length >= targetCount) {
+          console.log(
+            `[Bucle Acumulador Backend DOCX] 🎯 Objetivo alcanzado: ${tarjetasAcumuladas.length} tarjetas exactas en Página Virtual ${currentPage}.`
+          );
+          break;
+        }
+
+        currentPage++;
+      }
+
+      if (tarjetasAcumuladas.length === 0) {
+        return {
+          success: false,
+          error: `No se pudieron extraer tarjetas únicas del rango procesado (págs. virtuales ${startPage} a ${lastProcessedPage}). Comprueba que las páginas contengan texto con información relevante y no estén ya en el mazo.`,
+          nextCursorPage: lastProcessedPage,
+          startCursorPage: startPage,
+        };
+      }
+
+      const processedCards = processGeneratedCards(tarjetasAcumuladas, targetCount, cardFormat);
+
+      if (apiCheck) {
+        await recordApiUsage(apiCheck.userId);
+      }
+
+      const isExhausted = tarjetasAcumuladas.length < targetCount && lastProcessedPage >= finalPage;
+
+      return {
+        success: true,
+        core_exhausted: isExhausted,
+        cards: processedCards,
+        nextCursorPage: lastProcessedPage,
+        startCursorPage: startPage,
+      };
+    }
+
+    // FASE 2: Fallback para documentos que no sean PDF ni DOCX paginado (Audio, TXT)
     // 4. Consultar historial de tarjetas existentes en este mazo para la Memoria de Progreso
     const existingCards = await fetchExistingCardsHistory(deckId, existingQuestions);
     const existingTopicsList = extractUniqueTopicsList(existingCards);

@@ -3,9 +3,9 @@ declare module 'mammoth' {
     value: string;
     messages: Array<{ type: string; message: string }>;
   }
-  export function extractRawText(input: { buffer: Buffer } | { path: string }): Promise<MammothResult>;
-  export function convertToMarkdown(input: { buffer: Buffer } | { path: string }): Promise<MammothResult>;
-  export function convertToHtml(input: { buffer: Buffer } | { path: string }): Promise<MammothResult>;
+  export function extractRawText(input: { buffer: Buffer } | { path: string } | { arrayBuffer: ArrayBuffer }): Promise<MammothResult>;
+  export function convertToMarkdown(input: { buffer: Buffer } | { path: string } | { arrayBuffer: ArrayBuffer }): Promise<MammothResult>;
+  export function convertToHtml(input: { buffer: Buffer } | { path: string } | { arrayBuffer: ArrayBuffer }): Promise<MammothResult>;
   
   const mammoth: {
     extractRawText: typeof extractRawText;
