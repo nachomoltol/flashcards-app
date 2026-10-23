@@ -1,8 +1,10 @@
 'use server';
 
 import { GoogleGenAI, Type } from '@google/genai';
-import mammoth from 'mammoth';
-import { segmentDocxIntoVirtualPages } from '@/lib/docxPagination';
+import {
+  parseDocxIntoVirtualPages,
+  type VirtualDocxPage,
+} from '@/lib/docxPagination';
 import { PDFDocument } from 'pdf-lib';
 import { YoutubeTranscript } from 'youtube-transcript';
 import { createClient } from '@supabase/supabase-js';
@@ -1517,45 +1519,23 @@ export async function generateCardsFromDocumentAction(
       normalizedMime === 'application/msword' ||
       Boolean(fileName && /\.(docx|doc)$/i.test(fileName));
 
+    let wordPages: VirtualDocxPage[] = [];
     let extractedWordText = '';
     if (isWordDocument) {
       try {
         const fileBuffer = Buffer.from(fileArrayBuffer);
-        const mammothResult = await mammoth.extractRawText({ buffer: fileBuffer });
-        extractedWordText = (mammothResult.value || '').trim();
+        wordPages = await parseDocxIntoVirtualPages(fileBuffer);
+        extractedWordText = wordPages.map((p) => p.text).join('\n\n');
       } catch (docxErr) {
-        console.warn('Advertencia al extraer texto con mammoth de documento Word:', docxErr);
+        console.warn('Advertencia al parsear documento Word con imágenes:', docxErr);
       }
 
-      // Fallback para documentos Word binarios .doc o si mammoth no extrajo suficiente texto
-      if (!extractedWordText || extractedWordText.length < 20) {
-        try {
-          const rawBuffer = Buffer.from(fileArrayBuffer);
-          const rawString = rawBuffer.toString('utf-8');
-          const cleanedString = rawString
-            .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, ' ')
-            .replace(/\s{2,}/g, ' ')
-            .trim();
-
-          if (cleanedString.length > extractedWordText.length) {
-            extractedWordText = cleanedString;
-          }
-        } catch (rawErr) {
-          console.warn('Fallback de extracción binaria falló:', rawErr);
-        }
-      }
-
-      if (!extractedWordText || extractedWordText.length < 10) {
+      if (!wordPages || wordPages.length === 0) {
         return {
           success: false,
           error: `No se pudo extraer texto legible del documento de Word "${fileName || 'documento'}". Asegúrate de que contenga texto y no esté protegido por contraseña.`,
         };
       }
-    }
-
-    let wordPages: string[] = [];
-    if (isWordDocument && extractedWordText) {
-      wordPages = segmentDocxIntoVirtualPages(extractedWordText);
     }
 
     // Identificar si es un documento PDF
@@ -1883,41 +1863,64 @@ Esta instrucción tiene PRIORIDAD ABSOLUTA y actúa como un filtro estricto sobr
       while (tarjetasAcumuladas.length < targetCount && currentPage <= finalPage) {
         lastProcessedPage = currentPage;
         const remainingToTarget = targetCount - tarjetasAcumuladas.length;
-        const currentPageText = wordPages[currentPage - 1] || '';
+        const currentVirtualPage = wordPages[currentPage - 1];
+        const currentPageText = currentVirtualPage?.text || '';
+        const currentPageImages = (currentVirtualPage?.images || []).slice(0, 3);
 
         console.log(
-          `[Bucle Acumulador Backend DOCX] Procesando Página Virtual ${currentPage} de ${finalPage}... (Acumuladas: ${tarjetasAcumuladas.length}/${targetCount}, Restan: ${remainingToTarget})`
+          `[Bucle Acumulador Backend DOCX] Procesando Página Virtual ${currentPage} de ${finalPage}... (Acumuladas: ${tarjetasAcumuladas.length}/${targetCount}, Restan: ${remainingToTarget}, Imágenes: ${currentPageImages.length})`
         );
 
         const exhaustiveQuotaMandate = isExhaustiveMode
           ? `\n\n🚨 DIRECTIVA DE COBERTURA Y CALIDAD (CUOTA RESTANTE: ${remainingToTarget} TARJETAS):
-- Si la sección contiene tablas o clasificaciones densas, extrae preguntas independientes de tantas filas y cruces como existan hasta cumplir la cuota requerida.
+- Si la sección contiene tablas, imágenes o clasificaciones densas, extrae preguntas independientes de tantas filas, cruces o diagramas como existan hasta cumplir la cuota requerida.
 - Si la sección es texto continuo (prosa/teoría), extrae con rigor quirúrgico cada dato fáctico, definición, mecanismo y excepción relevante.
 - IMPORTANTE: No dupliques preguntas con diferente redacción ni inventes preguntas sobre listas de palabras al margen para alcanzar un número artificial. Si has extraído todos los hechos sustanciales de esta página virtual, concluye tu respuesta; el motor secuencial del servidor continuará acumulando tarjetas en las siguientes páginas del documento hasta completar el objetivo.`
           : '';
 
         const currentPageSystemPrompt = `${singlePageSystemPrompt}${exhaustiveQuotaMandate}`;
 
+        const imageNotice = currentPageImages.length > 0
+          ? ` Se adjuntan ${currentPageImages.length} imagen(es) o diagrama(s) incrustados en esta sección del documento Word. Analízalos visualmente con precisión para extraer datos, esquemas, clasificaciones o conceptos presentes en ellos.`
+          : '';
+
         const pageUserPrompt = isExhaustiveMode
-          ? `Analiza el contenido de la Página Virtual ${currentPage} del documento Word adjunto aplicando la DIRECTIVA DE COBERTURA Y CALIDAD (cuota restante: ${remainingToTarget} tarjetas). ${pedagogicalMode === 'didactic' ? 'Aplica la DIRECTIVA DE MODO DOCENTE / DIDÁCTICO para crear ejercicios prácticos de evaluación sin metadatos de aula. ' : ''}Si hay tablas o datos estructurados, extrae preguntas independientes por cada dato relevante. Si es texto continuo, extrae hechos y definiciones sustanciales sin duplicar ni inventar preguntas sobre términos al margen, concluyendo cuando los datos sustanciales se agoten para que el servidor avance de página. Formato: "${cardFormat}".
+          ? `Analiza el contenido de la Página Virtual ${currentPage} del documento Word adjunto aplicando la DIRECTIVA DE COBERTURA Y CALIDAD (cuota restante: ${remainingToTarget} tarjetas). ${pedagogicalMode === 'didactic' ? 'Aplica la DIRECTIVA DE MODO DOCENTE / DIDÁCTICO para crear ejercicios prácticos de evaluación sin metadatos de aula. ' : ''}${imageNotice}Si hay tablas, diagramas o datos estructurados, extrae preguntas independientes por cada dato relevante. Si es texto continuo, extrae hechos y definiciones sustanciales sin duplicar ni inventar preguntas sobre términos al margen, concluyendo cuando los datos sustanciales se agoten para que el servidor avance de página. Formato: "${cardFormat}".
 
 --- TEXTO DE LA PÁGINA VIRTUAL ${currentPage} (${fileName || 'documento.docx'}) ---
 ${currentPageText}`
-          : `Analiza el contenido de la Página Virtual ${currentPage} del documento Word adjunto y extrae todos los conceptos clave, datos precisos, normativas o hechos únicos posibles en formato "${cardFormat}".${pedagogicalMode === 'didactic' ? ' Aplica el Modo Docente / Didáctico: preguntas prácticas de examen sin metadatos de aula.' : ''}
+          : `Analiza el contenido de la Página Virtual ${currentPage} del documento Word adjunto y extrae todos los conceptos clave, datos precisos, normativas o hechos únicos posibles en formato "${cardFormat}".${pedagogicalMode === 'didactic' ? ' Aplica el Modo Docente / Didáctico: preguntas prácticas de examen sin metadatos de aula.' : ''}${imageNotice}
 
 --- TEXTO DE LA PÁGINA VIRTUAL ${currentPage} (${fileName || 'documento.docx'}) ---
 ${currentPageText}`;
+
+        // Construir contenido multimodal para Gemini: imágenes + texto
+        const geminiContentParts: Array<
+          | { inlineData: { mimeType: string; data: string } }
+          | { text: string }
+        > = [];
+
+        for (const img of currentPageImages) {
+          if (img.dataBase64 && img.mimeType) {
+            geminiContentParts.push({
+              inlineData: {
+                mimeType: img.mimeType,
+                data: img.dataBase64,
+              },
+            });
+          }
+        }
+
+        geminiContentParts.push({
+          text: pageUserPrompt,
+        });
 
         let pageCandidateCards: GeneratedCard[] = [];
 
         try {
           const pageResponse = await ai.models.generateContent({
             model: GEMINI_MODEL,
-            contents: [
-              {
-                text: pageUserPrompt,
-              },
-            ],
+            contents: geminiContentParts,
             config: {
               systemInstruction: currentPageSystemPrompt,
               temperature: isExhaustiveMode ? 0.1 : 0.15,

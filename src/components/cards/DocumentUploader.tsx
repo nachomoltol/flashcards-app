@@ -2,8 +2,7 @@
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { PDFDocument } from 'pdf-lib';
-import mammoth from 'mammoth';
-import { segmentDocxIntoVirtualPages } from '@/lib/docxPagination';
+import { parseDocxIntoVirtualPages } from '@/lib/docxPagination';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore, useCardStore, useDeckStore, useProModalStore, useLanguageStore } from '@/stores';
 import { generateCardsFromDocumentAction } from '@/app/actions/generateCards';
@@ -284,24 +283,7 @@ export function DocumentUploader({
     if (isDocx) {
       try {
         const arrayBuffer = await file.arrayBuffer();
-        let rawText = '';
-        try {
-          const res = await mammoth.extractRawText({ arrayBuffer });
-          rawText = (res && res.value) || '';
-        } catch (mammothErr) {
-          console.warn('Aviso: mammoth client extraction fallback:', mammothErr);
-        }
-
-        if (!rawText || rawText.trim().length < 20) {
-          const decoder = new TextDecoder('utf-8', { fatal: false });
-          const rawString = decoder.decode(arrayBuffer);
-          rawText = rawString
-            .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, ' ')
-            .replace(/\s{2,}/g, ' ')
-            .trim();
-        }
-
-        const virtualPages = segmentDocxIntoVirtualPages(rawText);
+        const virtualPages = await parseDocxIntoVirtualPages(arrayBuffer);
         const docxPagesCount = Math.max(1, virtualPages.length);
         setDocxTotalPages(docxPagesCount);
       } catch (docxErr) {
