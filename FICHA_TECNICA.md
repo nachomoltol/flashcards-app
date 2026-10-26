@@ -37,8 +37,8 @@
            ▼                        ▼                         ▼
 ┌──────────────────────┐ ┌──────────────────────┐ ┌──────────────────────┐
 │  SUPABASE POSTGRES   │ │   GOOGLE GENAI API   │ │   STRIPE & RESEND    │
-│  - GoTrue Auth (JWT) │ │ - gemini-3.1-flash   │ │ - Checkout & Webhook │
-│  - 6 Tablas RLS      │ │ - JSON Schema        │ │ - Resend Emails      │
+│  - GoTrue Auth (JWT) │ │ - gemini-3.1-flash-  │ │ - Checkout & Webhook │
+│  - 6 Tablas RLS      │ │   lite (Económico)   │ │ - Resend Emails      │
 │  - 10 RPCs Security  │ │ - Grounding Estricto │ │ - Google AdMob       │
 │  - Storage Buckets   │ │ - Anti-Duplicados    │ │   Rewarded Ads       │
 └──────────────────────┘ └──────────────────────┘ └──────────────────────┘

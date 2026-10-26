@@ -4,7 +4,8 @@ import { use, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { Trash2, Edit3, X, Lightbulb, Camera, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { useDeckStore, useCardStore, useSettingsStore, useLanguageStore, type CardRow } from '@/stores';
+import { useDeckStore, useCardStore, useSettingsStore, useLanguageStore, useStreakStore, type CardRow } from '@/stores';
+import { toLocalDateString } from '@/lib/stats/streak';
 import {
   previewNextIntervals,
   type FSRSRating,
@@ -130,6 +131,22 @@ export default function StudyPage({ params }: StudyPageProps) {
   const isSessionFinished = isInitialized && (queue.length === 0 || currentIndex >= queue.length);
   const currentCard = !isSessionFinished && queue.length > 0 ? queue[currentIndex] : null;
 
+  // Racha diaria: se sincroniza al calificar la primera tarjeta (handleRate); aquí queda como
+  // respaldo al completar la cola si la sincronización inicial falló.
+  const streakInfo = useStreakStore((s) => s.streak);
+  const streakSyncedRef = useRef(false);
+  useEffect(() => {
+    if (!isSessionFinished || sessionReviews.length === 0 || streakSyncedRef.current) return;
+    streakSyncedRef.current = true;
+    const todayStr = toLocalDateString(new Date());
+    useStreakStore
+      .getState()
+      .syncDailyStudy(todayStr)
+      .then((res) => {
+        if (!res) streakSyncedRef.current = false;
+      });
+  }, [isSessionFinished, sessionReviews.length]);
+
   // Previsualización de los 4 intervalos FSRS calculados para la tarjeta activa
   const nextIntervals = useMemo(() => {
     if (!currentCard) return null;
@@ -176,6 +193,17 @@ export default function StudyPage({ params }: StudyPageProps) {
 
       // Registrar repaso persistente en Supabase (actualiza cards e inserta en reviews)
       const result = await recordReview(currentCard, rating);
+
+      // Racha diaria: contabilizar el día al calificar con éxito la primera tarjeta de la sesión
+      if (result && !streakSyncedRef.current) {
+        streakSyncedRef.current = true;
+        useStreakStore
+          .getState()
+          .syncDailyStudy(toLocalDateString(new Date()))
+          .then((res) => {
+            if (!res) streakSyncedRef.current = false;
+          });
+      }
 
       // Registrar en el resumen de la sesión
       setSessionReviews((prev) => [...prev, { rating, cardId: currentCard.id }]);
@@ -473,6 +501,36 @@ export default function StudyPage({ params }: StudyPageProps) {
             {t('study.zero_inbox_desc')}
           </p>
         </div>
+
+        {/* Celebración de racha diaria protegida */}
+        {streakInfo.studiedToday && streakInfo.current > 0 && (
+          <div
+            id="streak-secured-banner"
+            className="streak-celebrate mx-auto w-full max-w-md p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 dark:from-amber-950/40 dark:via-orange-950/30 dark:to-amber-950/40 border border-amber-300 dark:border-amber-500/40 flex items-center gap-3 sm:gap-4 text-left"
+          >
+            <span className="streak-flame-anim text-4xl sm:text-5xl select-none drop-shadow-[0_0_10px_rgba(245,158,11,0.7)]" aria-hidden="true">
+              🔥
+            </span>
+            <div className="min-w-0">
+              <p className="text-base sm:text-lg font-extrabold text-amber-700 dark:text-amber-300 leading-tight">
+                {t('study.streak_secured_title')}
+              </p>
+              <p className="text-sm font-bold text-neutral-900 dark:text-white">
+                {streakInfo.current === 1
+                  ? t('study.streak_secured_day')
+                  : t('study.streak_secured_days', { days: streakInfo.current })}
+                {streakInfo.max > streakInfo.current && (
+                  <span className="ml-2 text-[11px] font-mono font-medium text-neutral-500 dark:text-neutral-400">
+                    {t('study.streak_secured_record', { days: streakInfo.max })}
+                  </span>
+                )}
+              </p>
+              <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-0.5">
+                {t('study.streak_secured_desc')}
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Key Summary Metric Banner: Tarjetas repasadas hoy en este mazo */}
         <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-indigo-50/70 via-violet-50/50 to-emerald-50/70 dark:from-indigo-950/40 dark:via-violet-950/30 dark:to-emerald-950/40 border border-indigo-200 dark:border-indigo-500/30 shadow-lg text-left flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">

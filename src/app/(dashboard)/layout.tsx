@@ -4,7 +4,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useAuthStore, useProfileStore, useLanguageStore, useThemeStore } from '@/stores';
+import { useAuthStore, useProfileStore, useLanguageStore, useThemeStore, useStreakStore } from '@/stores';
 import { supabase } from '@/lib/supabase';
 import {
   User as UserIcon,
@@ -28,6 +28,7 @@ import { ProModal } from '@/components/subscription/ProModal';
 import { DeleteAccountModal } from '@/components/auth/DeleteAccountModal';
 import { FeedbackModal } from '@/components/feedback/FeedbackModal';
 import { LanguageSelector } from '@/components/ui/LanguageSelector';
+import { StreakBadge } from '@/components/ui/StreakBadge';
 import { NewMenuDropdown } from '@/components/ui/NewMenuDropdown';
 import { useProModalStore } from '@/stores/useProModalStore';
 import { useFeedbackModalStore } from '@/stores/useFeedbackModalStore';
@@ -104,6 +105,19 @@ export default function DashboardLayout({
       fetchProfile(user.id);
     }
   }, [user?.id, fetchProfile]);
+
+  // Sincronizar racha diaria (al autenticar y al volver a la app, p. ej. tras medianoche)
+  const fetchStreak = useStreakStore((s) => s.fetchStreak);
+  useEffect(() => {
+    if (!user?.id) return;
+    const userId = user.id;
+    fetchStreak(userId);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') fetchStreak(userId);
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [user?.id, fetchStreak]);
 
   // Si finalizó de verificar la autenticación y no hay sesión activa, redirigir a /login
   useEffect(() => {
@@ -199,21 +213,22 @@ export default function DashboardLayout({
     <div className={isStudyPage ? "h-[100dvh] md:min-h-screen bg-neutral-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 flex flex-col md:flex-row overflow-hidden transition-colors duration-150" : "min-h-screen bg-neutral-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 flex flex-col md:flex-row transition-colors duration-150"}>
       {/* Mobile Top Bar (Oculto en Modo Estudio para permitir pantalla completa real) */}
       {!isStudyPage && (
-        <header className="md:hidden flex items-center justify-between px-4 py-3 border-b border-neutral-200 dark:border-neutral-800 bg-white/90 dark:bg-neutral-900/80 backdrop-blur sticky top-0 z-40">
-          <Link href="/" className="flex items-center gap-2.5">
+        <header className="md:hidden flex items-center justify-between px-3 sm:px-4 py-2.5 sm:py-3 border-b border-neutral-200 dark:border-neutral-800 bg-white/90 dark:bg-neutral-900/80 backdrop-blur sticky top-0 z-40">
+          <Link href="/" className="flex items-center gap-2 sm:gap-2.5 shrink-0">
             <img
               src="/icons/android-chrome-192x192.png"
               alt="Flashmente"
-              className="w-10 h-10 rounded-lg object-contain shadow-sm"
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg object-contain shadow-sm shrink-0"
             />
-            <span className="font-semibold text-neutral-900 dark:text-white tracking-tight text-base">Flashmente</span>
+            <span className="font-semibold text-neutral-900 dark:text-white tracking-tight text-base hidden sm:inline-block">Flashmente</span>
           </Link>
 
-          <div className="flex items-center gap-2.5">
-            <LanguageSelector />
+          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+            <LanguageSelector className="shrink-0" />
+            <StreakBadge className="shrink-0" />
 
             {/* Mobile User Profile Avatar & Dropdown */}
-            <div className="relative" ref={mobileUserMenuRef}>
+            <div className="relative shrink-0" ref={mobileUserMenuRef}>
             <button
               onClick={() => {
                 setIsMobileUserMenuOpen((prev) => !prev);
@@ -395,7 +410,7 @@ export default function DashboardLayout({
               setIsMobileUserMenuOpen(false);
             }}
             aria-label="Toggle navigation menu"
-            className="p-2 rounded-lg text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800/60 transition cursor-pointer"
+            className="p-2 rounded-lg text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800/60 transition cursor-pointer shrink-0"
           >
             {mobileMenuOpen ? <XIcon className="w-6 h-6" /> : <MenuIcon className="w-6 h-6" />}
           </button>
@@ -834,6 +849,7 @@ export default function DashboardLayout({
           <header className="hidden md:flex items-center justify-end px-8 py-3.5 border-b border-neutral-200 dark:border-neutral-800 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-md sticky top-0 z-20">
             <div className="flex items-center gap-3">
               <LanguageSelector />
+              <StreakBadge />
             </div>
           </header>
         )}

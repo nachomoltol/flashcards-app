@@ -229,9 +229,12 @@ export type Database = {
         Row: {
           avatar_url: string | null
           created_at: string
+          current_streak: number
           enable_fuzz: boolean | null
           full_name: string | null
           id: string
+          last_study_date: string | null
+          longest_streak: number
           maximum_interval: number | null
           request_retention: number | null
           updated_at: string
@@ -240,9 +243,12 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           created_at?: string
+          current_streak?: number
           enable_fuzz?: boolean | null
           full_name?: string | null
           id: string
+          last_study_date?: string | null
+          longest_streak?: number
           maximum_interval?: number | null
           request_retention?: number | null
           updated_at?: string
@@ -251,9 +257,12 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           created_at?: string
+          current_streak?: number
           enable_fuzz?: boolean | null
           full_name?: string | null
           id?: string
+          last_study_date?: string | null
+          longest_streak?: number
           maximum_interval?: number | null
           request_retention?: number | null
           updated_at?: string
@@ -413,6 +422,16 @@ export type Database = {
           p_subscription_id?: string | null
         }
         Returns: void
+      }
+      record_daily_study: {
+        Args: {
+          p_study_date: string
+        }
+        Returns: {
+          current_streak: number
+          longest_streak: number
+          last_study_date: string | null
+        }
       }
       downgrade_user_by_stripe: {
         Args: {

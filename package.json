@@ -12,6 +12,7 @@
     "@capacitor/android": "^8.5.3",
     "@capacitor/cli": "^8.5.3",
     "@capacitor/core": "^8.5.3",
+    "@capacitor/local-notifications": "^8.3.1",
     "@google/genai": "^2.27.0",
     "@supabase/supabase-js": "^2.117.2",
     "lucide-react": "^1.53.0",

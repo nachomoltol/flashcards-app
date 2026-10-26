@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { useAuthStore } from '@/stores';
-import { calculateStreak } from '@/lib/stats/streak';
+import { useAuthStore, useStreakStore } from '@/stores';
 import type { Database } from '@/types/database';
 import { RefreshCw, ShieldCheck, Flame, CheckCircle2 } from 'lucide-react';
 
@@ -123,14 +122,8 @@ export default function StatsPage() {
     };
   }, [cards]);
 
-  // Cálculo de Racha Activa y Racha Máxima
-  const streak = useMemo(() => {
-    const timestamps = reviews.map((r) => r.created_at);
-    cards.forEach((c) => {
-      if (c.last_review) timestamps.push(c.last_review);
-    });
-    return calculateStreak(timestamps);
-  }, [reviews, cards]);
+  // Racha Activa y Máxima: misma fuente única que el header (profiles vía useStreakStore)
+  const streak = useStreakStore((s) => s.streak);
 
   // Tasa de Aciertos limpia (Good/Easy vs Again/Hard)
   const accuracyStats = useMemo(() => {
