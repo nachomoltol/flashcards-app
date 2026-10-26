@@ -10,3 +10,4 @@ export * from './useLanguageStore';
 export * from './useFeedbackModalStore';
 export * from './useThemeStore';
 export * from './useAtlasStore';
+export * from './useExamStore';

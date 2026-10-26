@@ -20,6 +20,7 @@ import {
   Check,
   Play,
   Map,
+  Award,
 } from 'lucide-react';
 
 const COLOR_PALETTE = [
@@ -178,15 +179,19 @@ function DecksViewContent() {
   // Menú contextual de opciones por tarjeta (⋮)
   const [activeDropdownDeckId, setActiveDropdownDeckId] = useState<string | null>(null);
 
-  // Cerrar menú contextual al hacer clic fuera
+  // Menú flotante de modo de estudio por tarjeta (Estudiar / Simulacro)
+  const [activeStudyMenuDeckId, setActiveStudyMenuDeckId] = useState<string | null>(null);
+
+  // Cerrar menús contextuales al hacer clic fuera
   useEffect(() => {
-    if (!activeDropdownDeckId) return;
+    if (!activeDropdownDeckId && !activeStudyMenuDeckId) return;
     const handleClose = () => {
       setActiveDropdownDeckId(null);
+      setActiveStudyMenuDeckId(null);
     };
     window.addEventListener('click', handleClose);
     return () => window.removeEventListener('click', handleClose);
-  }, [activeDropdownDeckId]);
+  }, [activeDropdownDeckId, activeStudyMenuDeckId]);
 
   // Sincronizar hacia atrás/adelante en el historial del navegador
   useEffect(() => {
@@ -874,11 +879,20 @@ function DecksViewContent() {
         ) : (
           /* Cuadrícula de Carpetas y Mazos */
           <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-4 md:gap-5">
-            {filteredDecks.map((deck) => {
+            {filteredDecks.map((deck, idx) => {
               const isFolder = Boolean(deck.is_folder || (deck as unknown as Record<string, unknown>).isFolder);
               const accentColor = deck.color || (isFolder ? '#f59e0b' : '#6366f1');
               const hasDue = deck.dueCount > 0;
               const hasCards = deck.cardsCount > 0;
+              const isMobileRight = idx % 2 === 1;
+              const isDesktopRight = (idx + 1) % 3 === 0;
+              const popoverPositionClass = isMobileRight
+                ? isDesktopRight
+                  ? 'right-0'
+                  : 'right-0 sm:left-0 sm:right-auto'
+                : isDesktopRight
+                ? 'left-0 lg:left-auto lg:right-0'
+                : 'left-0';
 
               // Renderizado para CARPETA
               if (isFolder) {
@@ -1165,19 +1179,93 @@ function DecksViewContent() {
 
                   {/* Pie del Mazo */}
                   <div className="mt-3 sm:mt-5 pt-2 sm:pt-3 border-t border-neutral-200 dark:border-neutral-800/80 flex items-center justify-between gap-1 sm:gap-2">
-                    <Link
-                      href={`/study/${deck.id}`}
-                      className={`inline-flex items-center justify-center gap-1 text-[11px] sm:text-xs font-semibold px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl transition-all duration-150 flex-1 min-w-0 ${
-                        !hasCards
-                          ? 'bg-neutral-100 dark:bg-neutral-800/50 text-neutral-400 dark:text-neutral-500 pointer-events-none'
-                          : hasDue
-                          ? 'bg-gradient-to-r from-rose-600 to-indigo-600 hover:from-rose-500 hover:to-indigo-500 text-white shadow-md shadow-rose-900/30 active:scale-95'
-                          : 'bg-indigo-50 dark:bg-indigo-600/20 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-600/30 border border-indigo-200 dark:border-indigo-500/30'
-                      }`}
-                    >
-                      <Play className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0 fill-current" />
-                      <span className="truncate">{t('dashboard.study_button', 'Estudiar')} {hasDue ? `(${deck.dueCount})` : ''}</span>
-                    </Link>
+                    <div className="relative flex-1 min-w-0">
+                      <button
+                        type="button"
+                        disabled={!hasCards}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setActiveDropdownDeckId(null);
+                          setActiveStudyMenuDeckId((prev) => (prev === deck.id ? null : deck.id));
+                        }}
+                        className={`w-full inline-flex items-center justify-center gap-1.5 text-[11px] sm:text-xs font-semibold px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl transition-all duration-150 cursor-pointer ${
+                          !hasCards
+                            ? 'bg-neutral-100 dark:bg-neutral-800/50 text-neutral-400 dark:text-neutral-500 pointer-events-none'
+                            : hasDue
+                            ? 'bg-gradient-to-r from-rose-600 to-indigo-600 hover:from-rose-500 hover:to-indigo-500 text-white shadow-md shadow-rose-900/30 active:scale-95'
+                            : 'bg-indigo-50 dark:bg-indigo-600/20 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-600/30 border border-indigo-200 dark:border-indigo-500/30'
+                        }`}
+                      >
+                        <Play className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0 fill-current" />
+                        <span className="truncate">{t('dashboard.study_button', 'Estudiar')} {hasDue ? `(${deck.dueCount})` : ''}</span>
+                        <ChevronDown className={`w-3 h-3 shrink-0 transition-transform duration-150 ${activeStudyMenuDeckId === deck.id ? 'rotate-180' : ''}`} />
+                      </button>
+
+                      {/* Popover Menú Flotante: Repaso Diario vs Simulacro */}
+                      {activeStudyMenuDeckId === deck.id && (
+                        <div
+                          className={`absolute bottom-full mb-2 w-64 sm:w-72 max-w-[calc(100vw-2rem)] rounded-2xl bg-white/95 dark:bg-neutral-900/95 backdrop-blur-xl border border-neutral-200 dark:border-neutral-800 shadow-2xl p-1.5 z-40 animate-in fade-in zoom-in-95 duration-150 space-y-1 text-left ${popoverPositionClass}`}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="px-2.5 py-1.5 border-b border-neutral-100 dark:border-neutral-800/80">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 font-mono">
+                              {t('dashboard.select_mode', 'Elige cómo estudiar')}
+                            </span>
+                          </div>
+
+                          {/* Opción A: Repaso Diario (FSRS) */}
+                          <Link
+                            href={`/study/${deck.id}`}
+                            onClick={() => setActiveStudyMenuDeckId(null)}
+                            className="w-full flex items-center gap-2.5 p-2 rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800/70 transition group text-left cursor-pointer"
+                          >
+                            <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-500/20 group-hover:scale-105 transition-transform">
+                              <Play className="w-4 h-4 fill-current" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center justify-between gap-1">
+                                <p className="text-xs font-bold text-neutral-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                                  {t('dashboard.fsrs_review_title', 'Repaso Diario (FSRS)')}
+                                </p>
+                                {hasDue && (
+                                  <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-rose-500/15 text-rose-600 dark:text-rose-400 shrink-0">
+                                    {deck.dueCount}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[10px] text-neutral-500 dark:text-neutral-400 leading-tight">
+                                {t('dashboard.fsrs_review_desc', 'Memorización con repetición espaciada')}
+                              </p>
+                            </div>
+                          </Link>
+
+                          {/* Opción B: Simulacro de Examen */}
+                          <Link
+                            href={`/exam/${deck.id}`}
+                            onClick={() => setActiveStudyMenuDeckId(null)}
+                            className="w-full flex items-center gap-2.5 p-2 rounded-xl hover:bg-purple-500/10 dark:hover:bg-purple-500/15 transition group text-left border border-transparent hover:border-purple-500/25 cursor-pointer"
+                          >
+                            <div className="w-8 h-8 rounded-lg bg-purple-500/15 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 border border-purple-500/30 group-hover:scale-105 transition-transform">
+                              <Award className="w-4 h-4" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center justify-between gap-1.5">
+                                <p className="text-xs font-bold text-purple-700 dark:text-purple-300 group-hover:text-purple-600 dark:group-hover:text-purple-200 transition-colors">
+                                  {t('dashboard.exam_mode_title', 'Simulacro de Examen')}
+                                </p>
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-purple-500/20 text-purple-700 dark:text-purple-300 shrink-0">
+                                  TEST
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-neutral-500 dark:text-neutral-400 leading-tight">
+                                {t('dashboard.exam_mode_desc', 'Test formal evaluativo con cronómetro')}
+                              </p>
+                            </div>
+                          </Link>
+                        </div>
+                      )}
+                    </div>
 
                     <Link
                       href={`/decks/${deck.id}`}

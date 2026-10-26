@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
-import { Search, X } from 'lucide-react';
+import { Search, X, Award } from 'lucide-react';
 import { useDeckStore, useCardStore, useProModalStore, useAuthStore, useLanguageStore } from '@/stores';
 import { CardEditor, DocumentUploader, FormattedCardView, UrlCardGenerator } from '@/components/cards';
 import { ShareDeckModal } from '@/components/decks';
@@ -280,6 +280,20 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <span>{t('deck_detail.study_deck')}{currentDeck && currentDeck.dueCount > 0 ? ` (${currentDeck.dueCount})` : ''}</span>
+            </Link>
+
+            {/* Botón: Simulacro de Examen */}
+            <Link
+              href={`/exam/${id}`}
+              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all duration-150 shadow-md ${
+                cards.length === 0
+                  ? 'bg-neutral-100 text-neutral-400 pointer-events-none border border-neutral-200 dark:bg-neutral-800/60 dark:text-neutral-500 dark:border-neutral-800'
+                  : 'bg-purple-600/10 hover:bg-purple-600/20 text-purple-700 dark:text-purple-300 border border-purple-500/30 hover:border-purple-500/50 active:scale-95'
+              }`}
+              title={t('deck_detail.exam_mode_tooltip', 'Modo simulacro a ciegas con temporizador')}
+            >
+              <Award className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+              <span>{t('deck_detail.exam_mode', 'Simulacro')}</span>
             </Link>
 
             {/* Botón: Compartir Mazo */}

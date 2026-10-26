@@ -207,12 +207,22 @@ export default function DashboardLayout({
 
   const userEmail = isMounted && user?.email ? user.email : '';
   const hasAvatar = Boolean(isMounted && profile.avatar_url && !avatarError);
-  const isStudyPage = pathname?.startsWith('/study');
+  const isStudyPage = Boolean(pathname?.startsWith('/study'));
+  const isExamPage = Boolean(pathname?.startsWith('/exam'));
+  const isFullscreen = isStudyPage || isExamPage;
 
   return (
-    <div className={isStudyPage ? "h-[100dvh] md:min-h-screen bg-neutral-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 flex flex-col md:flex-row overflow-hidden transition-colors duration-150" : "min-h-screen bg-neutral-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 flex flex-col md:flex-row transition-colors duration-150"}>
-      {/* Mobile Top Bar (Oculto en Modo Estudio para permitir pantalla completa real) */}
-      {!isStudyPage && (
+    <div
+      className={
+        isStudyPage
+          ? "h-[100dvh] md:min-h-screen bg-neutral-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 flex flex-col md:flex-row overflow-hidden transition-colors duration-150"
+          : isExamPage
+          ? "min-h-screen w-full bg-neutral-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 flex flex-col md:flex-row overflow-y-auto transition-colors duration-150"
+          : "min-h-screen bg-neutral-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 flex flex-col md:flex-row transition-colors duration-150"
+      }
+    >
+      {/* Mobile Top Bar (Oculto en Modo Estudio y Examen para permitir pantalla completa real) */}
+      {!isFullscreen && (
         <header className="md:hidden flex items-center justify-between px-3 sm:px-4 py-2.5 sm:py-3 border-b border-neutral-200 dark:border-neutral-800 bg-white/90 dark:bg-neutral-900/80 backdrop-blur sticky top-0 z-40">
           <Link href="/" className="flex items-center gap-2 sm:gap-2.5 shrink-0">
             <img
@@ -419,7 +429,7 @@ export default function DashboardLayout({
       )}
 
       {/* Mobile Menu Drawer */}
-      {!isStudyPage && mobileMenuOpen && (
+      {!isFullscreen && mobileMenuOpen && (
         <div className="md:hidden border-b border-neutral-200 dark:border-neutral-800 bg-white/95 dark:bg-neutral-900/95 backdrop-blur px-4 py-3 space-y-3 z-30">
           <div className="space-y-1">
             {navItems.map((item) => {
@@ -591,8 +601,8 @@ export default function DashboardLayout({
         </div>
       )}
 
-      {/* Desktop Sidebar (Oculto en Modo Estudio para inmersión total) */}
-      <aside className={isStudyPage ? "hidden" : "hidden md:flex flex-col w-64 border-r border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shrink-0 p-4 justify-between h-screen sticky top-0"}>
+      {/* Desktop Sidebar (Oculto en Modo Estudio y Examen para inmersión total) */}
+      <aside className={isFullscreen ? "hidden" : "hidden md:flex flex-col w-64 border-r border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shrink-0 p-4 justify-between h-screen sticky top-0"}>
         <div className="space-y-6">
           {/* Logo / Brand */}
           <Link href="/" className="flex items-center gap-3 px-2 py-2 group">
@@ -844,8 +854,16 @@ export default function DashboardLayout({
       </aside>
 
       {/* Main Content Area */}
-      <div className={isStudyPage ? "flex-1 flex flex-col min-w-0 h-[100dvh] overflow-hidden" : "flex-1 flex flex-col min-w-0"}>
-        {!isStudyPage && (
+      <div
+        className={
+          isStudyPage
+            ? "flex-1 flex flex-col min-w-0 h-[100dvh] overflow-hidden"
+            : isExamPage
+            ? "flex-1 flex flex-col min-w-0 min-h-screen w-full overflow-y-auto"
+            : "flex-1 flex flex-col min-w-0"
+        }
+      >
+        {!isFullscreen && (
           <header className="hidden md:flex items-center justify-end px-8 py-3.5 border-b border-neutral-200 dark:border-neutral-800 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-md sticky top-0 z-20">
             <div className="flex items-center gap-3">
               <LanguageSelector />
@@ -857,6 +875,8 @@ export default function DashboardLayout({
           className={
             isStudyPage
               ? "flex-1 w-full mx-auto h-full flex flex-col p-2 sm:p-4 max-w-4xl overflow-hidden"
+              : isExamPage
+              ? "flex-1 w-full mx-auto min-h-screen flex flex-col p-2 sm:p-4 max-w-5xl overflow-y-auto"
               : "flex-1 p-4 sm:p-8 md:p-10 max-w-6xl w-full mx-auto"
           }
         >
