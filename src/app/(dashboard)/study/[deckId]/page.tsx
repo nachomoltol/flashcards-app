@@ -10,8 +10,8 @@ import {
   previewNextIntervals,
   type FSRSRating,
 } from '@/lib/fsrs';
-import { FormattedCardView } from '@/components/cards';
-import { StudyRatingHelpModal } from '@/components/study';
+import { FormattedCardView, parseMultipleChoice } from '@/components/cards';
+import { StudyRatingHelpModal, SocraticTutorDrawer } from '@/components/study';
 
 interface StudyPageProps {
   params: Promise<{ deckId: string }>;
@@ -66,6 +66,10 @@ export default function StudyPage({ params }: StudyPageProps) {
 
   // Estado para el modal de ayuda contextual con la Regla de Oro FSRS
   const [isRatingHelpOpen, setIsRatingHelpOpen] = useState(false);
+
+  // Estados para el Tutor Socrático Post-Fallo
+  const [isTutorDrawerOpen, setIsTutorDrawerOpen] = useState(false);
+  const [selectedOptionForTutor, setSelectedOptionForTutor] = useState<string | undefined>(undefined);
 
   // Función unificada para revelar respuesta
   const handleReveal = useCallback(() => {
@@ -217,12 +221,27 @@ export default function StudyPage({ params }: StudyPageProps) {
         setQueue((prev) => [...prev, result.updatedCard]);
       }
 
-      // Avanzar a la siguiente tarjeta
+      // Si califica Again (1), mantener la tarjeta en pantalla y abrir el Tutor Socrático
+      if (rating === 1) {
+        setIsTutorDrawerOpen(true);
+        return;
+      }
+
+      // Avanzar a la siguiente tarjeta para calificaciones exitosas (2, 3 o 4)
       setIsAnswerRevealed(false);
+      setSelectedOptionForTutor(undefined);
       setCurrentIndex((prev) => prev + 1);
     },
     [currentCard, recordReview]
   );
+
+  // Avanzar a la siguiente tarjeta tras la interacción o decisión en el Tutor Socrático
+  const handleContinueAfterAgain = useCallback(() => {
+    setIsTutorDrawerOpen(false);
+    setSelectedOptionForTutor(undefined);
+    setIsAnswerRevealed(false);
+    setCurrentIndex((prev) => prev + 1);
+  }, []);
 
   // Borrar tarjeta de Supabase, extraerla de la cola de estudio y saltar a la siguiente tarjeta automáticamente
   const handleDeleteCurrentCard = async () => {
@@ -405,6 +424,15 @@ export default function StudyPage({ params }: StudyPageProps) {
         document.activeElement.blur();
       }
 
+      // Si el Tutor Socrático está desplegado, Espacio o Enter avanzan directamente a la siguiente tarjeta
+      if (isTutorDrawerOpen) {
+        if (e.code === 'Space' || e.key === ' ' || e.code === 'Enter') {
+          e.preventDefault();
+          handleContinueAfterAgain();
+        }
+        return;
+      }
+
       if (!isAnswerRevealed) {
         if (e.code === 'Space' || e.key === ' ' || e.code === 'Enter') {
           e.preventDefault();
@@ -429,7 +457,7 @@ export default function StudyPage({ params }: StudyPageProps) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isAnswerRevealed, handleRate, handleReveal, isEditModalOpen, isNoteModalOpen, isRatingHelpOpen]);
+  }, [isAnswerRevealed, handleRate, handleReveal, isEditModalOpen, isNoteModalOpen, isRatingHelpOpen, isTutorDrawerOpen, handleContinueAfterAgain]);
 
   // Estado de carga inicial
   if (isLoading && !isInitialized) {
@@ -600,6 +628,8 @@ export default function StudyPage({ params }: StudyPageProps) {
               setQueue(allCards);
               setCurrentIndex(0);
               setIsAnswerRevealed(false);
+              setIsTutorDrawerOpen(false);
+              setSelectedOptionForTutor(undefined);
               setSessionReviews([]);
             }}
             className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-800 border-neutral-300 dark:bg-neutral-800 dark:hover:bg-neutral-700 dark:text-white font-medium text-sm border dark:border-neutral-700 transition"
@@ -838,6 +868,7 @@ export default function StudyPage({ params }: StudyPageProps) {
               }
               isRevealed={isAnswerRevealed}
               interactive={true}
+              onOptionSelect={(opt) => setSelectedOptionForTutor(opt)}
             />
           </div>
         )}
@@ -867,6 +898,21 @@ export default function StudyPage({ params }: StudyPageProps) {
                 {t('study.space_key') || 'Espacio'}
               </kbd>
             </button>
+          ) : isTutorDrawerOpen ? (
+            /* Cajón Sutil del Tutor Socrático tras fallo con Again */
+            <SocraticTutorDrawer
+              isOpen={isTutorDrawerOpen}
+              deckTitle={currentDeck?.title || 'Estudio'}
+              question={currentCard?.front || ''}
+              options={
+                currentCard?.card_type === 'multiple_choice' || currentCard?.card_format === 'multiple_choice'
+                  ? parseMultipleChoice(currentCard.front).options.map((o) => `${o.key}) ${o.text}`)
+                  : undefined
+              }
+              correctAnswer={currentCard?.back || ''}
+              selectedAnswer={selectedOptionForTutor}
+              onContinue={handleContinueAfterAgain}
+            />
           ) : (
             /* FSRS 4 Rating Buttons */
             <div className="space-y-1.5 sm:space-y-2 animate-in fade-in duration-200">

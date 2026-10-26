@@ -14,6 +14,7 @@ export interface FormattedCardViewProps {
   cardFormat?: CardFormat | string;
   isRevealed?: boolean;
   interactive?: boolean; // Permite al usuario seleccionar opciones durante el estudio
+  onOptionSelect?: (option: string) => void;
   className?: string;
 }
 
@@ -248,6 +249,7 @@ export function FormattedCardView({
   cardFormat = 'basic',
   isRevealed = false,
   interactive = true,
+  onOptionSelect,
   className = '',
 }: FormattedCardViewProps) {
   const { t, language } = useLanguageStore();
@@ -406,6 +408,7 @@ export function FormattedCardView({
                   onClick={(e) => {
                     (e.currentTarget as HTMLElement)?.blur();
                     setSelectedOption(opt.key);
+                    onOptionSelect?.(opt.key);
                   }}
                   className={`${
                     isRevealed ? 'p-2 sm:p-2.5 min-h-[40px]' : 'p-2.5 sm:p-3.5 min-h-[40px] sm:min-h-[48px]'
@@ -442,6 +445,7 @@ export function FormattedCardView({
               onClick={(e) => {
                 (e.currentTarget as HTMLElement)?.blur();
                 setSelectedOption('true');
+                onOptionSelect?.('true');
               }}
               className={`flex-1 ${
                 isRevealed ? 'py-2.5 sm:py-3 min-h-[42px]' : 'py-3.5 px-4 min-h-[48px]'
@@ -465,6 +469,7 @@ export function FormattedCardView({
               onClick={(e) => {
                 (e.currentTarget as HTMLElement)?.blur();
                 setSelectedOption('false');
+                onOptionSelect?.('false');
               }}
               className={`flex-1 ${
                 isRevealed ? 'py-2.5 sm:py-3 min-h-[42px]' : 'py-3.5 px-4 min-h-[48px]'

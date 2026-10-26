@@ -750,6 +750,29 @@
     "easy_badge": "Acierto Inmediato",
     "easy_desc": "Acierto inmediato y sin dudar. Amplía el intervalo para espaciarla en el tiempo.",
     "got_it_btn": "Entendido, ¡a repasar!"
+  },
+  "socratic_tutor": {
+    "trigger_button": "🦉 ¿Por qué fallé? (Tutor Socrático)",
+    "trigger_short": "¿Por qué fallé?",
+    "trigger_suffix": "(Tutor Socrático)",
+    "continue_button": "Continuar a la siguiente tarjeta",
+    "continue_short": "Continuar",
+    "badge_pro": "PRO Ilimitado",
+    "badge_pro_short": "PRO",
+    "badge_free_count": "{count} gratis este mes",
+    "badge_free_singular": "1 gratis este mes",
+    "badge_ad_required": "Ver anuncio (+1)",
+    "loading_tutor": "El Tutor Socrático está analizando tu razonamiento...",
+    "title": "Explicación Socrática",
+    "subtitle": "Comprensión de raíz y trampa conceptual",
+    "watching_ad": "Cargando anuncio para desbloquear consulta...",
+    "ad_failed": "Debes completar el anuncio para consultar al tutor.",
+    "error_generic": "No se pudo consultar al tutor en este momento. Inténtalo de nuevo.",
+    "ask_followup_placeholder": "Pregunta una duda sobre esta explicación...",
+    "send_btn": "Preguntar",
+    "max_turn_reached": "Consulta socrática completada",
+    "followup_title": "Aclaración del Tutor",
+    "loading_followup": "Resolviendo tu duda..."
   }
 }
 

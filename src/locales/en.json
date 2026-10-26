@@ -751,6 +751,29 @@
     "easy_badge": "Immediate Recall",
     "easy_desc": "Instant recall without hesitation. Expands the interval to space it further in time.",
     "got_it_btn": "Got it, let's study!"
+  },
+  "socratic_tutor": {
+    "trigger_button": "🦉 Why did I miss this? (Socratic Tutor)",
+    "trigger_short": "Why did I miss this?",
+    "trigger_suffix": "(Socratic Tutor)",
+    "continue_button": "Continue to next card",
+    "continue_short": "Continue",
+    "badge_pro": "PRO Unlimited",
+    "badge_pro_short": "PRO",
+    "badge_free_count": "{count} free this month",
+    "badge_free_singular": "1 free this month",
+    "badge_ad_required": "Watch ad (+1)",
+    "loading_tutor": "Socratic Tutor is analyzing your reasoning...",
+    "title": "Socratic Explanation",
+    "subtitle": "Root understanding & conceptual distinction",
+    "watching_ad": "Loading ad to unlock consultation...",
+    "ad_failed": "You must complete the ad to consult the tutor.",
+    "error_generic": "Could not consult the tutor right now. Please try again.",
+    "ask_followup_placeholder": "Ask a doubt about this explanation...",
+    "send_btn": "Ask",
+    "max_turn_reached": "Socratic consultation complete",
+    "followup_title": "Tutor Clarification",
+    "loading_followup": "Clarifying your doubt..."
   }
 }
 

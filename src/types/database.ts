@@ -19,6 +19,8 @@ export type Database = {
           user_id: string
           generations_count: number
           last_generation_date: string | null
+          tutor_consultations_count?: number
+          last_tutor_date?: string | null
           tier: 'free' | 'pro' | 'vip'
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
@@ -31,6 +33,8 @@ export type Database = {
           user_id: string
           generations_count?: number
           last_generation_date?: string | null
+          tutor_consultations_count?: number
+          last_tutor_date?: string | null
           tier?: 'free' | 'pro' | 'vip'
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
@@ -43,6 +47,8 @@ export type Database = {
           user_id?: string
           generations_count?: number
           last_generation_date?: string | null
+          tutor_consultations_count?: number
+          last_tutor_date?: string | null
           tier?: 'free' | 'pro' | 'vip'
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
@@ -422,6 +428,18 @@ export type Database = {
           p_subscription_id?: string | null
         }
         Returns: void
+      }
+      record_tutor_consultation: {
+        Args: {
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      get_tutor_quota_status: {
+        Args: {
+          p_user_id: string
+        }
+        Returns: Json
       }
       record_daily_study: {
         Args: {
