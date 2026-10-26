@@ -2,7 +2,7 @@
 
 import { use, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
-import { Trash2, Edit3, X, Lightbulb, Camera, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { Trash2, Edit3, X, Lightbulb, Camera, Image as ImageIcon, Loader2, HelpCircle, BookOpen } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useDeckStore, useCardStore, useSettingsStore, useLanguageStore, useStreakStore, type CardRow } from '@/stores';
 import { toLocalDateString } from '@/lib/stats/streak';
@@ -11,6 +11,7 @@ import {
   type FSRSRating,
 } from '@/lib/fsrs';
 import { FormattedCardView } from '@/components/cards';
+import { StudyRatingHelpModal } from '@/components/study';
 
 interface StudyPageProps {
   params: Promise<{ deckId: string }>;
@@ -62,6 +63,9 @@ export default function StudyPage({ params }: StudyPageProps) {
   const [isUploadingNoteImage, setIsUploadingNoteImage] = useState(false);
   const noteImageInputRef = useRef<HTMLInputElement>(null);
   const cardScrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Estado para el modal de ayuda contextual con la Regla de Oro FSRS
+  const [isRatingHelpOpen, setIsRatingHelpOpen] = useState(false);
 
   // Función unificada para revelar respuesta
   const handleReveal = useCallback(() => {
@@ -387,7 +391,7 @@ export default function StudyPage({ params }: StudyPageProps) {
   // Atajos de teclado: Espacio/Enter para revelar, 1-4 para calificar
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (isEditModalOpen || isNoteModalOpen) return;
+      if (isEditModalOpen || isNoteModalOpen || isRatingHelpOpen) return;
 
       if (
         e.target instanceof HTMLElement &&
@@ -425,7 +429,7 @@ export default function StudyPage({ params }: StudyPageProps) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isAnswerRevealed, handleRate, handleReveal, isEditModalOpen, isNoteModalOpen]);
+  }, [isAnswerRevealed, handleRate, handleReveal, isEditModalOpen, isNoteModalOpen, isRatingHelpOpen]);
 
   // Estado de carga inicial
   if (isLoading && !isInitialized) {
@@ -658,8 +662,8 @@ export default function StudyPage({ params }: StudyPageProps) {
             </span>
           </Link>
 
-          {/* Counter of Remaining Cards */}
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          {/* Counter of Remaining Cards & Contextual Help Button */}
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
             <div className="flex items-center gap-1 text-[11px] sm:text-xs">
               <span className="text-neutral-500 dark:text-neutral-400 hidden sm:inline">{t('study.progress_label')}</span>
               <span className="font-semibold text-neutral-900 dark:text-white">
@@ -670,6 +674,17 @@ export default function StudyPage({ params }: StudyPageProps) {
             <span className="text-[10px] sm:text-xs px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full font-semibold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
               {remainingCount} {remainingCount === 1 ? t('study.remaining_singular') : t('study.remaining_plural')}
             </span>
+
+            {/* Botón con icono de ayuda ? en la cabecera superior */}
+            <button
+              type="button"
+              onClick={() => setIsRatingHelpOpen(true)}
+              className="p-1 sm:p-1.5 rounded-lg text-neutral-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition active:scale-95 cursor-pointer flex items-center justify-center border border-transparent hover:border-neutral-200 dark:hover:border-neutral-700"
+              title={t('study_help.open_button', 'Regla de Oro de Calificación FSRS')}
+              aria-label={t('study_help.open_button', 'Regla de Oro de Calificación FSRS')}
+            >
+              <HelpCircle className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+            </button>
           </div>
         </div>
 
@@ -937,8 +952,17 @@ export default function StudyPage({ params }: StudyPageProps) {
                 </button>
               </div>
 
-              <div className="hidden sm:block text-center text-[11px] text-neutral-500 pt-1">
-                {t('study.rating_keys_hint')}
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-2 pt-1.5">
+                <span className="hidden sm:inline text-[11px] text-neutral-500">{t('study.rating_keys_hint')}</span>
+                <span className="hidden sm:inline text-neutral-300 dark:text-neutral-700">•</span>
+                <button
+                  type="button"
+                  onClick={() => setIsRatingHelpOpen(true)}
+                  className="bg-neutral-100 hover:bg-neutral-200 text-neutral-800 hover:text-neutral-900 border border-neutral-300 dark:bg-neutral-800/80 dark:hover:bg-neutral-700 dark:border-neutral-700 dark:text-neutral-200 dark:hover:text-white px-3.5 py-1.5 rounded-full text-xs font-medium transition-all shadow-sm flex items-center gap-1.5 cursor-pointer active:scale-95"
+                >
+                  <BookOpen className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
+                  <span>{t('study_help.guide_pill_btn', '📖 Guía: Aprende a puntuar')}</span>
+                </button>
               </div>
             </div>
           )}
@@ -1202,6 +1226,12 @@ export default function StudyPage({ params }: StudyPageProps) {
           </div>
         </div>
       )}
+
+      {/* Modal de Ayuda Contextual con la Regla de Oro de FSRS */}
+      <StudyRatingHelpModal
+        isOpen={isRatingHelpOpen}
+        onClose={() => setIsRatingHelpOpen(false)}
+      />
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   CheckCircle2,
   XCircle,
@@ -15,8 +16,15 @@ import {
   AlertTriangle,
   Check,
   X,
+  Zap,
 } from 'lucide-react';
-import { useLanguageStore, useExamStore, type CardRow, evaluateObjectiveAnswer } from '@/stores';
+import {
+  useLanguageStore,
+  useExamStore,
+  usePanicStore,
+  type CardRow,
+  evaluateObjectiveAnswer,
+} from '@/stores';
 import { formatSeconds } from '@/hooks/useExamTimer';
 
 interface ExamResultsViewProps {
@@ -26,6 +34,7 @@ interface ExamResultsViewProps {
 }
 
 export function ExamResultsView({ deckId, deckTitle, onRetry }: ExamResultsViewProps) {
+  const router = useRouter();
   const { t } = useLanguageStore();
   const {
     cards,
@@ -38,6 +47,29 @@ export function ExamResultsView({ deckId, deckTitle, onRetry }: ExamResultsViewP
   } = useExamStore();
 
   const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
+
+  // Identificar tarjetas falladas en el simulacro para acción rápida en Modo Pánico
+  const failedCards = cards.filter((card) => {
+    const format =
+      card.cardFormat ||
+      card.card_format ||
+      (card.card_type === 'cloze' ? 'cloze' : 'basic');
+    const isObjective = format === 'multiple_choice' || format === 'true_false';
+    const userAnswer = (answers[card.id] || '').trim();
+
+    if (isObjective) {
+      return evaluateObjectiveAnswer(card, userAnswer) === 'incorrect';
+    } else {
+      return selfEvaluations[card.id] === 'incorrect' || (!selfEvaluations[card.id] && userAnswer !== '');
+    }
+  });
+
+  const failedCardIds = failedCards.map((c) => c.id);
+
+  const handleLaunchPanicWithErrors = () => {
+    usePanicStore.getState().initPanicSession(cards, 'exam_errors', deckId, failedCardIds);
+    router.push(`/panic/${deckId}?mode=exam_errors`);
+  };
 
   // 1. Identificar si hay tarjetas abiertas o de huecos que requieran auto-evaluación
   const openCardsPendingReview = cards.filter((card) => {
@@ -289,6 +321,19 @@ export function ExamResultsView({ deckId, deckTitle, onRetry }: ExamResultsViewP
 
       {/* Acciones Rápidas */}
       <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+        {failedCardIds.length > 0 && (
+          <button
+            type="button"
+            onClick={handleLaunchPanicWithErrors}
+            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-white font-bold text-sm transition shadow-lg shadow-amber-500/25 flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+          >
+            <Zap className="w-4 h-4 fill-current" />
+            <span>
+              {t('exam.drill_errors_panic_btn', 'Machacar fallos en Modo Pánico ⚡')} ({failedCardIds.length})
+            </span>
+          </button>
+        )}
+
         <button
           type="button"
           onClick={onRetry}

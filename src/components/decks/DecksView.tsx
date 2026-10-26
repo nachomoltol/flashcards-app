@@ -21,6 +21,7 @@ import {
   Play,
   Map,
   Award,
+  Zap,
 } from 'lucide-react';
 
 const COLOR_PALETTE = [
@@ -1260,6 +1261,30 @@ function DecksViewContent() {
                               </div>
                               <p className="text-[10px] text-neutral-500 dark:text-neutral-400 leading-tight">
                                 {t('dashboard.exam_mode_desc', 'Test formal evaluativo con cronómetro')}
+                              </p>
+                            </div>
+                          </Link>
+
+                          {/* Opción C: Repaso de Emergencia (Modo Pánico ⚡) */}
+                          <Link
+                            href={`/panic/${deck.id}`}
+                            onClick={() => setActiveStudyMenuDeckId(null)}
+                            className="w-full flex items-center gap-2.5 p-2 rounded-xl hover:bg-amber-500/10 dark:hover:bg-amber-500/15 transition group text-left border border-transparent hover:border-amber-500/25 cursor-pointer"
+                          >
+                            <div className="w-8 h-8 rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/30 group-hover:scale-105 transition-transform">
+                              <Zap className="w-4 h-4 fill-current" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center justify-between gap-1.5">
+                                <p className="text-xs font-bold text-amber-700 dark:text-amber-300 group-hover:text-amber-600 dark:group-hover:text-amber-200 transition-colors">
+                                  {t('dashboard.panic_mode_title', 'Modo Pánico ⚡')}
+                                </p>
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-amber-500/20 text-amber-700 dark:text-amber-300 shrink-0">
+                                  SOS
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-neutral-500 dark:text-neutral-400 leading-tight">
+                                {t('dashboard.panic_mode_desc', 'Repaso intensivo de puntos débiles')}
                               </p>
                             </div>
                           </Link>

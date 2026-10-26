@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
-import { Search, X, Award } from 'lucide-react';
+import { Search, X, Award, Zap } from 'lucide-react';
 import { useDeckStore, useCardStore, useProModalStore, useAuthStore, useLanguageStore } from '@/stores';
 import { CardEditor, DocumentUploader, FormattedCardView, UrlCardGenerator } from '@/components/cards';
 import { ShareDeckModal } from '@/components/decks';
@@ -294,6 +294,20 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
             >
               <Award className="w-4 h-4 text-purple-600 dark:text-purple-400" />
               <span>{t('deck_detail.exam_mode', 'Simulacro')}</span>
+            </Link>
+
+            {/* Botón: Modo Pánico ⚡ */}
+            <Link
+              href={`/panic/${id}`}
+              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all duration-150 shadow-md ${
+                cards.length === 0
+                  ? 'bg-neutral-100 text-neutral-400 pointer-events-none border border-neutral-200 dark:bg-neutral-800/60 dark:text-neutral-500 dark:border-neutral-800'
+                  : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30 hover:border-amber-500/50 active:scale-95'
+              }`}
+              title={t('deck_detail.panic_mode_tooltip', 'Repaso intensivo de emergencia sin alterar FSRS')}
+            >
+              <Zap className="w-4 h-4 text-amber-500 fill-current" />
+              <span>{t('deck_detail.panic_mode', 'Pánico ⚡')}</span>
             </Link>
 
             {/* Botón: Compartir Mazo */}
