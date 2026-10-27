@@ -2,10 +2,10 @@
 
 import { use, useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
-import { Search, X, Award, Zap } from 'lucide-react';
+import { Search, X, Award, Zap, FileText, HelpCircle, Plus, Sparkles, Share2 } from 'lucide-react';
 import { useDeckStore, useCardStore, useProModalStore, useAuthStore, useLanguageStore } from '@/stores';
 import { CardEditor, DocumentUploader, FormattedCardView, UrlCardGenerator } from '@/components/cards';
-import { ShareDeckModal } from '@/components/decks';
+import { ShareDeckModal, QuickStudyGuideModal, StudyModesHelpModal } from '@/components/decks';
 import { generateCardsAction } from '@/app/actions/generateCards';
 import { showAdMobRewardedAd } from '@/lib/admob';
 import { claimAdRewardAction } from '@/app/actions/claimAdReward';
@@ -43,6 +43,10 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
 
   // Estado para el modal de Compartir Mazo
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+
+  // Estados para la Guía de Repaso Rápido y Ayuda de Modos
+  const [isQuickGuideOpen, setIsQuickGuideOpen] = useState(false);
+  const [isModesHelpOpen, setIsModesHelpOpen] = useState(false);
 
   // Estado para el acordeón del Editor Manual de Tarjetas (cerrado por defecto para evitar saturar la pantalla)
   const [isManualEditorOpen, setIsManualEditorOpen] = useState(false);
@@ -215,29 +219,38 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
           {t('deck_detail.back_to_dashboard')}
         </Link>
 
-        {/* Deck Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-neutral-200 dark:border-neutral-800/80">
-          <div>
-            <div className="flex items-center gap-2.5 mb-1.5">
-              <span
-                className="w-3 h-3 rounded-full shadow-md"
-                style={{ backgroundColor: currentDeck?.color || '#6366f1' }}
-              />
-              <span className="text-xs px-2.5 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 font-mono">
-                ID: {id.slice(0, 8)}...
+        {/* Cabecera del Mazo: Información Básica */}
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2.5">
+            <span
+              className="w-3.5 h-3.5 rounded-full shadow-md shrink-0"
+              style={{ backgroundColor: currentDeck?.color || '#6366f1' }}
+            />
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 font-mono">
+              ID: {id.slice(0, 8)}...
+            </span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-neutral-900 dark:text-white">
+            {deckLoading && !currentDeck ? t('deck_detail.loading_deck') : currentDeck?.title || t('deck_detail.untitled_deck')}
+          </h1>
+          <p className="text-sm text-neutral-600 dark:text-neutral-400">
+            {currentDeck?.description || t('deck_detail.cards_registered', { count: cards.length })}
+          </p>
+        </div>
+
+        {/* ESTRUCTURA DE 2 COLUMNAS (Grid 2 bloques clara y limpia) */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5 sm:gap-4 pt-1 pb-6 border-b border-neutral-200 dark:border-neutral-800/80">
+          {/* COLUMNA IZQUIERDA: Creación y Gestión */}
+          <div className="flex flex-col justify-between gap-2.5 p-3.5 sm:p-4 rounded-2xl bg-neutral-50/90 dark:bg-neutral-900/50 border border-neutral-200/90 dark:border-neutral-800/90 shadow-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+                {t('deck_detail.section_creation', 'Creación y Gestión')}
               </span>
             </div>
-            <h1 className="text-xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-neutral-900 dark:text-white">
-              {deckLoading && !currentDeck ? t('deck_detail.loading_deck') : currentDeck?.title || t('deck_detail.untitled_deck')}
-            </h1>
-            <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1">
-              {currentDeck?.description || t('deck_detail.cards_registered', { count: cards.length })}
-            </p>
-          </div>
 
-          <div className="flex items-center gap-3 flex-wrap">
-            {/* Botón: Generar con IA Multimodal */}
+            {/* Botón Principal Destacado: Generar preguntas con IA (Ancho completo) */}
             <button
+              type="button"
               onClick={() => {
                 setAiError(null);
                 setAiSuccessMessage(null);
@@ -245,83 +258,189 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                 setAiMode('multimodal');
                 setIsAiModalOpen(true);
               }}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm text-white bg-gradient-to-r from-violet-600 via-indigo-600 to-indigo-700 hover:from-violet-500 hover:to-indigo-600 shadow-lg shadow-violet-600/25 transition-all duration-150 active:scale-95 border border-violet-400/20"
+              className="w-full py-2.5 sm:py-3 px-4 rounded-xl font-bold text-xs sm:text-sm text-white bg-gradient-to-r from-violet-600 via-indigo-600 to-indigo-700 hover:from-violet-500 hover:to-indigo-600 shadow-md shadow-violet-600/20 transition-all duration-150 active:scale-[0.99] border border-violet-400/20 cursor-pointer flex items-center justify-center gap-2"
             >
-              <svg className="w-4 h-4 text-violet-200 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M13 10V3L4 14h7v7l9-11h-7z"
-                />
-              </svg>
-              <span>{t('deck_detail.generate_ai')}</span>
-              <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-white/15 text-white font-mono tracking-tight">
-                {t('deck_detail.multimodal_badge')}
+              <Sparkles className="w-4 h-4 text-violet-200 animate-pulse shrink-0" />
+              <span>{t('deck_detail.generate_ai', 'Generar preguntas con IA')}</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded bg-white/20 text-white font-mono tracking-tight shrink-0 hidden sm:inline">
+                {t('deck_detail.multimodal_badge', 'Multimodal')}
               </span>
             </button>
 
-            {/* Botón: Estudiar Mazo */}
+            {/* Debajo: [ ✏️ Añadir tarjeta manualmente ] y [ 🔗 Compartir ] */}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setIsManualEditorOpen(!isManualEditorOpen)}
+                className={`w-full py-2.5 px-3 rounded-xl font-semibold text-xs sm:text-sm border transition-all duration-150 active:scale-[0.99] cursor-pointer flex items-center justify-center gap-1.5 min-w-0 ${
+                  isManualEditorOpen
+                    ? 'bg-neutral-800 text-white border-neutral-700 shadow-sm'
+                    : 'bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-neutral-800 dark:text-neutral-200 border-neutral-300 dark:border-neutral-700/80 shadow-sm'
+                }`}
+              >
+                <Plus className="w-4 h-4 text-indigo-500 shrink-0" />
+                <span className="truncate">
+                  {isManualEditorOpen
+                    ? t('deck_detail.hide_editor', 'Cerrar editor')
+                    : t('deck_detail.add_manual_btn', 'Añadir tarjeta')}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsShareModalOpen(true)}
+                className="w-full py-2.5 px-3 rounded-xl font-semibold text-xs sm:text-sm text-neutral-800 dark:text-neutral-200 hover:text-black dark:hover:text-white bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 border border-neutral-300 dark:border-neutral-700/80 shadow-sm transition-all duration-150 active:scale-[0.99] cursor-pointer flex items-center justify-center gap-1.5 min-w-0"
+              >
+                <Share2 className="w-4 h-4 text-indigo-500 dark:text-indigo-400 shrink-0" />
+                <span className="truncate">{t('deck_detail.share', 'Compartir')}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* COLUMNA DERECHA: Núcleo de Estudio y Modos */}
+          <div className="flex flex-col justify-between gap-2.5 p-3.5 sm:p-4 rounded-2xl bg-indigo-50/40 dark:bg-indigo-950/20 border border-indigo-200/60 dark:border-indigo-900/40 shadow-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                {t('deck_detail.section_study', 'Núcleo de Estudio')}
+              </span>
+            </div>
+
+            {/* Botón Principal: Estudiar Mazo (X) (Ancho completo) */}
             <Link
               href={`/study/${id}`}
-              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all duration-150 shadow-lg ${
+              className={`w-full py-2.5 sm:py-3 px-4 rounded-xl font-bold text-xs sm:text-sm transition-all duration-150 shadow-lg flex items-center justify-center gap-2 active:scale-[0.99] ${
                 cards.length === 0
-                  ? 'bg-neutral-100 text-neutral-400 pointer-events-none border border-neutral-200 dark:bg-neutral-800/60 dark:text-neutral-500 dark:border-neutral-800'
-                  : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/25 active:scale-95'
+                  ? 'bg-neutral-200 text-neutral-400 pointer-events-none border border-neutral-300 dark:bg-neutral-800/60 dark:text-neutral-500 dark:border-neutral-800'
+                  : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30 ring-1 ring-indigo-400/40'
               }`}
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
-                />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <svg className="w-4 h-4 fill-current shrink-0" viewBox="0 0 24 24">
+                <path d="M8 5v14l11-7z" />
               </svg>
-              <span>{t('deck_detail.study_deck')}{currentDeck && currentDeck.dueCount > 0 ? ` (${currentDeck.dueCount})` : ''}</span>
+              <span>{t('deck_detail.study_deck', 'Estudiar Mazo')}</span>
+              {currentDeck && currentDeck.dueCount > 0 && (
+                <span className="px-2 py-0.5 rounded-full bg-white/20 text-white text-xs font-mono font-bold shrink-0">
+                  {currentDeck.dueCount}
+                </span>
+              )}
             </Link>
 
-            {/* Botón: Simulacro de Examen */}
-            <Link
-              href={`/exam/${id}`}
-              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all duration-150 shadow-md ${
-                cards.length === 0
-                  ? 'bg-neutral-100 text-neutral-400 pointer-events-none border border-neutral-200 dark:bg-neutral-800/60 dark:text-neutral-500 dark:border-neutral-800'
-                  : 'bg-purple-600/10 hover:bg-purple-600/20 text-purple-700 dark:text-purple-300 border border-purple-500/30 hover:border-purple-500/50 active:scale-95'
-              }`}
-              title={t('deck_detail.exam_mode_tooltip', 'Modo simulacro a ciegas con temporizador')}
-            >
-              <Award className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-              <span>{t('deck_detail.exam_mode', 'Simulacro')}</span>
-            </Link>
+            {/* Fila Inferior: Botonera de 4 Modos Secundarios en grid-cols-4 compacta */}
+            <div className="grid grid-cols-4 gap-1.5 bg-neutral-100 dark:bg-neutral-900/90 p-1 rounded-xl border border-neutral-200 dark:border-neutral-800/90 shadow-inner">
+              {/* 1. Guía Rápida */}
+              <div className="relative group w-full min-w-0">
+                <button
+                  type="button"
+                  onClick={() => setIsQuickGuideOpen(true)}
+                  disabled={cards.length === 0}
+                  className="w-full py-2 px-1 sm:px-1.5 rounded-lg font-bold transition flex items-center justify-center gap-1 cursor-pointer active:scale-95 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/15 border border-transparent hover:border-emerald-500/30 disabled:opacity-40 disabled:cursor-not-allowed min-w-0"
+                >
+                  <FileText className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                  <span className="text-[11px] sm:text-xs whitespace-nowrap">
+                    {t('quick_guide.button_short', 'Guía')}
+                  </span>
+                  <span className="text-[9px] px-1 py-0.2 rounded bg-amber-500/20 text-amber-500 dark:text-amber-300 font-mono shrink-0 hidden sm:inline">
+                    👑
+                  </span>
+                </button>
+                {/* Tooltip PC */}
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden md:group-hover:block z-50 pointer-events-none transition-all duration-150 animate-in fade-in zoom-in-95">
+                  <div className="px-3 py-1.5 rounded-xl bg-neutral-950/95 text-neutral-200 border border-neutral-800 text-[11px] font-medium shadow-2xl whitespace-nowrap backdrop-blur-md">
+                    {t('quick_guide.tooltip', 'Guía de síntesis estructurada y cheat sheet del mazo')}
+                  </div>
+                </div>
+              </div>
 
-            {/* Botón: Modo Pánico ⚡ */}
-            <Link
-              href={`/panic/${id}`}
-              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all duration-150 shadow-md ${
-                cards.length === 0
-                  ? 'bg-neutral-100 text-neutral-400 pointer-events-none border border-neutral-200 dark:bg-neutral-800/60 dark:text-neutral-500 dark:border-neutral-800'
-                  : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30 hover:border-amber-500/50 active:scale-95'
-              }`}
-              title={t('deck_detail.panic_mode_tooltip', 'Repaso intensivo de emergencia sin alterar FSRS')}
-            >
-              <Zap className="w-4 h-4 text-amber-500 fill-current" />
-              <span>{t('deck_detail.panic_mode', 'Pánico ⚡')}</span>
-            </Link>
+              {/* 2. Pánico */}
+              <div className="relative group w-full min-w-0">
+                <Link
+                  href={`/panic/${id}`}
+                  className={`w-full py-2 px-1 sm:px-1.5 rounded-lg font-bold transition flex items-center justify-center gap-1 active:scale-95 min-w-0 ${
+                    cards.length === 0
+                      ? 'pointer-events-none opacity-40 text-neutral-400'
+                      : 'text-amber-700 dark:text-amber-300 hover:bg-amber-500/15 border border-transparent hover:border-amber-500/30'
+                  }`}
+                >
+                  <Zap className="w-3.5 h-3.5 text-amber-500 fill-current shrink-0" />
+                  <span className="text-[11px] sm:text-xs whitespace-nowrap">
+                    {t('deck_detail.panic_short', 'Pánico')}
+                  </span>
+                </Link>
+                {/* Tooltip PC */}
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden md:group-hover:block z-50 pointer-events-none transition-all duration-150 animate-in fade-in zoom-in-95">
+                  <div className="px-3 py-1.5 rounded-xl bg-neutral-950/95 text-neutral-200 border border-neutral-800 text-[11px] font-medium shadow-2xl whitespace-nowrap backdrop-blur-md">
+                    {t('deck_detail.panic_mode_tooltip', 'Repaso intensivo de emergencia sin alterar FSRS')}
+                  </div>
+                </div>
+              </div>
 
-            {/* Botón: Compartir Mazo */}
-            <button
-              onClick={() => setIsShareModalOpen(true)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm text-neutral-700 hover:text-neutral-950 dark:text-neutral-300 dark:hover:text-white bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 border border-neutral-300 dark:border-neutral-700/80 shadow-sm transition-all duration-150 active:scale-95"
-            >
-              <svg className="w-4 h-4 text-indigo-500 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-              </svg>
-              <span>{t('deck_detail.share')}</span>
-            </button>
+              {/* 3. Simulacro */}
+              <div className="relative group w-full min-w-0">
+                <Link
+                  href={`/exam/${id}`}
+                  className={`w-full py-2 px-1 sm:px-1.5 rounded-lg font-bold transition flex items-center justify-center gap-1 active:scale-95 min-w-0 ${
+                    cards.length === 0
+                      ? 'pointer-events-none opacity-40 text-neutral-400'
+                      : 'text-purple-700 dark:text-purple-300 hover:bg-purple-500/15 border border-transparent hover:border-purple-500/30'
+                  }`}
+                >
+                  <Award className="w-3.5 h-3.5 text-purple-500 shrink-0" />
+                  <span className="text-[11px] sm:text-xs whitespace-nowrap">
+                    {t('deck_detail.exam_short', 'Simulacro')}
+                  </span>
+                </Link>
+                {/* Tooltip PC */}
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden md:group-hover:block z-50 pointer-events-none transition-all duration-150 animate-in fade-in zoom-in-95">
+                  <div className="px-3 py-1.5 rounded-xl bg-neutral-950/95 text-neutral-200 border border-neutral-800 text-[11px] font-medium shadow-2xl whitespace-nowrap backdrop-blur-md">
+                    {t('deck_detail.exam_mode_tooltip', 'Modo simulacro a ciegas con temporizador')}
+                  </div>
+                </div>
+              </div>
+
+              {/* 4. Ayuda Contextual (?) */}
+              <div className="relative group w-full min-w-0">
+                <button
+                  type="button"
+                  onClick={() => setIsModesHelpOpen(true)}
+                  className="w-full py-2 px-1 sm:px-1.5 rounded-lg font-bold text-neutral-500 hover:text-white hover:bg-neutral-800/80 transition cursor-pointer active:scale-95 flex items-center justify-center gap-1 border border-transparent hover:border-neutral-700/80 min-w-0"
+                  aria-label={t('study_modes_help.button_title', '¿Cómo funcionan los modos de estudio?')}
+                >
+                  <HelpCircle className="w-3.5 h-3.5 text-neutral-400 group-hover:text-amber-400 transition-colors shrink-0" />
+                  <span className="text-[11px] sm:text-xs font-mono">?</span>
+                </button>
+                {/* Tooltip PC */}
+                <div className="absolute bottom-full right-0 mb-2 hidden md:group-hover:block z-50 pointer-events-none transition-all duration-150 animate-in fade-in zoom-in-95">
+                  <div className="px-3 py-1.5 rounded-xl bg-neutral-950/95 text-neutral-200 border border-neutral-800 text-[11px] font-medium shadow-2xl whitespace-nowrap backdrop-blur-md">
+                    {t('study_modes_help.button_title', '¿Cómo funcionan los modos de estudio?')}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
+
+        {/* Editor Manual Desplegado (Cero redundancias: se abre con el botón de la cabecera) */}
+        {isManualEditorOpen && (
+          <div className="p-4 sm:p-6 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/60 shadow-lg animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between pb-3.5 mb-4 border-b border-neutral-200 dark:border-neutral-800">
+              <div className="flex items-center gap-2.5">
+                <span className="text-xl">✏️</span>
+                <h3 className="font-bold text-sm sm:text-base text-neutral-900 dark:text-white">
+                  {t('deck_detail.add_manual_title', 'Añadir tarjeta manualmente')}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsManualEditorOpen(false)}
+                className="p-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-800 transition cursor-pointer"
+                title={t('deck_detail.hide_editor', 'Cerrar editor')}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <CardEditor deckId={id} onCardCreated={handleCardCreated} />
+          </div>
+        )}
       </div>
 
       {error && (
@@ -330,52 +449,9 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
         </div>
       )}
 
-      {/* Contenido Principal: Editor Manual Plegable y Lista de Tarjetas */}
+      {/* Contenido Principal: Lista de Tarjetas */}
       <div className="space-y-6">
-        {/* Separador 1: Añadir tarjeta manualmente (Acordeón desplegable, cerrado por defecto) */}
-        <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/40 overflow-hidden transition-all duration-200 shadow-sm">
-          <button
-            type="button"
-            onClick={() => setIsManualEditorOpen(!isManualEditorOpen)}
-            className="w-full p-4 sm:p-5 flex items-center justify-between text-left hover:bg-neutral-50 dark:hover:bg-neutral-800/40 transition group cursor-pointer"
-          >
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-9 h-9 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-base shrink-0 group-hover:scale-105 transition-transform">
-                ✏️
-              </div>
-              <div className="min-w-0">
-                <h2 className="text-sm sm:text-base font-bold text-neutral-900 dark:text-white tracking-tight flex items-center gap-2">
-                  <span className="truncate">{t('deck_detail.add_manual_title', 'Añadir tarjeta manualmente')}</span>
-                  <span className="text-[10px] sm:text-[11px] font-normal px-2 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 font-mono shrink-0">
-                    {isManualEditorOpen ? t('common.open', 'Abierto') : t('common.collapsed', 'Plegado')}
-                  </span>
-                </h2>
-                <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5 truncate hidden sm:block">
-                  {t('deck_detail.add_manual_desc', 'Crea preguntas personalizadas (Básica, Test, Cloze o V/F)')}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 text-xs font-semibold text-neutral-500 group-hover:text-neutral-900 dark:text-neutral-400 dark:group-hover:text-white transition shrink-0 ml-2">
-              <span className="hidden sm:inline">
-                {isManualEditorOpen ? t('deck_detail.hide_editor', 'Ocultar editor manual') : t('deck_detail.show_editor', 'Mostrar editor manual')}
-              </span>
-              <div className={`w-8 h-8 rounded-lg bg-neutral-100 dark:bg-neutral-800/80 border border-neutral-200 dark:border-neutral-700/60 flex items-center justify-center transition-transform duration-200 ${isManualEditorOpen ? 'rotate-180' : ''}`}>
-                <svg className="w-4 h-4 text-neutral-600 dark:text-neutral-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
-            </div>
-          </button>
-
-          {isManualEditorOpen && (
-            <div className="p-4 sm:p-6 border-t border-neutral-200 dark:border-neutral-800/80 bg-neutral-50/50 dark:bg-neutral-950/40 animate-in fade-in duration-200">
-              <CardEditor deckId={id} onCardCreated={handleCardCreated} />
-            </div>
-          )}
-        </div>
-
-        {/* Separador 2: Tarjetas en este mazo */}
+        {/* Tarjetas en este mazo */}
         <div className="space-y-4 pt-1">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-neutral-200 dark:border-neutral-800/80">
             <h2 className="text-base sm:text-lg font-bold text-neutral-900 dark:text-white tracking-tight flex items-center gap-2.5">
@@ -869,6 +945,20 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
         isOpen={isShareModalOpen}
         onClose={() => setIsShareModalOpen(false)}
         deck={currentDeck}
+      />
+
+      {/* Modal: Guía de Repaso Rápido (Cheat Sheet de Síntesis) */}
+      <QuickStudyGuideModal
+        isOpen={isQuickGuideOpen}
+        onClose={() => setIsQuickGuideOpen(false)}
+        deckId={id}
+        deckTitle={currentDeck?.title || 'Mazo'}
+      />
+
+      {/* Modal: Ayuda Contextual de Modos de Estudio */}
+      <StudyModesHelpModal
+        isOpen={isModesHelpOpen}
+        onClose={() => setIsModesHelpOpen(false)}
       />
     </div>
   );

@@ -83,7 +83,7 @@ export function StudyRatingHelpModal({ isOpen, onClose }: StudyRatingHelpModalPr
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" />
                 <span className="font-bold text-xs sm:text-sm text-rose-700 dark:text-rose-300">
-                  {t('study_help.again_title', '1. De nuevo / Again')}
+                  {t('study_help.again_title', '1. Fallé')}
                 </span>
               </div>
               <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/30">

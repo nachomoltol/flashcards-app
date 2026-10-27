@@ -54,6 +54,36 @@ async function resolveAuthUserId(explicitUserId?: string): Promise<string | null
 }
 
 /**
+ * Resuelve la clave de la API de Gemini desde variables de entorno o lee directamente
+ * de .env.local en caso de que el entorno de desarrollo no la haya cargado en caliente.
+ */
+function resolveGeminiApiKey(): string | null {
+  const envKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENAI_API_KEY;
+  if (envKey && envKey.trim()) {
+    return envKey.trim();
+  }
+
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const envPath = path.resolve(process.cwd(), '.env.local');
+    if (fs.existsSync(envPath)) {
+      const content = fs.readFileSync(envPath, 'utf8');
+      const match = content.match(/^(?:GEMINI_API_KEY|GOOGLE_GENAI_API_KEY)\s*=\s*(.*)$/m);
+      if (match && match[1]) {
+        const val = match[1].trim().replace(/^["']|["']$/g, '');
+        if (val) return val;
+      }
+    }
+  } catch (err) {
+    console.warn('[socraticTutor] Advertencia al leer .env.local de respaldo:', err);
+  }
+
+  return null;
+}
+
+
+/**
  * Consulta la cuota actual del Tutor Socrático para el usuario
  */
 export async function getTutorQuotaStatusAction(explicitUserId?: string): Promise<TutorQuotaStatus> {
@@ -236,9 +266,9 @@ export async function askSocraticTutorAction(input: SocraticTutorInput): Promise
   }
 
   // 2. Invocar Gemini 3.1 Flash-Lite con prompt socrático y límites de coste
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = resolveGeminiApiKey();
   if (!apiKey) {
-    console.error('GEMINI_API_KEY no está configurada.');
+    console.error('[socraticTutor] GEMINI_API_KEY no está configurada.');
     return {
       success: false,
       error: 'SERVER_CONFIG_ERROR',

@@ -135,7 +135,7 @@ const slides: SlideData[] = [
       <div className="w-full bg-neutral-50 dark:bg-neutral-950/70 border border-neutral-200 dark:border-neutral-800/80 rounded-2xl p-4 sm:p-5 space-y-3">
         <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
           <div className="p-2 sm:p-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-center">
-            <span className="block text-[11px] font-bold text-red-600 dark:text-red-400">1. Again</span>
+            <span className="block text-[11px] font-bold text-red-600 dark:text-red-400">1. Fallé</span>
             <span className="text-[9px] text-neutral-500 dark:text-neutral-400">Repetir</span>
           </div>
           <div className="p-2 sm:p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-center">

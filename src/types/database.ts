@@ -151,6 +151,7 @@ export type Database = {
           is_public: boolean
           parent_id: string | null
           share_id: string | null
+          summary_guide?: Json | null
           title: string
           updated_at: string
           user_id: string
@@ -165,6 +166,7 @@ export type Database = {
           is_public?: boolean
           parent_id?: string | null
           share_id?: string | null
+          summary_guide?: Json | null
           title: string
           updated_at?: string
           user_id?: string
@@ -179,6 +181,7 @@ export type Database = {
           is_public?: boolean
           parent_id?: string | null
           share_id?: string | null
+          summary_guide?: Json | null
           title?: string
           updated_at?: string
           user_id?: string

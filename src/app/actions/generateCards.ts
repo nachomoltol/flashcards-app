@@ -1027,7 +1027,7 @@ export async function generateCardsAction(
     return { success: false, error: 'Por favor introduce un tema para generar tarjetas.' };
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENAI_API_KEY;
   if (!apiKey) {
     return {
       success: false,
@@ -1392,7 +1392,7 @@ export async function generateCardsFromDocumentAction(
     return { success: false, error: 'Ruta de archivo de Supabase Storage no proporcionada.' };
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENAI_API_KEY;
   if (!apiKey) {
     return {
       success: false,
@@ -2359,7 +2359,7 @@ export async function generateCardsFromUrlAction(
     };
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENAI_API_KEY;
   if (!apiKey) {
     return {
       success: false,
