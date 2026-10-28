@@ -54,33 +54,16 @@ async function resolveAuthUserId(explicitUserId?: string): Promise<string | null
 }
 
 /**
- * Resuelve la clave de la API de Gemini desde variables de entorno o lee directamente
- * de .env.local en caso de que el entorno de desarrollo no la haya cargado en caliente.
+ * Resuelve la clave de la API de Gemini desde variables de entorno
  */
 function resolveGeminiApiKey(): string | null {
   const envKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENAI_API_KEY;
   if (envKey && envKey.trim()) {
     return envKey.trim();
   }
-
-  try {
-    const fs = require('fs');
-    const path = require('path');
-    const envPath = path.resolve(process.cwd(), '.env.local');
-    if (fs.existsSync(envPath)) {
-      const content = fs.readFileSync(envPath, 'utf8');
-      const match = content.match(/^(?:GEMINI_API_KEY|GOOGLE_GENAI_API_KEY)\s*=\s*(.*)$/m);
-      if (match && match[1]) {
-        const val = match[1].trim().replace(/^["']|["']$/g, '');
-        if (val) return val;
-      }
-    }
-  } catch (err) {
-    console.warn('[socraticTutor] Advertencia al leer .env.local de respaldo:', err);
-  }
-
   return null;
 }
+
 
 
 /**

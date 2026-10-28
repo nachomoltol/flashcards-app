@@ -3,7 +3,7 @@
 import { GoogleGenAI, Type } from '@google/genai';
 import { createClient } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
-import type { Database } from '@/types/database';
+import type { Database, Json } from '@/types/database';
 
 export interface KeyConceptItem {
   title: string;
@@ -66,31 +66,13 @@ function getServerSupabaseClient() {
 }
 
 /**
- * Resuelve la clave de la API de Gemini desde variables de entorno o lee directamente
- * de .env.local en caso de que el entorno de desarrollo no la haya cargado en caliente.
+ * Resuelve la clave de la API de Gemini desde variables de entorno
  */
 function resolveGeminiApiKey(): string | null {
   const envKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENAI_API_KEY;
   if (envKey && envKey.trim()) {
     return envKey.trim();
   }
-
-  try {
-    const fs = require('fs');
-    const path = require('path');
-    const envPath = path.resolve(process.cwd(), '.env.local');
-    if (fs.existsSync(envPath)) {
-      const content = fs.readFileSync(envPath, 'utf8');
-      const match = content.match(/^(?:GEMINI_API_KEY|GOOGLE_GENAI_API_KEY)\s*=\s*(.*)$/m);
-      if (match && match[1]) {
-        const val = match[1].trim().replace(/^["']|["']$/g, '');
-        if (val) return val;
-      }
-    }
-  } catch (err) {
-    console.warn('[generateDeckSummary] Advertencia al leer .env.local de respaldo:', err);
-  }
-
   return null;
 }
 
@@ -359,7 +341,7 @@ Sintetiza este mazo en una guía de repaso rápido estructurada siguiendo el esq
     const { error: updateErr } = await db
       .from('decks')
       .update({
-        summary_guide: completeGuide as any,
+        summary_guide: completeGuide as unknown as Json,
         updated_at: new Date().toISOString(),
       })
       .eq('id', cleanDeckId);
