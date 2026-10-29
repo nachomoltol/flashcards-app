@@ -1,7 +1,7 @@
 'use client';
 /* eslint-disable @next/next/no-img-element */
 
-import { use, useEffect, useState } from 'react';
+import { use, useEffect, useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -42,6 +42,7 @@ export default function SharedDeckPage({ params }: SharedDeckPageProps) {
   const [isImporting, setIsImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const autoImportTriggeredRef = useRef(false);
 
   useEffect(() => {
     initAuth();
@@ -80,16 +81,38 @@ export default function SharedDeckPage({ params }: SharedDeckPageProps) {
     fetchSharedDeck();
   }, [shareId]);
 
-  const handleImport = async () => {
+  const handleImport = useCallback(async () => {
     if (!deck) return;
+
+    if (!user?.id) {
+      if (typeof window !== 'undefined') {
+        try {
+          sessionStorage.setItem('pending_import_share_id', shareId);
+        } catch {
+          // Ignorar si sessionStorage no está disponible
+        }
+      }
+      router.push('/login?next=' + encodeURIComponent('/shared/' + shareId + '?autoImport=1'));
+      return;
+    }
+
     setIsImporting(true);
     setImportError(null);
 
     try {
-      const targetUserId = user?.id;
+      const targetUserId = user.id;
       const result = await importSharedDeck(shareId, targetUserId);
 
       if (!result.success || !result.newDeckId) {
+        if (result.error === 'AUTH_REQUIRED') {
+          if (typeof window !== 'undefined') {
+            try {
+              sessionStorage.setItem('pending_import_share_id', shareId);
+            } catch {}
+          }
+          router.push('/login?next=' + encodeURIComponent('/shared/' + shareId + '?autoImport=1'));
+          return;
+        }
         setImportError(result.error || 'No se pudo importar el mazo. Inténtalo de nuevo.');
         setIsImporting(false);
         return;
@@ -102,7 +125,31 @@ export default function SharedDeckPage({ params }: SharedDeckPageProps) {
       setImportError(msg);
       setIsImporting(false);
     }
-  };
+  }, [deck, user?.id, shareId, router]);
+
+  // Auto-importación al regresar autenticado tras login/signup
+  useEffect(() => {
+    if (!deck || !user?.id || isImporting || autoImportTriggeredRef.current) return;
+    if (typeof window === 'undefined') return;
+
+    const searchParams = new URLSearchParams(window.location.search);
+    const hasAutoImportParam = searchParams.get('autoImport') === '1';
+    let hasPendingStorage = false;
+
+    try {
+      hasPendingStorage = sessionStorage.getItem('pending_import_share_id') === shareId;
+    } catch {
+      // Ignorar errores de sessionStorage
+    }
+
+    if (hasAutoImportParam || hasPendingStorage) {
+      autoImportTriggeredRef.current = true;
+      try {
+        sessionStorage.removeItem('pending_import_share_id');
+      } catch {}
+      handleImport();
+    }
+  }, [deck, user?.id, isImporting, shareId, handleImport]);
 
   if (isLoading) {
     return (
@@ -259,7 +306,12 @@ export default function SharedDeckPage({ params }: SharedDeckPageProps) {
                 </>
               )}
             </button>
-            <p className="text-[11px] text-neutral-500 mt-2.5">
+            {!user && (
+              <p className="text-xs font-medium text-indigo-300 mt-2.5">
+                Inicia sesión o crea tu cuenta gratis para guardarlo en tu colección
+              </p>
+            )}
+            <p className="text-[11px] text-neutral-500 mt-2">
               Al importar, se creará una copia completa en tu colección. Tus repasos comenzarán desde cero.
             </p>
           </div>

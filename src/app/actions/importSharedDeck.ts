@@ -36,14 +36,11 @@ export async function importSharedDeck(
       userId = user?.id;
     }
 
-    // Fallback seguro en entorno de desarrollo local si no se transmitieron cookies SSR
     if (!userId) {
-      const { data: defaultUserDeck } = await supabase
-        .from('decks')
-        .select('user_id')
-        .ilike('title', '%Krause%')
-        .limit(1);
-      userId = defaultUserDeck?.[0]?.user_id || '6324eade-0c36-482a-99b1-fa6161374208';
+      return {
+        success: false,
+        error: 'AUTH_REQUIRED',
+      };
     }
 
     // 2. Ejecutar clonación atómica con tarjetas vírgenes mediante la función RPC segura de Supabase

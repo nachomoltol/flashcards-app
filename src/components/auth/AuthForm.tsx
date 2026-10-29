@@ -58,12 +58,22 @@ export function AuthForm({ initialMode = 'signin' }: AuthFormProps) {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+  const getNextUrl = () => {
+    if (typeof window === 'undefined') return '/';
+    const searchParams = new URLSearchParams(window.location.search);
+    const rawNext = searchParams.get('next') || searchParams.get('redirect') || '/';
+    return rawNext.startsWith('/') ? rawNext : `/${rawNext}`;
+  };
+
   // Redirigir si ya existe una sesión activa
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) {
         useAuthStore.getState().setSession(data.session);
-        router.push('/');
+        const searchParams = new URLSearchParams(window.location.search);
+        const rawNext = searchParams.get('next') || searchParams.get('redirect') || '/';
+        const nextUrl = rawNext.startsWith('/') ? rawNext : `/${rawNext}`;
+        router.push(nextUrl);
       }
     });
   }, [router]);
@@ -153,15 +163,20 @@ export function AuthForm({ initialMode = 'signin' }: AuthFormProps) {
             console.warn('Error inicializando mazo demo:', seedErr);
           }
           useAuthStore.getState().setSession(data.session);
-          router.push('/');
+          router.push(getNextUrl());
         } else {
           setLoading(false);
         }
       } else {
-        const redirectUrl =
+        const nextUrl = getNextUrl();
+        const baseCallbackUrl =
           typeof window !== 'undefined'
             ? `${window.location.origin}/auth/callback`
             : 'https://flashmente.com/auth/callback';
+        const redirectUrl =
+          nextUrl && nextUrl !== '/'
+            ? `${baseCallbackUrl}?next=${encodeURIComponent(nextUrl)}`
+            : baseCallbackUrl;
 
         const { data, error: signUpError } = await supabase.auth.signUp({
           email: cleanEmail,
@@ -184,7 +199,7 @@ export function AuthForm({ initialMode = 'signin' }: AuthFormProps) {
             console.warn('Error inicializando mazo demo:', seedErr);
           }
           useAuthStore.getState().setSession(data.session);
-          router.push('/');
+          router.push(nextUrl);
         } else {
           setSuccessMessage(
             '¡Cuenta creada con éxito! Si requiere verificación, revisa tu bandeja de entrada para confirmar el correo.'
@@ -225,7 +240,7 @@ export function AuthForm({ initialMode = 'signin' }: AuthFormProps) {
           console.warn('Error inicializando mazo demo:', seedErr);
         }
         useAuthStore.getState().setSession(data.session);
-        router.push('/');
+        router.push(getNextUrl());
       } else {
         setDemoLoading(false);
       }
