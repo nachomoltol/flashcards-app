@@ -22,6 +22,15 @@ interface CardState {
     cardType?: string,
     cardFormat?: CardFormat
   ) => Promise<CardRow | null>;
+  createCardsBatch: (
+    deckId: string,
+    cardsToCreate: Array<{
+      front: string;
+      back: string;
+      cardType?: string;
+      cardFormat?: CardFormat;
+    }>
+  ) => Promise<CardRow[]>;
   deleteCard: (cardId: string) => Promise<boolean>;
   updateCard: (
     cardId: string,
@@ -111,6 +120,53 @@ export const useCardStore = create<CardState>((set) => ({
       console.error('Error creating card:', err);
       set({ error: message, isLoading: false });
       return null;
+    }
+  },
+
+  createCardsBatch: async (deckId, cardsToCreate) => {
+    if (!cardsToCreate || cardsToCreate.length === 0) return [];
+    set({ isLoading: true, error: null });
+    try {
+      const initialFSRS = createInitialCardValues();
+      const rows = cardsToCreate.map((card) => {
+        const resolvedFormat: CardFormat =
+          card.cardFormat || (card.cardType === 'cloze' ? 'cloze' : 'basic');
+        return {
+          deck_id: deckId,
+          front: card.front.trim(),
+          back: card.back.trim(),
+          card_type: card.cardType || 'basic',
+          card_format: resolvedFormat,
+          cardFormat: resolvedFormat,
+          due: initialFSRS.due,
+          stability: initialFSRS.stability,
+          difficulty: initialFSRS.difficulty,
+          state: initialFSRS.state,
+          reps: initialFSRS.reps,
+          lapses: initialFSRS.lapses,
+          last_review: null,
+        };
+      });
+
+      const { data, error } = await supabase
+        .from('cards')
+        .insert(rows)
+        .select();
+
+      if (error) throw error;
+
+      const insertedCards = (data || []) as CardRow[];
+      set((state) => ({
+        cards: [...insertedCards, ...state.cards],
+        isLoading: false,
+      }));
+
+      return insertedCards;
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Error al crear las tarjetas en lote';
+      console.error('Error creating cards batch:', err);
+      set({ error: message, isLoading: false });
+      return [];
     }
   },
 

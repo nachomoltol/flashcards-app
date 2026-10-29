@@ -28,37 +28,76 @@ const STOP_WORDS = new Set([
 
 /**
  * Normaliza una cadena de texto para comparación léxica y semántica:
+ * - Elimina explicaciones extensas ("Explicación: ...") para no diluir la comparación
  * - Elimina acentos/diacríticos
  * - Pasa a minúsculas
- * - Elimina opciones múltiples (a), b), c), d) del front
+ * - Elimina opciones múltiples (a), b), c), d) del front o prefijos de opción del back
  * - Elimina fórmulas interrogativas iniciales (¿cuál es, define, qué es...)
  * - Elimina signos de puntuación
  */
 export function normalizeCardText(rawText: string): string {
   if (!rawText) return '';
 
-  // 1. Tomar únicamente la pregunta (antes de cualquier salto de línea de opciones tipo test)
-  let text = rawText.split(/\r?\n\s*[a-dA-D][\)\.\:\-]/)[0].trim();
+  // 0. Cortar cualquier bloque de "Explicación:" / "Explanation:" / "Justificación:" para aislar el núcleo evaluativo
+  let text = rawText
+    .split(/\r?\n+\s*(?:explicaci[oó]n|explanation|justificaci[oó]n)\s*:/i)[0]
+    .split(/\b(?:explicaci[oó]n|explanation|justificaci[oó]n)\s*:/i)[0]
+    .trim();
 
-  // 2. Normalizar diacríticos (á -> a, é -> e...) y minúsculas
+  // 1. Tomar únicamente la pregunta o respuesta principal (antes de cualquier salto de línea de opciones tipo test)
+  text = text.split(/\r?\n\s*[a-dA-D][\)\.\:\-]/)[0].trim();
+
+  // 2. Eliminar prefijos de opción al inicio (ej. "a) ", "d) ") y negritas markdown
+  text = text.replace(/^[a-dA-D][\)\.\:\-]\s*/i, '').replace(/\*\*/g, '').trim();
+
+  // 3. Normalizar diacríticos (á -> a, é -> e...) y minúsculas
   text = text
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '');
 
-  // 3. Eliminar signos de puntuación iniciales y finales
-  text = text.replace(/^[¿\?¡!\s\d\.\)\-]+/, '').replace(/[\?¡!\s]+$/, '').trim();
+  // 4. Eliminar signos de puntuación iniciales y finales
+  text = text.replace(/^[¿\?¡!\s\d\.\)\-]+/, '').replace(/[\?¡!\s\.]+$/, '').trim();
 
-  // 4. Limpiar fórmulas interrogativas comunes en español e inglés
+  // 5. Limpiar fórmulas interrogativas comunes en español e inglés
   text = text.replace(
     /^(cual\s+es|cuales\s+son|que\s+es|en\s+que\s+consiste|defina|define|indique|indica|senale|senala|describa|describe|explique|explica|mencione|menciona|diga|diga\s+que|what\s+is|which\s+is|describe|define)\s+(el|la|los|las|un|una|unos|unas)?\s*/i,
     ''
   ).trim();
 
-  // 5. Eliminar corchetes de cloze [...]
+  // 6. Eliminar corchetes de cloze [...]
   text = text.replace(/\[\.\.\.\]/g, '').replace(/\s+/g, ' ').trim();
 
   return text;
+}
+
+/**
+ * Extrae exclusivamente el núcleo de la respuesta correcta en `back`, descartando por completo
+ * el bloque de 'Explicación: ...' y los prefijos de letra ('a)', 'b)', etc.).
+ * Para tarjetas Cloze donde el término oculto se resalta en **negrita**, prioriza dicho término junto con la línea base.
+ */
+export function extractCoreAnswerText(rawBack?: string): string {
+  if (!rawBack) return '';
+
+  const withoutExplanation = rawBack
+    .split(/\r?\n+\s*(?:explicaci[oó]n|explanation|justificaci[oó]n)\s*:/i)[0]
+    .split(/\b(?:explicaci[oó]n|explanation|justificaci[oó]n)\s*:/i)[0]
+    .trim();
+
+  const firstLine = withoutExplanation.split(/\r?\n/)[0].trim();
+
+  // Si contiene término resaltado en negrita (ej. Cloze "**fotosíntesis**" o True/False "**Verdadero**"), extraerlo
+  const boldMatches = Array.from(firstLine.matchAll(/\*\*([^*]+)\*\*/g)).map((m) => m[1].trim());
+  if (boldMatches.length > 0) {
+    const boldCore = boldMatches.join(' ');
+    const normalizedBold = normalizeCardText(boldCore);
+    // Si el término en negrita no es solo "verdadero"/"falso", es el concepto clave exacto
+    if (normalizedBold && normalizedBold !== 'verdadero' && normalizedBold !== 'falso' && normalizedBold !== 'true' && normalizedBold !== 'false') {
+      return normalizedBold;
+    }
+  }
+
+  return normalizeCardText(firstLine);
 }
 
 /**
@@ -69,6 +108,31 @@ export function extractContentTokens(normalizedText: string): string[] {
     .split(/[\s,.;:()_/\-–—"']/)
     .map((w) => w.trim())
     .filter((w) => w.length >= 3 && !STOP_WORDS.has(w));
+}
+
+/**
+ * Determina si dos enunciados (`front`) evalúan variables o sujetos sustancialmente distintos
+ * dentro de una misma estructura de pregunta (ej. despiece de tablas/esquemas: 'hierro' vs. 'calcio',
+ * 'amilasa' vs. 'lipasa', 'vitamina A' vs. 'vitamina D').
+ * Devuelve true cuando cada enunciado posee al menos un término sustancial propio que no aparece en el otro.
+ */
+export function hasDistinctEvaluatedSubject(frontA: string, frontB: string): boolean {
+  const tokensA = new Set(extractContentTokens(normalizeCardText(frontA)));
+  const tokensB = new Set(extractContentTokens(normalizeCardText(frontB)));
+
+  if (tokensA.size === 0 || tokensB.size === 0) return false;
+
+  const uniqueToA: string[] = [];
+  const uniqueToB: string[] = [];
+
+  for (const t of tokensA) {
+    if (!tokensB.has(t)) uniqueToA.push(t);
+  }
+  for (const t of tokensB) {
+    if (!tokensA.has(t)) uniqueToB.push(t);
+  }
+
+  return uniqueToA.length >= 1 && uniqueToB.length >= 1;
 }
 
 /**
@@ -202,25 +266,39 @@ export async function deduplicateCandidateCards(params: {
   const intraBatchUnique: GeneratedCard[] = [];
   for (const card of candidateCards) {
     let isIntraDuplicate = false;
+    const candidateCoreAns = extractCoreAnswerText(card.back);
+
     for (const accepted of intraBatchUnique) {
       const { jaccard, containment } = calculateLexicalSimilarity(card.front, accepted.front);
-      const answerLex = calculateLexicalSimilarity(card.back, accepted.back);
+      const acceptedCoreAns = extractCoreAnswerText(accepted.back);
+      const answerLex = calculateLexicalSimilarity(candidateCoreAns, acceptedCoreAns);
+      const distinctSubject = hasDistinctEvaluatedSubject(card.front, accepted.front);
+
+      // En modo exhaustivo, si el enunciado evalúa un sujeto/variable distinta (ej. 'hierro' vs. 'calcio',
+      // 'amilasa' vs. 'lipasa'), permitimos que compartan respuesta nuclear o plantilla de pregunta.
+      // Solo se marca como clon si TANTO el concepto en el front como la respuesta nuclear son esencialmente idénticos.
+      const sameCoreAnswerClone =
+        candidateCoreAns.length > 0 &&
+        acceptedCoreAns.length > 0 &&
+        (candidateCoreAns === acceptedCoreAns || answerLex.jaccard >= 0.75 || answerLex.containment >= 0.85) &&
+        (isExhaustiveMode
+          ? (!distinctSubject && (jaccard >= 0.75 || containment >= 0.85))
+          : (jaccard >= 0.35 || containment >= 0.45));
 
       // Criterio de duplicado léxico intra-lote:
-      // En modo exhaustivo, se preservan preguntas estructuradas similares de tablas/gráficas
-      // (ej. colesterol de huevo vs. colesterol de manteca) salvo que pregunten exactamente lo mismo
-      // o compartan también la misma respuesta/solución.
       const isDuplicate = isExhaustiveMode
-        ? (jaccard >= 0.85 || (containment >= 0.88 && answerLex.jaccard >= 0.65))
-        : (jaccard >= 0.65 || (containment >= 0.75 && answerLex.jaccard >= 0.35));
+        ? (jaccard >= 0.90 || (!distinctSubject && jaccard >= 0.75) || (!distinctSubject && containment >= 0.85 && answerLex.jaccard >= 0.50) || sameCoreAnswerClone)
+        : (jaccard >= 0.65 || (containment >= 0.75 && answerLex.jaccard >= 0.35) || sameCoreAnswerClone);
 
       if (isDuplicate) {
         isIntraDuplicate = true;
         duplicatesRemoved.push({
           candidateFront: card.front,
           matchedWith: accepted.front,
-          similarityScore: Math.max(jaccard, containment),
-          reason: 'Duplicado léxico intra-lote',
+          similarityScore: Math.max(jaccard, containment, answerLex.jaccard),
+          reason: sameCoreAnswerClone
+            ? 'Concepto/respuesta nuclear duplicada intra-lote'
+            : 'Duplicado léxico intra-lote',
         });
         break;
       }
@@ -248,20 +326,32 @@ export async function deduplicateCandidateCards(params: {
   for (const card of intraBatchUnique) {
     let matchedExisting: CardHistoryItem | null = null;
     let maxLexSim = 0;
+    const candidateCoreAns = extractCoreAnswerText(card.back);
 
     for (const existing of existingCards) {
       const qSim = calculateLexicalSimilarity(card.front, existing.front);
-      const aSim = existing.back ? calculateLexicalSimilarity(card.back, existing.back) : { jaccard: 0, containment: 0 };
+      const existingCoreAns = extractCoreAnswerText(existing.back);
+      const aSim = existingCoreAns
+        ? calculateLexicalSimilarity(candidateCoreAns, existingCoreAns)
+        : { jaccard: 0, containment: 0 };
+      const distinctSubject = hasDistinctEvaluatedSubject(card.front, existing.front);
 
-      // Criterio de rechazo léxico:
-      // En modo exhaustivo, umbral elevado para permitir variantes de tablas con distintas respuestas.
+      const sameCoreAnswerClone =
+        candidateCoreAns.length > 0 &&
+        existingCoreAns.length > 0 &&
+        (candidateCoreAns === existingCoreAns || aSim.jaccard >= 0.75 || aSim.containment >= 0.85) &&
+        (isExhaustiveMode
+          ? (!distinctSubject && (qSim.jaccard >= 0.75 || qSim.containment >= 0.85))
+          : (qSim.jaccard >= 0.35 || qSim.containment >= 0.45));
+
+      // Criterio de rechazo léxico comparando pregunta y núcleo de respuesta (sin explicación)
       const isDuplicate = isExhaustiveMode
-        ? (qSim.jaccard >= 0.85 || (qSim.containment >= 0.88 && aSim.jaccard >= 0.65))
-        : (qSim.jaccard >= 0.65 || (qSim.containment >= 0.75 && aSim.jaccard >= 0.35));
+        ? (qSim.jaccard >= 0.90 || (!distinctSubject && qSim.jaccard >= 0.75) || (!distinctSubject && qSim.containment >= 0.85 && aSim.jaccard >= 0.50) || sameCoreAnswerClone)
+        : (qSim.jaccard >= 0.65 || (qSim.containment >= 0.75 && aSim.jaccard >= 0.35) || sameCoreAnswerClone);
 
       if (isDuplicate) {
         matchedExisting = existing;
-        maxLexSim = Math.max(qSim.jaccard, qSim.containment);
+        maxLexSim = Math.max(qSim.jaccard, qSim.containment, aSim.jaccard);
         break;
       }
     }
@@ -286,12 +376,12 @@ export async function deduplicateCandidateCards(params: {
       // Limitamos el historial evaluado para embeddings a las últimas 80 tarjetas si el mazo es gigantesco
       const relevantHistory = existingCards.slice(-80);
 
-      // Formatear texto representativo: "Pregunta | Respuesta"
+      // Formatear texto representativo aislando estrictamente "Pregunta | Respuesta Nuclear" (sin "Explicación: ...")
       const candidateTexts = survivingLexical.map(
-        (c) => `${normalizeCardText(c.front)} | ${normalizeCardText(c.back)}`
+        (c) => `${normalizeCardText(c.front)} | ${extractCoreAnswerText(c.back)}`
       );
       const existingTexts = relevantHistory.map(
-        (e) => `${normalizeCardText(e.front)} | ${normalizeCardText(e.back || '')}`
+        (e) => `${normalizeCardText(e.front)} | ${extractCoreAnswerText(e.back)}`
       );
 
       console.log(
@@ -323,12 +413,22 @@ export async function deduplicateCandidateCards(params: {
           if (!eVec || eVec.length === 0) continue;
 
           const sim = cosineSimilarity(cVec, eVec);
+          const distinctSubject = hasDistinctEvaluatedSubject(
+            candidate.front,
+            relevantHistory[j].front
+          );
+
+          // En modo exhaustivo, si el enunciado evalúa un sujeto/variable diferente de una tabla o esquema
+          // (ej. 'hierro' vs 'calcio'), solo se descarta por embedding si son prácticamente idénticas (>= 0.97).
+          const effectiveThreshold =
+            isExhaustiveMode && distinctSubject ? 0.97 : similarityThreshold;
+
           if (sim > highestSim) {
             highestSim = sim;
             matchedItem = relevantHistory[j];
           }
 
-          if (sim >= similarityThreshold) {
+          if (sim >= effectiveThreshold) {
             isSemanticDuplicate = true;
             break;
           }

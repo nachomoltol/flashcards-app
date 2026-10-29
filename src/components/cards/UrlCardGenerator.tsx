@@ -24,7 +24,7 @@ export function UrlCardGenerator({
   onMeticulousChange,
 }: UrlCardGeneratorProps) {
   const { user } = useAuthStore();
-  const { cards, createCard, fetchCardsByDeck } = useCardStore();
+  const { cards, createCardsBatch, fetchCardsByDeck } = useCardStore();
   const { fetchDeckById } = useDeckStore();
   const { openProModal } = useProModalStore();
   const { language, t } = useLanguageStore();
@@ -143,27 +143,18 @@ export function UrlCardGenerator({
       setCoreExhausted(Boolean(result.core_exhausted));
       setGeneratedCardsPreview(result.cards);
 
-      // Guardar secuencialmente en Supabase mediante Zustand
+      // Guardar en lote en Supabase mediante Zustand
       setStatus('saving');
       setStatusStep(language === 'en' ? `Saving ${result.cards.length} cards to Supabase...` : `Guardando ${result.cards.length} tarjetas en Supabase...`);
 
-      let savedCount = 0;
-      for (const card of result.cards) {
-        const backValue =
-          card.cardFormat === 'cloze' && !card.back ? card.front : card.back;
-
-        const created = await createCard(
-          deckId,
-          card.front,
-          backValue,
-          card.cardFormat === 'cloze' ? 'cloze' : 'basic',
-          card.cardFormat
-        );
-
-        if (created) {
-          savedCount++;
-        }
-      }
+      const cardsPayload = result.cards.map((card) => ({
+        front: card.front,
+        back: card.cardFormat === 'cloze' && !card.back ? card.front : card.back,
+        cardType: card.cardFormat === 'cloze' ? 'cloze' : 'basic',
+        cardFormat: card.cardFormat,
+      }));
+      const saved = await createCardsBatch(deckId, cardsPayload);
+      const savedCount = saved.length;
 
       // FASE 2: Notificación si el contenido no tenía suficientes conceptos únicos
       if (result.cards.length < cardCount) {

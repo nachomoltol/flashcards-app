@@ -19,7 +19,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
   const { id } = use(params);
 
   const { currentDeck, isLoading: deckLoading, fetchDeckById } = useDeckStore();
-  const { cards, isLoading: cardsLoading, error, fetchCardsByDeck, createCard, deleteCard } =
+  const { cards, isLoading: cardsLoading, error, fetchCardsByDeck, createCardsBatch, deleteCard } =
     useCardStore();
   const { openProModal } = useProModalStore();
   const { user } = useAuthStore();
@@ -134,16 +134,14 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
     }
 
     try {
-      // Guardar secuencialmente las tarjetas generadas en Supabase mediante Zustand
-      for (const card of result.cards) {
-        await createCard(
-          id,
-          card.front,
-          card.back,
-          card.cardFormat === 'cloze' ? 'cloze' : 'basic',
-          card.cardFormat
-        );
-      }
+      // Guardar en lote las tarjetas generadas en Supabase mediante Zustand
+      const cardsPayload = result.cards.map((card) => ({
+        front: card.front,
+        back: card.back,
+        cardType: card.cardFormat === 'cloze' ? 'cloze' : 'basic',
+        cardFormat: card.cardFormat,
+      }));
+      await createCardsBatch(id, cardsPayload);
 
       await fetchCardsByDeck(id);
       await fetchDeckById(id);

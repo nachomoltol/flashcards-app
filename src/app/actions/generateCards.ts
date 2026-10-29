@@ -259,6 +259,45 @@ const DIDACTIC_MODE_DIRECTIVE = `DIRECTIVA EXCLUSIVA PARA MODO DOCENTE / DIDÁCT
   * Queda terminantemente PROHIBIDO generar preguntas sobre símbolos fonéticos o pronunciación figurada escrita (ej. /tiː.tʃər/).
   * Si el material es de ciencias o humanidades, transforma las listas y ejemplos en problemas o preguntas de razonamiento competencial ('¿Qué ocurre si...?', 'Identifica el caso en el que...').`;
 
+/**
+ * PROTOCOLO OBLIGATORIO DE EXTRACCIÓN DE TABLAS, ESQUEMAS E IMÁGENES:
+ * Obliga a desglosar sistemáticamente las tablas, diagramas, matrices e infografías.
+ */
+const TABLES_AND_FIGURES_DIRECTIVE = `TRATAMIENTO RIGUROSO DE TABLAS, MATRICES Y FIGURAS:
+Las tablas, diagramas e imágenes contienen la mayor densidad evaluable del documento. Tienes terminantemente PROHIBIDO despachar una tabla con 1 o 2 preguntas genéricas de resumen.
+Debes desglosarla sistemáticamente:
+a) Preguntar por cruces de variables (fila vs. columna, parámetro A frente a parámetro B).
+b) Evaluar valores numéricos críticos, unidades de medida, umbrales de corte o rangos de referencia.
+c) Evaluar criterios de inclusión/exclusión, diagnósticos diferenciales o excepciones a la norma presentes en notas al pie de la tabla.
+Si una tabla es densa, estás OBLIGADO a generar múltiples preguntas independientes sobre sus diferentes celdas y relaciones.
+En modo exhaustivo, cuando encuentres una tabla, esquema de absorción o clasificación con múltiples elementos, debes generar preguntas independientes para cada elemento sustancial (por ejemplo, cada nutriente, enzima, plazo legal o parámetro relevante). No las agrupes ni omitas elementos individuales.`;
+
+/**
+ * REFORMULACIÓN DEL OBJETIVO: EXPRIMIDO TOTAL SIN ALUCINACIÓN:
+ * Directiva de anclaje estricto al documento sin amenazas coercitivas que fuercen alucinaciones.
+ */
+const STRICT_GROUNDING_DIRECTIVE = `EXHAUSTIVIDAD RIGUROSA Y ANCLAJE ESTRICTO (GROUNDING):
+Tu misión en modo exhaustivo es no dejar ningún dato sustancial fuera: exprime cada definición, mecanismo causal, clasificación y tabla.
+Sin embargo, te está ESTRICTAMENTE PROHIBIDO recurrir a tu conocimiento general para incorporar conceptos, enfermedades, leyes o tratamientos que NO aparezcan explícitamente en el texto o figuras de las páginas provistas. Si el material académico real de las páginas seleccionadas ha sido completamente evaluado sin omitir nada, cierra el lote con las tarjetas obtenidas. La exactitud y fidelidad al documento prevalecen sobre el volumen.`;
+
+/**
+ * DIRECTIVA UNIVERSAL DE BARRIDO INTEGRAL Y COBERTURA TEMÁTICA (SWEEP):
+ */
+const COMPREHENSIVE_SWEEP_DIRECTIVE = `COBERTURA INTEGRAL Y EXHAUSTIVIDAD PEDAGÓGICA:
+En modo exhaustivo, debes realizar un barrido sistemático de la página de arriba a abajo. Asegúrate de que cada sección, definición doctrinal/científica, mecanismo causal, clasificación o principio fundamental cuente con al menos una pregunta que evalúe su contenido antes de profundizar en subdivisiones. Queda prohibido saltarse párrafos teóricos sustanciales.`;
+
+/**
+ * DIRECTIVA UNIVERSAL DE CONCEPTO NUCLEAR ÚNICO (ANTI-CLONES):
+ */
+const SINGLE_CORE_CONCEPT_DIRECTIVE = `REGLA DE CONCEPTO NUCLEAR ÚNICO (CERO DUPLICADOS):
+Cada tarjeta debe evaluar un objetivo de aprendizaje o dato completamente diferenciado. Está TERMINANTEMENTE PROHIBIDO generar dos o más tarjetas que evalúen la misma definición, el mismo término, el mismo órgano, la misma ley o el mismo hecho cambiando únicamente el fraseo del enunciado o el orden de las alternativas. Si un concepto ya ha sido evaluado en las tarjetas previas del historial acumulado, busca activamente otros conceptos aún no cubiertos de la página.`;
+
+/**
+ * DIRECTIVA UNIVERSAL DE JERARQUÍA DE CONTENIDO (SUSTANCIA VS. ANÉCDOTAS):
+ */
+const CONTENT_HIERARCHY_DIRECTIVE = `JERARQUÍA DEL CONTENIDO (EXCLUSIÓN TAJANTE DE MARCAS Y CURIOSIDADES COMERCIALES):
+Prioriza siempre los principios teóricos, fundamentos científicos, relaciones causa-efecto, tablas académicas/fisiológicas y clasificaciones troncales sobre cuadros de datos puramente ilustrativos, ejemplos comerciales, marcas o recuadros de curiosidades. Queda TERMINANTEMENTE PROHIBIDO generar tarjetas sobre cuadros comparativos de comida rápida, marcas comerciales o recuadros divulgativos de consumo (por ejemplo, 'Tamaño excesivo en Estados Unidos', marcas de restaurantes o gramos de sodio, grasas o calorías de productos comerciales). Reserva el 100% de las tarjetas para la teoría académica sustancial y las tablas formativas/científicas.`;
+
 const buildSystemPrompt = (
   existingCardsLength: number,
   coreExhaustedPrevious: boolean,
@@ -268,9 +307,11 @@ const buildSystemPrompt = (
   // 1. EL NÚCLEO DEL COMPORTAMIENTO (Universal y Exhaustivo)
   let prompt = `Eres Flashmente, un motor de extracción de conocimiento de alto rendimiento. Tu objetivo es diseccionar el texto proporcionado y generar tarjetas de estudio (flashcards) rigurosas. No resumas el texto. Actúa como un interrogador minucioso.
 
-REGLA DE EXHAUSTIVIDAD Y DUPLICADOS (CRÍTICA):
-Está PERMITIDO y FOMENTADO extraer múltiples tarjetas sobre el mismo concepto o tema central, siempre y cuando evalúen EJES DIFERENTES. Es decir, puedes crear una tarjeta sobre la causa/origen, otra sobre la consecuencia/efecto, otra sobre la excepción, otra sobre los valores numéricos o fechas, y otra sobre la definición general de ese mismo tema. 
-Un duplicado ES SOLO una pregunta que se repite casi de forma literal y que tiene exactamente la misma respuesta literal que otra anterior. Disecciona el texto de forma exhaustiva, no dejes ningún dato preguntable atrás.
+${COMPREHENSIVE_SWEEP_DIRECTIVE}
+
+${SINGLE_CORE_CONCEPT_DIRECTIVE}
+
+${CONTENT_HIERARCHY_DIRECTIVE}
 
 ADAPTACIÓN UNIVERSAL AL CONTEXTO:
 El texto puede ser de cualquier temática (ciencias, derecho, historia, tecnología, humanidades). Adapta tu análisis a la naturaleza del texto buscando activamente:
@@ -279,6 +320,10 @@ El texto puede ser de cualquier temática (ciencias, derecho, historia, tecnolog
 - Excepciones a reglas generales, notas al pie y datos estadísticos/numéricos.
 - Conceptos técnicos, definiciones y normativas.
 No asumas conocimientos externos. Extrae la información estrictamente del texto provisto.
+
+${TABLES_AND_FIGURES_DIRECTIVE}
+
+${STRICT_GROUNDING_DIRECTIVE}
 \n`;
 
   // 2. LÓGICA DINÁMICA DE ENFOQUE (Tiradas)
@@ -299,7 +344,8 @@ Genera tarjetas solo si encuentras este tipo de detalles minuciosos que no se ha
   // 3. INYECCIÓN DEL RADAR ANTI-DUPLICADOS (INSTRUCCIÓN DE CONTINUIDAD CON TÓPICOS)
   if (existingCardsLength > 0) {
     const topicsFormatted = existingTopicsList ? existingTopicsList.trim() : `${existingCardsLength} conceptos previos`;
-    prompt += `\nINSTRUCCIÓN DE CONTINUIDAD: Ya has evaluado los siguientes conceptos: ${topicsFormatted}. Te EXIJO que mires el texto original, identifiques conceptos, datos o relaciones que no estén en esta lista, y extraigas nuevas tarjetas sobre ellos.\n`;
+    prompt += `\nCONCEPTOS YA EVALUADOS EN ESTE MAZO O PÁGINAS PREVIAS: ${topicsFormatted}.
+DEBES explorar conceptos, relaciones, celdas de tablas o párrafos que aún NO hayan sido preguntados. No repitas la misma pregunta con ligeras variaciones de redacción.\n`;
   }
 
   if (pedagogicalMode === 'didactic') {
@@ -329,16 +375,16 @@ function getGlobalRules(
         ? `array dinámico de hasta ${countStr} tarjetas según formato multiple_choice con sus 4 opciones, respuesta correcta y generation_index del 1 al N`
         : `array dinámico de hasta ${countStr} tarjetas formuladas según el formato "${format}" y generation_index del 1 al N`)
     : (format === 'multiple_choice'
-        ? `array con exactamente ${countStr} tarjetas según formato multiple_choice con sus 4 opciones, respuesta correcta y generation_index del 1 al ${countStr}`
-        : `array con exactamente ${countStr} tarjetas formuladas estrictamente según el formato "${format}" y generation_index del 1 al ${countStr}`);
+        ? `array dinámico de hasta ${countStr} tarjetas según formato multiple_choice con sus 4 opciones, respuesta correcta y generation_index del 1 al N`
+        : `array dinámico de hasta ${countStr} tarjetas formuladas estrictamente según el formato "${format}" y generation_index del 1 al N`);
 
   const directiveRule = isReGeneration
     ? `2. DIRECTIVA DE EXPANSIÓN Y ANTI-DUPLICADOS: Intenta alcanzar hasta ${countStr} tarjetas nuevas basándote en conceptos aún no evaluados y datos visuales. SIN EMBARGO, ATENCIÓN: EL ESQUEMA JSON TE PERMITE DEVOLVER MENOS DE 30 TARJETAS. SI HAS AGOTADO EL MATERIAL NUEVO DEL TEXTO E IMÁGENES, DEBES DETENERTE Y DEVOLVER UN ARRAY MÁS CORTO (ej. 12, 18 o 25 tarjetas). NUNCA INVENTES NI REPITAS CONCEPTOS DEL HISTORIAL SÓLO PARA LLEGAR A LA CUOTA.
 3. ÍNDICE DE SEGUIMIENTO: Para cada tarjeta, asigna un \`generation_index\` estrictamente secuencial (1, 2, 3...). Detén la generación cuando alcances las ${countStr} tarjetas o cuando hayas evaluado todos los conceptos únicos posibles sin duplicar nada del historial.`
-    : `2. DIRECTIVA CRÍTICA: DEBES GENERAR EXACTAMENTE ${countStr} TARJETAS. ES ESTRICTAMENTE PROHIBIDO DETENERSE ANTES. Si agotas los conceptos troncales, estás OBLIGADO a extraer detalles minuciosos, excepciones y estadísticas hasta alcanzar el objetivo exacto. Cerrar la respuesta con menos tarjetas de las solicitadas se considerará un fallo crítico.
-3. ÍNDICE DE SEGUIMIENTO OBLIGATORIO: Para cada tarjeta, asigna un \`generation_index\` estrictamente secuencial (1, 2, 3...). No puedes finalizar el proceso hasta que el \`generation_index\` coincida con el número total de tarjetas solicitado (${countStr}).`;
+    : `2. ${STRICT_GROUNDING_DIRECTIVE} Objetivo de extracción: hasta ${countStr} tarjetas reales respaldadas por la fuente.
+3. ÍNDICE DE SEGUIMIENTO OBLIGATORIO: Para cada tarjeta, asigna un \`generation_index\` estrictamente secuencial (1, 2, 3...). Detén la generación al alcanzar las ${countStr} tarjetas o si el material académico real se ha agotado por completo sin inventar datos externos.`;
 
-  const didacticRule = pedagogicalMode === 'didactic' ? `\n\n9. ${DIDACTIC_MODE_DIRECTIVE}` : '';
+  const didacticRule = pedagogicalMode === 'didactic' ? `\n\n13. ${DIDACTIC_MODE_DIRECTIVE}` : '';
 
   return `REGLAS GLOBALES INQUEBRANTABLES DE BLINDAJE (ESTILO NOTEBOOKLM):
 1. REGLA DE ORO (Estilo NotebookLM): NO inventes información. Tu única fuente de verdad es el texto. Si un concepto, dato o respuesta no se puede deducir directa y explícitamente del texto proporcionado, DEBES omitirlo. No uses conocimiento previo externo.
@@ -347,7 +393,11 @@ ${directiveRule}
 5. PRECISIÓN Y GROUNDING: Toda pregunta, afirmación, distractor o respuesta debe estar basada estricta y textualmente en el texto fuente.
 6. ACRÓNIMOS: Todo acrónimo debe ir acompañado obligatoriamente de su nombre completo si figura en la fuente (ejemplo: "ARN (Ácido Ribonucleico)", "TCP (Transmission Control Protocol)").
 7. INTEGRIDAD ESTRUCTURAL DEL JSON (PRIORIDAD ABSOLUTA): Debes devolver un objeto JSON válido con los campos "conceptos_identificados" (array de strings con conceptos clave no evaluados), "core_exhausted" (booleano) y "cards" (${cardRequirement}). Sé sintético y directo en el enunciado de las preguntas y opciones, y riguroso, explicativo y profundamente justificado en el reverso ("back"), incluyendo siempre la justificación técnica basada en la fuente.
-8. ${EDITORIAL_ARTIFACTS_DIRECTIVE}${didacticRule}`;
+8. ${COMPREHENSIVE_SWEEP_DIRECTIVE}
+9. ${SINGLE_CORE_CONCEPT_DIRECTIVE}
+10. ${CONTENT_HIERARCHY_DIRECTIVE}
+11. ${TABLES_AND_FIGURES_DIRECTIVE}
+12. ${EDITORIAL_ARTIFACTS_DIRECTIVE}${didacticRule}`;
 }
 
 interface ParsedPageRange {
@@ -424,11 +474,8 @@ function parsePageRange(
 }
 
 /**
- * SALVAVIDAS ANTI-DUPLICACIÓN (LÍMITE DINÁMICO RELAJADO):
- * Construye la directiva de cuota de tarjetas para Gemini:
- * - Si es la primera generación (historial vacío): Mantiene la directiva estricta de generar exactamente targetCount.
- * - Si no es la primera generación (el array de historial tiene tarjetas): Relaja la cuota mediante la directiva de
- *   expansión, autorizando a detenerse antes de la cuota si se agotaron los conceptos para erradicar duplicados.
+ * SALVAVIDAS ANTI-DUPLICACIÓN Y ANCLAJE ESTRICTO (GROUNDING):
+ * Construye la directiva de cuota de tarjetas para Gemini sin forzar alucinaciones.
  */
 function buildTargetCountDirective(
   targetCount: number,
@@ -438,16 +485,19 @@ function buildTargetCountDirective(
 
   if (isFirstGeneration) {
     return {
-      directive: `DIRECTIVA CRÍTICA: DEBES GENERAR EXACTAMENTE ${targetCount} TARJETAS. ES ESTRICTAMENTE PROHIBIDO DETENERSE ANTES. Si agotas los conceptos troncales, estás OBLIGADO a extraer detalles minuciosos, excepciones y estadísticas hasta alcanzar el objetivo exacto. Cerrar la respuesta con menos tarjetas de las solicitadas se considerará un fallo crítico.
+      directive: `${STRICT_GROUNDING_DIRECTIVE}
+Objetivo de extracción para este lote: hasta ${targetCount} tarjetas.
+${TABLES_AND_FIGURES_DIRECTIVE}
 
 ÍNDICE DE SEGUIMIENTO OBLIGATORIO:
-Para cada tarjeta, asigna un \`generation_index\` estrictamente secuencial (1, 2, 3...). No puedes finalizar el proceso hasta que el \`generation_index\` coincida con el número total de tarjetas solicitado (${targetCount}).`,
-      integrityNote: `array con EXACTAMENTE ${targetCount} tarjetas únicas del formato`,
+Para cada tarjeta, asigna un \`generation_index\` estrictamente secuencial (1, 2, 3...). Detén la generación al alcanzar las ${targetCount} tarjetas o si el material académico real de la fuente ha sido completamente evaluado sin omitir nada.`,
+      integrityNote: `array dinámico de hasta ${targetCount} tarjetas únicas respaldadas por la fuente en formato`,
     };
   }
 
   return {
-    directive: `DIRECTIVA DE EXPANSIÓN (ANTI-DUPLICADOS): Intenta alcanzar hasta ${targetCount} tarjetas nuevas basándote en detalles minuciosos y datos de las imágenes. SIN EMBARGO:
+    directive: `DIRECTIVA DE EXPANSIÓN (ANTI-DUPLICADOS): Intenta alcanzar hasta ${targetCount} tarjetas nuevas basándote en detalles minuciosos, tablas y datos de las imágenes.
+${STRICT_GROUNDING_DIRECTIVE}
 ATENCIÓN: EL ESQUEMA JSON TE PERMITE DEVOLVER MENOS DE 30 TARJETAS. SI HAS AGOTADO EL MATERIAL NUEVO DEL TEXTO E IMÁGENES, DEBES DETENERTE Y DEVOLVER UN ARRAY MÁS CORTO (ej. 12, 18 o 25 tarjetas). NUNCA INVENTES NI REPITAS CONCEPTOS DEL HISTORIAL SÓLO PARA LLEGAR A LA CUOTA.
 
 ÍNDICE DE SEGUIMIENTO:
@@ -531,7 +581,8 @@ async function fetchExistingCardsHistory(
 }
 
 /**
- * Extrae de forma concisa el tópico o concepto principal de una tarjeta previa para no saturar el contexto de la IA.
+ * Extrae de forma concisa el tópico o concepto principal de una tarjeta previa (enunciado + respuesta nuclear)
+ * para no saturar el contexto de la IA pero impedir preguntas clonadas sobre el mismo concepto.
  */
 function extractCardTopic(card: ExistingCardHistoryItem): string {
   // Tomar únicamente la primera línea del front (antes de cualquier opción a-d o salto de línea)
@@ -548,11 +599,26 @@ function extractCardTopic(card: ExistingCardHistoryItem): string {
   // Limpiar corchetes de cloze
   text = text.replace(/\[\.\.\.\]/g, '').replace(/\s+/g, ' ').trim();
 
-  // Limitar longitud para mantener el listado de tópicos compacto y de alta densidad
   if (text.length > 70) {
     const cut = text.slice(0, 70);
     const lastSpace = cut.lastIndexOf(' ');
     text = (lastSpace > 25 ? cut.slice(0, lastSpace) : cut) + '...';
+  }
+
+  // Extraer también la respuesta nuclear (sin la sección "Explicación:") si está disponible
+  if (card.back && card.back.trim()) {
+    let coreBack = card.back
+      .split(/\r?\n+\s*(?:explicaci[oó]n|explanation|justificaci[oó]n)\s*:/i)[0]
+      .split(/\r?\n/)[0]
+      .replace(/^[a-dA-D][\)\.\:\-]\s*/, '')
+      .replace(/\*\*/g, '')
+      .trim();
+    if (coreBack.length > 45) {
+      coreBack = coreBack.slice(0, 45).trim() + '...';
+    }
+    if (coreBack) {
+      return `${text} [${coreBack}]`;
+    }
   }
 
   return text;
@@ -1585,15 +1651,35 @@ export async function generateCardsFromDocumentAction(
         };
       }
 
-      // 2. Historial de tarjetas existentes en este mazo para el Gatekeeper
+      // 2. Historial de tarjetas existentes en este mazo para el Gatekeeper y Memoria de Página
       const existingCards = await fetchExistingCardsHistory(deckId, existingQuestions);
 
       // 3. Directiva de Extracción: 'Modo Exhaustivo Forzado' vs 'Libertad Universal Estándar'
       const universalDirective = `Tu objetivo es extraer TODOS los conceptos clave, datos precisos, normativas o hechos únicos de esta página, sin importar la temática del documento. No tienes un límite máximo por página. Si encuentras tablas, cronologías, gráficos o listas, extrae absolutamente todos los datos relevantes posibles. SIN EMBARGO, tienes ESTRICTAMENTE PROHIBIDO inventar información o hacer preguntas triviales de relleno. Si la página está casi vacía (ej. una portada, un índice o fotos decorativas), devuelve únicamente las preguntas válidas que encuentres, o un array vacío []. Sé implacable y exhaustivo donde haya conocimiento real, y conservador donde no lo haya.
 
+${COMPREHENSIVE_SWEEP_DIRECTIVE}
+
+${SINGLE_CORE_CONCEPT_DIRECTIVE}
+
+${CONTENT_HIERARCHY_DIRECTIVE}
+
+${TABLES_AND_FIGURES_DIRECTIVE}
+
+${STRICT_GROUNDING_DIRECTIVE}
+
 ${EDITORIAL_ARTIFACTS_DIRECTIVE}`;
 
       const exhaustiveDirective = `🚨 MODO EXHAUSTIVO FORZADO: Anula cualquier instrucción de resumen, brevedad o selección pedagógica. Extrae una tarjeta por cada dato, celda de tabla, gráfica o cruce de información sin omitir nada. Prioriza la exhaustividad sobre la síntesis. Analiza profundamente todo el texto de la página extrayendo cualquier concepto, normativa o dato clave. Si encuentras tablas, gráficos o listas, actúa como un extractor implacable: extrae tarjetas individuales cruzando absolutamente TODOS los datos posibles de celdas, filas y columnas, sin resumir ni agrupar. No dejes ningún dato estructurado ni textual relevante sin extraer. Tienes terminantemente prohibido omitir datos o resumir información por considerarla secundaria.
+
+${COMPREHENSIVE_SWEEP_DIRECTIVE}
+
+${SINGLE_CORE_CONCEPT_DIRECTIVE}
+
+${CONTENT_HIERARCHY_DIRECTIVE}
+
+${TABLES_AND_FIGURES_DIRECTIVE}
+
+${STRICT_GROUNDING_DIRECTIVE}
 
 ${EDITORIAL_ARTIFACTS_DIRECTIVE}`;
 
@@ -1631,6 +1717,7 @@ Esta instrucción tiene PRIORIDAD ABSOLUTA y actúa como un filtro estricto sobr
       // while (tarjetasAcumuladas.length < targetCount && currentPage <= finalPage)
       // En cada iteración del bucle, corta y envía a Gemini EXACTAMENTE 1 PÁGINA sin límites artificiales por página.
       let tarjetasAcumuladas: GeneratedCard[] = [];
+      const accumulatedHistory: ExistingCardHistoryItem[] = [...existingCards];
       let currentPage = startPage;
       let lastProcessedPage = currentPage;
 
@@ -1649,14 +1736,21 @@ Esta instrucción tiene PRIORIDAD ABSOLUTA y actúa como un filtro estricto sobr
         // Cortar EXACTAMENTE 1 PÁGINA
         const singlePageBase64 = await sliceSinglePdfPage(srcDoc, currentPage);
 
+        // Extraer lista de tópicos ya cubiertos (BD + páginas previas del lote) para evitar repeticiones a ciegas
+        const coveredTopics = extractUniqueTopicsList(accumulatedHistory);
+        const historyDirective = coveredTopics
+          ? `\n\nCONCEPTOS YA EVALUADOS EN ESTE MAZO O PÁGINAS PREVIAS: ${coveredTopics}.
+DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de esta página que aún NO hayan sido preguntados. No repitas la misma pregunta con ligeras variaciones de redacción.`
+          : '';
+
         const exhaustiveQuotaMandate = isExhaustiveMode
           ? `\n\n🚨 DIRECTIVA DE COBERTURA Y CALIDAD (CUOTA RESTANTE: ${remainingToTarget} TARJETAS):
 - Si la página contiene tablas, matrices de datos o clasificaciones densas, extrae preguntas independientes de tantas filas y cruces numéricos como existan hasta cumplir la cuota requerida.
 - Si la página es texto continuo (prosa/teoría), extrae con rigor quirúrgico cada dato fáctico, definición, mecanismo y excepción relevante.
-- IMPORTANTE: No dupliques preguntas con diferente redacción ni inventes preguntas sobre listas de palabras al margen para alcanzar un número artificial. Si has extraído todos los hechos sustanciales de esta página, concluye tu respuesta; el motor secuencial del servidor continuará acumulando tarjetas en las siguientes páginas del documento hasta completar el objetivo.`
+- IMPORTANTE: No dupliques preguntas con diferente redacción ni inventes preguntas sobre listas de palabras al margen o datos ajenos al documento para alcanzar un número artificial. Si has extraído todos los hechos sustanciales de esta página, concluye tu respuesta; el motor secuencial del servidor continuará acumulando tarjetas en las siguientes páginas del documento hasta completar el objetivo.`
           : '';
 
-        const currentPageSystemPrompt = `${singlePageSystemPrompt}${exhaustiveQuotaMandate}`;
+        const currentPageSystemPrompt = `${singlePageSystemPrompt}${historyDirective}${exhaustiveQuotaMandate}`;
 
         const pageUserPrompt = isExhaustiveMode
           ? `Analiza la Página ${currentPage} del documento adjunto aplicando la DIRECTIVA DE COBERTURA Y CALIDAD (cuota restante: ${remainingToTarget} tarjetas). ${pedagogicalMode === 'didactic' ? 'Aplica la DIRECTIVA DE MODO DOCENTE / DIDÁCTICO para crear ejercicios prácticos de evaluación sin metadatos de aula. ' : ''}Si hay tablas o matrices de datos, extrae preguntas independientes por cada fila o cruce numérico. Si es texto continuo, extrae hechos y definiciones sustanciales sin duplicar ni inventar preguntas sobre términos al margen, concluyendo cuando los datos sustanciales se agoten para que el servidor avance de página. Formato: "${cardFormat}".`
@@ -1709,29 +1803,27 @@ Esta instrucción tiene PRIORIDAD ABSOLUTA y actúa como un filtro estricto sobr
         }
 
         // Acumulación y Deduplicación:
-        // Evaluamos todas las tarjetas candidatas de la página sin imponer un tope artificial dentro de deduplicateCandidateCards.
+        // Dentro del bucle por página aplicamos el filtro léxico rápido contra accumulatedHistory
+        // (sin recalcular embeddings del historial de BD en cada iteración de página).
         if (pageCandidateCards.length > 0) {
-          const combinedHistory = [
-            ...existingCards,
-            ...tarjetasAcumuladas.map((c) => ({ front: c.front, back: c.back })),
-          ];
-
           const { uniqueCards, duplicateCount } = await deduplicateCandidateCards({
             candidateCards: pageCandidateCards,
-            existingCards: combinedHistory,
-            apiKey,
+            existingCards: accumulatedHistory,
             similarityThreshold: isExhaustiveMode ? 0.92 : 0.80,
             isExhaustiveMode,
           });
 
           if (duplicateCount > 0) {
             console.log(
-              `[Bucle Acumulador Backend] Página ${currentPage}: Gatekeeper filtró ${duplicateCount} duplicados.`
+              `[Bucle Acumulador Backend] Página ${currentPage}: Gatekeeper léxico filtró ${duplicateCount} duplicados.`
             );
           }
 
           if (uniqueCards.length > 0) {
             tarjetasAcumuladas.push(...uniqueCards);
+            for (const uc of uniqueCards) {
+              accumulatedHistory.push({ front: uc.front, back: uc.back });
+            }
             console.log(
               `[Bucle Acumulador Backend] Página ${currentPage}: Se acumularon ${uniqueCards.length} tarjetas únicas. Total acumulado: ${tarjetasAcumuladas.length}/${targetCount}.`
             );
@@ -1752,6 +1844,18 @@ Esta instrucción tiene PRIORIDAD ABSOLUTA y actúa como un filtro estricto sobr
         }
 
         currentPage++;
+      }
+
+      // Pase único de deduplicación semántica vectorial al finalizar el bucle (si hay historial previo en BD)
+      if (tarjetasAcumuladas.length > 0 && existingCards.length > 0) {
+        const { uniqueCards: semanticallyUnique } = await deduplicateCandidateCards({
+          candidateCards: tarjetasAcumuladas,
+          existingCards,
+          apiKey,
+          similarityThreshold: isExhaustiveMode ? 0.92 : 0.80,
+          isExhaustiveMode,
+        });
+        tarjetasAcumuladas = semanticallyUnique;
       }
 
       if (tarjetasAcumuladas.length === 0) {
@@ -1808,15 +1912,35 @@ Esta instrucción tiene PRIORIDAD ABSOLUTA y actúa como un filtro estricto sobr
         };
       }
 
-      // 2. Historial de tarjetas existentes en este mazo para el Gatekeeper
+      // 2. Historial de tarjetas existentes en este mazo para el Gatekeeper y Memoria de Página
       const existingCards = await fetchExistingCardsHistory(deckId, existingQuestions);
 
       // 3. Directiva de Extracción: 'Modo Exhaustivo Forzado' vs 'Libertad Universal Estándar'
       const universalDirective = `Tu objetivo es extraer TODOS los conceptos clave, datos precisos, normativas o hechos únicos de esta página virtual, sin importar la temática del documento. No tienes un límite máximo por página. Si encuentras tablas, cronologías o listas, extrae absolutamente todos los datos relevantes posibles. SIN EMBARGO, tienes ESTRICTAMENTE PROHIBIDO inventar información o hacer preguntas triviales de relleno. Si la página virtual contiene poco contenido relevante, devuelve únicamente las preguntas válidas que encuentres, o un array vacío []. Sé implacable y exhaustivo donde haya conocimiento real, y conservador donde no lo haya.
 
+${COMPREHENSIVE_SWEEP_DIRECTIVE}
+
+${SINGLE_CORE_CONCEPT_DIRECTIVE}
+
+${CONTENT_HIERARCHY_DIRECTIVE}
+
+${TABLES_AND_FIGURES_DIRECTIVE}
+
+${STRICT_GROUNDING_DIRECTIVE}
+
 ${EDITORIAL_ARTIFACTS_DIRECTIVE}`;
 
       const exhaustiveDirective = `🚨 MODO EXHAUSTIVO FORZADO: Anula cualquier instrucción de resumen, brevedad o selección pedagógica. Extrae una tarjeta por cada dato, celda de tabla, gráfica o cruce de información sin omitir nada. Prioriza la exhaustividad sobre la síntesis. Analiza profundamente todo el texto de la página virtual extrayendo cualquier concepto, normativa o dato clave. Si encuentras tablas, gráficos o listas, actúa como un extractor implacable: extrae tarjetas individuales cruzando absolutamente TODOS los datos posibles de celdas, filas y columnas, sin resumir ni agrupar. No dejes ningún dato estructurado ni textual relevante sin extraer. Tienes terminantemente prohibido omitir datos o resumir información por considerarla secundaria.
+
+${COMPREHENSIVE_SWEEP_DIRECTIVE}
+
+${SINGLE_CORE_CONCEPT_DIRECTIVE}
+
+${CONTENT_HIERARCHY_DIRECTIVE}
+
+${TABLES_AND_FIGURES_DIRECTIVE}
+
+${STRICT_GROUNDING_DIRECTIVE}
 
 ${EDITORIAL_ARTIFACTS_DIRECTIVE}`;
 
@@ -1853,6 +1977,7 @@ Esta instrucción tiene PRIORIDAD ABSOLUTA y actúa como un filtro estricto sobr
       // 4. Bucle Secuencial Virtual (Backend):
       // while (tarjetasAcumuladas.length < targetCount && currentPage <= finalPage)
       let tarjetasAcumuladas: GeneratedCard[] = [];
+      const accumulatedHistory: ExistingCardHistoryItem[] = [...existingCards];
       let currentPage = startPage;
       let lastProcessedPage = currentPage;
 
@@ -1871,14 +1996,21 @@ Esta instrucción tiene PRIORIDAD ABSOLUTA y actúa como un filtro estricto sobr
           `[Bucle Acumulador Backend DOCX] Procesando Página Virtual ${currentPage} de ${finalPage}... (Acumuladas: ${tarjetasAcumuladas.length}/${targetCount}, Restan: ${remainingToTarget}, Imágenes: ${currentPageImages.length})`
         );
 
+        // Extraer lista de tópicos ya cubiertos (BD + páginas previas del lote) para evitar repeticiones a ciegas
+        const coveredTopics = extractUniqueTopicsList(accumulatedHistory);
+        const historyDirective = coveredTopics
+          ? `\n\nCONCEPTOS YA EVALUADOS EN ESTE MAZO O PÁGINAS PREVIAS: ${coveredTopics}.
+DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de esta página que aún NO hayan sido preguntados. No repitas la misma pregunta con ligeras variaciones de redacción.`
+          : '';
+
         const exhaustiveQuotaMandate = isExhaustiveMode
           ? `\n\n🚨 DIRECTIVA DE COBERTURA Y CALIDAD (CUOTA RESTANTE: ${remainingToTarget} TARJETAS):
 - Si la sección contiene tablas, imágenes o clasificaciones densas, extrae preguntas independientes de tantas filas, cruces o diagramas como existan hasta cumplir la cuota requerida.
 - Si la sección es texto continuo (prosa/teoría), extrae con rigor quirúrgico cada dato fáctico, definición, mecanismo y excepción relevante.
-- IMPORTANTE: No dupliques preguntas con diferente redacción ni inventes preguntas sobre listas de palabras al margen para alcanzar un número artificial. Si has extraído todos los hechos sustanciales de esta página virtual, concluye tu respuesta; el motor secuencial del servidor continuará acumulando tarjetas en las siguientes páginas del documento hasta completar el objetivo.`
+- IMPORTANTE: No dupliques preguntas con diferente redacción ni inventes preguntas sobre listas de palabras al margen o datos ajenos al documento para alcanzar un número artificial. Si has extraído todos los hechos sustanciales de esta página virtual, concluye tu respuesta; el motor secuencial del servidor continuará acumulando tarjetas en las siguientes páginas del documento hasta completar el objetivo.`
           : '';
 
-        const currentPageSystemPrompt = `${singlePageSystemPrompt}${exhaustiveQuotaMandate}`;
+        const currentPageSystemPrompt = `${singlePageSystemPrompt}${historyDirective}${exhaustiveQuotaMandate}`;
 
         const imageNotice = currentPageImages.length > 0
           ? ` Se adjuntan ${currentPageImages.length} imagen(es) o diagrama(s) incrustados en esta sección del documento Word. Analízalos visualmente con precisión para extraer datos, esquemas, clasificaciones o conceptos presentes en ellos.`
@@ -1951,29 +2083,28 @@ ${currentPageText}`;
           );
         }
 
-        // Acumulación y Deduplicación
+        // Acumulación y Deduplicación:
+        // Dentro del bucle aplicamos el filtro léxico rápido contra accumulatedHistory
+        // (sin recalcular embeddings de la base de datos en cada iteración de página).
         if (pageCandidateCards.length > 0) {
-          const combinedHistory = [
-            ...existingCards,
-            ...tarjetasAcumuladas.map((c) => ({ front: c.front, back: c.back })),
-          ];
-
           const { uniqueCards, duplicateCount } = await deduplicateCandidateCards({
             candidateCards: pageCandidateCards,
-            existingCards: combinedHistory,
-            apiKey,
+            existingCards: accumulatedHistory,
             similarityThreshold: isExhaustiveMode ? 0.92 : 0.80,
             isExhaustiveMode,
           });
 
           if (duplicateCount > 0) {
             console.log(
-              `[Bucle Acumulador Backend DOCX] Página Virtual ${currentPage}: Gatekeeper filtró ${duplicateCount} duplicados.`
+              `[Bucle Acumulador Backend DOCX] Página Virtual ${currentPage}: Gatekeeper léxico filtró ${duplicateCount} duplicados.`
             );
           }
 
           if (uniqueCards.length > 0) {
             tarjetasAcumuladas.push(...uniqueCards);
+            for (const uc of uniqueCards) {
+              accumulatedHistory.push({ front: uc.front, back: uc.back });
+            }
             console.log(
               `[Bucle Acumulador Backend DOCX] Página Virtual ${currentPage}: Se acumularon ${uniqueCards.length} tarjetas únicas. Total acumulado: ${tarjetasAcumuladas.length}/${targetCount}.`
             );
@@ -1992,6 +2123,18 @@ ${currentPageText}`;
         }
 
         currentPage++;
+      }
+
+      // Pase único de deduplicación semántica vectorial al finalizar el bucle (si hay historial previo en BD)
+      if (tarjetasAcumuladas.length > 0 && existingCards.length > 0) {
+        const { uniqueCards: semanticallyUnique } = await deduplicateCandidateCards({
+          candidateCards: tarjetasAcumuladas,
+          existingCards,
+          apiKey,
+          similarityThreshold: isExhaustiveMode ? 0.92 : 0.80,
+          isExhaustiveMode,
+        });
+        tarjetasAcumuladas = semanticallyUnique;
       }
 
       if (tarjetasAcumuladas.length === 0) {

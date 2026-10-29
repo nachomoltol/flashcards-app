@@ -196,7 +196,7 @@ export function DocumentUploader({
   onStepChange,
 }: DocumentUploaderProps) {
   const { user } = useAuthStore();
-  const { cards, createCard, fetchCardsByDeck } = useCardStore();
+  const { cards, createCardsBatch, fetchCardsByDeck } = useCardStore();
   const { fetchDeckById } = useDeckStore();
   const { openProModal } = useProModalStore();
   const { language, t } = useLanguageStore();
@@ -514,20 +514,18 @@ export function DocumentUploader({
         return;
       }
 
-      // 3. Guardar las tarjetas generadas en Supabase mediante el store de Zustand
+      // 3. Guardar las tarjetas generadas en Supabase en lote mediante el store de Zustand
       setStatus('saving');
       const generatedCards = result.cards;
       setGeneratedCardsPreview(generatedCards);
 
-      for (const card of generatedCards) {
-        await createCard(
-          deckId,
-          card.front,
-          card.back,
-          card.cardFormat === 'cloze' ? 'cloze' : 'basic',
-          card.cardFormat
-        );
-      }
+      const cardsPayload = generatedCards.map((card) => ({
+        front: card.front,
+        back: card.back,
+        cardType: card.cardFormat === 'cloze' ? 'cloze' : 'basic',
+        cardFormat: card.cardFormat,
+      }));
+      await createCardsBatch(deckId, cardsPayload);
 
       // Sincronizar datos del mazo en local
       await fetchCardsByDeck(deckId);
