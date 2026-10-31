@@ -241,6 +241,25 @@ export function DocumentUploader({
     fileKey: string;
   } | null>(null);
 
+  // Referencia mutable para auto-borrado garantizado en desmontaje
+  const uploadedStorageRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    uploadedStorageRef.current = uploadedStorage?.storagePath || null;
+  }, [uploadedStorage]);
+
+  // Limpieza en el desmontaje del componente (evita archivos huérfanos si el usuario cierra el modal)
+  useEffect(() => {
+    return () => {
+      if (uploadedStorageRef.current) {
+        supabase.storage
+          .from('user-documents')
+          .remove([uploadedStorageRef.current])
+          .catch((err) => console.warn('Error al auto-borrar documento en desmontaje:', err));
+      }
+    };
+  }, []);
+
   // Sincronizar fase minuciosa si viene activa por prop
   useEffect(() => {
     if (initialMeticulousPhase) {
@@ -256,6 +275,12 @@ export function DocumentUploader({
     setDocxTotalPages(null);
     setNextCursorPage(null);
     setLastStartPage(null);
+    if (uploadedStorage?.storagePath) {
+      supabase.storage
+        .from('user-documents')
+        .remove([uploadedStorage.storagePath])
+        .catch((err) => console.warn('Error al auto-borrar documento en reset:', err));
+    }
     setUploadedStorage(null);
     const error = validateFile(file);
     if (error) {
@@ -583,6 +608,12 @@ export function DocumentUploader({
     setGeneratedCardsPreview([]);
     setNextCursorPage(null);
     setLastStartPage(null);
+    if (uploadedStorage?.storagePath) {
+      supabase.storage
+        .from('user-documents')
+        .remove([uploadedStorage.storagePath])
+        .catch((err) => console.warn('Error al auto-borrar documento en reset:', err));
+    }
     setUploadedStorage(null);
     setMaterialExhaustedNotice(null);
     setPedagogicalMode('academic');
@@ -780,7 +811,15 @@ export function DocumentUploader({
             </button>
             {onCancel && (
               <button
-                onClick={onCancel}
+                onClick={() => {
+                  if (uploadedStorage?.storagePath) {
+                    supabase.storage
+                      .from('user-documents')
+                      .remove([uploadedStorage.storagePath])
+                      .catch((err) => console.warn('Error al auto-borrar documento en cerrar ventana:', err));
+                  }
+                  onCancel();
+                }}
                 className="px-3.5 py-2.5 text-xs rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900/80 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white font-medium transition cursor-pointer"
               >
                 {t('ai_uploader.close_btn', 'Cerrar ventana')}
@@ -1059,7 +1098,15 @@ export function DocumentUploader({
                 {onCancel && (
                   <button
                     type="button"
-                    onClick={onCancel}
+                    onClick={() => {
+                      if (uploadedStorage?.storagePath) {
+                        supabase.storage
+                          .from('user-documents')
+                          .remove([uploadedStorage.storagePath])
+                          .catch((err) => console.warn('Error al auto-borrar documento en cancelar:', err));
+                      }
+                      onCancel();
+                    }}
                     className="px-4 py-2 text-xs text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 transition cursor-pointer"
                   >
                     {t('common.cancel', 'Cancelar')}

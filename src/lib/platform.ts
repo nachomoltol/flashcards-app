@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { Capacitor } from '@capacitor/core';
 
 export interface PlatformInfo {
   /** Indica si la aplicación se está ejecutando dentro de un contenedor nativo Android (Capacitor, TWA o WebView) */
@@ -39,14 +40,11 @@ export function detectPlatform(): PlatformInfo {
   const isAndroidOS = /Android/i.test(userAgent);
   const isIOS = /iPhone|iPad|iPod/i.test(userAgent);
 
-  // 1. Detección de Capacitor Nativo en Android
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const capacitor = (window as any).Capacitor;
+  // 1. Detección de Capacitor Nativo en Android (mediante SDK oficial de Capacitor)
   const isCapacitorAndroid = Boolean(
-    capacitor &&
-      typeof capacitor.isNativePlatform === 'function' &&
-      capacitor.isNativePlatform() &&
-      capacitor.getPlatform?.() === 'android'
+    typeof window !== 'undefined' &&
+      Capacitor.isNativePlatform() &&
+      Capacitor.getPlatform() === 'android'
   );
 
   // 2. Detección de Trusted Web Activity (TWA)
@@ -65,7 +63,7 @@ export function detectPlatform(): PlatformInfo {
   const isAndroidWebView =
     isAndroidOS &&
     (/wv/i.test(userAgent) ||
-      /Version\/[0-9.]+/i.test(userAgent) ||
+      /Version\/[\d.]+/i.test(userAgent) ||
       hasAndroidBridge);
 
   const isNativeAndroid = isCapacitorAndroid || isTWA || isAndroidWebView || hasAndroidBridge;
