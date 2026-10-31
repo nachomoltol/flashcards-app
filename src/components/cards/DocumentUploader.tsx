@@ -10,6 +10,8 @@ import { showAdMobRewardedAd } from '@/lib/admob';
 import { claimAdRewardAction } from '@/app/actions/claimAdReward';
 import type { CardFormat, GeneratedCard } from '@/types/cards';
 import { FormattedCardView } from './FormattedCardView';
+import { cleanupUploadedDocument } from '@/lib/storageCleanup';
+import { purgeExpiredDocumentsAction } from '@/app/actions/storageCleanup';
 
 interface DocumentUploaderProps {
   deckId: string;
@@ -248,17 +250,30 @@ export function DocumentUploader({
     uploadedStorageRef.current = uploadedStorage?.storagePath || null;
   }, [uploadedStorage]);
 
-  // Limpieza en el desmontaje del componente (evita archivos huérfanos si el usuario cierra el modal)
+  // Purga proactiva de archivos huérfanos (> 2 horas) al montar el modal
+  useEffect(() => {
+    purgeExpiredDocumentsAction(2).catch(() => {});
+  }, []);
+
+  // Limpieza en el desmontaje garantizada mediante Beacon / keepalive
   useEffect(() => {
     return () => {
       if (uploadedStorageRef.current) {
-        supabase.storage
-          .from('user-documents')
-          .remove([uploadedStorageRef.current])
-          .catch((err) => console.warn('Error al auto-borrar documento en desmontaje:', err));
+        cleanupUploadedDocument(uploadedStorageRef.current);
       }
     };
   }, []);
+
+  // Cancelación segura y asíncrona que aguarda la eliminación del archivo
+  const handleSafeCancel = async () => {
+    if (uploadedStorage?.storagePath) {
+      await cleanupUploadedDocument(uploadedStorage.storagePath);
+      setUploadedStorage(null);
+    }
+    if (onCancel) {
+      onCancel();
+    }
+  };
 
   // Sincronizar fase minuciosa si viene activa por prop
   useEffect(() => {
@@ -276,10 +291,7 @@ export function DocumentUploader({
     setNextCursorPage(null);
     setLastStartPage(null);
     if (uploadedStorage?.storagePath) {
-      supabase.storage
-        .from('user-documents')
-        .remove([uploadedStorage.storagePath])
-        .catch((err) => console.warn('Error al auto-borrar documento en reset:', err));
+      cleanupUploadedDocument(uploadedStorage.storagePath);
     }
     setUploadedStorage(null);
     const error = validateFile(file);
@@ -609,10 +621,7 @@ export function DocumentUploader({
     setNextCursorPage(null);
     setLastStartPage(null);
     if (uploadedStorage?.storagePath) {
-      supabase.storage
-        .from('user-documents')
-        .remove([uploadedStorage.storagePath])
-        .catch((err) => console.warn('Error al auto-borrar documento en reset:', err));
+      cleanupUploadedDocument(uploadedStorage.storagePath);
     }
     setUploadedStorage(null);
     setMaterialExhaustedNotice(null);
@@ -804,15 +813,7 @@ export function DocumentUploader({
             </button>
             {onCancel && (
               <button
-                onClick={() => {
-                  if (uploadedStorage?.storagePath) {
-                    supabase.storage
-                      .from('user-documents')
-                      .remove([uploadedStorage.storagePath])
-                      .catch((err) => console.warn('Error al auto-borrar documento en cerrar ventana:', err));
-                  }
-                  onCancel();
-                }}
+                onClick={handleSafeCancel}
                 className="px-3.5 py-2.5 text-xs rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900/80 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white font-medium transition cursor-pointer"
               >
                 {t('ai_uploader.close_btn', 'Cerrar ventana')}
@@ -1091,15 +1092,7 @@ export function DocumentUploader({
                 {onCancel && (
                   <button
                     type="button"
-                    onClick={() => {
-                      if (uploadedStorage?.storagePath) {
-                        supabase.storage
-                          .from('user-documents')
-                          .remove([uploadedStorage.storagePath])
-                          .catch((err) => console.warn('Error al auto-borrar documento en cancelar:', err));
-                      }
-                      onCancel();
-                    }}
+                    onClick={handleSafeCancel}
                     className="px-4 py-2 text-xs text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 transition cursor-pointer"
                   >
                     {t('common.cancel', 'Cancelar')}
