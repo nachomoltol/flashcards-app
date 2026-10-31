@@ -207,6 +207,9 @@ function CallbackHandler() {
 
         // Inicializar mazo demo en segundo plano SOLO si es alta normal, no en recovery
         if (!isRecovery && session?.user?.id) {
+          try {
+            localStorage.removeItem('flashcards_welcome_tutorial_seen');
+          } catch {}
           ensureQuickGuideDeck(session.user.id).catch((seedErr) => {
             console.warn('Error inicializando mazo demo en callback:', seedErr);
           });

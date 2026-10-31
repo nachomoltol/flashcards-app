@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/types/database';
 import { ensureQuickGuideDeck } from '@/lib/onboarding/seedGuideDeck';
+import { useTutorialStore } from './useTutorialStore';
 
 export type DeckRow = Database['public']['Tables']['decks']['Row'];
 
@@ -68,12 +69,16 @@ export const useDeckStore = create<DeckState>((set, get) => ({
         return;
       }
 
-      // Asegurar que el nuevo usuario cuente con el mazo de demostración "Guía Rápida"
+      // Asegurar que el nuevo usuario cuente con el mazo de demostración "Guía Rápida" y el tutorial de bienvenida
       try {
         const seededKey = `flashcards_guide_seeded_${user.id}`;
         if (typeof window !== 'undefined' && !localStorage.getItem(seededKey)) {
           await ensureQuickGuideDeck(user.id);
           localStorage.setItem(seededKey, 'true');
+          try {
+            localStorage.removeItem('flashcards_welcome_tutorial_seen');
+          } catch {}
+          useTutorialStore.getState().openTutorial(0);
         }
       } catch (seedErr) {
         console.warn('No se pudo verificar el mazo demo:', seedErr);

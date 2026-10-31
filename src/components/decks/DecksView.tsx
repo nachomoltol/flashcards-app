@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { useSearchParams, useRouter } from 'next/navigation';
-import { useDeckStore, useAuthStore, useStreakStore, useLanguageStore, useAtlasStore, type DeckWithStats } from '@/stores';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
+import { useDeckStore, useAuthStore, useStreakStore, useLanguageStore, useAtlasStore, useTutorialStore, type DeckWithStats } from '@/stores';
 import { ShareDeckModal } from './ShareDeckModal';
 import { NewMenuDropdown } from '@/components/ui/NewMenuDropdown';
 import {
@@ -22,6 +22,7 @@ import {
   Map,
   Award,
   Zap,
+  GraduationCap,
 } from 'lucide-react';
 
 const COLOR_PALETTE = [
@@ -107,11 +108,13 @@ export function DecksSkeleton() {
 function DecksViewContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   const { user, isLoading: authLoading } = useAuthStore();
   const { decks, isLoading, error, fetchDecks, createDeck, deleteDeck, updateDeck, moveDeck } = useDeckStore();
   const { atlasItems, fetchAtlasItems } = useAtlasStore();
   const { streak, fetchStreak } = useStreakStore();
   const { t } = useLanguageStore();
+  const { openTutorial } = useTutorialStore();
 
   // Navegación jerárquica por carpetas (Adjacency List)
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(() => {
@@ -121,6 +124,7 @@ function DecksViewContent() {
   // Modales y Menús
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createType, setCreateType] = useState<'deck' | 'folder'>('folder');
+  const [createParentId, setCreateParentId] = useState<string>('');
   const [editingDeck, setEditingDeck] = useState<DeckWithStats | null>(null);
 
   // Reubicación (Mover elemento a otra carpeta o raíz)
@@ -204,23 +208,41 @@ function DecksViewContent() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
+  // Abrir modal de creación sincronizando el tipo y la carpeta de destino
+  const openCreateModal = (type: 'deck' | 'folder', parentFolderId?: string | null) => {
+    setCreateType(type);
+    setNewColor(type === 'folder' ? '#f59e0b' : '#6366f1');
+    setNewTitle('');
+    setNewDescription('');
+    const resolvedParent = parentFolderId !== undefined
+      ? (parentFolderId || '')
+      : (currentFolderId || searchParams.get('folder') || '');
+    setCreateParentId(resolvedParent);
+    setIsCreateModalOpen(true);
+  };
+
+  // Cerrar modal de creación limpiando el parámetro ?create de la URL
+  const handleCloseCreateModal = () => {
+    setIsCreateModalOpen(false);
+    if (searchParams.get('create')) {
+      const activeFolder = currentFolderId || searchParams.get('folder');
+      const targetUrl = activeFolder
+        ? `/decks?folder=${encodeURIComponent(activeFolder)}`
+        : (pathname.startsWith('/decks') ? '/decks' : '/');
+      router.replace(targetUrl);
+    }
+  };
+
   // Escuchar parámetro de creación (?create=deck o ?create=folder)
   useEffect(() => {
     const createParam = searchParams.get('create');
+    const folderParam = searchParams.get('folder');
     if (createParam === 'deck') {
-      setCreateType('deck');
-      setNewColor('#6366f1');
-      setNewTitle('');
-      setNewDescription('');
-      setIsCreateModalOpen(true);
+      openCreateModal('deck', folderParam || currentFolderId);
     } else if (createParam === 'folder') {
-      setCreateType('folder');
-      setNewColor('#f59e0b');
-      setNewTitle('');
-      setNewDescription('');
-      setIsCreateModalOpen(true);
+      openCreateModal('folder', folderParam || currentFolderId);
     }
-  }, [searchParams]);
+  }, [searchParams, currentFolderId]);
 
   // Resolver carpeta activa actual (priorizando estado y con fallback en searchParams)
   const activeFolderId = currentFolderId ?? searchParams.get('folder');
@@ -230,7 +252,7 @@ function DecksViewContent() {
     setCurrentFolderId(folderId);
     setSearchQuery('');
     setFilterMode('all');
-    const targetUrl = folderId ? `/decks?folder=${folderId}` : '/decks';
+    const targetUrl = folderId ? `/decks?folder=${encodeURIComponent(folderId)}` : '/';
     router.push(targetUrl);
     window.history.pushState(null, '', targetUrl);
   };
@@ -292,6 +314,13 @@ function DecksViewContent() {
     }
     return [...result].sort((a, b) => a.title.localeCompare(b.title, undefined, { numeric: true, sensitivity: 'base' }));
   }, [decks, movingDeck]);
+
+  // Carpetas disponibles en la base de datos para la creación de nuevos elementos
+  const availableFoldersForCreate = useMemo(() => {
+    return decks
+      .filter((d) => Boolean(d.is_folder || (d as unknown as Record<string, unknown>).isFolder))
+      .sort((a, b) => a.title.localeCompare(b.title, undefined, { numeric: true, sensitivity: 'base' }));
+  }, [decks]);
 
   // Obtener ruta legible de una carpeta (ej: "Asignatura / Tema 1")
   const getFolderPath = (folderId: string): string => {
@@ -372,8 +401,8 @@ function DecksViewContent() {
 
     setIsCreating(true);
 
-    // 2. Determinar el parent_id activo (usando estado o fallback de searchParams)
-    const activeParentId = currentFolderId || searchParams.get('folder') || null;
+    // 2. Determinar el parent_id activo según la carpeta seleccionada en el modal
+    const activeParentId = createParentId.trim() ? createParentId.trim() : null;
 
     const created = await createDeck({
       title: newTitle.trim(),
@@ -390,7 +419,7 @@ function DecksViewContent() {
       setNewTitle('');
       setNewDescription('');
       setNewColor(isFolder ? '#f59e0b' : '#6366f1');
-      setIsCreateModalOpen(false);
+      handleCloseCreateModal();
       // Re-consultar los mazos inmediatamente para garantizar reflejo en UI
       await fetchDecks();
     }
@@ -537,6 +566,17 @@ function DecksViewContent() {
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-600 dark:text-indigo-400 font-mono font-medium">
               FSRS v5
             </span>
+            {!currentFolderId && (
+              <button
+                type="button"
+                onClick={() => openTutorial(0)}
+                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer"
+                title={t('settings.tutorial_button', 'Ver tutorial')}
+              >
+                <GraduationCap className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
+                <span>{t('settings.tutorial_pill', 'Ver tutorial')}</span>
+              </button>
+            )}
           </div>
           <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
             {currentFolder
@@ -559,24 +599,14 @@ function DecksViewContent() {
             </button>
           )}
 
-          {/* Botón Principal "+ Nuevo" con Menú Desplegable (Visible SOLO en Móvil) */}
-          <NewMenuDropdown
-            className="flex md:hidden ml-auto"
-            onSelectDeck={() => {
-              setCreateType('deck');
-              setNewColor('#6366f1');
-              setNewTitle('');
-              setNewDescription('');
-              setIsCreateModalOpen(true);
-            }}
-            onSelectFolder={() => {
-              setCreateType('folder');
-              setNewColor('#f59e0b');
-              setNewTitle('');
-              setNewDescription('');
-              setIsCreateModalOpen(true);
-            }}
-          />
+          {/* Botón Principal "+ Nuevo" con Menú Desplegable (Visible SOLO en Móvil; se oculta en carpetas vacías para priorizar el empty state) */}
+          {(!currentFolderId || filteredDecks.length > 0) && (
+            <NewMenuDropdown
+              className="flex md:hidden ml-auto"
+              onSelectDeck={() => openCreateModal('deck')}
+              onSelectFolder={() => openCreateModal('folder')}
+            />
+          )}
         </div>
       </div>
 
@@ -825,19 +855,19 @@ function DecksViewContent() {
           </div>
         ) : filteredDecks.length === 0 ? (
           /* Empty State */
-          <div className="rounded-2xl border border-dashed border-neutral-300 dark:border-neutral-800 bg-white/50 dark:bg-neutral-900/30 p-12 text-center flex flex-col items-center justify-center space-y-4 shadow-sm">
-            <div className="w-16 h-16 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 flex items-center justify-center text-neutral-400 dark:text-neutral-500 shadow-inner text-2xl">
+          <div className="rounded-2xl border border-dashed border-neutral-300 dark:border-neutral-800 bg-white/50 dark:bg-neutral-900/30 px-4 py-7 sm:py-9 md:p-12 text-center flex flex-col items-center justify-center space-y-3 sm:space-y-4 shadow-sm">
+            <div className="w-11 h-11 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-xl sm:rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 flex items-center justify-center text-neutral-400 dark:text-neutral-500 shadow-inner text-xl sm:text-2xl shrink-0">
               {currentFolder ? '📁' : '🗂️'}
             </div>
             <div>
-              <h3 className="text-base font-semibold text-neutral-900 dark:text-white">
+              <h3 className="text-sm sm:text-base font-semibold text-neutral-900 dark:text-white leading-tight">
                 {searchQuery || filterMode !== 'all'
                   ? t('dashboard.empty_search_title', 'No se encontraron elementos con los filtros actuales')
                   : currentFolder
                   ? t('dashboard.empty_folder_title', `La carpeta "${currentFolder.title}" está vacía`).replace('{folder}', currentFolder.title)
                   : t('dashboard.empty_root_title', 'No tienes elementos creados en el nivel raíz')}
               </h3>
-              <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400 max-w-sm mx-auto leading-relaxed">
+              <p className="mt-1 text-[11px] sm:text-xs text-neutral-500 dark:text-neutral-400 max-w-sm mx-auto leading-relaxed">
                 {searchQuery || filterMode !== 'all'
                   ? t('dashboard.empty_search_desc', 'Prueba a cambiar tu búsqueda o selecciona otro filtro.')
                   : currentFolder
@@ -847,29 +877,17 @@ function DecksViewContent() {
             </div>
 
             {!searchQuery && filterMode === 'all' && (
-              <div className="flex items-center gap-3 pt-2 flex-wrap justify-center">
+              <div className="flex items-center gap-2 sm:gap-3 pt-1 sm:pt-2 flex-wrap justify-center w-full max-w-xs sm:max-w-none">
                 <button
-                  onClick={() => {
-                    setCreateType('folder');
-                    setNewColor('#f59e0b');
-                    setNewTitle('');
-                    setNewDescription('');
-                    setIsCreateModalOpen(true);
-                  }}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-amber-600 dark:text-amber-300 font-medium text-xs transition active:scale-95 border border-neutral-300 dark:border-neutral-700/80 shadow-sm cursor-pointer"
+                  onClick={() => openCreateModal('folder')}
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-amber-600 dark:text-amber-300 font-medium text-xs transition active:scale-95 border border-neutral-300 dark:border-neutral-700/80 shadow-sm cursor-pointer"
                 >
                   <span>📁</span>
                   <span>{currentFolder ? t('dashboard.create_subfolder', 'Crear Subcarpeta') : t('dashboard.create_folder', 'Crear Carpeta')}</span>
                 </button>
                 <button
-                  onClick={() => {
-                    setCreateType('deck');
-                    setNewColor('#6366f1');
-                    setNewTitle('');
-                    setNewDescription('');
-                    setIsCreateModalOpen(true);
-                  }}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-medium text-xs shadow-lg shadow-indigo-600/25 transition active:scale-95 cursor-pointer"
+                  onClick={() => openCreateModal('deck')}
+                  className="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-medium text-xs shadow-md sm:shadow-lg shadow-indigo-600/25 transition active:scale-95 cursor-pointer"
                 >
                   <span>🃏</span>
                   <span>{currentFolder ? t('dashboard.create_deck_here', 'Crear Mazo aquí') : t('dashboard.create_deck', 'Crear Mazo de Estudio')}</span>
@@ -1420,27 +1438,27 @@ function DecksViewContent() {
 
       {/* Modal: Creación Contextual Inteligente (Carpeta vs Mazo) */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/75 backdrop-blur-sm animate-in fade-in">
-          <div className="w-full max-w-md rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6 shadow-2xl relative space-y-5">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 dark:bg-black/75 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-md max-h-[88vh] sm:max-h-[85vh] overflow-y-auto overscroll-contain pr-1 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 sm:p-6 shadow-2xl relative space-y-3 sm:space-y-4 scrollbar-thin scrollbar-thumb-neutral-300 dark:scrollbar-thumb-neutral-800">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-neutral-900 dark:text-white tracking-tight flex items-center gap-2">
+              <h3 className="text-base sm:text-lg font-bold text-neutral-900 dark:text-white tracking-tight flex items-center gap-2">
                 <span>{createType === 'folder' ? t('dashboard.modal_create_folder_title', '📁 Crear Nueva Carpeta') : t('dashboard.modal_create_deck_title', '🃏 Crear Mazo de Estudio')}</span>
               </h3>
               <button
-                onClick={() => setIsCreateModalOpen(false)}
+                onClick={handleCloseCreateModal}
                 className="text-neutral-400 hover:text-neutral-900 dark:hover:text-white p-1 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 transition cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleCreate} className="space-y-4">
+            <form onSubmit={handleCreate} className="space-y-3 sm:space-y-4">
               {/* Entradas ocultas de respaldo para garantizar sincronización de datos */}
               <input type="hidden" name="isFolder" value={createType === 'folder' ? 'true' : 'false'} />
-              <input type="hidden" name="parentId" value={activeFolderId || ''} />
+              <input type="hidden" name="parentId" value={createParentId || ''} />
 
               {/* Selector Visual de Tipo */}
-              <div className="grid grid-cols-2 gap-3" role="radiogroup" aria-label="Tipo de elemento">
+              <div className="grid grid-cols-2 gap-2 sm:gap-3" role="radiogroup" aria-label="Tipo de elemento">
                 <button
                   type="button"
                   role="radio"
@@ -1448,14 +1466,14 @@ function DecksViewContent() {
                   onClick={() => {
                     setCreateType('folder');
                   }}
-                  className={`p-3.5 rounded-2xl border text-left transition-all duration-150 flex flex-col justify-between relative cursor-pointer ${
+                  className={`p-3 sm:p-3.5 rounded-xl sm:rounded-2xl border text-left transition-all duration-150 flex flex-col justify-between relative cursor-pointer ${
                     createType === 'folder'
                       ? 'border-amber-500 bg-amber-500/15 shadow-lg shadow-amber-500/10 ring-2 ring-amber-500/30'
                       : 'border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950/60 hover:border-neutral-300 dark:hover:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-900/60'
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-2xl">📁</span>
+                  <div className="flex items-center justify-between mb-1.5 sm:mb-2">
+                    <span className="text-xl sm:text-2xl">📁</span>
                     <span
                       className={`w-4 h-4 rounded-full border flex items-center justify-center transition ${
                         createType === 'folder'
@@ -1468,8 +1486,8 @@ function DecksViewContent() {
                       )}
                     </span>
                   </div>
-                  <div className="font-bold text-neutral-900 dark:text-white text-sm">{t('dashboard.modal_create_folder_title', '📁 Crear Carpeta')}</div>
-                  <div className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-1 leading-snug">
+                  <div className="font-bold text-neutral-900 dark:text-white text-xs sm:text-sm">{t('dashboard.modal_create_folder_title', '📁 Crear Carpeta')}</div>
+                  <div className="text-[10px] sm:text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5 sm:mt-1 leading-snug">
                     {t('dashboard.new_folder_desc', 'Agrupa asignaturas o temas')}
                   </div>
                 </button>
@@ -1481,14 +1499,14 @@ function DecksViewContent() {
                   onClick={() => {
                     setCreateType('deck');
                   }}
-                  className={`p-3.5 rounded-2xl border text-left transition-all duration-150 flex flex-col justify-between relative cursor-pointer ${
+                  className={`p-3 sm:p-3.5 rounded-xl sm:rounded-2xl border text-left transition-all duration-150 flex flex-col justify-between relative cursor-pointer ${
                     createType === 'deck'
                       ? 'border-indigo-500 bg-indigo-500/15 shadow-lg shadow-indigo-500/10 ring-2 ring-indigo-500/30'
                       : 'border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950/60 hover:border-neutral-300 dark:hover:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-900/60'
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-2xl">🃏</span>
+                  <div className="flex items-center justify-between mb-1.5 sm:mb-2">
+                    <span className="text-xl sm:text-2xl">🃏</span>
                     <span
                       className={`w-4 h-4 rounded-full border flex items-center justify-center transition ${
                         createType === 'deck'
@@ -1501,8 +1519,8 @@ function DecksViewContent() {
                       )}
                     </span>
                   </div>
-                  <div className="font-bold text-neutral-900 dark:text-white text-sm">{t('dashboard.modal_create_deck_title', '🃏 Crear Mazo')}</div>
-                  <div className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-1 leading-snug">
+                  <div className="font-bold text-neutral-900 dark:text-white text-xs sm:text-sm">{t('dashboard.modal_create_deck_title', '🃏 Crear Mazo')}</div>
+                  <div className="text-[10px] sm:text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5 sm:mt-1 leading-snug">
                     {t('dashboard.new_deck_desc', 'Tarjetas con repasos FSRS')}
                   </div>
                 </button>
@@ -1511,8 +1529,8 @@ function DecksViewContent() {
               {/* Enlace directo a Nuevo Atlas Visual */}
               <Link
                 href="/atlas/new"
-                onClick={() => setIsCreateModalOpen(false)}
-                className="flex items-center justify-between p-3 rounded-2xl border border-emerald-500/25 bg-emerald-500/10 hover:bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 transition text-xs font-medium cursor-pointer"
+                onClick={handleCloseCreateModal}
+                className="flex items-center justify-between p-2.5 sm:p-3 rounded-xl sm:rounded-2xl border border-emerald-500/25 bg-emerald-500/10 hover:bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 transition text-xs font-medium cursor-pointer"
               >
                 <div className="flex items-center gap-2.5">
                   <span className="text-xl">🗺️</span>
@@ -1528,22 +1546,42 @@ function DecksViewContent() {
                 <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">→</span>
               </Link>
 
-              {/* Banner de Ubicación Contextual */}
-              <div className="flex items-center justify-between p-2.5 rounded-xl bg-neutral-100 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 text-xs">
-                <span className="text-neutral-500 dark:text-neutral-400">{t('dashboard.modal_dest_location', '📍 Ubicación de destino:')}</span>
-                <span className="font-semibold text-neutral-900 dark:text-white flex items-center gap-1.5">
-                  {currentFolder ? (
-                    <>
-                      <span className="text-amber-500 dark:text-amber-400">📁</span>
-                      <span className="truncate max-w-[200px]">{currentFolder.title}</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>🏠</span>
-                      <span>{t('dashboard.modal_dest_root', 'Nivel raíz (Inicio)')}</span>
-                    </>
-                  )}
-                </span>
+              {/* Selector de Ubicación de Destino */}
+              <div>
+                <label
+                  htmlFor="create-parent-folder-select"
+                  className="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1.5"
+                >
+                  {t('dashboard.modal_dest_location', '📍 Ubicación de destino')}
+                </label>
+                <div className="relative">
+                  <select
+                    id="create-parent-folder-select"
+                    value={createParentId}
+                    onChange={(e) => setCreateParentId(e.target.value)}
+                    className="w-full text-xs sm:text-sm px-3.5 py-2.5 rounded-xl bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition appearance-none cursor-pointer pr-10 font-medium"
+                  >
+                    <option value="">
+                      🏠 {t('dashboard.modal_dest_root', 'Nivel raíz (Inicio)')}
+                    </option>
+                    {availableFoldersForCreate.map((folder) => {
+                      const path = getFolderPath(folder.id);
+                      return (
+                        <option key={folder.id} value={folder.id}>
+                          📁 {path || folder.title}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-neutral-400">
+                    <ChevronDown className="w-4 h-4" />
+                  </div>
+                </div>
+                <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-1">
+                  {createParentId
+                    ? t('dashboard.modal_dest_folder_hint', 'El elemento se creará dentro de la carpeta seleccionada.')
+                    : t('dashboard.modal_dest_root_hint', 'El elemento se creará en el nivel principal (biblioteca general).')}
+                </p>
               </div>
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1.5">
@@ -1588,16 +1626,16 @@ function DecksViewContent() {
 
               {/* Selector de Color */}
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-2">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1.5 sm:mb-2">
                   {t('dashboard.modal_color_label', 'Color Distintivo')}
                 </label>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2.5 sm:gap-3">
                   {COLOR_PALETTE.map((c) => (
                     <button
                       key={c.hex}
                       type="button"
                       onClick={() => setNewColor(c.hex)}
-                      className={`w-7 h-7 rounded-full transition-transform cursor-pointer ${
+                      className={`w-6 h-6 sm:w-7 sm:h-7 rounded-full transition-transform cursor-pointer ${
                         newColor === c.hex
                           ? 'scale-125 ring-2 ring-offset-2 ring-offset-white dark:ring-offset-neutral-900 shadow-md ring-neutral-800 dark:ring-white'
                           : 'hover:scale-110 opacity-70 hover:opacity-100'
@@ -1609,18 +1647,18 @@ function DecksViewContent() {
                 </div>
               </div>
 
-              <div className="pt-2 flex items-center justify-end gap-3">
+              <div className="pt-2 sm:pt-3 flex items-center justify-end gap-2 sm:gap-3">
                 <button
                   type="button"
-                  onClick={() => setIsCreateModalOpen(false)}
-                  className="px-4 py-2 text-xs text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 transition cursor-pointer"
+                  onClick={handleCloseCreateModal}
+                  className="px-3.5 py-2 sm:px-4 sm:py-2 text-xs text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 transition cursor-pointer"
                 >
                   {t('common.cancel', 'Cancelar')}
                 </button>
                 <button
                   type="submit"
                   disabled={isCreating || !newTitle.trim()}
-                  className={`px-5 py-2.5 text-xs font-medium text-white disabled:opacity-50 rounded-xl transition shadow-lg active:scale-95 cursor-pointer ${
+                  className={`px-4 py-2 sm:px-5 sm:py-2.5 text-xs font-medium text-white disabled:opacity-50 rounded-xl transition shadow-lg active:scale-95 cursor-pointer ${
                     createType === 'folder'
                       ? 'bg-amber-600 hover:bg-amber-500 shadow-amber-600/25'
                       : 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-600/25'

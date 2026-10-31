@@ -194,6 +194,9 @@ export function AuthForm({ initialMode = 'signin' }: AuthFormProps) {
 
         if (data?.session) {
           try {
+            localStorage.removeItem('flashcards_welcome_tutorial_seen');
+          } catch {}
+          try {
             await ensureQuickGuideDeck(data.session.user.id);
           } catch (seedErr) {
             console.warn('Error inicializando mazo demo:', seedErr);

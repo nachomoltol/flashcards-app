@@ -1,22 +1,15 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import { useTutorialStore } from '@/stores/useTutorialStore';
+import { useAuthStore } from '@/stores/useAuthStore';
 import {
-  FolderTree,
-  Sparkles,
-  Brain,
-  Rocket,
   ChevronRight,
   ChevronLeft,
   X,
-  FileText,
-  FileCode,
-  CheckCircle2,
-  Clock,
-  Layers,
-  Settings,
-  Video,
+  Rocket,
+  Sparkles,
 } from 'lucide-react';
 
 export const TUTORIAL_STORAGE_KEY = 'flashcards_welcome_tutorial_seen';
@@ -26,242 +19,142 @@ interface SlideData {
   badge: string;
   title: string;
   description: string;
+  image: string;
   gradient: string;
-  iconBg: string;
-  iconColor: string;
-  renderIcon: () => React.ReactNode;
-  renderIllustration: () => React.ReactNode;
 }
 
 const slides: SlideData[] = [
-  // Slide 1
   {
-    step: '1 de 5',
-    badge: 'Organización',
-    title: 'Crea tu primera Carpeta',
+    step: 'Paso 1 de 12',
+    badge: 'Inicio',
+    title: 'Crea tu espacio de estudio',
     description:
-      'El primer paso es organizarte. Pulsa el botón principal \'+ Nuevo\' para crear una Carpeta para tu asignatura o tema. Dentro de ella, podrás crear subcarpetas y tus mazos de estudio.',
+      'Desde la pantalla principal de tu panel, pulsa el botón destacado + Nuevo para desplegar todas las opciones de creación disponibles.',
+    image: '/tutorial/paso-1.jpeg',
     gradient: 'from-blue-600/20 via-indigo-600/10 to-transparent',
-    iconBg: 'bg-blue-500/15 border-blue-500/30',
-    iconColor: 'text-blue-400',
-    renderIcon: () => <FolderTree className="w-6 h-6" />,
-    renderIllustration: () => (
-      <div className="w-full bg-neutral-50 dark:bg-neutral-950/70 border border-neutral-200 dark:border-neutral-800/80 rounded-2xl p-4 sm:p-5 space-y-3">
-        <div className="flex items-center justify-between pb-2.5 border-b border-neutral-200 dark:border-neutral-800/60">
-          <div className="flex items-center gap-2">
-            <span className="text-sm">📁</span>
-            <span className="text-xs font-semibold text-neutral-900 dark:text-white">Biblioteca</span>
-          </div>
-          <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 text-white text-[11px] font-bold shadow-sm">
-            <span>+</span>
-            <span>Nuevo</span>
-          </div>
-        </div>
-        <div className="pl-3 sm:pl-4 space-y-2 border-l-2 border-amber-500/40">
-          <div className="flex items-center justify-between p-2 rounded-xl bg-white dark:bg-neutral-900/80 border border-neutral-200 dark:border-neutral-800 text-left">
-            <div className="flex items-center gap-2">
-              <span className="text-sm">📁</span>
-              <span className="text-xs font-medium text-neutral-800 dark:text-neutral-200">Carpeta: Asignatura</span>
-            </div>
-            <span className="text-[10px] text-amber-700 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full font-mono">
-              Organizador
-            </span>
-          </div>
-          <div className="pl-3 sm:pl-4 border-l border-neutral-200 dark:border-neutral-800 space-y-1.5">
-            <div className="flex items-center justify-between p-1.5 rounded-lg bg-white dark:bg-neutral-900/50 border border-neutral-200 dark:border-neutral-800/60 text-left">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs">🃏</span>
-                <span className="text-[11px] text-neutral-700 dark:text-neutral-300">Mazo de Estudio</span>
-              </div>
-              <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-mono">FSRS</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    ),
   },
-
-  // Slide 2
   {
-    step: '2 de 5',
-    badge: 'Inteligencia Artificial',
-    title: 'Genera preguntas al instante',
+    step: 'Paso 2 de 12',
+    badge: 'Creación',
+    title: 'Personaliza tu temario',
     description:
-      'Una vez creado un mazo, entra en él y pulsa \'Generar preguntas con IA\'. Sube tus apuntes en PDF, Word, un audio o pega un enlace de YouTube. Nosotros extraeremos las flashcards por ti.',
-    gradient: 'from-purple-600/20 via-pink-600/10 to-transparent',
-    iconBg: 'bg-purple-500/15 border-purple-500/30',
-    iconColor: 'text-purple-400',
-    renderIcon: () => <Sparkles className="w-6 h-6" />,
-    renderIllustration: () => (
-      <div className="w-full bg-neutral-50 dark:bg-neutral-950/70 border border-neutral-200 dark:border-neutral-800/80 rounded-2xl p-4 sm:p-5 space-y-3">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
-          <div className="p-2.5 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800/80 flex flex-col items-center gap-1.5 shadow-sm">
-            <FileText className="w-4 h-4 text-rose-500 dark:text-rose-400" />
-            <span className="text-[11px] font-medium text-neutral-700 dark:text-neutral-300">PDFs</span>
-          </div>
-          <div className="p-2.5 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800/80 flex flex-col items-center gap-1.5 shadow-sm">
-            <FileCode className="w-4 h-4 text-blue-500 dark:text-blue-400" />
-            <span className="text-[11px] font-medium text-neutral-700 dark:text-neutral-300">Word .docx</span>
-          </div>
-          <div className="p-2.5 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800/80 flex flex-col items-center gap-1.5 shadow-sm">
-            <Video className="w-4 h-4 text-red-500" />
-            <span className="text-[11px] font-medium text-neutral-700 dark:text-neutral-300">YouTube</span>
-          </div>
-          <div className="p-2.5 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800/80 flex flex-col items-center gap-1.5 shadow-sm">
-            <Sparkles className="w-4 h-4 text-amber-500 dark:text-amber-400" />
-            <span className="text-[11px] font-medium text-neutral-700 dark:text-neutral-300">Audios MP3</span>
-          </div>
-        </div>
-        <div className="p-3 rounded-xl bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/20 text-purple-700 dark:text-purple-300 text-xs flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0" />
-          <span>Extracción inteligente por bloques de hasta 30 tarjetas.</span>
-        </div>
-      </div>
-    ),
+      'Selecciona Crear Mazo de Estudio, asígnale un nombre descriptivo, elige su color identificativo y pulsa en Crear Mazo de Estudio para guardarlo. (También puedes crear carpetas para organizar o un Atlas Visual para memorizar diagramas).',
+    image: '/tutorial/paso-2.jpeg',
+    gradient: 'from-purple-600/20 via-indigo-600/10 to-transparent',
   },
-
-  // Slide 3
   {
-    step: '3 de 5',
-    badge: 'El arte del repaso',
-    title: 'El arte del repaso',
+    step: 'Paso 3 de 12',
+    badge: 'Biblioteca',
+    title: 'Gestiona y añade contenido',
     description:
-      'Al estudiar, lee la pregunta y piensa la respuesta. Luego mira la respuesta y sé honesto: pulsa 1, 2, 3 o 4 según te haya costado recordarlo. El algoritmo calculará el día exacto para volvértela a mostrar.',
+      'Tu mazo recién creado ya aparece en la biblioteca principal. Haz clic sobre su tarjeta o en el icono de engranaje (⚙️) para acceder a su panel de gestión.',
+    image: '/tutorial/paso-3.jpeg',
+    gradient: 'from-indigo-600/20 via-sky-600/10 to-transparent',
+  },
+  {
+    step: 'Paso 4 de 12',
+    badge: 'Generación IA',
+    title: 'Generación inteligente o manual',
+    description:
+      'Dentro del mazo, pulsa el botón principal ✨ Generar preguntas con IA para transformar tus apuntes automáticamente, o utiliza + Añadir tarjeta si prefieres escribirlas tú mismo.',
+    image: '/tutorial/paso-4.jpeg',
+    gradient: 'from-amber-600/20 via-purple-600/10 to-transparent',
+  },
+  {
+    step: 'Paso 5 de 12',
+    badge: 'Formatos',
+    title: 'Multi-formato a tu alcance',
+    description:
+      'En la pestaña Subir Documento, arrastra o selecciona cualquier archivo de tu temario. Es compatible con archivos PDF, Word (.docx), notas de audio (.mp3) o texto plano (.txt).',
+    image: '/tutorial/paso-5.jpeg',
     gradient: 'from-emerald-600/20 via-teal-600/10 to-transparent',
-    iconBg: 'bg-emerald-500/15 border-emerald-500/30',
-    iconColor: 'text-emerald-400',
-    renderIcon: () => <Brain className="w-6 h-6" />,
-    renderIllustration: () => (
-      <div className="w-full bg-neutral-50 dark:bg-neutral-950/70 border border-neutral-200 dark:border-neutral-800/80 rounded-2xl p-4 sm:p-5 space-y-3">
-        <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
-          <div className="p-2 sm:p-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-center">
-            <span className="block text-[11px] font-bold text-red-600 dark:text-red-400">1. Fallé</span>
-            <span className="text-[9px] text-neutral-500 dark:text-neutral-400">Repetir</span>
-          </div>
-          <div className="p-2 sm:p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-center">
-            <span className="block text-[11px] font-bold text-amber-600 dark:text-amber-400">2. Hard</span>
-            <span className="text-[9px] text-neutral-500 dark:text-neutral-400">Difícil</span>
-          </div>
-          <div className="p-2 sm:p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/30 text-center">
-            <span className="block text-[11px] font-bold text-blue-600 dark:text-blue-400">3. Good</span>
-            <span className="text-[9px] text-neutral-500 dark:text-neutral-400">Bien</span>
-          </div>
-          <div className="p-2 sm:p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-center">
-            <span className="block text-[11px] font-bold text-emerald-600 dark:text-emerald-400">4. Easy</span>
-            <span className="text-[9px] text-neutral-500 dark:text-neutral-400">Fácil</span>
-          </div>
-        </div>
-        <div className="p-2.5 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-[11px] text-neutral-600 dark:text-neutral-400 flex items-center justify-between">
-          <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-medium">
-            <Clock className="w-3.5 h-3.5" /> Algoritmo FSRS de Repetición Espaciada
-          </span>
-          <span className="font-mono text-neutral-700 dark:text-neutral-300">Teclas 1, 2, 3, 4</span>
-        </div>
-      </div>
-    ),
   },
-
-  // Slide 4
   {
-    step: '4 de 5',
-    badge: 'Edición y Gestión',
-    title: 'Edita y organiza a tu gusto',
+    step: 'Paso 6 de 12',
+    badge: 'Documento',
+    title: 'Archivo cargado y listo',
     description:
-      '¿Te has equivocado al crear algo? No pasa nada. Usa el botón del engranaje (⚙️) que verás junto a cualquier mazo o carpeta para cambiarle el nombre, el color o eliminarlo.',
+      'Comprueba que tu archivo se ha cargado correctamente en la lista y pulsa el botón Continuar al Paso 2 > para configurar las opciones de extracción.',
+    image: '/tutorial/paso-6.jpeg',
+    gradient: 'from-teal-600/20 via-blue-600/10 to-transparent',
+  },
+  {
+    step: 'Paso 7 de 12',
+    badge: 'Tipos de pregunta',
+    title: 'Tipos de pregunta a tu medida',
+    description:
+      'Selecciona el formato que mejor encaje con tu método de estudio: Test (4 opciones), Básica (Pregunta y respuesta directa), Cloze (Rellenar huecos) o Verdadero/Falso.',
+    image: '/tutorial/paso-7.jpeg',
+    gradient: 'from-pink-600/20 via-purple-600/10 to-transparent',
+  },
+  {
+    step: 'Paso 8 de 12',
+    badge: 'Páginas y límites',
+    title: 'Control preciso del temario',
+    description:
+      'Introduce el tramo exacto de páginas que deseas procesar (ej. de la 1 a la 10). En la cantidad de tarjetas, te recomendamos seleccionar siempre el máximo (30 tarjetas) para aprovechar al límite cada tanda.',
+    image: '/tutorial/paso-8.jpeg',
+    gradient: 'from-blue-600/20 via-violet-600/10 to-transparent',
+  },
+  {
+    step: 'Paso 9 de 12',
+    badge: 'Rigor y profundidad',
+    title: 'Rigor y profundidad con IA',
+    description:
+      'Escoge entre enfoque de Estudio / Académico o Docente / Didáctico. Activa el Modo Exhaustivo si necesitas que la IA despiece cada dato, tabla o detalle sin dejar nada atrás. Cuando esté listo, pulsa Extraer tarjetas.',
+    image: '/tutorial/paso-9.jpeg',
+    gradient: 'from-violet-600/20 via-fuchsia-600/10 to-transparent',
+  },
+  {
+    step: 'Paso 10 de 12',
+    badge: 'Marcapáginas',
+    title: 'Tu marcapáginas automático',
+    description:
+      'La IA generará y guardará tus tarjetas por bloques. Si el documento es extenso, utiliza el botón Continuar extrayendo para avanzar en las siguientes páginas desde el punto exacto donde se quedó el motor.',
+    image: '/tutorial/paso-10.jpeg',
     gradient: 'from-amber-600/20 via-orange-600/10 to-transparent',
-    iconBg: 'bg-amber-500/15 border-amber-500/30',
-    iconColor: 'text-amber-400',
-    renderIcon: () => <Settings className="w-6 h-6" />,
-    renderIllustration: () => (
-      <div className="w-full bg-neutral-50 dark:bg-neutral-950/70 border border-neutral-200 dark:border-neutral-800/80 rounded-2xl p-4 sm:p-5 space-y-3">
-        {/* Mockup Card con Botón de Engranaje */}
-        <div className="p-3 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 flex items-center justify-between shadow-sm">
-          <div className="flex items-center gap-2.5">
-            <span className="w-3 h-3 rounded-full bg-indigo-500" />
-            <div className="text-left">
-              <span className="text-xs font-bold text-neutral-900 dark:text-white block">Mazo de Estudio</span>
-              <span className="text-[10px] text-neutral-500 dark:text-neutral-400">20 tarjetas</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-[11px] px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-600/20 text-indigo-700 dark:text-indigo-300 font-semibold border border-indigo-200 dark:border-indigo-500/30">
-              Estudiar
-            </span>
-            <div className="p-1 rounded-lg bg-amber-500/15 dark:bg-amber-500/20 text-amber-600 dark:text-amber-300 border border-amber-500/30 dark:border-amber-500/40 flex items-center justify-center animate-pulse">
-              <Settings className="w-3.5 h-3.5" />
-            </div>
-          </div>
-        </div>
-
-        {/* Menú de Opciones */}
-        <div className="grid grid-cols-3 gap-2 text-center text-[11px]">
-          <div className="p-2 rounded-xl bg-white dark:bg-neutral-900/90 border border-neutral-200 dark:border-neutral-800/80 text-neutral-700 dark:text-neutral-300 flex flex-col items-center gap-1 shadow-sm">
-            <span className="text-sm">✏️</span>
-            <span>Editar nombre</span>
-          </div>
-          <div className="p-2 rounded-xl bg-white dark:bg-neutral-900/90 border border-neutral-200 dark:border-neutral-800/80 text-neutral-700 dark:text-neutral-300 flex flex-col items-center gap-1 shadow-sm">
-            <span className="text-sm">🎨</span>
-            <span>Cambiar color</span>
-          </div>
-          <div className="p-2 rounded-xl bg-white dark:bg-neutral-900/90 border border-rose-200 dark:border-rose-500/20 text-rose-600 dark:text-rose-300 flex flex-col items-center gap-1 shadow-sm">
-            <span className="text-sm">🗑️</span>
-            <span>Eliminar</span>
-          </div>
-        </div>
-      </div>
-    ),
   },
-
-  // Slide 5
   {
-    step: '5 de 5',
-    badge: 'Comienza ahora',
-    title: 'Tu turno. ¡A jugar!',
+    step: 'Paso 11 de 12',
+    badge: 'Tarjetas listas',
+    title: 'Todas tus tarjetas listas',
     description:
-      'Te hemos dejado un mazo llamado \'Guía Rápida\' en tu panel. Ábrelo ahora mismo y dale a \'Estudiar\' para hacer tu primera sesión de prueba y entender la dinámica.',
+      'Al cerrar el generador, verás el recuento de tarjetas en tu mazo. Pulsa en Estudiar Mazo para iniciar la sesión con repetición espaciada FSRS, o utiliza modalidades como Modo Pánico o Simulacro.',
+    image: '/tutorial/paso-11.jpeg',
+    gradient: 'from-emerald-600/20 via-green-600/10 to-transparent',
+  },
+  {
+    step: 'Paso 12 de 12',
+    badge: 'Algoritmo FSRS',
+    title: 'Califica y fija en la memoria',
+    description:
+      'Lee la pregunta y pulsa para voltear y ver la solución fundamentada. Califica tu grado de recuerdo con los 4 botones inferiores (1. Fallé, 2. Hard, 3. Good, 4. Easy) para que el algoritmo programe el siguiente repaso en el momento óptimo.',
+    image: '/tutorial/paso-12.jpeg',
     gradient: 'from-indigo-600/25 via-violet-600/15 to-transparent',
-    iconBg: 'bg-indigo-500/20 border-indigo-500/40',
-    iconColor: 'text-indigo-400',
-    renderIcon: () => <Rocket className="w-6 h-6" />,
-    renderIllustration: () => (
-      <div className="w-full bg-neutral-50 dark:bg-neutral-950/70 border border-indigo-200 dark:border-indigo-500/30 rounded-2xl p-4 sm:p-5 space-y-3">
-        <div className="flex items-center justify-between p-3 rounded-xl bg-indigo-50 dark:bg-gradient-to-r dark:from-indigo-950/50 dark:to-neutral-900 border border-indigo-200 dark:border-indigo-500/40 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-600/30">
-              <Layers className="w-5 h-5" />
-            </div>
-            <div className="text-left">
-              <h4 className="text-xs sm:text-sm font-bold text-neutral-900 dark:text-white">Guía Rápida</h4>
-              <p className="text-[11px] text-indigo-700 dark:text-indigo-300">5 tarjetas interactivas de prueba</p>
-            </div>
-          </div>
-          <span className="text-[11px] font-medium px-2.5 py-1 rounded-lg bg-indigo-600 text-white shadow-sm">
-            Listo para estudiar
-          </span>
-        </div>
-        <p className="text-[11px] text-neutral-500 dark:text-neutral-400 text-left">
-          💡 Puedes voltear tarjetas haciendo clic o con la tecla <kbd className="px-1.5 py-0.5 rounded bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-300 border border-neutral-300 dark:border-neutral-700 font-mono text-[10px]">Espacio</kbd>.
-        </p>
-      </div>
-    ),
   },
 ];
 
 export function WelcomeTutorial() {
   const { isOpen, initialSlide, closeTutorial, openTutorial } = useTutorialStore();
+  const { user, isLoading } = useAuthStore();
   const [currentSlide, setCurrentSlide] = useState(0);
 
-  // Verificación automática en el primer acceso
+  // Verificación automática garantizada tras cargar la sesión del usuario
   useEffect(() => {
+    if (isLoading) return;
+
     try {
       const hasSeen = localStorage.getItem(TUTORIAL_STORAGE_KEY);
       if (!hasSeen) {
-        openTutorial(0);
+        const timer = setTimeout(() => {
+          openTutorial(0);
+        }, 350);
+        return () => clearTimeout(timer);
       }
     } catch (e) {
       console.warn('Error leyendo localStorage para el tutorial:', e);
     }
-  }, [openTutorial]);
+  }, [openTutorial, isLoading, user?.id]);
 
   // Sincronizar el slide inicial cuando se abre el modal
   useEffect(() => {
@@ -322,86 +215,95 @@ export function WelcomeTutorial() {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
       role="dialog"
       aria-modal="true"
-      aria-label="Tutorial de bienvenida"
+      aria-label="Tutorial paso a paso de Flashmente"
     >
       <div
-        className="relative w-full max-w-lg rounded-3xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800/90 shadow-2xl shadow-neutral-950/20 dark:shadow-black overflow-hidden flex flex-col animate-in zoom-in-95 duration-200"
-        style={{ maxHeight: '92vh' }}
+        className="relative w-full max-w-md sm:max-w-lg rounded-3xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-2xl shadow-neutral-950/20 dark:shadow-black overflow-hidden flex flex-col animate-in zoom-in-95 duration-200"
+        style={{ maxHeight: '94vh' }}
       >
         {/* Glow de fondo dinámico según el slide */}
         <div
-          className={`absolute top-0 inset-x-0 h-44 bg-gradient-to-b ${current.gradient} pointer-events-none transition-all duration-500`}
+          className={`absolute top-0 inset-x-0 h-40 bg-gradient-to-b ${current.gradient} pointer-events-none transition-all duration-500`}
         />
 
-        {/* Barra superior con navegación y botón cerrar */}
-        <div className="relative flex items-center justify-between px-6 pt-5 pb-2 z-10">
+        {/* Barra superior con badge de paso y botón cerrar */}
+        <div className="relative flex items-center justify-between px-5 pt-4 pb-2 z-10 shrink-0">
           <div className="flex items-center gap-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700/80 text-neutral-700 dark:text-neutral-300 font-mono">
+            <span className="text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/40 border border-purple-200 dark:border-purple-700/60 text-purple-800 dark:text-purple-300 font-mono">
               {current.step}
             </span>
-            <span className="text-xs text-neutral-500 dark:text-neutral-400 font-medium hidden sm:inline">
+            <span className="text-xs text-neutral-500 dark:text-neutral-400 font-medium">
               {current.badge}
             </span>
           </div>
 
-          <button
-            type="button"
-            onClick={handleDismiss}
-            className="p-1.5 rounded-full text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800/80 transition cursor-pointer"
-            aria-label="Cerrar tutorial"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Contenido principal del slide */}
-        <div className="relative px-6 py-4 flex-1 overflow-y-auto space-y-5 text-center sm:text-left z-10">
-          {/* Cabecera con Icono y Título */}
-          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
-            <div
-              className={`w-12 h-12 rounded-2xl flex items-center justify-center border shadow-lg shrink-0 ${current.iconBg} ${current.iconColor}`}
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={handleDismiss}
+              className="text-xs text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 px-2 py-1 transition cursor-pointer"
             >
-              {current.renderIcon()}
-            </div>
-            <div>
-              <h3 className="text-xl sm:text-2xl font-bold text-neutral-900 dark:text-white tracking-tight">
-                {current.title}
-              </h3>
-              <p className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-300 mt-1 leading-relaxed">
-                {current.description}
-              </p>
-            </div>
-          </div>
-
-          {/* Ilustración interactiva / visual específica del slide */}
-          <div className="pt-1">
-            {current.renderIllustration()}
+              Saltar
+            </button>
+            <button
+              type="button"
+              onClick={handleDismiss}
+              className="p-1.5 rounded-full text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition cursor-pointer"
+              aria-label="Cerrar tutorial"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
         </div>
 
-        {/* Barra de control inferior: Dots y botones de navegación */}
-        <div className="relative px-6 py-4 bg-neutral-50 dark:bg-neutral-950/80 border-t border-neutral-200 dark:border-neutral-800/80 flex items-center justify-between gap-3 z-10">
-          {/* Indicadores de diapositiva (Dots) */}
-          <div className="flex items-center gap-1.5" aria-label="Indicador de diapositiva">
+        {/* Contenido principal del slide con scroll si es necesario */}
+        <div className="relative px-5 py-2 flex-1 overflow-y-auto space-y-3.5 z-10 text-center sm:text-left scrollbar-thin scrollbar-thumb-neutral-300 dark:scrollbar-thumb-neutral-800">
+          {/* Título y Descripción */}
+          <div className="space-y-1">
+            <h3 className="text-lg sm:text-xl font-extrabold text-neutral-900 dark:text-white tracking-tight leading-snug">
+              {current.title}
+            </h3>
+            <p className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-300 leading-relaxed">
+              {current.description}
+            </p>
+          </div>
+
+          {/* Marco de Captura Visual Responsivo */}
+          <div className="relative mx-auto w-full max-w-[270px] sm:max-w-[310px] aspect-[9/19.5] max-h-[46vh] sm:max-h-[50vh] rounded-2xl overflow-hidden border border-neutral-200 dark:border-neutral-800/90 shadow-xl bg-neutral-950 flex items-center justify-center">
+            <Image
+              src={current.image}
+              alt={current.title}
+              fill
+              sizes="(max-width: 640px) 270px, 310px"
+              className="object-contain object-top"
+              priority={currentSlide === 0}
+            />
+          </div>
+        </div>
+
+        {/* Barra de control inferior: Progreso y botones de navegación */}
+        <div className="relative px-5 py-3.5 bg-neutral-50 dark:bg-neutral-950/90 border-t border-neutral-200 dark:border-neutral-800 flex items-center justify-between gap-2 z-10 shrink-0">
+          {/* Indicadores de diapositiva (Dots compactos) */}
+          <div className="flex items-center gap-1 sm:gap-1.5" aria-label="Indicador de diapositiva">
             {slides.map((_, idx) => (
               <button
                 key={idx}
                 type="button"
                 onClick={() => setCurrentSlide(idx)}
                 aria-label={`Ir a la diapositiva ${idx + 1}`}
-                className={`transition-all duration-300 rounded-full h-2 ${
+                className={`transition-all duration-300 rounded-full h-1.5 ${
                   idx === currentSlide
-                    ? 'w-6 bg-indigo-500 shadow-sm shadow-indigo-500/50'
-                    : 'w-2 bg-neutral-300 dark:bg-neutral-700 hover:bg-neutral-400 dark:hover:bg-neutral-600'
+                    ? 'w-4 sm:w-5 bg-purple-600 dark:bg-purple-500 shadow-sm shadow-purple-500/50'
+                    : 'w-1.5 bg-neutral-300 dark:bg-neutral-700 hover:bg-neutral-400 dark:hover:bg-neutral-600'
                 }`}
               />
             ))}
           </div>
 
-          {/* Botones de acción */}
+          {/* Botones de navegación */}
           <div className="flex items-center gap-2">
             {currentSlide > 0 && (
               <button
@@ -409,8 +311,8 @@ export function WelcomeTutorial() {
                 onClick={handlePrev}
                 className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white text-xs font-medium transition active:scale-95 cursor-pointer shadow-sm"
               >
-                <ChevronLeft className="w-4 h-4" />
-                <span>Anterior</span>
+                <ChevronLeft className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Anterior</span>
               </button>
             )}
 
@@ -418,19 +320,19 @@ export function WelcomeTutorial() {
               <button
                 type="button"
                 onClick={handleDismiss}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-indigo-600/30 transition active:scale-95 cursor-pointer animate-pulse"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 text-white text-xs sm:text-sm font-bold shadow-lg shadow-purple-600/30 transition active:scale-95 cursor-pointer animate-pulse"
               >
-                <span>¡A jugar!</span>
+                <span>¡A Estudiar!</span>
                 <Rocket className="w-4 h-4" />
               </button>
             ) : (
               <button
                 type="button"
                 onClick={handleNext}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-medium shadow-md shadow-indigo-600/20 transition active:scale-95 cursor-pointer"
+                className="inline-flex items-center gap-1 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs sm:text-sm font-semibold shadow-md shadow-purple-600/20 transition active:scale-95 cursor-pointer"
               >
                 <span>Siguiente</span>
-                <ChevronRight className="w-4 h-4" />
+                <ChevronRight className="w-3.5 h-3.5" />
               </button>
             )}
           </div>

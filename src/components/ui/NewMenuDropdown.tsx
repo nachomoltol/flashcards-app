@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useLanguageStore } from '@/stores';
 import { Plus, ChevronDown, Folder, FileText, Map } from 'lucide-react';
 
@@ -20,6 +20,8 @@ export function NewMenuDropdown({
   onSelectFolder,
 }: NewMenuDropdownProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
   const { t } = useLanguageStore();
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -53,7 +55,12 @@ export function NewMenuDropdown({
     if (onSelectDeck) {
       onSelectDeck();
     } else {
-      router.push('/?create=deck');
+      const folderId = searchParams.get('folder');
+      const basePath = pathname.startsWith('/decks') ? '/decks' : '/';
+      const targetUrl = folderId
+        ? `${basePath}?create=deck&folder=${encodeURIComponent(folderId)}`
+        : `${basePath}?create=deck`;
+      router.push(targetUrl);
     }
   };
 
@@ -62,7 +69,12 @@ export function NewMenuDropdown({
     if (onSelectFolder) {
       onSelectFolder();
     } else {
-      router.push('/?create=folder');
+      const folderId = searchParams.get('folder');
+      const basePath = pathname.startsWith('/decks') ? '/decks' : '/';
+      const targetUrl = folderId
+        ? `${basePath}?create=folder&folder=${encodeURIComponent(folderId)}`
+        : `${basePath}?create=folder`;
+      router.push(targetUrl);
     }
   };
 

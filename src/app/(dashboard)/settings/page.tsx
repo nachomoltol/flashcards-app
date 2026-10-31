@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Ticket, CheckCircle2, AlertCircle, ShieldCheck } from 'lucide-react';
 import { useAuthStore, useSettingsStore, useTutorialStore, useLanguageStore, DEFAULT_FSRS_SETTINGS } from '@/stores';
 import { redeemPromoCodeAction } from '@/app/actions/redeemPromoCode';
+import { TUTORIAL_STORAGE_KEY } from '@/components/onboarding/WelcomeTutorial';
 
 export default function SettingsPage() {
   const { user } = useAuthStore();
@@ -534,7 +535,14 @@ export default function SettingsPage() {
 
             <button
               type="button"
-              onClick={() => openTutorial(0)}
+              onClick={() => {
+                try {
+                  localStorage.removeItem(TUTORIAL_STORAGE_KEY);
+                } catch (e) {
+                  console.warn('Error al limpiar TUTORIAL_STORAGE_KEY:', e);
+                }
+                openTutorial(0);
+              }}
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-900 dark:hover:bg-neutral-800 border border-neutral-300 dark:border-neutral-700/80 hover:border-neutral-400 dark:hover:border-neutral-600 text-neutral-800 dark:text-neutral-200 hover:text-neutral-900 dark:hover:text-white text-xs sm:text-sm font-medium transition active:scale-95 shrink-0 cursor-pointer shadow-sm group"
             >
               <svg className="w-4 h-4 text-indigo-500 dark:text-indigo-400 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -15,6 +15,8 @@ export interface PlatformInfo {
   isWebDesktop: boolean;
   /** Indica si el dispositivo es un navegador móvil estándar (fuera de wrapper nativo) */
   isMobileBrowser: boolean;
+  /** Indica si el dispositivo es iOS (iPhone, iPad o iPod) */
+  isIOS: boolean;
 }
 
 /**
@@ -29,11 +31,13 @@ export function detectPlatform(): PlatformInfo {
       isAndroidWebView: false,
       isWebDesktop: true,
       isMobileBrowser: false,
+      isIOS: false,
     };
   }
 
   const userAgent = navigator.userAgent || '';
   const isAndroidOS = /Android/i.test(userAgent);
+  const isIOS = /iPhone|iPad|iPod/i.test(userAgent);
 
   // 1. Detección de Capacitor Nativo en Android
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -65,7 +69,7 @@ export function detectPlatform(): PlatformInfo {
       hasAndroidBridge);
 
   const isNativeAndroid = isCapacitorAndroid || isTWA || isAndroidWebView || hasAndroidBridge;
-  const isMobileDevice = isAndroidOS || /iPhone|iPad|iPod/i.test(userAgent);
+  const isMobileDevice = isAndroidOS || isIOS;
   const isWebDesktop = !isNativeAndroid && !isMobileDevice;
   const isMobileBrowser = isMobileDevice && !isNativeAndroid;
 
@@ -85,6 +89,7 @@ export function detectPlatform(): PlatformInfo {
     isAndroidWebView,
     isWebDesktop,
     isMobileBrowser,
+    isIOS,
   };
 }
 
@@ -100,6 +105,7 @@ export function usePlatform(): PlatformInfo {
     isAndroidWebView: false,
     isWebDesktop: true,
     isMobileBrowser: false,
+    isIOS: false,
   });
 
   useEffect(() => {

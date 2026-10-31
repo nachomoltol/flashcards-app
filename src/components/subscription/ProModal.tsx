@@ -18,6 +18,8 @@ import {
   Smartphone,
   PlayCircle,
   Tv,
+  Apple,
+  Mail,
 } from 'lucide-react';
 import { useProModalStore } from '@/stores/useProModalStore';
 import { useAuthStore, useLanguageStore } from '@/stores';
@@ -66,6 +68,10 @@ export function ProModal({
     tier?: string;
   } | null>(null);
 
+  // Estado para captura de interés en App Store para usuarios de iOS
+  const [iosEmail, setIosEmail] = useState('');
+  const [iosSubmitted, setIosSubmitted] = useState(false);
+
   // Estado de nivel y consumo para mensajes de límite duros (50 Free / 120 Pro)
   const [userLimits, setUserLimits] = useState<{
     tier: 'free' | 'pro' | 'vip';
@@ -90,7 +96,19 @@ export function ProModal({
           });
       });
     }
-  }, [isOpen, user?.id]);
+
+    if (user?.email && !iosEmail) {
+      setIosEmail(user.email);
+    }
+
+    try {
+      if (typeof window !== 'undefined' && localStorage.getItem('flashmente_ios_waitlist_email')) {
+        setIosSubmitted(true);
+      }
+    } catch {
+      // Ignorar fallo en acceso a localStorage
+    }
+  }, [isOpen, user?.id, user?.email, iosEmail]);
 
   const handleClose = useCallback(() => {
     if (propOnClose) {
@@ -316,7 +334,7 @@ export function ProModal({
               <Sparkles className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 animate-pulse" />
               <span>{t('pro_modal.badge', 'FLASHCARDS PRO')}</span>
               <span className="px-1.5 py-0.2 rounded-md bg-purple-200/80 dark:bg-purple-500/30 text-[10px] text-purple-800 dark:text-purple-200 font-mono">
-                {platform.isNativeAndroid ? 'ANDROID APP' : 'WEB & DESKTOP'}
+                {platform.isNativeAndroid ? 'ANDROID APP' : platform.isIOS ? 'IPHONE & IPAD' : 'WEB & DESKTOP'}
               </span>
             </div>
 
@@ -511,41 +529,111 @@ export function ProModal({
                 </div>
               </div>
 
-              {/* Si es Web/PC y no ha agotado el límite mensual, mostrar Alternativa 2 (App Android) */}
+              {/* Si es Web/PC o iOS y no ha agotado el límite mensual, mostrar Alternativa adaptada */}
               {!isLimitReached && (
-                <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 space-y-2.5 animate-in fade-in">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="p-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-400">
-                        <Smartphone className="w-4 h-4" />
+                platform.isIOS ? (
+                  <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 space-y-3 animate-in fade-in">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1.5 rounded-lg bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200">
+                          <Apple className="w-4 h-4" />
+                        </div>
+                        <h4 className="text-xs font-bold text-neutral-900 dark:text-white">
+                          Próximamente en Apple App Store (iOS)
+                        </h4>
                       </div>
-                      <h4 className="text-xs font-bold text-neutral-900 dark:text-white">
-                        {t(
-                          'pro_modal.web_option_mobile_title',
-                          'Opción 2: Generaciones Gratis en la App Android'
-                        )}
-                      </h4>
+                      <span className="px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-500/20 text-purple-800 dark:text-purple-300 font-bold text-[9px] uppercase tracking-wider">
+                        EN DESARROLLO
+                      </span>
                     </div>
-                    <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 font-bold text-[9px] uppercase tracking-wider">
-                      {t('pro_modal.web_option_mobile_badge', '100% GRATIS')}
-                    </span>
-                  </div>
 
-                  <p className="text-[11px] text-neutral-600 dark:text-neutral-300 leading-relaxed">
-                    {t(
-                      'pro_modal.web_option_mobile_desc',
-                      '¿Prefieres no suscribirte? Abre Flashmente en tu dispositivo Android y desbloquea generaciones gratuitas viendo anuncios cortos de vídeo.'
+                    <p className="text-[11px] text-neutral-600 dark:text-neutral-300 leading-relaxed">
+                      La app nativa de Flashmente para iPhone y iPad llegará próximamente al App Store. Mientras tanto, puedes generar sin límites desde Safari con el Plan PRO o dejarnos tu correo para ser notificado del lanzamiento:
+                    </p>
+
+                    {iosSubmitted ? (
+                      <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/30 text-emerald-800 dark:text-emerald-200 text-xs flex items-center gap-2 animate-in fade-in">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                        <span className="font-medium">
+                          ¡Anotado! Te avisaremos al lanzar la app oficial en la App Store.
+                        </span>
+                      </div>
+                    ) : (
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          const targetEmail = (iosEmail || user?.email || '').trim();
+                          if (targetEmail) {
+                            try {
+                              localStorage.setItem('flashmente_ios_waitlist_email', targetEmail);
+                            } catch {}
+                            setIosSubmitted(true);
+                          }
+                        }}
+                        className="flex gap-2"
+                      >
+                        <input
+                          type="email"
+                          value={iosEmail}
+                          onChange={(e) => setIosEmail(e.target.value)}
+                          placeholder={user?.email || 'tu-email@ejemplo.com'}
+                          required
+                          className="flex-1 bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 focus:border-purple-500 rounded-xl px-3 py-1.5 text-xs text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none transition"
+                        />
+                        <button
+                          type="submit"
+                          className="px-3.5 py-1.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-200 text-white dark:text-neutral-900 font-semibold text-xs transition active:scale-95 cursor-pointer shrink-0"
+                        >
+                          Avisarme
+                        </button>
+                      </form>
                     )}
-                  </p>
 
-                  <div className="pt-1 flex items-center justify-between text-[11px] text-neutral-600 dark:text-neutral-400 bg-white dark:bg-neutral-900/60 p-2.5 rounded-xl border border-neutral-200 dark:border-neutral-800/80">
-                    <span className="flex items-center gap-1.5">
-                      <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                      Sincronización instantánea de tus mazos en la nube
-                    </span>
-                    <span className="text-neutral-500 font-mono text-[10px]">Google AdMob</span>
+                    <div className="pt-0.5 text-center sm:text-left">
+                      <a
+                        href="mailto:soporte@flashmente.com?subject=Interés%20App%20iOS%20Flashmente"
+                        className="text-[11px] text-purple-600 dark:text-purple-400 hover:underline inline-flex items-center gap-1"
+                      >
+                        <Mail className="w-3 h-3" />
+                        <span>¿Preguntas sobre iOS? Escríbenos a soporte@flashmente.com</span>
+                      </a>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 space-y-2.5 animate-in fade-in">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-400">
+                          <Smartphone className="w-4 h-4" />
+                        </div>
+                        <h4 className="text-xs font-bold text-neutral-900 dark:text-white">
+                          {t(
+                            'pro_modal.web_option_mobile_title',
+                            'Opción 2: Generaciones Gratis en la App Android'
+                          )}
+                        </h4>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 font-bold text-[9px] uppercase tracking-wider">
+                        {t('pro_modal.web_option_mobile_badge', '100% GRATIS')}
+                      </span>
+                    </div>
+
+                    <p className="text-[11px] text-neutral-600 dark:text-neutral-300 leading-relaxed">
+                      {t(
+                        'pro_modal.web_option_mobile_desc',
+                        '¿Prefieres no suscribirte? Abre Flashmente en tu dispositivo Android y desbloquea generaciones gratuitas viendo anuncios cortos de vídeo.'
+                      )}
+                    </p>
+
+                    <div className="pt-1 flex items-center justify-between text-[11px] text-neutral-600 dark:text-neutral-400 bg-white dark:bg-neutral-900/60 p-2.5 rounded-xl border border-neutral-200 dark:border-neutral-800/80">
+                      <span className="flex items-center gap-1.5">
+                        <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                        Sincronización instantánea de tus mazos en la nube
+                      </span>
+                      <span className="text-neutral-500 font-mono text-[10px]">Google AdMob</span>
+                    </div>
+                  </div>
+                )
               )}
             </div>
           )}

@@ -1,6 +1,7 @@
 'use client';
 
 import { detectPlatform } from './platform';
+import { useProModalStore } from '@/stores/useProModalStore';
 
 /**
  * Identificadores de Google AdMob para Flashmente (Android Producción & Pruebas).
@@ -87,6 +88,18 @@ export async function showAdMobRewardedAd(
   adUnitId: string = ADMOB_CONFIG.REWARDED_AD_UNIT_ID
 ): Promise<ShowRewardedAdResult> {
   const platform = detectPlatform();
+
+  // Si la plataforma NO es Android nativo, los anuncios bonificados no aplican:
+  // Se bloquea cualquier crédito simulado y se abre directamente el modal PRO.
+  if (!platform.isNativeAndroid) {
+    if (typeof window !== 'undefined') {
+      useProModalStore.getState().openProModal(false);
+    }
+    return {
+      completed: false,
+      error: 'Los anuncios bonificados están disponibles exclusivamente en la aplicación Android. Pasa a PRO para continuar en Web.',
+    };
+  }
 
   // 1. Canal 1: Capacitor Nativo con @capacitor-community/admob
   if (platform.isCapacitorAndroid) {
@@ -193,105 +206,9 @@ export async function showAdMobRewardedAd(
     });
   }
 
-  // 3. Canal 3: Emulación en Entorno de Desarrollo / Modo de Pruebas Local
-  // Permite validar íntegramente el ciclo de recompensa y conexión con Supabase desde el navegador
-  return emulateRewardedAdDialog(adUnitId);
-}
-
-/**
- * Emula la visualización de un anuncio bonificado de AdMob durante el desarrollo local,
- * mostrando una cuenta atrás de prueba para certificar que el frontend y Supabase se integran correctamente.
- */
-function emulateRewardedAdDialog(
-  adUnitId: string = ADMOB_CONFIG.REWARDED_AD_UNIT_ID
-): Promise<ShowRewardedAdResult> {
-  return new Promise<ShowRewardedAdResult>((resolve) => {
-    // Si no estamos en el navegador, resolver inmediatamente
-    if (typeof document === 'undefined') {
-      resolve({
-        completed: true,
-        reward: { amount: 1, type: 'generation_credit' },
-      });
-      return;
-    }
-
-    const overlay = document.createElement('div');
-    overlay.id = 'admob-test-overlay';
-    overlay.className =
-      'fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-black/95 backdrop-blur-md p-6 text-white font-sans animate-in fade-in duration-200 select-none';
-
-    let countdown = 5;
-
-    overlay.innerHTML = `
-      <div class="max-w-md w-full bg-neutral-900 border border-amber-500/40 rounded-3xl p-6 sm:p-8 text-center space-y-6 shadow-2xl shadow-amber-950/40">
-        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-semibold tracking-wide">
-          <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
-          GOOGLE ADMOB • SIMULACIÓN
-        </div>
-
-        <div class="space-y-2">
-          <h3 class="text-xl font-bold text-white">Anuncio Bonificado</h3>
-          <p class="text-xs text-neutral-300 leading-relaxed">
-            Ad Unit ID: <code class="text-amber-300 font-mono text-[11px]">${adUnitId}</code>
-          </p>
-        </div>
-
-        <div class="relative w-28 h-28 mx-auto flex items-center justify-center">
-          <div class="absolute inset-0 rounded-full border-4 border-amber-500/20 border-t-amber-400 animate-spin"></div>
-          <span id="admob-timer-num" class="text-4xl font-extrabold text-amber-400 font-mono">${countdown}s</span>
-        </div>
-
-        <p class="text-xs text-neutral-400">
-          Visualizando anuncio de recompensa para obtener <strong class="text-emerald-400">+1 crédito de generación con IA</strong>...
-        </p>
-
-        <div class="pt-2 flex gap-3 justify-center">
-          <button id="admob-cancel-btn" type="button" class="px-4 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-white text-xs font-medium transition cursor-pointer">
-            Cancelar (Sin recompensa)
-          </button>
-        </div>
-      </div>
-    `;
-
-    document.body.appendChild(overlay);
-
-    const timerNumEl = overlay.querySelector('#admob-timer-num');
-    const cancelBtn = overlay.querySelector('#admob-cancel-btn');
-
-    const interval = setInterval(() => {
-      countdown -= 1;
-      if (timerNumEl) {
-        timerNumEl.textContent = `${countdown}s`;
-      }
-
-      if (countdown <= 0) {
-        clearInterval(interval);
-        cleanup();
-        resolve({
-          completed: true,
-          reward: {
-            amount: 1,
-            type: 'generation_credit',
-          },
-        });
-      }
-    }, 1000);
-
-    const cleanup = () => {
-      clearInterval(interval);
-      if (document.body.contains(overlay)) {
-        document.body.removeChild(overlay);
-      }
-    };
-
-    if (cancelBtn) {
-      cancelBtn.addEventListener('click', () => {
-        cleanup();
-        resolve({
-          completed: false,
-          error: 'Visualización cancelada por el usuario.',
-        });
-      });
-    }
-  });
+  // Si se ejecuta en Android pero ningún canal nativo pudo desplegar el anuncio
+  return {
+    completed: false,
+    error: 'No se pudo cargar el anuncio bonificado en este momento. Inténtalo de nuevo más tarde.',
+  };
 }
