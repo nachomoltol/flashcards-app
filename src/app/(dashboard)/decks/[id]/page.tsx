@@ -9,6 +9,7 @@ import { ShareDeckModal, QuickStudyGuideModal, StudyModesHelpModal } from '@/com
 import { generateCardsAction } from '@/app/actions/generateCards';
 import { showAdMobRewardedAd } from '@/lib/admob';
 import { claimAdRewardAction } from '@/app/actions/claimAdReward';
+import { getDeckColorStyles } from '@/lib/colors';
 import type { CardFormat } from '@/types/database';
 
 interface DeckPageProps {
@@ -199,7 +200,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300">
+    <div style={getDeckColorStyles(currentDeck?.color)} className="space-y-8 animate-in fade-in duration-300">
       {/* Top Navigation & Breadcrumbs */}
       <div>
         {(() => {
@@ -228,8 +229,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2.5">
             <span
-              className="w-3.5 h-3.5 rounded-full shadow-md shrink-0"
-              style={{ backgroundColor: currentDeck?.color || '#6366f1' }}
+              className="w-3.5 h-3.5 rounded-full shadow-md shrink-0 bg-[var(--deck-accent)]"
             />
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-slate-600 dark:text-neutral-400 font-mono">
               ID: {id.slice(0, 8)}...
@@ -263,9 +263,9 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                 setAiMode('multimodal');
                 setIsAiModalOpen(true);
               }}
-              className="w-full py-2.5 sm:py-3 px-4 rounded-xl font-bold text-xs sm:text-sm text-white bg-gradient-to-r from-violet-600 via-indigo-600 to-indigo-700 hover:from-violet-500 hover:to-indigo-600 shadow-md shadow-violet-600/20 transition-all duration-150 active:scale-[0.99] border border-violet-400/20 cursor-pointer flex items-center justify-center gap-2"
+              className="w-full py-2.5 sm:py-3 px-4 rounded-xl font-bold text-xs sm:text-sm text-white bg-gradient-to-r from-[var(--deck-accent)] via-indigo-600 to-indigo-700 hover:brightness-110 shadow-md shadow-[var(--deck-accent-40)] transition-all duration-150 active:scale-[0.99] border border-white/20 cursor-pointer flex items-center justify-center gap-2"
             >
-              <Sparkles className="w-4 h-4 text-violet-200 animate-pulse shrink-0" />
+              <Sparkles className="w-4 h-4 text-white animate-pulse shrink-0" />
               <span>{t('deck_detail.generate_ai', 'Generar preguntas con IA')}</span>
               <span className="text-[10px] px-1.5 py-0.2 rounded bg-white/20 text-white font-mono tracking-tight shrink-0 hidden sm:inline">
                 {t('deck_detail.multimodal_badge', 'Multimodal')}
@@ -283,7 +283,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                     : 'bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-neutral-800 dark:text-neutral-200 border-neutral-300 dark:border-neutral-700/80 shadow-sm'
                 }`}
               >
-                <Plus className="w-4 h-4 text-indigo-500 shrink-0" />
+                <Plus className="w-4 h-4 text-[var(--deck-accent)] shrink-0" />
                 <span className="truncate">
                   {isManualEditorOpen
                     ? t('deck_detail.hide_editor', 'Cerrar editor')
@@ -296,16 +296,16 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                 onClick={() => setIsShareModalOpen(true)}
                 className="w-full py-2.5 px-3 rounded-xl font-semibold text-xs sm:text-sm text-neutral-800 dark:text-neutral-200 hover:text-black dark:hover:text-white bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 border border-neutral-300 dark:border-neutral-700/80 shadow-sm transition-all duration-150 active:scale-[0.99] cursor-pointer flex items-center justify-center gap-1.5 min-w-0"
               >
-                <Share2 className="w-4 h-4 text-indigo-500 dark:text-indigo-400 shrink-0" />
+                <Share2 className="w-4 h-4 text-[var(--deck-accent)] shrink-0" />
                 <span className="truncate">{t('deck_detail.share', 'Compartir')}</span>
               </button>
             </div>
           </div>
 
           {/* COLUMNA DERECHA: Núcleo de Estudio y Modos */}
-          <div className="flex flex-col justify-between gap-2.5 p-3.5 sm:p-4 rounded-2xl bg-indigo-50/40 dark:bg-indigo-950/20 border border-indigo-200/60 dark:border-indigo-900/40 shadow-sm">
+          <div className="flex flex-col justify-between gap-2.5 p-3.5 sm:p-4 rounded-2xl bg-[var(--deck-accent-10)] border border-[var(--deck-accent-40)] shadow-sm">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--deck-accent)]">
                 {t('deck_detail.section_study', 'Núcleo de Estudio')}
               </span>
             </div>
@@ -316,7 +316,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
               className={`w-full py-2.5 sm:py-3 px-4 rounded-xl font-bold text-xs sm:text-sm transition-all duration-150 shadow-lg flex items-center justify-center gap-2 active:scale-[0.99] ${
                 cards.length === 0
                   ? 'bg-neutral-200 text-neutral-400 pointer-events-none border border-neutral-300 dark:bg-neutral-800/60 dark:text-neutral-500 dark:border-neutral-800'
-                  : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30 ring-1 ring-indigo-400/40'
+                  : 'bg-[var(--deck-accent)] hover:brightness-110 text-white shadow-lg shadow-[var(--deck-accent-40)] ring-1 ring-[var(--deck-accent-40)]'
               }`}
             >
               <svg className="w-4 h-4 fill-current shrink-0" viewBox="0 0 24 24">

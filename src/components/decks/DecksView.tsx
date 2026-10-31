@@ -6,6 +6,7 @@ import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { useDeckStore, useAuthStore, useStreakStore, useLanguageStore, useAtlasStore, useTutorialStore, type DeckWithStats } from '@/stores';
 import { ShareDeckModal } from './ShareDeckModal';
 import { NewMenuDropdown } from '@/components/ui/NewMenuDropdown';
+import { getDeckColorStyles, COLOR_PALETTE } from '@/lib/colors';
 import {
   ChevronLeft,
   ChevronDown,
@@ -26,14 +27,7 @@ import {
   Layers,
 } from 'lucide-react';
 
-const COLOR_PALETTE = [
-  { name: 'Índigo', hex: '#6366f1' },
-  { name: 'Violeta', hex: '#8b5cf6' },
-  { name: 'Rosa', hex: '#ec4899' },
-  { name: 'Esmeralda', hex: '#10b981' },
-  { name: 'Ámbar', hex: '#f59e0b' },
-  { name: 'Cian', hex: '#06b6d4' },
-];
+
 
 export function DecksSkeleton() {
   return (
@@ -1002,10 +996,11 @@ function DecksViewContent() {
                   <div
                     key={deck.id}
                     onClick={isMultiSelectMode ? undefined : () => navigateToFolder(deck.id)}
+                    style={getDeckColorStyles(accentColor)}
                     className={`group rounded-xl sm:rounded-2xl border border-neutral-200/90 dark:border-neutral-800 bg-white dark:bg-neutral-900/60 p-3 sm:p-5 transition-all duration-200 flex flex-col justify-between relative shadow-sm hover:shadow-md hover:shadow-neutral-950/5 dark:hover:shadow-black/50 hover:-translate-y-0.5 ${
                       isMultiSelectMode
                         ? 'opacity-40 pointer-events-none cursor-not-allowed'
-                        : 'hover:border-neutral-300 dark:hover:border-neutral-700/80 cursor-pointer'
+                        : 'hover:border-[var(--deck-accent)]/50 cursor-pointer'
                     }`}
                   >
                     <div>
@@ -1013,25 +1008,14 @@ function DecksViewContent() {
                       <div className="flex items-center justify-between gap-1.5 sm:gap-2 mb-2 sm:mb-3">
                         <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0">
                           <div
-                            className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl flex items-center justify-center text-xs sm:text-sm shadow-sm border shrink-0 transition-colors"
-                            style={{
-                              backgroundColor: `${accentColor}18`,
-                              borderColor: `${accentColor}40`,
-                              color: accentColor,
-                            }}
+                            className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl flex items-center justify-center text-xs sm:text-sm shadow-sm border shrink-0 transition-colors bg-[var(--deck-accent-10)] border-[var(--deck-accent-40)] text-[var(--deck-accent)]"
                           >
                             <Folder
-                              className="w-4 h-4 sm:w-4.5 sm:h-4.5"
-                              style={{ color: accentColor, fill: `${accentColor}33` }}
+                              className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-[var(--deck-accent)] fill-[var(--deck-accent-20)]"
                             />
                           </div>
                           <span
-                            className="text-[10px] sm:text-xs px-2 sm:px-2.5 py-0.5 rounded-full font-mono font-medium border truncate transition-colors"
-                            style={{
-                              backgroundColor: `${accentColor}15`,
-                              borderColor: `${accentColor}35`,
-                              color: accentColor,
-                            }}
+                            className="text-[10px] sm:text-xs px-2 sm:px-2.5 py-0.5 rounded-full font-mono font-medium border truncate transition-colors bg-[var(--deck-accent-10)] border-[var(--deck-accent-40)] text-[var(--deck-accent)]"
                           >
                             {t('dashboard.folder_badge', 'Carpeta')}
                           </span>
@@ -1103,7 +1087,7 @@ function DecksViewContent() {
                       </div>
 
                       {/* Folder Title & Description */}
-                      <h3 className="text-xs sm:text-base font-bold text-neutral-900 dark:text-white tracking-tight line-clamp-1 group-hover:text-amber-600 dark:group-hover:text-amber-300 transition flex items-center gap-1.5">
+                      <h3 className="text-xs sm:text-base font-bold text-neutral-900 dark:text-white tracking-tight line-clamp-1 group-hover:text-[var(--deck-accent)] transition flex items-center gap-1.5">
                         <span>{deck.title}</span>
                       </h3>
                       <p className="text-[10px] sm:text-xs text-slate-600 dark:text-neutral-400 mt-0.5 sm:mt-1 line-clamp-1 sm:line-clamp-2 leading-tight sm:leading-relaxed min-h-0 sm:min-h-[2rem]">
@@ -1129,7 +1113,7 @@ function DecksViewContent() {
                       <button
                         type="button"
                         onClick={() => navigateToFolder(deck.id)}
-                        className="inline-flex items-center justify-center gap-1 text-[11px] sm:text-xs font-semibold px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/30 transition-all duration-150 active:scale-95 flex-1 min-w-0 cursor-pointer"
+                        className="inline-flex items-center justify-center gap-1 text-[11px] sm:text-xs font-medium px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-[var(--deck-accent)] text-white border-2 border-[var(--deck-accent)] hover:brightness-110 transition-all duration-150 active:scale-95 flex-1 min-w-0 cursor-pointer"
                       >
                         <span className="truncate">{t('dashboard.open_folder', 'Abrir')}</span>
                         <span className="shrink-0">→</span>
@@ -1138,9 +1122,9 @@ function DecksViewContent() {
                         type="button"
                         onClick={(e) => handleOpenEdit(e, deck)}
                         title={t('dashboard.manage', 'Gestionar')}
-                        className="inline-flex items-center justify-center gap-1 text-[11px] sm:text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white px-2 py-1.5 sm:px-3 sm:py-2 rounded-lg sm:rounded-xl bg-neutral-100 dark:bg-neutral-800/80 hover:bg-neutral-200 dark:hover:bg-neutral-800 border border-neutral-200 dark:border-neutral-700/60 transition shrink-0 active:scale-95 cursor-pointer"
+                        className="inline-flex items-center justify-center gap-1 text-[11px] sm:text-xs font-medium bg-transparent hover:bg-[var(--deck-accent-10)] text-[var(--deck-accent)] border-2 border-[var(--deck-accent)] px-2 py-1.5 sm:px-3 sm:py-2 rounded-lg sm:rounded-xl transition-colors shrink-0 active:scale-95 cursor-pointer"
                       >
-                        <Settings className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-neutral-500 dark:text-neutral-300" />
+                        <Settings className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[var(--deck-accent)]" />
                         <span className="hidden sm:inline">{t('dashboard.manage', 'Gestionar')}</span>
                         <span className="hidden sm:inline">→</span>
                       </button>
@@ -1154,12 +1138,13 @@ function DecksViewContent() {
                 <div
                   key={deck.id}
                   onClick={isMultiSelectMode ? () => toggleDeckSelection(deck.id) : undefined}
+                  style={getDeckColorStyles(accentColor)}
                   className={`group rounded-xl sm:rounded-2xl border bg-white dark:bg-neutral-900/60 p-3 sm:p-5 transition-all duration-200 flex flex-col justify-between relative shadow-sm hover:shadow-md hover:shadow-neutral-950/5 dark:hover:shadow-black/40 hover:-translate-y-0.5 ${
                     isMultiSelectMode
                       ? selectedDeckIds.has(deck.id)
-                        ? 'ring-2 ring-indigo-500 border-indigo-500 bg-indigo-50/25 dark:bg-indigo-950/25 cursor-pointer shadow-indigo-500/10'
-                        : 'border-neutral-200/90 dark:border-neutral-800 hover:border-indigo-400/60 cursor-pointer'
-                      : 'border-neutral-200/90 dark:border-neutral-800 hover:border-indigo-400/60'
+                        ? 'ring-2 ring-[var(--deck-accent)] border-[var(--deck-accent)] bg-[var(--deck-accent-10)] cursor-pointer shadow-sm'
+                        : 'border-neutral-200/90 dark:border-neutral-800 hover:border-[var(--deck-accent)]/60 cursor-pointer'
+                      : 'border-neutral-200/90 dark:border-neutral-800 hover:border-[var(--deck-accent)]/60'
                   }`}
                 >
                   <div>
@@ -1170,7 +1155,7 @@ function DecksViewContent() {
                           <div
                             className={`w-5 h-5 rounded-full flex items-center justify-center border-2 transition-all shrink-0 ${
                               selectedDeckIds.has(deck.id)
-                                ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm shadow-indigo-600/30 scale-105'
+                                ? 'bg-[var(--deck-accent)] border-[var(--deck-accent)] text-white shadow-sm scale-105'
                                 : 'border-neutral-300 dark:border-neutral-600 bg-white/50 dark:bg-neutral-800/50'
                             }`}
                           >
@@ -1178,8 +1163,7 @@ function DecksViewContent() {
                           </div>
                         )}
                         <span
-                          className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full shrink-0 shadow-sm"
-                          style={{ backgroundColor: accentColor }}
+                          className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full shrink-0 shadow-sm bg-[var(--deck-accent)]"
                         />
                         <span className="text-[10px] sm:text-xs px-2 sm:px-2.5 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-800/80 text-neutral-700 dark:text-neutral-300 font-mono font-medium border border-neutral-200 dark:border-neutral-700/40 truncate">
                           {deck.cardsCount} <span className="hidden sm:inline">{deck.cardsCount === 1 ? t('dashboard.cards_count_singular', 'tarjeta') : t('dashboard.cards_count_plural', 'tarjetas')}</span><span className="sm:hidden">t.</span>
@@ -1274,8 +1258,8 @@ function DecksViewContent() {
                         </h3>
                       </div>
                     ) : (
-                      <Link href={`/decks/${deck.id}`} className="block group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">
-                        <h3 className="text-xs sm:text-base font-bold text-neutral-900 dark:text-white tracking-tight line-clamp-1 group-hover:text-indigo-600 dark:group-hover:text-indigo-300 transition">
+                      <Link href={`/decks/${deck.id}`} className="block group-hover:text-[var(--deck-accent)] transition">
+                        <h3 className="text-xs sm:text-base font-bold text-neutral-900 dark:text-white tracking-tight line-clamp-1 group-hover:text-[var(--deck-accent)] transition">
                           {deck.title}
                         </h3>
                       </Link>
@@ -1316,7 +1300,7 @@ function DecksViewContent() {
                     <div className="mt-3 sm:mt-5 pt-2 sm:pt-3 border-t border-neutral-200 dark:border-neutral-800/80 flex items-center justify-between text-xs select-none">
                       <span className="text-[11px] font-medium">
                         {selectedDeckIds.has(deck.id) ? (
-                          <span className="text-indigo-600 dark:text-indigo-400 font-semibold flex items-center gap-1">
+                          <span className="text-[var(--deck-accent)] font-semibold flex items-center gap-1">
                             <Check className="w-3.5 h-3.5 stroke-[2.5]" />
                             <span>{t('dashboard.deck_selected', 'Seleccionado')}</span>
                           </span>
@@ -1350,8 +1334,8 @@ function DecksViewContent() {
                             !hasCards
                               ? 'bg-neutral-100 dark:bg-neutral-800/50 text-neutral-400 dark:text-neutral-500 pointer-events-none'
                               : hasDue
-                              ? 'bg-gradient-to-r from-rose-600 to-indigo-600 hover:from-rose-500 hover:to-indigo-500 text-white shadow-md shadow-rose-900/30 active:scale-95'
-                              : 'bg-indigo-50 dark:bg-indigo-600/20 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-600/30 border border-indigo-200 dark:border-indigo-500/30'
+                              ? 'bg-gradient-to-r from-rose-600 to-[var(--deck-accent)] hover:brightness-110 text-white shadow-md shadow-rose-900/30 active:scale-95'
+                              : 'bg-[var(--deck-accent)] text-white border-2 border-[var(--deck-accent)] hover:brightness-110 font-medium active:scale-95'
                           }`}
                         >
                           <Play className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0 fill-current" />
@@ -1377,12 +1361,12 @@ function DecksViewContent() {
                               onClick={() => setActiveStudyMenuDeckId(null)}
                               className="w-full flex items-center gap-2.5 p-2 rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800/70 transition group text-left cursor-pointer"
                             >
-                              <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-500/20 group-hover:scale-105 transition-transform">
+                              <div className="w-8 h-8 rounded-lg bg-[var(--deck-accent-10)] text-[var(--deck-accent)] flex items-center justify-center shrink-0 border border-[var(--deck-accent-40)] group-hover:scale-105 transition-transform">
                                 <Play className="w-4 h-4 fill-current" />
                               </div>
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center justify-between gap-1">
-                                  <p className="text-xs font-bold text-neutral-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                                  <p className="text-xs font-bold text-neutral-900 dark:text-white group-hover:text-[var(--deck-accent)] transition-colors">
                                     {t('dashboard.fsrs_review_title', 'Repaso Diario (FSRS)')}
                                   </p>
                                   {hasDue && (
@@ -1451,9 +1435,9 @@ function DecksViewContent() {
                       <Link
                         href={`/decks/${deck.id}`}
                         title={t('dashboard.manage', 'Gestionar')}
-                        className="inline-flex items-center justify-center gap-1 text-[11px] sm:text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white px-2 py-1.5 sm:px-3 sm:py-2 rounded-lg sm:rounded-xl bg-neutral-100 dark:bg-neutral-800/80 hover:bg-neutral-200 dark:hover:bg-neutral-800 border border-neutral-200 dark:border-neutral-700/60 transition shrink-0 active:scale-95 cursor-pointer"
+                        className="inline-flex items-center justify-center gap-1 text-[11px] sm:text-xs font-medium bg-transparent hover:bg-[var(--deck-accent-10)] text-[var(--deck-accent)] border-2 border-[var(--deck-accent)] px-2 py-1.5 sm:px-3 sm:py-2 rounded-lg sm:rounded-xl transition-colors shrink-0 active:scale-95 cursor-pointer"
                       >
-                        <Settings className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-neutral-500 dark:text-neutral-300" />
+                        <Settings className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[var(--deck-accent)]" />
                         <span className="hidden sm:inline">{t('dashboard.manage', 'Gestionar')}</span>
                         <span className="hidden sm:inline">→</span>
                       </Link>
@@ -1772,7 +1756,7 @@ function DecksViewContent() {
                 <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1.5 sm:mb-2">
                   {t('dashboard.modal_color_label', 'Color Distintivo')}
                 </label>
-                <div className="flex items-center gap-2.5 sm:gap-3">
+                <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
                   {COLOR_PALETTE.map((c) => (
                     <button
                       key={c.hex}
@@ -1868,7 +1852,7 @@ function DecksViewContent() {
                 <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-2">
                   {t('dashboard.modal_color_label', 'Color Distintivo')}
                 </label>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
                   {COLOR_PALETTE.map((c) => (
                     <button
                       key={c.hex}

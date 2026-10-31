@@ -12,6 +12,7 @@ import {
 } from '@/lib/fsrs';
 import { FormattedCardView, parseMultipleChoice } from '@/components/cards';
 import { StudyRatingHelpModal, SocraticTutorDrawer } from '@/components/study';
+import { getDeckColorStyles } from '@/lib/colors';
 
 interface StudyPageProps {
   params: Promise<{ deckId: string }>;
@@ -671,7 +672,7 @@ export default function StudyPage({ params }: StudyPageProps) {
   ];
 
   return (
-    <div className="w-full max-w-3xl mx-auto h-[100dvh] md:h-full max-h-[100dvh] flex flex-col justify-between p-2.5 sm:p-4 md:p-6 overflow-hidden animate-in fade-in duration-200">
+    <div style={getDeckColorStyles(currentDeck?.color)} className="w-full max-w-3xl mx-auto h-[100dvh] md:h-full max-h-[100dvh] flex flex-col justify-between p-2.5 sm:p-4 md:p-6 overflow-hidden animate-in fade-in duration-200">
       {/* Top Header & Session Counters */}
       <div className="shrink-0 space-y-2 pb-2">
         <div className="flex items-center justify-between gap-3">
@@ -701,7 +702,7 @@ export default function StudyPage({ params }: StudyPageProps) {
               </span>
             </div>
 
-            <span className="text-[10px] sm:text-xs px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full font-semibold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+            <span className="text-[10px] sm:text-xs px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full font-semibold bg-[var(--deck-accent-10)] text-[var(--deck-accent)] border border-[var(--deck-accent-40)]">
               {remainingCount} {remainingCount === 1 ? t('study.remaining_singular') : t('study.remaining_plural')}
             </span>
 
@@ -709,7 +710,7 @@ export default function StudyPage({ params }: StudyPageProps) {
             <button
               type="button"
               onClick={() => setIsRatingHelpOpen(true)}
-              className="p-1 sm:p-1.5 rounded-lg text-neutral-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition active:scale-95 cursor-pointer flex items-center justify-center border border-transparent hover:border-neutral-200 dark:hover:border-neutral-700"
+              className="p-1 sm:p-1.5 rounded-lg text-neutral-400 hover:text-[var(--deck-accent)] dark:hover:text-[var(--deck-accent)] hover:bg-neutral-100 dark:hover:bg-neutral-800 transition active:scale-95 cursor-pointer flex items-center justify-center border border-transparent hover:border-neutral-200 dark:hover:border-neutral-700"
               title={t('study_help.open_button', 'Regla de Oro de Calificación FSRS')}
               aria-label={t('study_help.open_button', 'Regla de Oro de Calificación FSRS')}
             >
@@ -721,7 +722,7 @@ export default function StudyPage({ params }: StudyPageProps) {
         {/* Progress Bar */}
         <div className="w-full bg-neutral-200 dark:bg-neutral-900 rounded-full h-1 sm:h-1.5 overflow-hidden">
           <div
-            className="bg-gradient-to-r from-indigo-500 to-violet-500 h-full rounded-full transition-all duration-300"
+            className="bg-gradient-to-r from-[var(--deck-accent)] to-violet-500 h-full rounded-full transition-all duration-300"
             style={{ width: `${progressPercent}%` }}
           />
         </div>
@@ -891,7 +892,7 @@ export default function StudyPage({ params }: StudyPageProps) {
                 (e.currentTarget as HTMLElement)?.blur();
                 handleReveal();
               }}
-              className="w-full py-3 sm:py-3.5 px-4 min-h-[46px] sm:min-h-[52px] rounded-xl sm:rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm sm:base transition-all duration-150 shadow-xl shadow-indigo-600/25 active:scale-[0.99] flex items-center justify-center gap-2 group cursor-pointer"
+              className="w-full py-3 sm:py-3.5 px-4 min-h-[46px] sm:min-h-[52px] rounded-xl sm:rounded-2xl bg-[var(--deck-accent)] hover:brightness-110 text-white font-semibold text-sm sm:base transition-all duration-150 shadow-xl shadow-[var(--deck-accent-40)] active:scale-[0.99] flex items-center justify-center gap-2 group cursor-pointer"
             >
               <span>{t('study.show_answer')}</span>
               <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono rounded bg-neutral-200/60 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-300 ml-2">
