@@ -8,13 +8,20 @@ import {
 import type { Database, CardFormat } from '@/types/database';
 import { useSettingsStore } from './useSettingsStore';
 
-export type CardRow = Database['public']['Tables']['cards']['Row'];
+export type CardRow = Database['public']['Tables']['cards']['Row'] & {
+  decks?: {
+    id: string;
+    title: string;
+    color: string | null;
+  } | null;
+};
 
 interface CardState {
   cards: CardRow[];
   isLoading: boolean;
   error: string | null;
   fetchCardsByDeck: (deckId: string) => Promise<CardRow[]>;
+  fetchCardsByDecks: (deckIds: string[]) => Promise<CardRow[]>;
   createCard: (
     deckId: string,
     front: string,
@@ -69,6 +76,48 @@ export const useCardStore = create<CardState>((set) => ({
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Error al cargar las tarjetas';
       console.error('Error fetching cards:', err);
+      set({ error: message, isLoading: false });
+      return [];
+    }
+  },
+
+  fetchCardsByDecks: async (deckIds: string[]) => {
+    if (!deckIds || deckIds.length === 0) {
+      set({ cards: [], isLoading: false, error: null });
+      return [];
+    }
+
+    set({ isLoading: true, error: null });
+    try {
+      const { data, error } = await supabase
+        .from('cards')
+        .select('*, decks(id, title, color)')
+        .in('deck_id', deckIds);
+
+      if (error) throw error;
+
+      const loadedCards = (data as unknown as CardRow[]) || [];
+
+      // Ordenamiento FSRS Unificado:
+      // 1. Tarjetas vencidas (due <= now) ordenadas por fecha de vencimiento más antigua primero
+      // 2. Tarjetas futuras ordenadas cronológicamente
+      const now = new Date();
+      loadedCards.sort((a, b) => {
+        const timeA = new Date(a.due).getTime();
+        const timeB = new Date(b.due).getTime();
+        const aIsDue = timeA <= now.getTime();
+        const bIsDue = timeB <= now.getTime();
+
+        if (aIsDue && !bIsDue) return -1;
+        if (!aIsDue && bIsDue) return 1;
+        return timeA - timeB;
+      });
+
+      set({ cards: loadedCards, isLoading: false });
+      return loadedCards;
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Error al cargar las tarjetas de los mazos seleccionados';
+      console.error('Error fetching cards by decks:', err);
       set({ error: message, isLoading: false });
       return [];
     }

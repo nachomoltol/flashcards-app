@@ -643,10 +643,10 @@ export default function StudyPage({ params }: StudyPageProps) {
             {t('study.view_deck_btn')}
           </Link>
           <Link
-            href="/"
+            href={currentDeck?.parent_id ? `/decks?folder=${encodeURIComponent(currentDeck.parent_id)}` : '/'}
             className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm transition shadow-lg shadow-indigo-600/25"
           >
-            {t('study.back_to_dashboard')}
+            {currentDeck?.parent_id ? t('study.back_to_folder', 'Volver a la carpeta') : t('study.back_to_dashboard')}
           </Link>
         </div>
       </div>
@@ -676,8 +676,8 @@ export default function StudyPage({ params }: StudyPageProps) {
       <div className="shrink-0 space-y-2 pb-2">
         <div className="flex items-center justify-between gap-3">
           <Link
-            href={`/decks/${deckId}`}
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white transition group py-1"
+            href={currentDeck?.parent_id ? `/decks?folder=${encodeURIComponent(currentDeck.parent_id)}` : `/decks/${deckId}`}
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 dark:text-neutral-400 dark:hover:text-white transition group py-1"
           >
             <svg
               className="w-4 h-4 transition-transform group-hover:-translate-x-1"

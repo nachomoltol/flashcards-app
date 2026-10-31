@@ -196,7 +196,7 @@ export const useDeckStore = create<DeckState>((set, get) => ({
 
       const insertPayload: Database['public']['Tables']['decks']['Insert'] = {
         title: finalTitle.trim(),
-        description: finalIsFolder ? null : (finalDescription ? finalDescription.trim() : null),
+        description: finalDescription ? finalDescription.trim() : null,
         color: finalColor,
         is_folder: Boolean(finalIsFolder),
         parent_id: finalParentId,

@@ -202,20 +202,27 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
     <div className="space-y-8 animate-in fade-in duration-300">
       {/* Top Navigation & Breadcrumbs */}
       <div>
-        <Link
-          href="/"
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white transition group mb-3"
-        >
-          <svg
-            className="w-4 h-4 transition-transform group-hover:-translate-x-1"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-          {t('deck_detail.back_to_dashboard')}
-        </Link>
+        {(() => {
+          const backUrl = currentDeck?.parent_id
+            ? `/decks?folder=${encodeURIComponent(currentDeck.parent_id)}`
+            : '/';
+          return (
+            <Link
+              href={backUrl}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 dark:text-neutral-400 dark:hover:text-white transition group mb-3"
+            >
+              <svg
+                className="w-4 h-4 transition-transform group-hover:-translate-x-1"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              {currentDeck?.parent_id ? t('deck_detail.back_to_folder', 'Volver a la carpeta') : t('deck_detail.back_to_dashboard')}
+            </Link>
+          );
+        })()}
 
         {/* Cabecera del Mazo: Información Básica */}
         <div className="flex flex-col gap-2">
@@ -224,14 +231,14 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
               className="w-3.5 h-3.5 rounded-full shadow-md shrink-0"
               style={{ backgroundColor: currentDeck?.color || '#6366f1' }}
             />
-            <span className="text-xs px-2.5 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 font-mono">
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-slate-600 dark:text-neutral-400 font-mono">
               ID: {id.slice(0, 8)}...
             </span>
           </div>
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-neutral-900 dark:text-white">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white">
             {deckLoading && !currentDeck ? t('deck_detail.loading_deck') : currentDeck?.title || t('deck_detail.untitled_deck')}
           </h1>
-          <p className="text-sm text-neutral-600 dark:text-neutral-400">
+          <p className="text-sm text-slate-600 dark:text-neutral-400">
             {currentDeck?.description || t('deck_detail.cards_registered', { count: cards.length })}
           </p>
         </div>

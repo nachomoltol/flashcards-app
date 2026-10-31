@@ -379,7 +379,7 @@ export function FormattedCardView({
 
               // Estilo dinámico según revelación y selección
               let cardStyles =
-                'border-neutral-200 bg-white hover:border-neutral-300 hover:bg-neutral-50 text-neutral-800 dark:border-neutral-800 dark:bg-neutral-950/70 dark:hover:border-neutral-700 dark:text-neutral-300';
+                'border-neutral-200 bg-white hover:border-indigo-300 hover:bg-neutral-50 text-slate-800 dark:border-neutral-800 dark:bg-neutral-950/70 dark:hover:bg-slate-800/90 dark:hover:border-indigo-500/50 dark:text-slate-100';
               let badgeStyles = 'bg-neutral-100 text-neutral-700 border-neutral-200 dark:bg-neutral-800 dark:text-neutral-400 dark:border-neutral-700';
 
               if (isRevealed) {
@@ -456,7 +456,7 @@ export function FormattedCardView({
                   ? 'border-rose-500 bg-rose-500/20 text-rose-800 dark:text-rose-300 line-through'
                   : selectedOption === 'true'
                   ? 'border-emerald-500 bg-emerald-500/20 text-emerald-800 dark:text-emerald-200'
-                  : 'border-neutral-200 bg-white hover:border-emerald-500/40 text-neutral-800 dark:border-neutral-800 dark:bg-neutral-950/70 dark:text-neutral-300'
+                  : 'border-neutral-200 bg-white hover:border-emerald-500/40 text-slate-800 dark:border-neutral-800 dark:bg-neutral-950/70 dark:hover:bg-slate-800/90 dark:hover:border-emerald-500/50 dark:text-slate-100'
               }`}
             >
               <Check className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
@@ -480,7 +480,7 @@ export function FormattedCardView({
                   ? 'border-rose-500 bg-rose-500/20 text-rose-800 dark:text-rose-300 line-through'
                   : selectedOption === 'false'
                   ? 'border-rose-500 bg-rose-500/20 text-rose-800 dark:text-rose-200'
-                  : 'border-neutral-200 bg-white hover:border-rose-500/40 text-neutral-800 dark:border-neutral-800 dark:bg-neutral-950/70 dark:text-neutral-300'
+                  : 'border-neutral-200 bg-white hover:border-rose-500/40 text-slate-800 dark:border-neutral-800 dark:bg-neutral-950/70 dark:hover:bg-slate-800/90 dark:hover:border-rose-500/50 dark:text-slate-100'
               }`}
             >
               <X className="w-4 h-4 text-rose-500 dark:text-rose-400" />

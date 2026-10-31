@@ -23,6 +23,7 @@ import {
   Award,
   Zap,
   GraduationCap,
+  Layers,
 } from 'lucide-react';
 
 const COLOR_PALETTE = [
@@ -155,6 +156,23 @@ function DecksViewContent() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterMode, setFilterMode] = useState<'all' | 'due' | 'empty' | 'folders'>('all');
 
+  // Modo Selección Múltiple para Estudio Combinado
+  const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
+  const [selectedDeckIds, setSelectedDeckIds] = useState<Set<string>>(new Set());
+
+  // Conmutador de selección individual de mazo
+  const toggleDeckSelection = (deckId: string) => {
+    setSelectedDeckIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(deckId)) {
+        next.delete(deckId);
+      } else {
+        next.add(deckId);
+      }
+      return next;
+    });
+  };
+
   // Estado del banner de retorno de Stripe
   const [stripeBanner, setStripeBanner] = useState<'success' | 'cancelled' | null>(null);
 
@@ -252,6 +270,8 @@ function DecksViewContent() {
     setCurrentFolderId(folderId);
     setSearchQuery('');
     setFilterMode('all');
+    setIsMultiSelectMode(false);
+    setSelectedDeckIds(new Set());
     const targetUrl = folderId ? `/decks?folder=${encodeURIComponent(folderId)}` : '/';
     router.push(targetUrl);
     window.history.pushState(null, '', targetUrl);
@@ -356,6 +376,19 @@ function DecksViewContent() {
     [currentLevelDecks]
   );
 
+  // Métricas de los mazos seleccionados para estudio combinado
+  const selectedDecksData = useMemo(() => {
+    return decks.filter((d) => selectedDeckIds.has(d.id));
+  }, [decks, selectedDeckIds]);
+
+  const selectedDueCount = useMemo(() => {
+    return selectedDecksData.reduce((acc, d) => acc + (d.dueCount || 0), 0);
+  }, [selectedDecksData]);
+
+  const selectedCardsCount = useMemo(() => {
+    return selectedDecksData.reduce((acc, d) => acc + (d.cardsCount || 0), 0);
+  }, [selectedDecksData]);
+
   // Elementos filtrados y ordenados en el nivel actual:
   // 1. Mostrar siempre primero las Carpetas y después los Mazos.
   // 2. Ordenación alfanumérica por título con localeCompare(..., { numeric: true }) para que "Tema 2" preceda a "Tema 10".
@@ -406,7 +439,7 @@ function DecksViewContent() {
 
     const created = await createDeck({
       title: newTitle.trim(),
-      description: isFolder ? '' : newDescription.trim(),
+      description: newDescription.trim() || undefined,
       color: newColor,
       isFolder: isFolder,
       is_folder: isFolder,
@@ -443,7 +476,7 @@ function DecksViewContent() {
     setIsUpdating(true);
     const success = await updateDeck(editingDeck.id, {
       title: editTitle.trim(),
-      description: editingDeck.is_folder ? null : (editDescription.trim() || null),
+      description: editDescription.trim() || null,
       color: editColor,
     });
     setIsUpdating(false);
@@ -578,24 +611,48 @@ function DecksViewContent() {
               </button>
             )}
           </div>
-          <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
+          <p className="text-sm text-slate-600 dark:text-neutral-400 mt-1">
             {currentFolder
               ? `${t('dashboard.folder_title_prefix', 'Explorando carpeta actual')} • ${foldersInLevel} ${foldersInLevel === 1 ? t('dashboard.item_singular', 'subcarpeta') : 'subcarpetas'} y ${decksInLevel} ${decksInLevel === 1 ? t('dashboard.cards_count_singular', 'mazo') : 'mazos'}.`
               : t('dashboard.subtitle', 'Estructura tu temario en Asignaturas > Temas > Mazos y repasa con repetición espaciada.')}
           </p>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0 flex-nowrap sm:flex-wrap relative w-full sm:w-auto justify-between sm:justify-start">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 flex-wrap relative w-full sm:w-auto justify-between sm:justify-start">
           {currentFolderId && (
             <button
               onClick={() => {
                 const parentId = currentFolder?.parent_id || null;
                 navigateToFolder(parentId);
               }}
-              className="inline-flex items-center justify-center gap-1 sm:gap-1.5 px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 border border-neutral-200 dark:border-neutral-800 text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white text-xs font-medium transition active:scale-95 shrink-0 shadow-sm"
+              className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 sm:px-3.5 sm:py-2.5 rounded-xl bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 border border-neutral-200 dark:border-neutral-800 text-slate-800 dark:text-neutral-300 hover:text-black dark:hover:text-white text-xs font-medium transition active:scale-95 shrink-0 shadow-sm"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <ChevronLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               <span>{t('dashboard.up_level', 'Subir nivel')}</span>
+            </button>
+          )}
+
+          {/* En móvil (< sm): Botón toggle Combinar Mazos sin desbordar */}
+          {currentFolderId && decksInLevel >= 2 && (
+            <button
+              type="button"
+              onClick={() => {
+                setIsMultiSelectMode((prev) => {
+                  if (prev) {
+                    setSelectedDeckIds(new Set());
+                  }
+                  return !prev;
+                });
+              }}
+              className={`sm:hidden inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition active:scale-95 shrink-0 shadow-sm cursor-pointer ${
+                isMultiSelectMode
+                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-indigo-600/25 ring-2 ring-indigo-500/30'
+                  : 'bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 border-neutral-200 dark:border-neutral-800 text-slate-800 dark:text-neutral-300'
+              }`}
+              title={isMultiSelectMode ? t('dashboard.cancel_combine', 'Cancelar selección') : t('dashboard.combine_decks', 'Combinar mazos')}
+            >
+              <Layers className={`w-3.5 h-3.5 ${isMultiSelectMode ? 'text-white' : 'text-indigo-500'}`} />
+              <span>{isMultiSelectMode ? t('dashboard.cancel_combine', 'Cancelar') : t('dashboard.combine_decks', 'Combinar')}</span>
             </button>
           )}
 
@@ -776,26 +833,52 @@ function DecksViewContent() {
 
       {/* Controls Bar: Search & Filters */}
       <div className="order-3 md:order-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
-        {/* Search Input */}
-        <div className="relative flex-1 max-w-md">
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={
-              currentFolder
-                ? t('dashboard.search_placeholder_folder', `Buscar en "${currentFolder.title}"...`).replace('{folder}', currentFolder.title)
-                : t('dashboard.search_placeholder_root', 'Buscar por título o descripción...')
-            }
-            className="w-full text-xs font-medium pl-9 pr-4 py-2.5 rounded-xl bg-white dark:bg-neutral-900/80 border border-neutral-300 dark:border-neutral-800 text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition shadow-sm"
-          />
-          <Search className="w-4 h-4 text-neutral-400 dark:text-neutral-500 absolute left-3 top-3 pointer-events-none" />
-          {searchQuery && (
+        {/* Search Input & Desktop Combinar Mazos */}
+        <div className="flex items-center gap-2 flex-1 max-w-lg">
+          <div className="relative flex-1">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={
+                currentFolder
+                  ? t('dashboard.search_placeholder_folder', `Buscar en "${currentFolder.title}"...`).replace('{folder}', currentFolder.title)
+                  : t('dashboard.search_placeholder_root', 'Buscar por título o descripción...')
+              }
+              className="w-full text-xs font-medium pl-9 pr-4 py-2.5 rounded-xl bg-white dark:bg-neutral-900/80 border border-neutral-300 dark:border-neutral-800 text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-neutral-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition shadow-sm"
+            />
+            <Search className="w-4 h-4 text-slate-400 dark:text-neutral-500 absolute left-3 top-3 pointer-events-none" />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-900 dark:hover:text-white p-0.5 rounded transition cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Reubicación en Escritorio: Botón Combinar Mazos junto a la búsqueda */}
+          {currentFolderId && decksInLevel >= 2 && (
             <button
-              onClick={() => setSearchQuery('')}
-              className="absolute right-2.5 top-2.5 text-neutral-400 hover:text-neutral-900 dark:hover:text-white p-0.5 rounded transition cursor-pointer"
+              type="button"
+              onClick={() => {
+                setIsMultiSelectMode((prev) => {
+                  if (prev) {
+                    setSelectedDeckIds(new Set());
+                  }
+                  return !prev;
+                });
+              }}
+              className={`hidden sm:inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl border text-xs font-semibold transition active:scale-95 shrink-0 shadow-sm cursor-pointer ${
+                isMultiSelectMode
+                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-indigo-600/25 ring-2 ring-indigo-500/30'
+                  : 'bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 border-neutral-200 dark:border-neutral-800 text-slate-800 dark:text-neutral-300 hover:text-black dark:hover:text-white'
+              }`}
+              title={isMultiSelectMode ? t('dashboard.cancel_combine', 'Cancelar selección') : t('dashboard.combine_decks', 'Combinar mazos')}
             >
-              <X className="w-3.5 h-3.5" />
+              <Layers className={`w-4 h-4 ${isMultiSelectMode ? 'text-white' : 'text-indigo-500'}`} />
+              <span>{isMultiSelectMode ? t('dashboard.cancel_combine', 'Cancelar selección') : t('dashboard.combine_decks', 'Combinar mazos')}</span>
             </button>
           )}
         </div>
@@ -806,8 +889,8 @@ function DecksViewContent() {
             onClick={() => setFilterMode('all')}
             className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer ${
               filterMode === 'all'
-                ? 'bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-sm font-semibold'
-                : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white'
+                ? 'bg-white dark:bg-neutral-800 text-slate-900 dark:text-white shadow-sm font-semibold'
+                : 'text-slate-600 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             {t('dashboard.filter_all', 'Todos')} ({currentLevelDecks.length})
@@ -816,8 +899,8 @@ function DecksViewContent() {
             onClick={() => setFilterMode('folders')}
             className={`px-3 py-1.5 rounded-lg font-medium transition flex items-center gap-1.5 cursor-pointer ${
               filterMode === 'folders'
-                ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30 font-semibold'
-                : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white'
+                ? 'bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30 font-semibold'
+                : 'text-slate-600 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             <span>📁 {t('dashboard.filter_folders', 'Carpetas')} ({foldersInLevel})</span>
@@ -826,8 +909,8 @@ function DecksViewContent() {
             onClick={() => setFilterMode('due')}
             className={`px-3 py-1.5 rounded-lg font-medium transition flex items-center gap-1.5 cursor-pointer ${
               filterMode === 'due'
-                ? 'bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/30 font-semibold'
-                : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white'
+                ? 'bg-rose-500/20 text-rose-800 dark:text-rose-300 border border-rose-500/30 font-semibold'
+                : 'text-slate-600 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
@@ -837,8 +920,8 @@ function DecksViewContent() {
             onClick={() => setFilterMode('empty')}
             className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer ${
               filterMode === 'empty'
-                ? 'bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-sm font-semibold'
-                : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white'
+                ? 'bg-white dark:bg-neutral-800 text-slate-900 dark:text-white shadow-sm font-semibold'
+                : 'text-slate-600 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             {t('dashboard.filter_empty', 'Vacíos')} ({currentLevelDecks.filter((d) => !d.is_folder && d.cardsCount === 0).length})
@@ -918,8 +1001,12 @@ function DecksViewContent() {
                 return (
                   <div
                     key={deck.id}
-                    onClick={() => navigateToFolder(deck.id)}
-                    className="group rounded-xl sm:rounded-2xl border border-neutral-200/90 dark:border-neutral-800 bg-white dark:bg-neutral-900/60 p-3 sm:p-5 hover:border-neutral-300 dark:hover:border-neutral-700/80 transition-all duration-200 flex flex-col justify-between relative shadow-sm hover:shadow-md hover:shadow-neutral-950/5 dark:hover:shadow-black/50 hover:-translate-y-0.5 cursor-pointer"
+                    onClick={isMultiSelectMode ? undefined : () => navigateToFolder(deck.id)}
+                    className={`group rounded-xl sm:rounded-2xl border border-neutral-200/90 dark:border-neutral-800 bg-white dark:bg-neutral-900/60 p-3 sm:p-5 transition-all duration-200 flex flex-col justify-between relative shadow-sm hover:shadow-md hover:shadow-neutral-950/5 dark:hover:shadow-black/50 hover:-translate-y-0.5 ${
+                      isMultiSelectMode
+                        ? 'opacity-40 pointer-events-none cursor-not-allowed'
+                        : 'hover:border-neutral-300 dark:hover:border-neutral-700/80 cursor-pointer'
+                    }`}
                   >
                     <div>
                       {/* Top Bar: Icono de Carpeta dinámico según su color, Badge de Carpeta y Menú Desplegable (⋮) */}
@@ -1019,14 +1106,14 @@ function DecksViewContent() {
                       <h3 className="text-xs sm:text-base font-bold text-neutral-900 dark:text-white tracking-tight line-clamp-1 group-hover:text-amber-600 dark:group-hover:text-amber-300 transition flex items-center gap-1.5">
                         <span>{deck.title}</span>
                       </h3>
-                      <p className="text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400 mt-0.5 sm:mt-1 line-clamp-1 sm:line-clamp-2 leading-tight sm:leading-relaxed min-h-0 sm:min-h-[2rem]">
+                      <p className="text-[10px] sm:text-xs text-slate-600 dark:text-neutral-400 mt-0.5 sm:mt-1 line-clamp-1 sm:line-clamp-2 leading-tight sm:leading-relaxed min-h-0 sm:min-h-[2rem]">
                         {deck.description || 'Carpeta organizadora de temas y mazos.'}
                       </p>
 
                       {/* Recuento de Elementos Contenidos */}
                       <div className="mt-2.5 sm:mt-3.5 pt-2 sm:pt-3 border-t border-neutral-200 dark:border-neutral-800/60">
                         <div className="flex items-center justify-between text-[10px] sm:text-xs">
-                          <span className="text-neutral-500 dark:text-neutral-400 font-medium hidden sm:inline">{t('dashboard.folder_content', 'Contenido:')}</span>
+                          <span className="text-slate-600 dark:text-neutral-400 font-medium hidden sm:inline">{t('dashboard.folder_content', 'Contenido:')}</span>
                           <span className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 font-medium text-[10px] sm:text-xs border border-neutral-200 dark:border-neutral-700/50">
                             <span>📁</span>
                             <span>
@@ -1066,12 +1153,30 @@ function DecksViewContent() {
               return (
                 <div
                   key={deck.id}
-                  className="group rounded-xl sm:rounded-2xl border border-neutral-200/90 dark:border-neutral-800 bg-white dark:bg-neutral-900/60 p-3 sm:p-5 hover:border-indigo-400/60 dark:hover:border-neutral-700/80 transition-all duration-200 flex flex-col justify-between relative shadow-sm hover:shadow-md hover:shadow-neutral-950/5 dark:hover:shadow-black/40 hover:-translate-y-0.5"
+                  onClick={isMultiSelectMode ? () => toggleDeckSelection(deck.id) : undefined}
+                  className={`group rounded-xl sm:rounded-2xl border bg-white dark:bg-neutral-900/60 p-3 sm:p-5 transition-all duration-200 flex flex-col justify-between relative shadow-sm hover:shadow-md hover:shadow-neutral-950/5 dark:hover:shadow-black/40 hover:-translate-y-0.5 ${
+                    isMultiSelectMode
+                      ? selectedDeckIds.has(deck.id)
+                        ? 'ring-2 ring-indigo-500 border-indigo-500 bg-indigo-50/25 dark:bg-indigo-950/25 cursor-pointer shadow-indigo-500/10'
+                        : 'border-neutral-200/90 dark:border-neutral-800 hover:border-indigo-400/60 cursor-pointer'
+                      : 'border-neutral-200/90 dark:border-neutral-800 hover:border-indigo-400/60'
+                  }`}
                 >
                   <div>
                     {/* Top Bar */}
                     <div className="flex items-center justify-between gap-1.5 sm:gap-2 mb-2 sm:mb-3">
                       <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                        {isMultiSelectMode && (
+                          <div
+                            className={`w-5 h-5 rounded-full flex items-center justify-center border-2 transition-all shrink-0 ${
+                              selectedDeckIds.has(deck.id)
+                                ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm shadow-indigo-600/30 scale-105'
+                                : 'border-neutral-300 dark:border-neutral-600 bg-white/50 dark:bg-neutral-800/50'
+                            }`}
+                          >
+                            {selectedDeckIds.has(deck.id) && <Check className="w-3 h-3 stroke-[3]" />}
+                          </div>
+                        )}
                         <span
                           className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full shrink-0 shadow-sm"
                           style={{ backgroundColor: accentColor }}
@@ -1081,98 +1186,108 @@ function DecksViewContent() {
                         </span>
                       </div>
 
-                      {/* Menú Desplegable de Tres Puntos (⋮) */}
-                      <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setActiveDropdownDeckId(activeDropdownDeckId === deck.id ? null : deck.id);
-                          }}
-                          title={t('dashboard.options_deck', 'Opciones del mazo')}
-                          className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition flex items-center justify-center font-bold text-xs sm:text-sm tracking-wider cursor-pointer"
-                        >
-                          ⋮
-                        </button>
-
-                        {activeDropdownDeckId === deck.id && (
-                          <div
-                            className="absolute right-0 top-8 w-44 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-2xl p-1 z-30 animate-in fade-in zoom-in-95 duration-100 text-xs"
-                            onClick={(e) => e.stopPropagation()}
+                      {/* Menú Desplegable de Tres Puntos (⋮) - Oculto en modo selección */}
+                      {!isMultiSelectMode && (
+                        <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setActiveDropdownDeckId(activeDropdownDeckId === deck.id ? null : deck.id);
+                            }}
+                            title={t('dashboard.options_deck', 'Opciones del mazo')}
+                            className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition flex items-center justify-center font-bold text-xs sm:text-sm tracking-wider cursor-pointer"
                           >
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                setActiveDropdownDeckId(null);
-                                handleOpenShare(deck);
-                              }}
-                              className="w-full text-left px-3 py-2 rounded-lg text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 flex items-center gap-2 transition cursor-pointer"
+                            ⋮
+                          </button>
+
+                          {activeDropdownDeckId === deck.id && (
+                            <div
+                              className="absolute right-0 top-8 w-44 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-2xl p-1 z-30 animate-in fade-in zoom-in-95 duration-100 text-xs"
+                              onClick={(e) => e.stopPropagation()}
                             >
-                              <span className="text-sm">🔗</span>
-                              <span>{t('dashboard.share_deck', 'Compartir Mazo')}</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                setActiveDropdownDeckId(null);
-                                handleOpenMove(deck);
-                              }}
-                              className="w-full text-left px-3 py-2 rounded-lg text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 flex items-center gap-2 transition cursor-pointer"
-                            >
-                              <span className="text-sm">📁</span>
-                              <span>{t('dashboard.move_to', 'Mover a...')}</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                setActiveDropdownDeckId(null);
-                                handleOpenEdit(e, deck);
-                              }}
-                              className="w-full text-left px-3 py-2 rounded-lg text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 flex items-center gap-2 transition cursor-pointer"
-                            >
-                              <span className="text-sm">✏️</span>
-                              <span>{t('dashboard.edit_deck', 'Editar Mazo')}</span>
-                            </button>
-                            <div className="my-1 border-t border-neutral-200 dark:border-neutral-800/80" />
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                setActiveDropdownDeckId(null);
-                                setDeletingDeck(deck);
-                              }}
-                              className="w-full text-left px-3 py-2 rounded-lg text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 hover:bg-rose-500/10 flex items-center gap-2 transition cursor-pointer"
-                            >
-                              <span className="text-sm">🗑️</span>
-                              <span>{t('dashboard.delete_deck', 'Eliminar Mazo')}</span>
-                            </button>
-                          </div>
-                        )}
-                      </div>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setActiveDropdownDeckId(null);
+                                  handleOpenShare(deck);
+                                }}
+                                className="w-full text-left px-3 py-2 rounded-lg text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 flex items-center gap-2 transition cursor-pointer"
+                              >
+                                <span className="text-sm">🔗</span>
+                                <span>{t('dashboard.share_deck', 'Compartir Mazo')}</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setActiveDropdownDeckId(null);
+                                  handleOpenMove(deck);
+                                }}
+                                className="w-full text-left px-3 py-2 rounded-lg text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 flex items-center gap-2 transition cursor-pointer"
+                              >
+                                <span className="text-sm">📁</span>
+                                <span>{t('dashboard.move_to', 'Mover a...')}</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setActiveDropdownDeckId(null);
+                                  handleOpenEdit(e, deck);
+                                }}
+                                className="w-full text-left px-3 py-2 rounded-lg text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 flex items-center gap-2 transition cursor-pointer"
+                              >
+                                <span className="text-sm">✏️</span>
+                                <span>{t('dashboard.edit_deck', 'Editar Mazo')}</span>
+                              </button>
+                              <div className="my-1 border-t border-neutral-200 dark:border-neutral-800/80" />
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setActiveDropdownDeckId(null);
+                                  setDeletingDeck(deck);
+                                }}
+                                className="w-full text-left px-3 py-2 rounded-lg text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 hover:bg-rose-500/10 flex items-center gap-2 transition cursor-pointer"
+                              >
+                                <span className="text-sm">🗑️</span>
+                                <span>{t('dashboard.delete_deck', 'Eliminar Mazo')}</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     {/* Mazo Title & Description */}
-                    <Link href={`/decks/${deck.id}`} className="block group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">
-                      <h3 className="text-xs sm:text-base font-bold text-neutral-900 dark:text-white tracking-tight line-clamp-1 group-hover:text-indigo-600 dark:group-hover:text-indigo-300 transition">
-                        {deck.title}
-                      </h3>
-                    </Link>
-                    <p className="text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400 mt-0.5 sm:mt-1 line-clamp-1 sm:line-clamp-2 leading-tight sm:leading-relaxed min-h-0 sm:min-h-[2rem]">
+                    {isMultiSelectMode ? (
+                      <div className="block select-none">
+                        <h3 className="text-xs sm:text-base font-bold text-neutral-900 dark:text-white tracking-tight line-clamp-1">
+                          {deck.title}
+                        </h3>
+                      </div>
+                    ) : (
+                      <Link href={`/decks/${deck.id}`} className="block group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">
+                        <h3 className="text-xs sm:text-base font-bold text-neutral-900 dark:text-white tracking-tight line-clamp-1 group-hover:text-indigo-600 dark:group-hover:text-indigo-300 transition">
+                          {deck.title}
+                        </h3>
+                      </Link>
+                    )}
+                    <p className="text-[10px] sm:text-xs text-slate-600 dark:text-neutral-400 mt-0.5 sm:mt-1 line-clamp-1 sm:line-clamp-2 leading-tight sm:leading-relaxed min-h-0 sm:min-h-[2rem]">
                       {deck.description || 'Sin descripción añadida.'}
                     </p>
 
                     {/* Indicador Numérico de Tarjetas a Repasar Hoy (FSRS due_date) */}
                     <div className="mt-2.5 sm:mt-3.5 pt-2 sm:pt-3 border-t border-neutral-200 dark:border-neutral-800/60">
                       <div className="flex items-center justify-between text-[10px] sm:text-xs">
-                        <span className="text-neutral-500 dark:text-neutral-400 font-medium hidden sm:inline">{t('dashboard.fsrs_review', 'Repaso FSRS:')}</span>
+                        <span className="text-slate-600 dark:text-neutral-400 font-medium hidden sm:inline">{t('dashboard.fsrs_review', 'Repaso FSRS:')}</span>
                         {hasDue ? (
                           <span className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-600 dark:text-rose-300 font-semibold text-[10px] sm:text-xs animate-in fade-in">
                             <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
@@ -1197,129 +1312,153 @@ function DecksViewContent() {
                   </div>
 
                   {/* Pie del Mazo */}
-                  <div className="mt-3 sm:mt-5 pt-2 sm:pt-3 border-t border-neutral-200 dark:border-neutral-800/80 flex items-center justify-between gap-1 sm:gap-2">
-                    <div className="relative flex-1 min-w-0">
-                      <button
-                        type="button"
-                        disabled={!hasCards}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setActiveDropdownDeckId(null);
-                          setActiveStudyMenuDeckId((prev) => (prev === deck.id ? null : deck.id));
-                        }}
-                        className={`w-full inline-flex items-center justify-center gap-1.5 text-[11px] sm:text-xs font-semibold px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl transition-all duration-150 cursor-pointer ${
-                          !hasCards
-                            ? 'bg-neutral-100 dark:bg-neutral-800/50 text-neutral-400 dark:text-neutral-500 pointer-events-none'
-                            : hasDue
-                            ? 'bg-gradient-to-r from-rose-600 to-indigo-600 hover:from-rose-500 hover:to-indigo-500 text-white shadow-md shadow-rose-900/30 active:scale-95'
-                            : 'bg-indigo-50 dark:bg-indigo-600/20 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-600/30 border border-indigo-200 dark:border-indigo-500/30'
-                        }`}
-                      >
-                        <Play className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0 fill-current" />
-                        <span className="truncate">{t('dashboard.study_button', 'Estudiar')} {hasDue ? `(${deck.dueCount})` : ''}</span>
-                        <ChevronDown className={`w-3 h-3 shrink-0 transition-transform duration-150 ${activeStudyMenuDeckId === deck.id ? 'rotate-180' : ''}`} />
-                      </button>
-
-                      {/* Popover Menú Flotante: Repaso Diario vs Simulacro */}
-                      {activeStudyMenuDeckId === deck.id && (
-                        <div
-                          className={`absolute bottom-full mb-2 w-64 sm:w-72 max-w-[calc(100vw-2rem)] rounded-2xl bg-white/95 dark:bg-neutral-900/95 backdrop-blur-xl border border-neutral-200 dark:border-neutral-800 shadow-2xl p-1.5 z-40 animate-in fade-in zoom-in-95 duration-150 space-y-1 text-left ${popoverPositionClass}`}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <div className="px-2.5 py-1.5 border-b border-neutral-100 dark:border-neutral-800/80">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 font-mono">
-                              {t('dashboard.select_mode', 'Elige cómo estudiar')}
-                            </span>
-                          </div>
-
-                          {/* Opción A: Repaso Diario (FSRS) */}
-                          <Link
-                            href={`/study/${deck.id}`}
-                            onClick={() => setActiveStudyMenuDeckId(null)}
-                            className="w-full flex items-center gap-2.5 p-2 rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800/70 transition group text-left cursor-pointer"
-                          >
-                            <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-500/20 group-hover:scale-105 transition-transform">
-                              <Play className="w-4 h-4 fill-current" />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center justify-between gap-1">
-                                <p className="text-xs font-bold text-neutral-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
-                                  {t('dashboard.fsrs_review_title', 'Repaso Diario (FSRS)')}
-                                </p>
-                                {hasDue && (
-                                  <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-rose-500/15 text-rose-600 dark:text-rose-400 shrink-0">
-                                    {deck.dueCount}
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-[10px] text-neutral-500 dark:text-neutral-400 leading-tight">
-                                {t('dashboard.fsrs_review_desc', 'Memorización con repetición espaciada')}
-                              </p>
-                            </div>
-                          </Link>
-
-                          {/* Opción B: Simulacro de Examen */}
-                          <Link
-                            href={`/exam/${deck.id}`}
-                            onClick={() => setActiveStudyMenuDeckId(null)}
-                            className="w-full flex items-center gap-2.5 p-2 rounded-xl hover:bg-purple-500/10 dark:hover:bg-purple-500/15 transition group text-left border border-transparent hover:border-purple-500/25 cursor-pointer"
-                          >
-                            <div className="w-8 h-8 rounded-lg bg-purple-500/15 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 border border-purple-500/30 group-hover:scale-105 transition-transform">
-                              <Award className="w-4 h-4" />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center justify-between gap-1.5">
-                                <p className="text-xs font-bold text-purple-700 dark:text-purple-300 group-hover:text-purple-600 dark:group-hover:text-purple-200 transition-colors">
-                                  {t('dashboard.exam_mode_title', 'Simulacro de Examen')}
-                                </p>
-                                <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-purple-500/20 text-purple-700 dark:text-purple-300 shrink-0">
-                                  TEST
-                                </span>
-                              </div>
-                              <p className="text-[10px] text-neutral-500 dark:text-neutral-400 leading-tight">
-                                {t('dashboard.exam_mode_desc', 'Test formal evaluativo con cronómetro')}
-                              </p>
-                            </div>
-                          </Link>
-
-                          {/* Opción C: Repaso de Emergencia (Modo Pánico ⚡) */}
-                          <Link
-                            href={`/panic/${deck.id}`}
-                            onClick={() => setActiveStudyMenuDeckId(null)}
-                            className="w-full flex items-center gap-2.5 p-2 rounded-xl hover:bg-amber-500/10 dark:hover:bg-amber-500/15 transition group text-left border border-transparent hover:border-amber-500/25 cursor-pointer"
-                          >
-                            <div className="w-8 h-8 rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/30 group-hover:scale-105 transition-transform">
-                              <Zap className="w-4 h-4 fill-current" />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center justify-between gap-1.5">
-                                <p className="text-xs font-bold text-amber-700 dark:text-amber-300 group-hover:text-amber-600 dark:group-hover:text-amber-200 transition-colors">
-                                  {t('dashboard.panic_mode_title', 'Modo Pánico ⚡')}
-                                </p>
-                                <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-amber-500/20 text-amber-700 dark:text-amber-300 shrink-0">
-                                  SOS
-                                </span>
-                              </div>
-                              <p className="text-[10px] text-neutral-500 dark:text-neutral-400 leading-tight">
-                                {t('dashboard.panic_mode_desc', 'Repaso intensivo de puntos débiles')}
-                              </p>
-                            </div>
-                          </Link>
-                        </div>
-                      )}
+                  {isMultiSelectMode ? (
+                    <div className="mt-3 sm:mt-5 pt-2 sm:pt-3 border-t border-neutral-200 dark:border-neutral-800/80 flex items-center justify-between text-xs select-none">
+                      <span className="text-[11px] font-medium">
+                        {selectedDeckIds.has(deck.id) ? (
+                          <span className="text-indigo-600 dark:text-indigo-400 font-semibold flex items-center gap-1">
+                            <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                            <span>{t('dashboard.deck_selected', 'Seleccionado')}</span>
+                          </span>
+                        ) : (
+                          <span className="text-neutral-400 dark:text-neutral-500">
+                            {t('dashboard.click_to_select', 'Toca para seleccionar')}
+                          </span>
+                        )}
+                      </span>
+                      <span className="text-[10px] sm:text-[11px] font-mono text-neutral-400">
+                        {deck.dueCount > 0 ? (
+                          <span className="text-rose-500 dark:text-rose-400 font-semibold">{deck.dueCount} pendientes</span>
+                        ) : (
+                          <span>0 pendientes</span>
+                        )}
+                      </span>
                     </div>
+                  ) : (
+                    <div className="mt-3 sm:mt-5 pt-2 sm:pt-3 border-t border-neutral-200 dark:border-neutral-800/80 flex items-center justify-between gap-1 sm:gap-2">
+                      <div className="relative flex-1 min-w-0">
+                        <button
+                          type="button"
+                          disabled={!hasCards}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setActiveDropdownDeckId(null);
+                            setActiveStudyMenuDeckId((prev) => (prev === deck.id ? null : deck.id));
+                          }}
+                          className={`w-full inline-flex items-center justify-center gap-1.5 text-[11px] sm:text-xs font-semibold px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl transition-all duration-150 cursor-pointer ${
+                            !hasCards
+                              ? 'bg-neutral-100 dark:bg-neutral-800/50 text-neutral-400 dark:text-neutral-500 pointer-events-none'
+                              : hasDue
+                              ? 'bg-gradient-to-r from-rose-600 to-indigo-600 hover:from-rose-500 hover:to-indigo-500 text-white shadow-md shadow-rose-900/30 active:scale-95'
+                              : 'bg-indigo-50 dark:bg-indigo-600/20 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-600/30 border border-indigo-200 dark:border-indigo-500/30'
+                          }`}
+                        >
+                          <Play className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0 fill-current" />
+                          <span className="truncate">{t('dashboard.study_button', 'Estudiar')} {hasDue ? `(${deck.dueCount})` : ''}</span>
+                          <ChevronDown className={`w-3 h-3 shrink-0 transition-transform duration-150 ${activeStudyMenuDeckId === deck.id ? 'rotate-180' : ''}`} />
+                        </button>
 
-                    <Link
-                      href={`/decks/${deck.id}`}
-                      title={t('dashboard.manage', 'Gestionar')}
-                      className="inline-flex items-center justify-center gap-1 text-[11px] sm:text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white px-2 py-1.5 sm:px-3 sm:py-2 rounded-lg sm:rounded-xl bg-neutral-100 dark:bg-neutral-800/80 hover:bg-neutral-200 dark:hover:bg-neutral-800 border border-neutral-200 dark:border-neutral-700/60 transition shrink-0 active:scale-95 cursor-pointer"
-                    >
-                      <Settings className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-neutral-500 dark:text-neutral-300" />
-                      <span className="hidden sm:inline">{t('dashboard.manage', 'Gestionar')}</span>
-                      <span className="hidden sm:inline">→</span>
-                    </Link>
-                  </div>
+                        {/* Popover Menú Flotante: Repaso Diario vs Simulacro */}
+                        {activeStudyMenuDeckId === deck.id && (
+                          <div
+                            className={`absolute bottom-full mb-2 w-64 sm:w-72 max-w-[calc(100vw-2rem)] rounded-2xl bg-white/95 dark:bg-neutral-900/95 backdrop-blur-xl border border-neutral-200 dark:border-neutral-800 shadow-2xl p-1.5 z-40 animate-in fade-in zoom-in-95 duration-150 space-y-1 text-left ${popoverPositionClass}`}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <div className="px-2.5 py-1.5 border-b border-neutral-100 dark:border-neutral-800/80">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 font-mono">
+                                {t('dashboard.select_mode', 'Elige cómo estudiar')}
+                              </span>
+                            </div>
+
+                            {/* Opción A: Repaso Diario (FSRS) */}
+                            <Link
+                              href={`/study/${deck.id}`}
+                              onClick={() => setActiveStudyMenuDeckId(null)}
+                              className="w-full flex items-center gap-2.5 p-2 rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800/70 transition group text-left cursor-pointer"
+                            >
+                              <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-500/20 group-hover:scale-105 transition-transform">
+                                <Play className="w-4 h-4 fill-current" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center justify-between gap-1">
+                                  <p className="text-xs font-bold text-neutral-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                                    {t('dashboard.fsrs_review_title', 'Repaso Diario (FSRS)')}
+                                  </p>
+                                  {hasDue && (
+                                    <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-rose-500/15 text-rose-600 dark:text-rose-400 shrink-0">
+                                      {deck.dueCount}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-[10px] text-neutral-500 dark:text-neutral-400 leading-tight">
+                                  {t('dashboard.fsrs_review_desc', 'Memorización con repetición espaciada')}
+                                </p>
+                              </div>
+                            </Link>
+
+                            {/* Opción B: Simulacro de Examen */}
+                            <Link
+                              href={`/exam/${deck.id}`}
+                              onClick={() => setActiveStudyMenuDeckId(null)}
+                              className="w-full flex items-center gap-2.5 p-2 rounded-xl hover:bg-purple-500/10 dark:hover:bg-purple-500/15 transition group text-left border border-transparent hover:border-purple-500/25 cursor-pointer"
+                            >
+                              <div className="w-8 h-8 rounded-lg bg-purple-500/15 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 border border-purple-500/30 group-hover:scale-105 transition-transform">
+                                <Award className="w-4 h-4" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center justify-between gap-1.5">
+                                  <p className="text-xs font-bold text-purple-700 dark:text-purple-300 group-hover:text-purple-600 dark:group-hover:text-purple-200 transition-colors">
+                                    {t('dashboard.exam_mode_title', 'Simulacro de Examen')}
+                                  </p>
+                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-purple-500/20 text-purple-700 dark:text-purple-300 shrink-0">
+                                    TEST
+                                  </span>
+                                </div>
+                                <p className="text-[10px] text-neutral-500 dark:text-neutral-400 leading-tight">
+                                  {t('dashboard.exam_mode_desc', 'Test formal evaluativo con cronómetro')}
+                                </p>
+                              </div>
+                            </Link>
+
+                            {/* Opción C: Repaso de Emergencia (Modo Pánico ⚡) */}
+                            <Link
+                              href={`/panic/${deck.id}`}
+                              onClick={() => setActiveStudyMenuDeckId(null)}
+                              className="w-full flex items-center gap-2.5 p-2 rounded-xl hover:bg-amber-500/10 dark:hover:bg-amber-500/15 transition group text-left border border-transparent hover:border-amber-500/25 cursor-pointer"
+                            >
+                              <div className="w-8 h-8 rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/30 group-hover:scale-105 transition-transform">
+                                <Zap className="w-4 h-4 fill-current" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center justify-between gap-1.5">
+                                  <p className="text-xs font-bold text-amber-700 dark:text-amber-300 group-hover:text-amber-600 dark:group-hover:text-amber-200 transition-colors">
+                                    {t('dashboard.panic_mode_title', 'Modo Pánico ⚡')}
+                                  </p>
+                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-amber-500/20 text-amber-700 dark:text-amber-300 shrink-0">
+                                    SOS
+                                  </span>
+                                </div>
+                                <p className="text-[10px] text-neutral-500 dark:text-neutral-400 leading-tight">
+                                  {t('dashboard.panic_mode_desc', 'Repaso intensivo de puntos débiles')}
+                                </p>
+                              </div>
+                            </Link>
+                          </div>
+                        )}
+                      </div>
+
+                      <Link
+                        href={`/decks/${deck.id}`}
+                        title={t('dashboard.manage', 'Gestionar')}
+                        className="inline-flex items-center justify-center gap-1 text-[11px] sm:text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white px-2 py-1.5 sm:px-3 sm:py-2 rounded-lg sm:rounded-xl bg-neutral-100 dark:bg-neutral-800/80 hover:bg-neutral-200 dark:hover:bg-neutral-800 border border-neutral-200 dark:border-neutral-700/60 transition shrink-0 active:scale-95 cursor-pointer"
+                      >
+                        <Settings className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-neutral-500 dark:text-neutral-300" />
+                        <span className="hidden sm:inline">{t('dashboard.manage', 'Gestionar')}</span>
+                        <span className="hidden sm:inline">→</span>
+                      </Link>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -1327,8 +1466,8 @@ function DecksViewContent() {
         )}
       </section>
 
-      {/* Sección: Tus Atlas Visuales */}
-      {(!currentFolder || atlasItems.length > 0) && (
+      {/* Sección: Tus Atlas Visuales (Visible únicamente en el dashboard raíz) */}
+      {!currentFolderId && (
         <section className="order-5 md:order-6 pt-6 border-t border-neutral-200 dark:border-neutral-800/80 space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
@@ -1608,21 +1747,25 @@ function DecksViewContent() {
                 />
               </div>
 
-              {/* Si es carpeta, ocultamos la descripción para mantener el formulario limpio */}
-              {createType === 'deck' && (
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1.5">
-                    {t('dashboard.modal_deck_desc_label', 'Descripción del Mazo (Opcional)')}
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={newDescription}
-                    onChange={(e) => setNewDescription(e.target.value)}
-                    placeholder={t('dashboard.modal_deck_desc_placeholder', 'Objetivos o temario de este mazo...')}
-                    className="w-full text-xs px-3.5 py-2.5 rounded-xl bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition resize-none"
-                  />
-                </div>
-              )}
+              {/* Descripción del elemento (Mazo o Carpeta) */}
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-800 dark:text-neutral-300 mb-1.5">
+                  {createType === 'folder'
+                    ? t('dashboard.modal_folder_desc_label', 'Descripción de la Carpeta (Opcional)')
+                    : t('dashboard.modal_deck_desc_label', 'Descripción del Mazo (Opcional)')}
+                </label>
+                <textarea
+                  rows={2}
+                  value={newDescription}
+                  onChange={(e) => setNewDescription(e.target.value)}
+                  placeholder={
+                    createType === 'folder'
+                      ? t('dashboard.modal_folder_desc_placeholder', 'Temario, asignatura o notas de esta carpeta...')
+                      : t('dashboard.modal_deck_desc_placeholder', 'Objetivos o temario de este mazo...')
+                  }
+                  className="w-full text-xs px-3.5 py-2.5 rounded-xl bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-neutral-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition resize-none"
+                />
+              </div>
 
               {/* Selector de Color */}
               <div>
@@ -1901,6 +2044,80 @@ function DecksViewContent() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Barra Flotante Inferior de Estudio Combinado */}
+      {isMultiSelectMode && selectedDeckIds.size >= 2 && (
+        <aside
+          aria-label="Barra de estudio combinado"
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[94%] sm:w-auto min-w-[320px] sm:min-w-[480px] max-w-xl animate-in slide-in-from-bottom-5 duration-200 shadow-2xl"
+        >
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3 sm:px-5 sm:py-3.5 rounded-2xl bg-neutral-900/95 dark:bg-neutral-950/95 text-white border border-neutral-700/80 backdrop-blur-xl shadow-2xl">
+            {/* Información de selección */}
+            <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-start">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
+                  <Layers className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-xs sm:text-sm font-bold flex items-center gap-1.5 text-white">
+                    <span>{selectedDeckIds.size} {t('dashboard.decks_selected', 'mazos seleccionados')}</span>
+                  </div>
+                  <div className="text-[11px] text-neutral-400 flex items-center gap-1.5">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-rose-500" />
+                    <span className="font-medium text-rose-400">
+                      {selectedDueCount} {selectedDueCount === 1 ? t('dashboard.card_due_singular', 'pendiente') : t('dashboard.cards_due_plural', 'pendientes')}
+                    </span>
+                    <span className="text-neutral-600">•</span>
+                    <span>{selectedCardsCount} {t('dashboard.cards_unit', 'tarjetas')}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Botón cerrar para móvil */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMultiSelectMode(false);
+                  setSelectedDeckIds(new Set());
+                }}
+                className="sm:hidden p-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-800 transition cursor-pointer"
+                title={t('common.cancel', 'Cancelar')}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Acciones */}
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMultiSelectMode(false);
+                  setSelectedDeckIds(new Set());
+                }}
+                className="hidden sm:inline-flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-medium text-neutral-300 hover:text-white hover:bg-neutral-800 transition cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+                <span>{t('common.cancel', 'Cancelar')}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const ids = Array.from(selectedDeckIds).join(',');
+                  router.push(`/study/combined?decks=${encodeURIComponent(ids)}`);
+                }}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold text-xs sm:text-sm shadow-lg shadow-indigo-600/30 transition active:scale-95 cursor-pointer"
+              >
+                <Play className="w-3.5 h-3.5 fill-current" />
+                <span>
+                  {t('dashboard.study_together_btn', 'Repasar juntos')} ({selectedDueCount > 0 ? selectedDueCount : selectedCardsCount})
+                </span>
+              </button>
+            </div>
+          </div>
+        </aside>
       )}
 
       {/* Modal: Compartir Mazo */}

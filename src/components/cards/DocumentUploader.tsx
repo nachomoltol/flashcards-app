@@ -647,13 +647,13 @@ export function DocumentUploader({
     <div className="w-full space-y-5">
       {/* Error Banner Amigable con Botón de Reintento Rápido */}
       {errorMessage && (
-        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs sm:text-sm flex flex-col sm:flex-row items-start justify-between gap-3 animate-in fade-in">
+        <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/30 text-rose-950 dark:text-rose-300 text-xs sm:text-sm flex flex-col sm:flex-row items-start justify-between gap-3 animate-in fade-in">
           <div className="flex items-start gap-2.5">
-            <svg className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
             <div className="leading-relaxed">
-              <strong className="font-semibold block text-rose-200 mb-0.5">Aviso de Generación:</strong>
+              <strong className="font-semibold block text-rose-950 dark:text-rose-200 mb-0.5">Aviso de Generación:</strong>
               {errorMessage}
             </div>
           </div>
@@ -664,7 +664,7 @@ export function DocumentUploader({
                 setCardCount(10);
                 setErrorMessage(null);
               }}
-              className="shrink-0 self-end sm:self-center px-3 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-500/40 text-xs font-medium transition active:scale-95 flex items-center gap-1.5"
+              className="shrink-0 self-end sm:self-center px-3 py-1.5 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-900 border border-rose-300 dark:bg-rose-500/20 dark:hover:bg-rose-500/30 dark:text-rose-200 dark:border-rose-500/40 text-xs font-semibold transition active:scale-95 flex items-center gap-1.5 cursor-pointer"
             >
               <span>⚡</span>
               <span>Ajustar a 10 tarjetas</span>
@@ -675,21 +675,21 @@ export function DocumentUploader({
 
       {/* Success View */}
       {status === 'success' ? (
-        <div className="p-6 rounded-2xl border border-emerald-500/30 bg-emerald-950/20 text-center space-y-4 animate-in fade-in duration-300">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center justify-center mx-auto shadow-lg shadow-emerald-900/30">
+        <div className="p-6 rounded-2xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-950/20 text-center space-y-4 animate-in fade-in duration-300">
+          <div className="w-12 h-12 rounded-2xl bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/40 flex items-center justify-center mx-auto shadow-md">
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
             </svg>
           </div>
 
           <div>
-            <h3 className="text-base font-bold text-white tracking-tight">
+            <h3 className="text-base font-extrabold text-slate-900 dark:text-white tracking-tight">
               {t('ai_uploader.success_title', '¡{count} Tarjetas Generadas y Guardadas!').replace('{count}', String(successCount))}
             </h3>
 
             {/* FASE 2: Notificación si el texto no contenía más conceptos únicos */}
             {materialExhaustedNotice && (
-              <div className="mt-3 p-3.5 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-200 text-xs text-left flex items-start gap-2.5 max-w-md mx-auto shadow-md animate-in fade-in">
+              <div className="mt-3 p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-950 dark:text-amber-200 text-xs text-left flex items-start gap-2.5 max-w-md mx-auto shadow-sm animate-in fade-in">
                 <span className="text-base shrink-0">⚠️</span>
                 <p className="leading-relaxed font-medium">
                   {t(
@@ -702,47 +702,40 @@ export function DocumentUploader({
               </div>
             )}
 
-            {/* Banner de Feedback de Continuidad / Radar de Profundidad */}
-            {((isMeticulousPhase || coreExhausted) ? (
-              <div className="mt-3 p-3.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-200 text-xs text-left flex items-start gap-2.5 max-w-md mx-auto shadow-sm">
-                <span className="text-base shrink-0">🎯</span>
-                <p className="leading-relaxed">
-                  <strong className="font-semibold text-amber-300">{t('deck_detail.theory_covered_title', 'Teoría principal cubierta.')}</strong> {t('deck_detail.theory_covered_desc', 'Se han extraído los conceptos troncales. Si continúas generando, la IA rebuscará detalles minuciosos, datos estadísticos y excepciones del texto para un estudio de máxima profundidad.')}
-                </p>
-              </div>
-            ) : (
-              <div className="mt-3 p-3.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-200 text-xs text-left flex items-start gap-2.5 max-w-md mx-auto shadow-sm">
-                <span className="text-base shrink-0">✅</span>
-                <p className="leading-relaxed">
-                  <strong className="font-semibold text-emerald-300">{t('deck_detail.cards_added_title', 'Tarjetas añadidas con éxito.')}</strong> {t('deck_detail.cards_added_desc', '¿El temario es largo? Dale a generar de nuevo para extraer el siguiente bloque de conocimientos.')}
-                </p>
-              </div>
-            ))}
-
-            <p className="text-[11px] text-neutral-400 mt-2 max-w-sm mx-auto">
-              {t('ai_uploader.document_label', 'Documento:')} &ldquo;{selectedFile?.name}&rdquo; ({cardFormat})
-            </p>
-            {isPageableDoc && typeof nextCursorPage === 'number' && (
-              <div className="mt-2.5 p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/25 text-indigo-300 text-xs text-center max-w-md mx-auto shadow-sm">
-                <div className="flex items-center justify-center gap-2">
+            {/* Si es documento por páginas / tramos, mostramos ÚNICAMENTE la caja de progreso limpia */}
+            {isPageableDoc && typeof nextCursorPage === 'number' ? (
+              <div className="mt-3 p-3.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 text-blue-950 dark:text-blue-200 text-xs text-center max-w-md mx-auto shadow-sm">
+                <div className="flex items-center justify-center gap-2 flex-wrap">
                   <span className="text-sm">📖</span>
-                  <span className="font-medium text-neutral-200">
+                  <span className="font-medium text-blue-950 dark:text-blue-200">
                     Páginas consumidas por el motor:{' '}
-                    <strong className="text-white font-semibold">
+                    <strong className="text-blue-950 dark:text-white font-semibold">
                       {lastStartPage && lastStartPage !== nextCursorPage
                         ? `de la ${lastStartPage} a la ${nextCursorPage}`
                         : `página ${nextCursorPage}`}
                     </strong>
                     {effectiveTotalPages && (
-                      <span className="text-neutral-400"> (de {effectiveTotalPages} págs {isPdf ? 'totales' : 'virtuales'})</span>
+                      <span className="text-blue-900/80 dark:text-blue-300"> (de {effectiveTotalPages} págs {isPdf ? 'totales' : 'virtuales'})</span>
                     )}
                   </span>
                 </div>
-                <span className="block text-[11px] text-indigo-400/80 mt-1">
+                <span className="block text-[11px] text-blue-900/80 dark:text-blue-300 mt-1 font-medium">
                   Marcapáginas guardado en pág. {nextCursorPage} • El motor retomará desde aquí en el siguiente clic
                 </span>
               </div>
+            ) : (
+              /* Para documentos generales sin páginas */
+              <div className="mt-3 p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-950 dark:text-emerald-200 text-xs text-left flex items-start gap-2.5 max-w-md mx-auto shadow-sm">
+                <span className="text-base shrink-0">✅</span>
+                <p className="leading-relaxed">
+                  <strong className="font-semibold text-emerald-950 dark:text-emerald-300">{t('deck_detail.cards_added_title', 'Tarjetas añadidas con éxito.')}</strong>
+                </p>
+              </div>
             )}
+
+            <p className="text-[11px] text-slate-600 dark:text-neutral-400 mt-2 max-w-sm mx-auto font-medium">
+              {t('ai_uploader.document_label', 'Documento:')} &ldquo;{selectedFile?.name}&rdquo; ({cardFormat})
+            </p>
           </div>
 
           {/* Cards Preview with FormattedCardView */}
@@ -1174,7 +1167,7 @@ export function DocumentUploader({
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-[11px] font-medium text-neutral-600 dark:text-neutral-400 mb-1">
+                      <label className="block text-[11px] font-semibold text-slate-800 dark:text-neutral-300 mb-1">
                         {t('ai_uploader.from_page', isEn ? 'Start page:' : 'Desde página:')}
                       </label>
                       <input
@@ -1189,11 +1182,11 @@ export function DocumentUploader({
                           setLastStartPage(null);
                         }}
                         placeholder="ej. 1"
-                        className="w-full text-xs font-medium px-3 py-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition disabled:opacity-50"
+                        className="w-full text-xs font-semibold px-3 py-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition disabled:opacity-50"
                       />
                     </div>
                     <div>
-                      <label className="block text-[11px] font-medium text-neutral-600 dark:text-neutral-400 mb-1">
+                      <label className="block text-[11px] font-semibold text-slate-800 dark:text-neutral-300 mb-1">
                         {t('ai_uploader.to_page', isEn ? 'End page:' : 'Hasta página:')}
                       </label>
                       <input
@@ -1208,13 +1201,13 @@ export function DocumentUploader({
                           setLastStartPage(null);
                         }}
                         placeholder={effectiveTotalPages ? (isEn ? `e.g. ${effectiveTotalPages}` : `ej. ${effectiveTotalPages}`) : (isEn ? 'e.g. 30' : 'ej. 30')}
-                        className="w-full text-xs font-medium px-3 py-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition disabled:opacity-50"
+                        className="w-full text-xs font-semibold px-3 py-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition disabled:opacity-50"
                       />
                     </div>
                   </div>
 
                   {typeof nextCursorPage === 'number' && (
-                    <div className="p-2 rounded-lg bg-indigo-500/10 border border-indigo-500/25 text-indigo-300 text-[11px] flex items-center justify-between gap-2">
+                    <div className="p-2 rounded-lg bg-blue-50 dark:bg-indigo-500/10 border border-blue-200 dark:border-indigo-500/25 text-blue-950 dark:text-indigo-300 text-[11px] flex items-center justify-between gap-2 font-medium">
                       <span>{t('ai_uploader.bookmark_resume', { page: nextCursorPage }, isEn ? `🔖 Bookmark: Will resume from page ${nextCursorPage}` : `🔖 Marcapáginas: Retomará desde pág. ${nextCursorPage}`)}</span>
                       <button
                         type="button"
@@ -1222,7 +1215,7 @@ export function DocumentUploader({
                           setNextCursorPage(null);
                           setLastStartPage(null);
                         }}
-                        className="text-[10px] text-indigo-400 hover:text-indigo-200 underline font-mono cursor-pointer"
+                        className="text-[10px] text-blue-700 hover:text-blue-900 dark:text-indigo-400 dark:hover:text-indigo-200 underline font-mono cursor-pointer font-semibold"
                       >
                         {t('ai_uploader.bookmark_reset', isEn ? 'Reset' : 'Reiniciar')}
                       </button>
@@ -1230,7 +1223,7 @@ export function DocumentUploader({
                   )}
                 </div>
               ) : (
-                <div className="p-3 rounded-xl bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-xs text-neutral-600 dark:text-neutral-400 flex items-center gap-2">
+                <div className="p-3 rounded-xl bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-xs text-slate-700 dark:text-neutral-300 flex items-center gap-2 font-medium">
                   <span>📄</span>
                   <span>{t('ai_uploader.full_doc_notice', { name: selectedFile.name }, isEn ? `Full document: The engine will process the entire file (${selectedFile.name}).` : `Documento completo: El motor procesará la totalidad del archivo (${selectedFile.name}).`)}</span>
                 </div>
@@ -1238,7 +1231,7 @@ export function DocumentUploader({
 
               {/* Formato de Tarjetas (Grid 2x2) */}
               <div className="space-y-1.5 sm:space-y-2">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-800 dark:text-neutral-300">
                   {t('ai_uploader.card_format_label', isEn ? 'Card Format' : 'Formato de Tarjetas')}
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5">
@@ -1277,14 +1270,14 @@ export function DocumentUploader({
                         onClick={() => setCardFormat(opt.id)}
                         className={`p-2.5 sm:p-3 rounded-xl border text-left transition-all flex items-start gap-2.5 cursor-pointer active:scale-[0.99] ${
                           isSelected
-                            ? 'border-violet-500 bg-violet-500/10 ring-1 ring-violet-500 text-neutral-900 dark:text-white shadow-sm'
-                            : 'border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/60 hover:border-neutral-300 dark:hover:border-neutral-700 text-neutral-700 dark:text-neutral-300'
+                            ? 'border-violet-500 bg-violet-500/10 ring-1 ring-violet-500 text-slate-900 dark:text-white shadow-sm'
+                            : 'border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/60 hover:border-neutral-300 dark:hover:border-neutral-700 text-slate-800 dark:text-neutral-300'
                         }`}
                       >
                         <span className="text-xl shrink-0 mt-0.5">{opt.icon}</span>
                         <div className="min-w-0 flex-1">
                           <p className="text-xs font-semibold">{opt.title}</p>
-                          <p className="text-[11px] sm:text-xs text-neutral-500 dark:text-slate-400 leading-snug line-clamp-2 mt-0.5">
+                          <p className="text-[11px] sm:text-xs text-slate-600 dark:text-slate-400 leading-snug line-clamp-2 mt-0.5">
                             {opt.subtitle}
                           </p>
                         </div>
@@ -1297,7 +1290,7 @@ export function DocumentUploader({
               {/* Cantidad de Tarjetas (1 a 30) */}
               <div className="p-3 sm:p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <label htmlFor="cardCount" className="text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300">
+                  <label htmlFor="cardCount" className="text-xs font-semibold uppercase tracking-wider text-slate-800 dark:text-neutral-300">
                     {t('ai_uploader.card_count_label', isEn ? 'Card Quantity' : 'Cantidad de Tarjetas')}
                   </label>
                   <span className="text-[10px] font-mono text-violet-600 dark:text-violet-400 font-bold">
@@ -1348,7 +1341,7 @@ export function DocumentUploader({
                 <button
                   type="button"
                   onClick={() => setCurrentStep(1)}
-                  className="px-4 py-2 text-xs text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 transition flex items-center gap-1.5 cursor-pointer"
+                  className="px-4 py-2 text-xs text-slate-700 hover:text-slate-900 dark:text-neutral-400 dark:hover:text-white rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 transition flex items-center gap-1.5 cursor-pointer font-medium"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -1379,7 +1372,7 @@ export function DocumentUploader({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="text-base">🎓</span>
-                    <h4 className="text-xs font-bold text-neutral-900 dark:text-white tracking-tight flex items-center">
+                    <h4 className="text-xs font-semibold text-slate-900 dark:text-white tracking-tight flex items-center">
                       <span>{t('ai_uploader.pedagogical_mode_label', isEn ? 'Pedagogical Focus' : 'Enfoque Pedagógico')}</span>
                       <InfoTooltip
                         title={t('ai_uploader.tooltip_pedagogical_title', isEn ? 'Academic vs. Teaching Mode' : 'Modo Estudio vs. Modo Docente')}
@@ -1424,10 +1417,10 @@ export function DocumentUploader({
                     type="button"
                     disabled={isBusy}
                     onClick={() => setPedagogicalMode('academic')}
-                    className={`py-2 px-2.5 rounded-lg text-xs font-medium transition-all flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 text-center cursor-pointer ${
+                    className={`py-2 px-2.5 rounded-lg text-xs transition-all flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 text-center cursor-pointer ${
                       pedagogicalMode === 'academic'
-                        ? 'bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-sm ring-1 ring-black/5 dark:ring-white/10 font-semibold'
-                        : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200'
+                        ? 'bg-white dark:bg-neutral-800 text-slate-900 dark:text-white shadow-sm ring-1 ring-black/5 dark:ring-white/10 font-bold'
+                        : 'text-slate-900 hover:text-black dark:text-neutral-300 dark:hover:text-white font-medium'
                     } disabled:opacity-50`}
                   >
                     <span>📚</span>
@@ -1437,10 +1430,10 @@ export function DocumentUploader({
                     type="button"
                     disabled={isBusy}
                     onClick={() => setPedagogicalMode('didactic')}
-                    className={`py-2 px-2.5 rounded-lg text-xs font-medium transition-all flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 text-center cursor-pointer ${
+                    className={`py-2 px-2.5 rounded-lg text-xs transition-all flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 text-center cursor-pointer ${
                       pedagogicalMode === 'didactic'
-                        ? 'bg-amber-500/15 dark:bg-amber-500/20 text-amber-900 dark:text-amber-300 border border-amber-500/40 shadow-sm font-semibold'
-                        : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200'
+                        ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-500/40 shadow-sm font-bold'
+                        : 'text-slate-900 hover:text-black dark:text-neutral-300 dark:hover:text-white font-medium'
                     } disabled:opacity-50`}
                   >
                     <span>👨‍🏫</span>
@@ -1450,9 +1443,9 @@ export function DocumentUploader({
 
                 {/* Micro-texto explicativo cuando esté en Modo Docente */}
                 {pedagogicalMode === 'didactic' && (
-                  <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 text-[11px] leading-relaxed flex items-start gap-2 animate-in fade-in">
+                  <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-950 dark:text-amber-300 text-[11px] leading-relaxed flex items-start gap-2 animate-in fade-in">
                     <span className="text-xs shrink-0 mt-0.5">💡</span>
-                    <p>
+                    <p className="font-medium">
                       {t(
                         'ai_uploader.pedagogical_didactic_notice',
                         isEn
@@ -1476,7 +1469,7 @@ export function DocumentUploader({
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <span className="text-base">⚡</span>
-                      <h4 className="text-xs font-bold text-neutral-900 dark:text-white tracking-tight flex items-center">
+                      <h4 className="text-xs font-semibold text-slate-900 dark:text-white tracking-tight flex items-center">
                         <span>
                           {t('ai_uploader.exhaustive_mode_label', isEn ? 'Exhaustive Mode' : 'Modo Exhaustivo')} (
                           {isExhaustiveMode
@@ -1509,99 +1502,99 @@ export function DocumentUploader({
                                   {t(
                                     'ai_uploader.tooltip_exhaustive_mode_desc',
                                     isEn
-                                      ? 'Surgically analyzes every table row, chart, numeric stat, legal deadline, and exception.'
-                                      : 'Analiza cada fila de tablas, gráficas, cifras, plazos legales y excepciones con precisión quirúrgica.'
-                                  )}
-                                </span>
-                              </div>
+                                    ? 'Surgically analyzes every table row, chart, numeric stat, legal deadline, and exception.'
+                                    : 'Analiza cada fila de tablas, gráficas, cifras, plazos legales y excepciones con precisión quirúrgica.'
+                                )}
+                              </span>
                             </div>
-                          }
-                        />
-                      </h4>
-                      {isExhaustiveMode && (
-                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-violet-600 text-white animate-pulse">
-                          {t('ai_uploader.mode_surgical', isEn ? 'SURGICAL' : 'QUIRÚRGICO').toUpperCase()}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[11px] text-neutral-600 dark:text-neutral-400 leading-relaxed">
-                      {isExhaustiveMode
-                        ? t(
-                            'ai_uploader.exhaustive_desc_surgical',
-                            isEn
-                              ? 'Surgically analyzes every table row, chart, numeric stat, legal deadline, and exception without summarizing.'
-                              : 'Desglose exhaustivo de tablas, gráficos y listas densas sin resumir información.'
-                          )
-                        : t(
-                            'ai_uploader.exhaustive_desc_normal',
-                            isEn
-                              ? 'Standard extraction and synthesis of main core concepts.'
-                              : 'Extracción estándar y síntesis de los conceptos clave principales.'
-                          )}
-                    </p>
+                          </div>
+                        }
+                      />
+                    </h4>
+                    {isExhaustiveMode && (
+                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-violet-600 text-white animate-pulse">
+                        {t('ai_uploader.mode_surgical', isEn ? 'SURGICAL' : 'QUIRÚRGICO').toUpperCase()}
+                      </span>
+                    )}
                   </div>
-
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={isExhaustiveMode}
-                    disabled={isBusy}
-                    onClick={() => setIsExhaustiveMode(!isExhaustiveMode)}
-                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 ${
-                      isExhaustiveMode
-                        ? 'bg-violet-600 dark:bg-violet-500'
-                        : 'bg-neutral-300 dark:bg-neutral-700'
-                    } disabled:opacity-50`}
-                  >
-                    <span
-                      aria-hidden="true"
-                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                        isExhaustiveMode ? 'translate-x-5' : 'translate-x-0'
-                      }`}
-                    />
-                  </button>
+                  <p className="text-[11px] text-slate-700 dark:text-neutral-300 leading-relaxed font-medium">
+                    {isExhaustiveMode
+                      ? t(
+                          'ai_uploader.exhaustive_desc_surgical',
+                          isEn
+                            ? 'Surgically analyzes every table row, chart, numeric stat, legal deadline, and exception without summarizing.'
+                            : 'Desglose exhaustivo de tablas, gráficos y listas densas sin resumir información.'
+                        )
+                      : t(
+                          'ai_uploader.exhaustive_desc_normal',
+                          isEn
+                            ? 'Standard extraction and synthesis of main core concepts.'
+                            : 'Extracción estándar y síntesis de los conceptos clave principales.'
+                        )}
+                  </p>
                 </div>
-              </div>
 
-              {/* Enfoque Temático con Tooltip */}
-              <div className="p-3 sm:p-3.5 rounded-2xl bg-neutral-50 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-neutral-900 dark:text-white flex items-center">
-                    <span>{t('ai_uploader.thematic_focus_label', isEn ? '🎯 Thematic Focus (Optional)' : '🎯 Enfoque Temático (Opcional)')}</span>
-                    <InfoTooltip
-                      title={t('ai_uploader.tooltip_focus_title', isEn ? 'Filtering and Focus Examples' : 'Ejemplos de Filtrado y Enfoque')}
-                      content={t(
-                        'ai_uploader.tooltip_focus_content',
-                        isEn
-                          ? 'Use this field to guide the AI and filter information within the chosen pages. Example: \'Focus on Table 5-3 and extract drug dosages\' or \'Ignore historical introduction and only ask about current regulations\'.'
-                          : 'Usa este campo para guiar a la IA y filtrar la información dentro de las páginas elegidas. Ejemplo: \'Centrar en el Cuadro 5-3 y extraer dosis farmacológicas\' o \'Ignorar introducción histórica y preguntar solo por la normativa vigente\'.'
-                      )}
-                    />
-                  </label>
-                </div>
-                <textarea
-                  rows={2}
-                  disabled={isBusy}
-                  value={customPrompt}
-                  onChange={(e) => setCustomPrompt(e.target.value)}
-                  placeholder={t(
-                    'ai_uploader.focus_prompt_placeholder',
-                    isEn
-                      ? "E.g., 'Extract data exclusively from Table 5-3 on fat content'..."
-                      : "Ej: 'Extrae exclusivamente datos del Cuadro 5-3 de contenido de grasa'..."
-                  )}
-                  className="w-full text-xs px-3.5 py-2 sm:py-2.5 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-1 focus:ring-violet-500 focus:border-violet-500 transition disabled:opacity-50 resize-none"
-                />
-              </div>
-
-              {/* Botones de navegación Paso 3 */}
-              <div className="flex items-center justify-between pt-1 sm:pt-2">
                 <button
                   type="button"
+                  role="switch"
+                  aria-checked={isExhaustiveMode}
                   disabled={isBusy}
-                  onClick={() => setCurrentStep(2)}
-                  className="px-4 py-2 text-xs text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  onClick={() => setIsExhaustiveMode(!isExhaustiveMode)}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 ${
+                    isExhaustiveMode
+                      ? 'bg-violet-600 dark:bg-violet-500'
+                      : 'bg-neutral-300 dark:bg-neutral-700'
+                  } disabled:opacity-50`}
                 >
+                  <span
+                    aria-hidden="true"
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                      isExhaustiveMode ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+
+            {/* Enfoque Temático con Tooltip */}
+            <div className="p-3 sm:p-3.5 rounded-2xl bg-neutral-50 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-slate-900 dark:text-white flex items-center">
+                  <span>{t('ai_uploader.thematic_focus_label', isEn ? '🎯 Thematic Focus (Optional)' : '🎯 Enfoque Temático (Opcional)')}</span>
+                  <InfoTooltip
+                    title={t('ai_uploader.tooltip_focus_title', isEn ? 'Filtering and Focus Examples' : 'Ejemplos de Filtrado y Enfoque')}
+                    content={t(
+                      'ai_uploader.tooltip_focus_content',
+                      isEn
+                        ? 'Use this field to guide the AI and filter information within the chosen pages. Example: \'Focus on Table 5-3 and extract drug dosages\' or \'Ignore historical introduction and only ask about current regulations\'.'
+                        : 'Usa este campo para guiar a la IA y filtrar la información dentro de las páginas elegidas. Ejemplo: \'Centrar en el Cuadro 5-3 y extraer dosis farmacológicas\' o \'Ignorar introducción histórica y preguntar solo por la normativa vigente\'.'
+                    )}
+                  />
+                </label>
+              </div>
+              <textarea
+                rows={2}
+                disabled={isBusy}
+                value={customPrompt}
+                onChange={(e) => setCustomPrompt(e.target.value)}
+                placeholder={t(
+                  'ai_uploader.focus_prompt_placeholder',
+                  isEn
+                    ? "E.g., 'Extract data exclusively from Table 5-3 on fat content'..."
+                    : "Ej: 'Extrae exclusivamente datos del Cuadro 5-3 de contenido de grasa'..."
+                )}
+                className="w-full text-xs px-3.5 py-2 sm:py-2.5 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-1 focus:ring-violet-500 focus:border-violet-500 transition disabled:opacity-50 resize-none font-medium"
+              />
+            </div>
+
+            {/* Botones de navegación Paso 3 */}
+            <div className="flex items-center justify-between pt-1 sm:pt-2">
+              <button
+                type="button"
+                disabled={isBusy}
+                onClick={() => setCurrentStep(2)}
+                className="px-4 py-2 text-xs text-slate-700 hover:text-slate-950 dark:text-neutral-400 dark:hover:text-white rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50 font-medium"
+              >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                   </svg>
