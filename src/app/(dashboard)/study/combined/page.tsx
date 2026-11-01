@@ -20,6 +20,7 @@ import { useCardStore, useSettingsStore, useLanguageStore, useStreakStore, type 
 import { toLocalDateString } from '@/lib/stats/streak';
 import {
   previewNextIntervals,
+  buildInterleavedCombinedQueue,
   type FSRSRating,
 } from '@/lib/fsrs';
 import { FormattedCardView, parseMultipleChoice } from '@/components/cards';
@@ -146,10 +147,8 @@ function CombinedStudyContent() {
     }
     fetchTodayReviewsCount();
     fetchCardsByDecks(deckIds).then((loaded) => {
-      // Ordenar: primero las pendientes (due <= now()), o todas si no hay vencidas
-      const now = new Date();
-      const dueCards = loaded.filter((c) => new Date(c.due) <= now);
-      const studyQueue = dueCards.length > 0 ? dueCards : loaded;
+      // Cola de Práctica Intercalada (Round-Robin para tarjetas nuevas + prioridad FSRS para repasos)
+      const studyQueue = buildInterleavedCombinedQueue(loaded, deckIds);
       setQueue(studyQueue);
       setIsInitialized(true);
     });

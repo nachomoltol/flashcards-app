@@ -22,6 +22,15 @@ export interface GenerateCardsResult {
   startCursorPage?: number;
 }
 
+export type DocenteFormat =
+  | 'mixed_test'
+  | 'multiple_choice'
+  | 'true_false'
+  | 'cloze'
+  | 'basic'
+  | 'open_cases';
+export type TargetAudience = 'auto' | '12-14_years' | '15-17_years' | 'university_plus';
+
 export interface MultimodalDocumentInput {
   deckId?: string;
   userId?: string;
@@ -42,6 +51,8 @@ export interface MultimodalDocumentInput {
   coreExhaustedPrevious?: boolean;
   isExhaustiveMode?: boolean;
   pedagogicalMode?: 'academic' | 'didactic';
+  docenteFormat?: DocenteFormat;
+  targetAudience?: TargetAudience;
 }
 
 export interface UrlCardInput {
@@ -56,6 +67,8 @@ export interface UrlCardInput {
   language?: string;
   coreExhaustedPrevious?: boolean;
   pedagogicalMode?: 'academic' | 'didactic';
+  docenteFormat?: DocenteFormat;
+  targetAudience?: TargetAudience;
 }
 
 

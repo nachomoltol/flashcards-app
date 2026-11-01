@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import {
   createInitialCardValues,
   scheduleReviewWithLog,
+  buildInterleavedCombinedQueue,
   type FSRSRating,
 } from '@/lib/fsrs';
 import type { Database, CardFormat } from '@/types/database';
@@ -98,23 +99,13 @@ export const useCardStore = create<CardState>((set) => ({
 
       const loadedCards = (data as unknown as CardRow[]) || [];
 
-      // Ordenamiento FSRS Unificado:
-      // 1. Tarjetas vencidas (due <= now) ordenadas por fecha de vencimiento más antigua primero
-      // 2. Tarjetas futuras ordenadas cronológicamente
-      const now = new Date();
-      loadedCards.sort((a, b) => {
-        const timeA = new Date(a.due).getTime();
-        const timeB = new Date(b.due).getTime();
-        const aIsDue = timeA <= now.getTime();
-        const bIsDue = timeB <= now.getTime();
+      // Algoritmo Round-Robin para Mazos Combinados (Práctica Intercalada + FSRS):
+      // - Tarjetas con historial FSRS (repaso/aprendizaje): gobernadas estrictamente por FSRS.
+      // - Tarjetas nuevas sin historial: agrupadas por mazo y entrelazadas cíclicamente en Round-Robin.
+      const interleavedCards = buildInterleavedCombinedQueue(loadedCards, deckIds);
 
-        if (aIsDue && !bIsDue) return -1;
-        if (!aIsDue && bIsDue) return 1;
-        return timeA - timeB;
-      });
-
-      set({ cards: loadedCards, isLoading: false });
-      return loadedCards;
+      set({ cards: interleavedCards, isLoading: false });
+      return interleavedCards;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Error al cargar las tarjetas de los mazos seleccionados';
       console.error('Error fetching cards by decks:', err);

@@ -8,8 +8,9 @@ import { useAuthStore, useCardStore, useDeckStore, useProModalStore, useLanguage
 import { generateCardsFromDocumentAction } from '@/app/actions/generateCards';
 import { showAdMobRewardedAd } from '@/lib/admob';
 import { claimAdRewardAction } from '@/app/actions/claimAdReward';
-import type { CardFormat, GeneratedCard } from '@/types/cards';
+import type { CardFormat, GeneratedCard, DocenteFormat, TargetAudience } from '@/types/cards';
 import { FormattedCardView } from './FormattedCardView';
+import { PrintExamSheet } from '@/components/decks';
 import { cleanupUploadedDocument } from '@/lib/storageCleanup';
 import { purgeExpiredDocumentsAction } from '@/app/actions/storageCleanup';
 
@@ -219,6 +220,11 @@ export function DocumentUploader({
   const [pdfTotalPages, setPdfTotalPages] = useState<number | null>(null);
   const [docxTotalPages, setDocxTotalPages] = useState<number | null>(null);
   
+  // Modal de restricción obligatoria de páginas para documentos PDF / DOCX
+  const [isPageRangeRequiredModalOpen, setIsPageRangeRequiredModalOpen] = useState<boolean>(false);
+  const [modalPageStart, setModalPageStart] = useState<string>('');
+  const [modalPageEnd, setModalPageEnd] = useState<string>('');
+  
   // Status flow: idle -> uploading -> analyzing -> saving -> success | error
   const [status, setStatus] = useState<
     'idle' | 'uploading' | 'analyzing' | 'saving' | 'success' | 'error'
@@ -231,6 +237,8 @@ export function DocumentUploader({
   );
   const [isExhaustiveMode, setIsExhaustiveMode] = useState<boolean>(false);
   const [pedagogicalMode, setPedagogicalMode] = useState<'academic' | 'didactic'>('academic');
+  const [docenteFormat, setDocenteFormat] = useState<DocenteFormat>('mixed_test');
+  const [targetAudience, setTargetAudience] = useState<TargetAudience>('auto');
   const [generatedCardsPreview, setGeneratedCardsPreview] = useState<GeneratedCard[]>([]);
   const [materialExhaustedNotice, setMaterialExhaustedNotice] = useState<{ generated: number; requested: number } | null>(null);
 
@@ -479,6 +487,15 @@ export function DocumentUploader({
 
       const existingFronts = cards && cards.length > 0 ? cards.map((c) => c.front) : [];
 
+      const effectiveCardFormat: CardFormat =
+        pedagogicalMode === 'didactic'
+          ? (docenteFormat === 'open_cases'
+              ? 'basic'
+              : docenteFormat === 'mixed_test'
+              ? cardFormat
+              : docenteFormat)
+          : cardFormat;
+
       let result: Awaited<ReturnType<typeof generateCardsFromDocumentAction>>;
       try {
         result = await generateCardsFromDocumentAction({
@@ -490,7 +507,7 @@ export function DocumentUploader({
           fileName: selectedFile.name,
           customPrompt: customPrompt.trim() || undefined,
           focusInstruction: customPrompt.trim() || undefined,
-          cardFormat,
+          cardFormat: effectiveCardFormat,
           cardCount,
           existingQuestions: existingFronts,
           cursorPage: startPageForRun,
@@ -500,6 +517,8 @@ export function DocumentUploader({
           coreExhaustedPrevious: coreExhausted || isMeticulousPhase,
           isExhaustiveMode,
           pedagogicalMode,
+          docenteFormat,
+          targetAudience,
         });
       } catch (actionErr: unknown) {
         const actionErrMsg =
@@ -652,6 +671,42 @@ export function DocumentUploader({
     pageStart.trim() === pageEnd.trim()
   );
 
+  const handleValidateAndProceedToStep3 = () => {
+    if (isPageableDoc) {
+      const pStart = parseInt(pageStart.trim(), 10);
+      const pEnd = parseInt(pageEnd.trim(), 10);
+      const isInvalid =
+        pageStart.trim() === '' ||
+        pageEnd.trim() === '' ||
+        isNaN(pStart) ||
+        isNaN(pEnd) ||
+        pStart < 1 ||
+        pEnd < pStart ||
+        Boolean(effectiveTotalPages && (pStart > effectiveTotalPages || pEnd > effectiveTotalPages));
+
+      if (isInvalid) {
+        setModalPageStart(pageStart.trim() || '1');
+        setModalPageEnd(pageEnd.trim() || (effectiveTotalPages ? String(effectiveTotalPages) : '10'));
+        setIsPageRangeRequiredModalOpen(true);
+        return;
+      }
+    }
+    setCurrentStep(3);
+  };
+
+  const handleApplyModalPageRange = () => {
+    const pStart = parseInt(modalPageStart.trim(), 10);
+    const pEnd = parseInt(modalPageEnd.trim(), 10);
+    if (!isNaN(pStart) && !isNaN(pEnd) && pStart >= 1 && pEnd >= pStart) {
+      setPageStart(String(pStart));
+      setPageEnd(String(pEnd));
+      setNextCursorPage(null);
+      setLastStartPage(null);
+      setIsPageRangeRequiredModalOpen(false);
+      setCurrentStep(3);
+    }
+  };
+
   return (
     <div className="w-full space-y-5">
       {/* Error Banner Amigable con Botón de Reintento Rápido */}
@@ -747,27 +802,56 @@ export function DocumentUploader({
             </p>
           </div>
 
-          {/* Cards Preview with FormattedCardView */}
-          <div className="overflow-y-auto max-h-[55vh] sm:max-h-[60vh] pr-2 space-y-3 text-left">
-            {generatedCardsPreview.map((card, i) => (
-              <div
-                key={card.id || `card-batch-${Date.now()}-${(card.front || '').slice(0, 15)}-${i}`}
-                className="p-3.5 rounded-xl bg-neutral-900/90 border border-neutral-800 text-xs shadow-sm"
-              >
-                <FormattedCardView
-                  cardId={card.id || `preview-${(card.front || '').slice(0, 15)}-${i}`}
-                  front={card.front}
-                  back={card.back}
-                  cardFormat={card.cardFormat}
-                  isRevealed={true}
-                  interactive={false}
-                />
-              </div>
-            ))}
+          {/* Cards Preview with FormattedCardView (Pantalla: visible | Impresión: oculta) */}
+          <div className="space-y-3 print:hidden">
+            <div className="overflow-y-auto max-h-[55vh] sm:max-h-[60vh] pr-2 space-y-3 text-left">
+              {generatedCardsPreview.map((card, i) => (
+                <div
+                  key={card.id || `card-batch-${Date.now()}-${(card.front || '').slice(0, 15)}-${i}`}
+                  className="p-3.5 rounded-xl bg-neutral-900/90 border border-neutral-800 text-xs shadow-sm"
+                >
+                  <FormattedCardView
+                    cardId={card.id || `preview-${(card.front || '').slice(0, 15)}-${i}`}
+                    front={card.front}
+                    back={card.back}
+                    cardFormat={card.cardFormat}
+                    isRevealed={true}
+                    interactive={false}
+                  />
+                </div>
+              ))}
+            </div>
           </div>
 
+          {/* Documento de Impresión Ultra-Compacto para Vista Previa */}
+          <PrintExamSheet
+            deckTitle={
+              selectedFile?.name
+                ? `${selectedFile.name.replace(/\.[^/.]+$/, '')} — ${
+                    pedagogicalMode === 'didactic'
+                      ? (docenteFormat === 'mixed_test' ? 'Examen de Evaluación (Test Mixto)' : 'Casos Prácticos y Preguntas Abiertas')
+                      : 'Ficha de Estudio y Repaso'
+                  }`
+                : 'Examen de Evaluación'
+            }
+            deckDescription={pedagogicalMode === 'didactic' ? `Modo Docente • ${docenteFormat}` : undefined}
+            cards={generatedCardsPreview}
+          />
+
           {/* Sticky Actions Footer */}
-          <div className="sticky bottom-0 z-10 bg-slate-900/95 backdrop-blur-sm border-t border-slate-800 p-3 mt-2 rounded-xl flex flex-wrap items-center justify-center gap-2.5 shadow-lg">
+          <div className="sticky bottom-0 z-10 bg-slate-900/95 backdrop-blur-sm border-t border-slate-800 p-3 mt-2 rounded-xl flex flex-wrap items-center justify-center gap-2.5 shadow-lg print:hidden">
+            {/* Exportar a PDF / Imprimir */}
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="px-3.5 py-2.5 text-xs rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 font-semibold transition flex items-center gap-1.5 active:scale-95 cursor-pointer shadow-sm"
+              title="Guardar como PDF o Imprimir tarjetas"
+            >
+              <svg className="w-3.5 h-3.5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+              </svg>
+              <span>{t('ai_uploader.export_pdf_btn', isEn ? 'Export to PDF / Print' : 'Exportar a PDF / Imprimir')}</span>
+            </button>
             {isPageableDoc && typeof nextCursorPage === 'number' ? (
               <button
                 type="button"
@@ -861,7 +945,11 @@ export function DocumentUploader({
                       disabled={!canNavigate}
                       onClick={() => {
                         if (canNavigate) {
-                          setCurrentStep(s.id as 1 | 2 | 3);
+                          if (s.id === 3 && currentStep === 2) {
+                            handleValidateAndProceedToStep3();
+                          } else {
+                            setCurrentStep(s.id as 1 | 2 | 3);
+                          }
                         }
                       }}
                       className={`group flex items-center gap-1.5 text-xs font-semibold transition-all ${
@@ -1224,9 +1312,26 @@ export function DocumentUploader({
 
               {/* Formato de Tarjetas (Grid 2x2) */}
               <div className="space-y-1.5 sm:space-y-2">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-800 dark:text-neutral-300">
-                  {t('ai_uploader.card_format_label', isEn ? 'Card Format' : 'Formato de Tarjetas')}
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-800 dark:text-neutral-300">
+                    {t('ai_uploader.card_format_label', isEn ? 'Card Format' : 'Formato de Tarjetas')}
+                  </label>
+                  {pedagogicalMode === 'didactic' && (
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-amber-500/15 border border-amber-500/30 text-amber-700 dark:text-amber-300 font-mono">
+                      {docenteFormat === 'mixed_test'
+                        ? t('ai_uploader.didactic_mixed_badge', isEn ? '✨ Varied Test: Bloom Taxonomy' : '✨ Test Variado: Distribución Bloom')
+                        : docenteFormat === 'open_cases'
+                        ? t('ai_uploader.didactic_open_badge', isEn ? '📋 Cases with Rubric' : '📋 Casos con Rúbrica')
+                        : docenteFormat === 'multiple_choice'
+                        ? t('ai_uploader.didactic_mc_badge', isEn ? '📝 Multiple Choice Only' : '📝 Solo Test')
+                        : docenteFormat === 'true_false'
+                        ? t('ai_uploader.didactic_tf_badge', isEn ? '⚖️ True/False Only' : '⚖️ Solo V/F')
+                        : docenteFormat === 'cloze'
+                        ? t('ai_uploader.didactic_cloze_badge', isEn ? '🧩 Cloze Only' : '🧩 Solo Huecos')
+                        : t('ai_uploader.didactic_basic_badge', isEn ? '🃏 Short Question Only' : '🃏 Solo Pregunta Corta')}
+                    </span>
+                  )}
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5">
                   {[
                     {
@@ -1260,7 +1365,12 @@ export function DocumentUploader({
                         key={opt.id}
                         type="button"
                         disabled={isBusy}
-                        onClick={() => setCardFormat(opt.id)}
+                        onClick={() => {
+                          setCardFormat(opt.id);
+                          if (pedagogicalMode === 'didactic') {
+                            setDocenteFormat(opt.id);
+                          }
+                        }}
                         className={`p-2.5 sm:p-3 rounded-xl border text-left transition-all flex items-start gap-2.5 cursor-pointer active:scale-[0.99] ${
                           isSelected
                             ? 'border-violet-500 bg-violet-500/10 ring-1 ring-violet-500 text-slate-900 dark:text-white shadow-sm'
@@ -1280,39 +1390,53 @@ export function DocumentUploader({
                 </div>
               </div>
 
-              {/* Cantidad de Tarjetas (1 a 30) */}
-              <div className="p-3 sm:p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label htmlFor="cardCount" className="text-xs font-semibold uppercase tracking-wider text-slate-800 dark:text-neutral-300">
-                    {t('ai_uploader.card_count_label', isEn ? 'Card Quantity' : 'Cantidad de Tarjetas')}
-                  </label>
-                  <span className="text-[10px] font-mono text-violet-600 dark:text-violet-400 font-bold">
-                    {cardCount} / 30 MÁX
+              {/* Cantidad de Tarjetas o Notificación Didáctica */}
+              {pedagogicalMode === 'didactic' ? (
+                <div className="p-3 sm:p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2 text-amber-900 dark:text-amber-200">
+                    <span className="text-base">👨‍🏫</span>
+                    <span className="font-medium">
+                      {t('ai_uploader.docente_step2_notice', { count: cardCount }, isEn ? `Teacher Mode: Question quantity is configured in Step 3 (${cardCount} questions)` : `Modo Docente activo: El número de preguntas se define en el Paso 3 (${cardCount} preguntas)`)}
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-800 dark:text-amber-300 shrink-0">
+                    {cardCount} / 40 MÁX
                   </span>
                 </div>
-                <input
-                  id="cardCount"
-                  name="cardCount"
-                  type="number"
-                  min={1}
-                  max={30}
-                  disabled={isBusy}
-                  value={cardCount}
-                  onChange={(e) => {
-                    const rawVal = e.target.value;
-                    if (rawVal === '') {
-                      setCardCount(1);
-                      return;
-                    }
-                    const val = parseInt(rawVal, 10);
-                    if (!isNaN(val)) {
-                      setCardCount(Math.min(30, Math.max(1, val)));
-                    }
-                  }}
-                  className="w-full text-xs font-semibold px-3.5 py-2 sm:py-2.5 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition disabled:opacity-50"
-                  placeholder={isEn ? "1 to 30 cards" : "1 a 30 tarjetas"}
-                />
-              </div>
+              ) : (
+                <div className="p-3 sm:p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="cardCount" className="text-xs font-semibold uppercase tracking-wider text-slate-800 dark:text-neutral-300">
+                      {t('ai_uploader.card_count_label', isEn ? 'Card Quantity' : 'Cantidad de Tarjetas')}
+                    </label>
+                    <span className="text-[10px] font-mono font-bold text-violet-600 dark:text-violet-400">
+                      {cardCount} / 30 MÁX
+                    </span>
+                  </div>
+                  <input
+                    id="cardCount"
+                    name="cardCount"
+                    type="number"
+                    min={1}
+                    max={30}
+                    disabled={isBusy}
+                    value={cardCount}
+                    onChange={(e) => {
+                      const rawVal = e.target.value;
+                      if (rawVal === '') {
+                        setCardCount(1);
+                        return;
+                      }
+                      const val = parseInt(rawVal, 10);
+                      if (!isNaN(val)) {
+                        setCardCount(Math.min(30, Math.max(1, val)));
+                      }
+                    }}
+                    className="w-full text-xs font-semibold px-3.5 py-2 sm:py-2.5 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition disabled:opacity-50"
+                    placeholder={isEn ? "1 to 30 cards" : "1 a 30 tarjetas"}
+                  />
+                </div>
+              )}
 
               {/* Alerta Preventiva Condicional (1 sola página y > 15 tarjetas) */}
               {isSinglePage && cardCount > 15 && (
@@ -1343,7 +1467,7 @@ export function DocumentUploader({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setCurrentStep(3)}
+                  onClick={handleValidateAndProceedToStep3}
                   className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-medium text-xs sm:text-sm transition shadow-lg shadow-violet-600/25 active:scale-95 cursor-pointer"
                 >
                   <span>{t('ai_uploader.continue_step3', isEn ? 'Continue to Step 3' : 'Continuar al Paso 3')}</span>
@@ -1368,34 +1492,30 @@ export function DocumentUploader({
                     <h4 className="text-xs font-semibold text-slate-900 dark:text-white tracking-tight flex items-center">
                       <span>{t('ai_uploader.pedagogical_mode_label', isEn ? 'Pedagogical Focus' : 'Enfoque Pedagógico')}</span>
                       <InfoTooltip
-                        title={t('ai_uploader.tooltip_pedagogical_title', isEn ? 'Academic vs. Teaching Mode' : 'Modo Estudio vs. Modo Docente')}
+                        title={t('ai_uploader.tooltip_pedagogical_title', isEn ? 'Pedagogical Focus Guide' : 'Guía de Enfoque Pedagógico')}
                         content={
-                          <div className="space-y-2">
+                          <div className="space-y-2.5 text-[11px]">
                             <div>
-                              <strong className="text-white block font-semibold">
-                                {t('ai_uploader.pedagogical_academic_title', isEn ? '📚 Academic / Study Mode:' : '📚 Modo Estudio / Académico:')}
+                              <strong className="text-white block font-semibold flex items-center gap-1.5">
+                                <span>📚</span>
+                                <span>{t('ai_uploader.pedagogical_academic_title', isEn ? 'Academic / Self-Study Mode:' : 'Modo Estudio / Académico:')}</span>
                               </strong>
-                              <span className="text-neutral-300">
-                                {t(
-                                  'ai_uploader.pedagogical_academic_desc',
-                                  isEn
-                                    ? 'Competitive exams, university, technical manuals, and law.'
-                                    : 'Oposiciones, universidad, manuales técnicos y leyes.'
-                                )}
-                              </span>
+                              <p className="text-neutral-300 mt-0.5 leading-relaxed">
+                                {isEn
+                                  ? 'Designed for personal mastery, active recall, and competitive exams (oposiciones, university). Generates flashcards optimized for long-term retention using the FSRS spaced repetition algorithm.'
+                                  : 'Diseñado para el estudio personal, memorización activa y oposiciones. Genera tarjetas de estudio atomizadas optimizadas para la retención a largo plazo con el algoritmo FSRS.'}
+                              </p>
                             </div>
                             <div>
-                              <strong className="text-amber-300 block font-semibold">
-                                {t('ai_uploader.pedagogical_didactic_title', isEn ? '👨‍🏫 Teaching / Didactic Mode:' : '👨‍🏫 Modo Docente / Didáctico:')}
+                              <strong className="text-amber-300 block font-semibold flex items-center gap-1.5">
+                                <span>👨‍🏫</span>
+                                <span>{t('ai_uploader.pedagogical_didactic_title', isEn ? 'Teacher / Didactic Mode:' : 'Modo Docente / Didáctico:')}</span>
                               </strong>
-                              <span className="text-neutral-300">
-                                {t(
-                                  'ai_uploader.pedagogical_didactic_desc',
-                                  isEn
-                                    ? 'Exclusive for teachers: transforms worksheets, exercises, and lists into practical application questions for students.'
-                                    : 'Exclusivo para profesores: transforma fichas, ejercicios y listas en preguntas de aplicación práctica para alumnos.'
-                                )}
-                              </span>
+                              <p className="text-neutral-300 mt-0.5 leading-relaxed">
+                                {isEn
+                                  ? 'Designed exclusively for teachers and educators to create classroom assessments, exams, and worksheets. Calibrates questions using Bloom\'s Taxonomy and age cognitive stages, eliminating references to document structure.'
+                                  : 'Diseñado exclusivamente para profesores y formadores para crear exámenes, pruebas y controles de clase. Calibra las preguntas según la Taxonomía de Bloom y tramos de edad escolar, formulando ejercicios de aplicación práctica.'}
+                              </p>
                             </div>
                           </div>
                         }
@@ -1409,7 +1529,10 @@ export function DocumentUploader({
                   <button
                     type="button"
                     disabled={isBusy}
-                    onClick={() => setPedagogicalMode('academic')}
+                    onClick={() => {
+                      setPedagogicalMode('academic');
+                      if (cardCount > 30) setCardCount(30);
+                    }}
                     className={`py-2 px-2.5 rounded-lg text-xs transition-all flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 text-center cursor-pointer ${
                       pedagogicalMode === 'academic'
                         ? 'bg-white dark:bg-neutral-800 text-slate-900 dark:text-white shadow-sm ring-1 ring-black/5 dark:ring-white/10 font-bold'
@@ -1434,18 +1557,272 @@ export function DocumentUploader({
                   </button>
                 </div>
 
-                {/* Micro-texto explicativo cuando esté en Modo Docente */}
+                {/* Configuración específica del Modo Docente / Didáctico */}
                 {pedagogicalMode === 'didactic' && (
-                  <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-950 dark:text-amber-300 text-[11px] leading-relaxed flex items-start gap-2 animate-in fade-in">
-                    <span className="text-xs shrink-0 mt-0.5">💡</span>
-                    <p className="font-medium">
-                      {t(
-                        'ai_uploader.pedagogical_didactic_notice',
-                        isEn
-                          ? 'Optimized for teachers: transforms worksheets and lists into practical assessment exercises without references to document structure.'
-                          : 'Optimizado para profesores: transforma fichas y listas en ejercicios prácticos de evaluación sin referencias a la estructura del documento.'
-                      )}
-                    </p>
+                  <div className="space-y-3.5 pt-1 animate-in fade-in slide-in-from-top-2 duration-200">
+                    {/* Micro-texto explicativo */}
+                    <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-950 dark:text-amber-300 text-[11px] leading-relaxed flex items-start gap-2">
+                      <span className="text-xs shrink-0 mt-0.5">💡</span>
+                      <p className="font-medium">
+                        {t(
+                          'ai_uploader.pedagogical_didactic_notice',
+                          isEn
+                            ? 'Optimized for teachers: transforms worksheets and lists into practical assessment exercises without references to document structure.'
+                            : 'Optimizado para profesores: transforma fichas y listas en ejercicios prácticos de evaluación sin referencias a la estructura del documento.'
+                        )}
+                      </p>
+                    </div>
+
+                    {/* Limitador Independiente de Preguntas (Modo Docente: Máx 40) */}
+                    <div className="p-3 rounded-xl bg-amber-500/10 dark:bg-amber-500/15 border border-amber-300 dark:border-amber-500/30 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-semibold text-amber-950 dark:text-amber-200 flex items-center">
+                          <span className="mr-1.5">🎯</span>
+                          <span>{t('ai_uploader.didactic_card_count_label', isEn ? 'Number of Exam Questions' : 'Número de Preguntas del Examen')}</span>
+                          <InfoTooltip
+                            title={t('ai_uploader.tooltip_exam_questions_title', isEn ? 'Exam Question Limit (Max 40)' : 'Límite de Preguntas del Examen (Máx 40)')}
+                            content={
+                              <div className="space-y-1.5 text-[11px]">
+                                <p className="text-neutral-200">
+                                  {t('ai_uploader.tooltip_exam_questions_desc', isEn ? 'Configure how many questions you want for this exam. The chunking engine will distribute them proportionally across all selected pages.' : 'Define cuántas preguntas quieres para este examen. El motor de chunking las distribuirá proporcionalmente por todas las páginas seleccionadas para que ninguna quede sin evaluar.')}
+                                </p>
+                                <div className="p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[10px]">
+                                  {isEn ? '💡 Maximum 40 questions per batch for optimal evaluation quality.' : '💡 Máximo 40 preguntas por lote para mantener la máxima calidad de evaluación.'}
+                                </div>
+                              </div>
+                            }
+                          />
+                        </label>
+                        <span className="text-xs font-mono font-bold text-amber-950 dark:text-amber-200 bg-amber-200/60 dark:bg-amber-900/40 px-2 py-0.5 rounded-md border border-amber-300 dark:border-amber-700">
+                          {cardCount} {isEn ? 'questions' : 'preguntas'}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {/* Preset buttons */}
+                        <div className="flex items-center gap-1.5 flex-1">
+                          {[10, 20, 30, 40].map((preset) => (
+                            <button
+                              key={preset}
+                              type="button"
+                              disabled={isBusy}
+                              onClick={() => setCardCount(preset)}
+                              className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                                cardCount === preset
+                                  ? 'bg-amber-500 text-white shadow-sm shadow-amber-500/25 ring-1 ring-amber-600'
+                                  : 'bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700 hover:border-amber-300'
+                              } disabled:opacity-50`}
+                            >
+                              {preset}
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* Custom number input */}
+                        <div className="w-20 shrink-0">
+                          <input
+                            type="number"
+                            min={1}
+                            max={40}
+                            disabled={isBusy}
+                            value={cardCount}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value, 10);
+                              if (!isNaN(val)) {
+                                setCardCount(Math.min(40, Math.max(1, val)));
+                              }
+                            }}
+                            className="w-full text-center text-xs font-mono font-bold py-1.5 px-2 rounded-lg bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Selector Formato Docente (6 Opciones) */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-semibold text-slate-800 dark:text-neutral-200 flex items-center">
+                          <span className="mr-1.5">📋</span>
+                          <span>{t('ai_uploader.docente_format_label', isEn ? 'Teacher Assessment Format' : 'Formato de Evaluación Docente')}</span>
+                          <InfoTooltip
+                            title={t('ai_uploader.tooltip_docente_formats_title', isEn ? 'Teacher Assessment Formats Guide' : 'Guía de Formatos de Evaluación Docente')}
+                            content={
+                              <div className="space-y-2 text-[11px]">
+                                <div>
+                                  <span className="font-semibold text-amber-300 block">🎯 {isEn ? 'Mixed Test (Bloom Distribution):' : 'Test Variado (Bloom):'}</span>
+                                  <span className="text-neutral-300">{isEn ? 'Combines formats balancing Bloom taxonomy levels (Remember, Understand, Apply, Analyze).' : 'Combina los 4 formatos distribuyendo las preguntas según los niveles cognitivos de Bloom (Recordar, Comprender, Aplicar y Analizar).'}</span>
+                                </div>
+                                <div>
+                                  <span className="font-semibold text-amber-300 block">📝 {isEn ? 'Multiple Choice Only:' : 'Solo Test:'}</span>
+                                  <span className="text-neutral-300">{isEn ? '4 options with single solution and reasoning.' : '4 alternativas con solución única argumentada y distractores plausibles.'}</span>
+                                </div>
+                                <div>
+                                  <span className="font-semibold text-amber-300 block">⚖️ {isEn ? 'True or False Only:' : 'Solo Verdadero o Falso:'}</span>
+                                  <span className="text-neutral-300">{isEn ? 'Statements with reasoned justification.' : 'Afirmaciones críticas para discriminación conceptual con justificación argumentada.'}</span>
+                                </div>
+                                <div>
+                                  <span className="font-semibold text-amber-300 block">🧩 {isEn ? 'Cloze / Fill-in Only:' : 'Solo Huecos (Cloze):'}</span>
+                                  <span className="text-neutral-300">{isEn ? 'Complete key concepts in brackets [...].' : 'Completar conceptos clave y fórmulas entre corchetes [...].'}</span>
+                                </div>
+                                <div>
+                                  <span className="font-semibold text-amber-300 block">🃏 {isEn ? 'Short Question Only:' : 'Solo Pregunta Corta:'}</span>
+                                  <span className="text-neutral-300">{isEn ? 'Direct questions and concise key answers.' : 'Preguntas directas y respuestas concisas orientadas a lo esencial.'}</span>
+                                </div>
+                                <div>
+                                  <span className="font-semibold text-amber-300 block">📋 {isEn ? 'Cases with Rubric:' : 'Casos con Rúbrica:'}</span>
+                                  <span className="text-neutral-300">{isEn ? 'Open cases with grading rubric for teachers.' : 'Casos prácticos de desarrollo con rúbrica de corrección y baremo de puntos para el docente.'}</span>
+                                </div>
+                              </div>
+                            }
+                          />
+                        </label>
+                        <span className="text-[10px] text-amber-700 dark:text-amber-300 font-mono font-medium">
+                          🧠 Taxonomía de Bloom
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                        {[
+                          {
+                            id: 'mixed_test' as const,
+                            icon: '🎯',
+                            title: t('ai_uploader.docente_format_mixed_title', isEn ? 'Mixed Test (Varied)' : 'Test Variado (Mixto)'),
+                            desc: t('ai_uploader.docente_format_mixed_desc', isEn ? 'Combines test, concepts, T/F and cloze with Bloom taxonomy.' : 'Combina test, conceptos, V/F y cloze con taxonomía de Bloom.'),
+                          },
+                          {
+                            id: 'multiple_choice' as const,
+                            icon: '📝',
+                            title: t('ai_uploader.docente_format_mc_title', isEn ? 'Multiple Choice Only' : 'Solo Test'),
+                            desc: t('ai_uploader.docente_format_mc_desc', isEn ? '4 options with single solution and reasoning.' : '4 alternativas con solución única y justificación.'),
+                          },
+                          {
+                            id: 'true_false' as const,
+                            icon: '⚖️',
+                            title: t('ai_uploader.docente_format_tf_title', isEn ? 'True or False Only' : 'Solo Verdadero o Falso'),
+                            desc: t('ai_uploader.docente_format_tf_desc', isEn ? 'Statements with reasoned justification.' : 'Afirmaciones con justificación argumentada.'),
+                          },
+                          {
+                            id: 'cloze' as const,
+                            icon: '🧩',
+                            title: t('ai_uploader.docente_format_cloze_title', isEn ? 'Cloze / Fill-in Only' : 'Solo Huecos (Cloze)'),
+                            desc: t('ai_uploader.docente_format_cloze_desc', isEn ? 'Complete key concepts in brackets [...].' : 'Completar conceptos clave entre corchetes [...].'),
+                          },
+                          {
+                            id: 'basic' as const,
+                            icon: '🃏',
+                            title: t('ai_uploader.docente_format_basic_title', isEn ? 'Short Question Only' : 'Solo Pregunta Corta'),
+                            desc: t('ai_uploader.docente_format_basic_desc', isEn ? 'Direct questions and concise key answers.' : 'Preguntas directas y respuestas concisas esenciales.'),
+                          },
+                          {
+                            id: 'open_cases' as const,
+                            icon: '📋',
+                            title: t('ai_uploader.docente_format_open_title', isEn ? 'Cases with Rubric' : 'Casos con Rúbrica'),
+                            desc: t('ai_uploader.docente_format_open_desc', isEn ? 'Open cases with grading rubric for teachers.' : 'Casos prácticos de desarrollo con rúbrica para el docente.'),
+                          },
+                        ].map((item) => {
+                          const isSelected = docenteFormat === item.id;
+                          return (
+                            <button
+                              key={item.id}
+                              type="button"
+                              disabled={isBusy}
+                              onClick={() => {
+                                setDocenteFormat(item.id);
+                                if (item.id === 'open_cases') setCardFormat('basic');
+                                else if (item.id !== 'mixed_test') setCardFormat(item.id);
+                              }}
+                              className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                                isSelected
+                                  ? 'bg-amber-500/10 dark:bg-amber-500/20 border-amber-400 dark:border-amber-500 text-amber-950 dark:text-amber-200 ring-1 ring-amber-400/40 shadow-sm font-semibold'
+                                  : 'bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 text-neutral-700 dark:text-neutral-300'
+                              }`}
+                            >
+                              <div className="flex items-center gap-1.5 mb-1">
+                                <span className="text-sm">{item.icon}</span>
+                                <span className="text-xs font-semibold leading-tight">{item.title}</span>
+                              </div>
+                              <p className="text-[10px] text-neutral-500 dark:text-neutral-400 leading-tight">
+                                {item.desc}
+                              </p>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Selector Audiencia / Nivel Educativo */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-slate-800 dark:text-neutral-200 flex items-center">
+                        <span className="mr-1.5">🎓</span>
+                        <span>{t('ai_uploader.target_audience_label', isEn ? 'Target Audience / Educational Level' : 'Audiencia / Nivel Educativo del Alumnado')}</span>
+                        <InfoTooltip
+                          title={t('ai_uploader.tooltip_target_audience_title', isEn ? 'Cognitive Calibration by Educational Level' : 'Calibración Cognitiva por Nivel Educativo')}
+                          content={
+                            <div className="space-y-2 text-[11px]">
+                              <div>
+                                <span className="font-semibold text-amber-300 block">🤖 {isEn ? 'Auto-detection:' : 'Detección Automática:'}</span>
+                                <span className="text-neutral-300">{isEn ? 'AI adapts difficulty to document complexity.' : 'La IA analiza la complejidad léxica y sintáctica del material para calibrar la dificultad.'}</span>
+                              </div>
+                              <div>
+                                <span className="font-semibold text-amber-300 block">🎒 {isEn ? '12-14 years (Middle School / 1º-2º ESO):' : '12-14 años (1º-2º ESO):'}</span>
+                                <span className="text-neutral-300">{isEn ? 'Accessible vocabulary, direct conceptual understanding.' : 'Lenguaje accesible, enunciados directos y foco en conceptos troncales.'}</span>
+                              </div>
+                              <div>
+                                <span className="font-semibold text-amber-300 block">🏫 {isEn ? '15-17 years (High School / 3º-4º ESO / Bachillerato):' : '15-17 años (3º-4º ESO / Bachillerato):'}</span>
+                                <span className="text-neutral-300">{isEn ? 'Pre-university analytical depth, cause-effect reasoning.' : 'Rigor preuniversitario, pensamiento crítico y análisis de relaciones causa-efecto.'}</span>
+                              </div>
+                              <div>
+                                <span className="font-semibold text-amber-300 block">🏛️ {isEn ? 'University & Professional (+18 years):' : 'Universidad / Oposiciones (+18 años):'}</span>
+                                <span className="text-neutral-300">{isEn ? 'Technical rigor, legal precision, advanced evaluation.' : 'Máximo rigor técnico, plazos legales, excepciones y evaluación conceptual avanzada.'}</span>
+                              </div>
+                            </div>
+                          }
+                        />
+                      </label>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {[
+                          {
+                            id: 'auto' as const,
+                            icon: '🤖',
+                            title: t('ai_uploader.target_audience_auto', isEn ? 'Auto-detection' : 'Detección Automática'),
+                            desc: t('ai_uploader.target_audience_auto_desc', isEn ? 'Adapts to text complexity' : 'Adapta según el texto')
+                          },
+                          {
+                            id: '12-14_years' as const,
+                            icon: '🎒',
+                            title: t('ai_uploader.target_audience_12_14', isEn ? '12-14 years' : '12-14 años'),
+                            desc: isEn ? 'Middle School / ESO 1-2' : '1º-2º ESO / Intermedio'
+                          },
+                          {
+                            id: '15-17_years' as const,
+                            icon: '🏫',
+                            title: t('ai_uploader.target_audience_15_17', isEn ? '15-17 years' : '15-17 años'),
+                            desc: isEn ? 'High School / Bachillerato' : '3º-4º ESO / Bachillerato'
+                          },
+                          {
+                            id: 'university_plus' as const,
+                            icon: '🏛️',
+                            title: t('ai_uploader.target_audience_univ', isEn ? 'University / Pro' : 'Universidad / Opos'),
+                            desc: isEn ? 'Higher Ed & Professional' : 'Universidad / +18 años'
+                          }
+                        ].map(item => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            disabled={isBusy}
+                            onClick={() => setTargetAudience(item.id)}
+                            className={`p-2 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-between min-h-[72px] ${
+                              targetAudience === item.id
+                                ? 'bg-amber-500/10 dark:bg-amber-500/20 border-amber-400 dark:border-amber-500 text-amber-950 dark:text-amber-200 ring-1 ring-amber-400/40 font-semibold'
+                                : 'bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 text-neutral-700 dark:text-neutral-300'
+                            }`}
+                          >
+                            <span className="text-base mb-1">{item.icon}</span>
+                            <span className="text-[11px] font-semibold leading-tight">{item.title}</span>
+                            <span className="text-[10px] text-neutral-500 dark:text-neutral-400 leading-tight mt-0.5 line-clamp-1">{item.desc}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1633,6 +2010,110 @@ export function DocumentUploader({
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Modal de Rango de Páginas Obligatorio (UX y Cobertura Total) */}
+      {isPageRangeRequiredModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-5 sm:p-6 max-w-lg w-full shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/15 text-amber-500 flex items-center justify-center shrink-0 text-xl font-bold">
+                📖
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  {t('ai_uploader.page_range_required_modal_title', isEn ? 'Mandatory Page Range' : 'Rango de Páginas Obligatorio')}
+                </h3>
+                <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed">
+                  {t('ai_uploader.page_range_required_modal_desc', isEn ? 'To ensure the exam accurately covers your required material without context saturation or topic omissions, you must set the page range before proceeding.' : 'Para garantizar que el examen cubra exactamente la materia deseada sin saturación de contexto ni omisión de temas, debes definir el rango de páginas a evaluar antes de continuar.')}
+                </p>
+              </div>
+            </div>
+
+            {/* Didactic Box: Visor PDF vs. Libro Impreso */}
+            <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 space-y-2 text-xs">
+              <div className="font-semibold text-amber-950 dark:text-amber-300 flex items-center gap-1.5">
+                <span>💡</span>
+                <span>{t('ai_uploader.diff_pdf_vs_book_title', isEn ? 'PDF Reader vs. Printed Book Page Numbers' : 'Diferencia entre Visor PDF y Libro Impreso')}</span>
+              </div>
+              <div className="space-y-2 text-[11px] text-amber-900/90 dark:text-amber-300/90 leading-relaxed">
+                <div>
+                  <strong className="block text-slate-900 dark:text-amber-200">
+                    {t('ai_uploader.diff_pdf_page_title', isEn ? 'PDF Reader Page (Absolute):' : 'Página del Visor PDF (Absoluta):')}
+                  </strong>
+                  <span>{t('ai_uploader.diff_pdf_page_desc', isEn ? 'The number shown in your PDF viewer or browser toolbar (e.g. page 12 of 120). This is the actual page number processed by the AI.' : 'Es el número que marca la barra de herramientas de tu lector o navegador (ej. página 12 de 120). Es la numeración técnica real que procesa la IA.')}</span>
+                </div>
+                <div>
+                  <strong className="block text-slate-900 dark:text-amber-200">
+                    {t('ai_uploader.diff_book_page_title', isEn ? 'Printed Book Page (Relative):' : 'Página Impresa en el Libro (Relativa):')}
+                  </strong>
+                  <span>{t('ai_uploader.diff_book_page_desc', isEn ? 'The number printed on the physical sheet corner (e.g. page 3 of Chapter 1). Covers, indices, or prologues typically offset printed numbers from digital page numbers.' : 'Es el número impreso en la esquina física de la hoja (ej. pág. 3 del Tema 1). Las portadas, índices o prólogos suelen desfasar la numeración impresa respecto al archivo digital.')}</span>
+                </div>
+              </div>
+              <div className="p-2 rounded-lg bg-amber-100/70 dark:bg-amber-900/40 text-amber-950 dark:text-amber-200 font-semibold text-[11px] flex items-center gap-1.5">
+                <span>⭐</span>
+                <span>{t('ai_uploader.diff_golden_rule', isEn ? 'Golden Rule: ALWAYS enter the page numbers displayed by your PDF viewer to ensure the AI evaluates the exact section.' : 'Regla de Oro: Introduce SIEMPRE los números que muestra tu visor PDF para asegurar que la IA evalúe la sección exacta.')}</span>
+              </div>
+            </div>
+
+            {/* Input controls */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-800 dark:text-neutral-200">
+                {isEn ? 'Set the range of pages to analyze:' : 'Indica el rango de páginas a analizar:'}
+              </label>
+              <div className="flex items-center gap-2">
+                <div className="flex-1">
+                  <span className="text-[10px] text-neutral-500 dark:text-neutral-400 block mb-1">{isEn ? 'From page:' : 'Desde página:'}</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={effectiveTotalPages || undefined}
+                    value={modalPageStart}
+                    onChange={(e) => setModalPageStart(e.target.value)}
+                    className="w-full text-xs font-mono px-3 py-2 rounded-xl bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500 font-bold"
+                    placeholder="1"
+                  />
+                </div>
+                <span className="text-neutral-400 font-bold self-end pb-2">→</span>
+                <div className="flex-1">
+                  <span className="text-[10px] text-neutral-500 dark:text-neutral-400 block mb-1">{isEn ? 'To page:' : 'Hasta página:'}</span>
+                  <input
+                    type="number"
+                    min={parseInt(modalPageStart, 10) || 1}
+                    max={effectiveTotalPages || undefined}
+                    value={modalPageEnd}
+                    onChange={(e) => setModalPageEnd(e.target.value)}
+                    className="w-full text-xs font-mono px-3 py-2 rounded-xl bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500 font-bold"
+                    placeholder={effectiveTotalPages ? String(effectiveTotalPages) : '10'}
+                  />
+                </div>
+              </div>
+              {Boolean(effectiveTotalPages) && (
+                <p className="text-[10px] text-neutral-500 dark:text-neutral-400">
+                  {isEn ? `Document total: ${effectiveTotalPages} pages` : `Total del documento: ${effectiveTotalPages} páginas`}
+                </p>
+              )}
+            </div>
+
+            {/* Buttons */}
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-neutral-200 dark:border-neutral-800">
+              <button
+                type="button"
+                onClick={() => setIsPageRangeRequiredModalOpen(false)}
+                className="px-3 py-2 text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-xl transition cursor-pointer"
+              >
+                {t('ai_uploader.btn_cancel_edit_range', isEn ? 'Back to form' : 'Volver al formulario')}
+              </button>
+              <button
+                type="button"
+                onClick={handleApplyModalPageRange}
+                className="px-4 py-2 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-500 rounded-xl transition shadow-md shadow-amber-600/20 cursor-pointer"
+              >
+                {t('ai_uploader.btn_apply_range_continue', isEn ? 'Save Range and Continue to Step 3' : 'Guardar Rango y Continuar al Paso 3')}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

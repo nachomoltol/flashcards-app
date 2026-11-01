@@ -2,10 +2,10 @@
 
 import { use, useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
-import { Search, X, Award, Zap, FileText, HelpCircle, Plus, Sparkles, Share2 } from 'lucide-react';
+import { Search, X, Award, Zap, FileText, HelpCircle, Plus, Sparkles, Share2, Printer } from 'lucide-react';
 import { useDeckStore, useCardStore, useProModalStore, useAuthStore, useLanguageStore } from '@/stores';
 import { CardEditor, DocumentUploader, FormattedCardView, UrlCardGenerator } from '@/components/cards';
-import { ShareDeckModal, QuickStudyGuideModal, StudyModesHelpModal } from '@/components/decks';
+import { ShareDeckModal, QuickStudyGuideModal, StudyModesHelpModal, PrintExamSheet } from '@/components/decks';
 import { generateCardsAction } from '@/app/actions/generateCards';
 import { showAdMobRewardedAd } from '@/lib/admob';
 import { claimAdRewardAction } from '@/app/actions/claimAdReward';
@@ -77,6 +77,12 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
 
   const handleCardCreated = () => {
     fetchDeckById(id);
+  };
+
+  const handlePrintExam = () => {
+    if (typeof window !== 'undefined') {
+      window.print();
+    }
   };
 
   // Manejar generación con Gemini por tema y guardado automático en Supabase
@@ -200,7 +206,8 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
   };
 
   return (
-    <div style={getDeckColorStyles(currentDeck?.color)} className="space-y-8 animate-in fade-in duration-300">
+    <>
+      <div style={getDeckColorStyles(currentDeck?.color)} className="space-y-8 animate-in fade-in duration-300 print:hidden">
       {/* Top Navigation & Breadcrumbs */}
       <div>
         {(() => {
@@ -272,12 +279,12 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
               </span>
             </button>
 
-            {/* Debajo: [ ✏️ Añadir tarjeta manualmente ] y [ 🔗 Compartir ] */}
-            <div className="grid grid-cols-2 gap-2">
+            {/* Debajo: [ ✏️ Añadir tarjeta ], [ 🔗 Compartir ] y [ 🖨️ Imprimir / PDF ] */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <button
                 type="button"
                 onClick={() => setIsManualEditorOpen(!isManualEditorOpen)}
-                className={`w-full py-2.5 px-3 rounded-xl font-semibold text-xs sm:text-sm border transition-all duration-150 active:scale-[0.99] cursor-pointer flex items-center justify-center gap-1.5 min-w-0 ${
+                className={`w-full py-2.5 px-2.5 rounded-xl font-semibold text-xs border transition-all duration-150 active:scale-[0.99] cursor-pointer flex items-center justify-center gap-1.5 min-w-0 ${
                   isManualEditorOpen
                     ? 'bg-neutral-800 text-white border-neutral-700 shadow-sm'
                     : 'bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-neutral-800 dark:text-neutral-200 border-neutral-300 dark:border-neutral-700/80 shadow-sm'
@@ -286,7 +293,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                 <Plus className="w-4 h-4 text-[var(--deck-accent)] shrink-0" />
                 <span className="truncate">
                   {isManualEditorOpen
-                    ? t('deck_detail.hide_editor', 'Cerrar editor')
+                    ? t('deck_detail.hide_editor', 'Cerrar')
                     : t('deck_detail.add_manual_btn', 'Añadir tarjeta')}
                 </span>
               </button>
@@ -294,10 +301,25 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
               <button
                 type="button"
                 onClick={() => setIsShareModalOpen(true)}
-                className="w-full py-2.5 px-3 rounded-xl font-semibold text-xs sm:text-sm text-neutral-800 dark:text-neutral-200 hover:text-black dark:hover:text-white bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 border border-neutral-300 dark:border-neutral-700/80 shadow-sm transition-all duration-150 active:scale-[0.99] cursor-pointer flex items-center justify-center gap-1.5 min-w-0"
+                className="w-full py-2.5 px-2.5 rounded-xl font-semibold text-xs text-neutral-800 dark:text-neutral-200 hover:text-black dark:hover:text-white bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 border border-neutral-300 dark:border-neutral-700/80 shadow-sm transition-all duration-150 active:scale-[0.99] cursor-pointer flex items-center justify-center gap-1.5 min-w-0"
               >
                 <Share2 className="w-4 h-4 text-[var(--deck-accent)] shrink-0" />
                 <span className="truncate">{t('deck_detail.share', 'Compartir')}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handlePrintExam}
+                disabled={cards.length === 0}
+                className="w-full py-2.5 px-2.5 rounded-xl font-semibold text-xs text-neutral-800 dark:text-neutral-200 hover:text-black dark:hover:text-white bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 border border-neutral-300 dark:border-neutral-700/80 shadow-sm transition-all duration-150 active:scale-[0.99] cursor-pointer flex items-center justify-center gap-1.5 min-w-0 disabled:opacity-40 disabled:cursor-not-allowed"
+                title={
+                  cards.length === 0
+                    ? t('deck_detail.empty_print_tooltip', 'El mazo no contiene preguntas para imprimir')
+                    : t('deck_detail.export_pdf_btn', 'Exportar a PDF / Imprimir')
+                }
+              >
+                <Printer className="w-4 h-4 text-[var(--deck-accent)] shrink-0" />
+                <span className="truncate">{t('deck_detail.export_pdf_short', 'Imprimir / PDF')}</span>
               </button>
             </div>
           </div>
@@ -466,29 +488,41 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
               </span>
             </h2>
 
-            {/* Barra de Búsqueda Dinámica */}
+            {/* Barra de Búsqueda Dinámica y Botón Imprimir */}
             {cards.length > 0 && (
-              <div className="relative w-full sm:w-72">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-neutral-400 dark:text-neutral-500">
-                  <Search className="w-4 h-4" />
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <div className="relative flex-1 sm:w-64">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-neutral-400 dark:text-neutral-500">
+                    <Search className="w-4 h-4" />
+                  </div>
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder={t('deck_detail.search_cards_placeholder', 'Buscar por pregunta o respuesta...')}
+                    className="w-full pl-9 pr-8 py-2 rounded-xl text-xs bg-neutral-100/80 dark:bg-neutral-800/60 border border-neutral-200 dark:border-neutral-700/70 text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition shadow-sm"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 cursor-pointer"
+                      title={t('common.clear', 'Limpiar')}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder={t('deck_detail.search_cards_placeholder', 'Buscar por pregunta o respuesta...')}
-                  className="w-full pl-9 pr-8 py-2 rounded-xl text-xs bg-neutral-100/80 dark:bg-neutral-800/60 border border-neutral-200 dark:border-neutral-700/70 text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition shadow-sm"
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchQuery('')}
-                    className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 cursor-pointer"
-                    title={t('common.clear', 'Limpiar')}
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
+
+                <button
+                  type="button"
+                  onClick={handlePrintExam}
+                  className="py-2 px-3 rounded-xl font-semibold text-xs text-neutral-700 dark:text-neutral-200 hover:text-neutral-950 dark:hover:text-white bg-white hover:bg-neutral-100 dark:bg-neutral-800 dark:hover:bg-neutral-700 border border-neutral-300 dark:border-neutral-700 shadow-sm transition flex items-center gap-1.5 cursor-pointer shrink-0"
+                  title={t('deck_detail.export_pdf_btn', 'Exportar a PDF / Imprimir')}
+                >
+                  <Printer className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                  <span className="hidden sm:inline">{t('deck_detail.export_pdf_short', 'Imprimir')}</span>
+                </button>
               </div>
             )}
           </div>
@@ -966,5 +1000,13 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
         onClose={() => setIsModesHelpOpen(false)}
       />
     </div>
-  );
+
+    {/* Documento de Impresión Ultra-Compacto (Examen Alumnos + Solucionario Docente) */}
+    <PrintExamSheet
+      deckTitle={currentDeck?.title || t('deck_detail.untitled_deck', 'Examen de Evaluación')}
+      deckDescription={currentDeck?.description}
+      cards={cards}
+    />
+  </>
+);
 }

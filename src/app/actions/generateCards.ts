@@ -17,6 +17,8 @@ import type {
   GenerateCardsResult,
   MultimodalDocumentInput,
   UrlCardInput,
+  DocenteFormat,
+  TargetAudience,
 } from '@/types/cards';
 
 const flashcardSchema = {
@@ -250,14 +252,158 @@ const RIGOR_WARNING_DIRECTIVE = `RIGOR MATEMÁTICO EN LA PROPIEDAD "core_exhaust
  * DIRECTIVA EXCLUSIVA PARA MODO DOCENTE / DIDÁCTICO:
  * Diseñada para profesores que preparan baterías de ejercicios para sus alumnos a partir de fichas,
  * ejercicios o vocabularios, eliminando referencias de aula y transformando listas en problemas prácticos.
+ * Incluye calibración por edad internacional, taxonomía de Bloom y libertad de formatos según docenteFormat y targetAudience.
  */
-const DIDACTIC_MODE_DIRECTIVE = `DIRECTIVA EXCLUSIVA PARA MODO DOCENTE / DIDÁCTICO:
-- Este modo está diseñado para profesores que preparan exámenes y ejercicios para sus estudiantes a partir de fichas de clase, ejercicios o vocabularios.
-- PROHIBICIÓN ABSOLUTA DE METADATOS DE AULA: Queda terminantemente PROHIBIDO utilizar fórmulas como 'Según el Bloque X', 'En la Unidad Y', 'En el Ejercicio Z', '¿Cuál es la frase de ejemplo del autor?' o hacer referencia a partes físicas de la ficha. La pregunta debe formularse como un examen directo e independiente.
-- TRANSFORMACIÓN EN CASOS PRÁCTICOS Y HUECOS (FILL-IN-THE-BLANK):
-  * Si el material contiene vocabulario o idiomas, transforma los ejemplos en frases incompletas con huecos ('______') para que el alumno demuestre el uso real del término en contexto, o formula preguntas de significado/traducción directa e inversa.
+function buildDidacticModeDirective(
+  docenteFormat: DocenteFormat = 'mixed_test',
+  targetAudience: TargetAudience = 'auto'
+): string {
+  let audienceInstruction = '';
+  switch (targetAudience) {
+    case '12-14_years':
+      audienceInstruction = `🎯 CALIBRACIÓN POR EDAD - ALUMNADO DE 12 A 14 AÑOS (SECUNDARIA INICIAL / MIDDLE SCHOOL / 1º-2º ESO):
+- Adapta la complejidad cognitiva, sintaxis y vocabulario estrictamente a estudiantes de 12-14 años.
+- Emplea oraciones directas, vocabulario accesible y contextualizado sin subordinación innecesaria ni jerga técnica abstracta.
+- Enfoque en la comprensión conceptual fundamental, relaciones causa-efecto claras y ejemplos cercanos y motivadores.`;
+      break;
+    case '15-17_years':
+      audienceInstruction = `🎯 CALIBRACIÓN POR EDAD - ALUMNADO DE 15 A 17 AÑOS (SECUNDARIA SUPERIOR / HIGH SCHOOL / 3º-4º ESO / BACHILLERATO):
+- Nivel de abstracción formal medio-alto, lenguaje académico y científico adecuado para preparación preuniversitaria.
+- Enfoque en el análisis crítico, interrelación de variables, deducción lógica y aplicación rigurosa de principios.
+- Opciones de examen y distractores plausibles que exijan discernir matices conceptuales finos.`;
+      break;
+    case 'university_plus':
+      audienceInstruction = `🎯 CALIBRACIÓN POR EDAD - UNIVERSIDAD Y OPOSICIONES (+18 AÑOS / HIGHER EDUCATION / EXÁMENES OFICIALES):
+- Máximo rigor académico, terminología técnica especializada, jurídica, biomédica o científica sin simplificaciones.
+- Enfoque en supuestos complejos, excepciones doctrinales, jurisprudencia, umbrales numéricos exactos y diagnóstico diferencial.
+- Rúbricas exigentes acordes a estándares universitarios y tribunales de oposición.`;
+      break;
+    case 'auto':
+    default:
+      audienceInstruction = `🎯 CALIBRACIÓN POR EDAD - DETECCIÓN AUTOMÁTICA SEGÚN EL TEXTO:
+- Analiza la densidad léxica, complejidad conceptual y nivel formativo intrínseco del texto fuente para ajustar automáticamente el tono, la sintaxis y el nivel de abstracción de las preguntas (desde educación básica hasta nivel universitario).`;
+      break;
+  }
+
+  // PROTOCOLO DE DISTRIBUCIÓN COGNITIVA (TAXONOMÍA DE BLOOM OBLIGATORIA)
+  const bloomTaxonomyInstruction = `🧠 PROTOCOLO DE DISTRIBUCIÓN COGNITIVA (TAXONOMÍA DE BLOOM OBLIGATORIA):
+Debes estructurar la batería de preguntas distribuyendo el nivel cognitivo de los ejercicios bajo la siguiente proporción estricta:
+1. 30% NIVEL BÁSICO (Recordar/Comprender):
+   - Identificación pura de conceptos, definiciones esenciales, terminología fundamental y reconocimiento de hechos explícitos.
+2. 40% NIVEL INTERMEDIO (Aplicar/Analizar):
+   - Escenarios prácticos aplicados, diferenciación entre conceptos similares, cálculo o uso de fórmulas/reglas en situaciones nuevas y análisis de causas y consecuencias.
+3. 30% NIVEL AVANZADO (Evaluar/Pensamiento Crítico):
+   - Supuestos de diagnóstico, resolución de casos límite o atípicos, detección de excepciones a la regla general, juicio fundamentado o razonamiento deductivo complejo.`;
+
+  // FORMATO DE EVALUACIÓN DOCENTE
+  let formatInstruction = '';
+  switch (docenteFormat) {
+    case 'multiple_choice':
+      formatInstruction = `📋 FORMATO DE EVALUACIÓN EXCLUSIVO: SOLO TEST / OPCIÓN MÚLTIPLE (FORMATO "multiple_choice"):
+- TODAS las tarjetas DEBEN ser formuladas estrictamente en formato "multiple_choice".
+- En cada tarjeta debes generar una pregunta clara en "front" y exactamente 4 alternativas plausibles en el array "options" (a, b, c, d).
+- En "back" especifica la letra y texto de la respuesta correcta junto a una explicación didáctica del motivo por el cual es correcta y por qué se descartan los distractores. Queda terminantemente PROHIBIDO devolver tarjetas en otro formato.`;
+      break;
+    case 'true_false':
+      formatInstruction = `📋 FORMATO DE EVALUACIÓN EXCLUSIVO: SOLO VERDADERO O FALSO (FORMATO "true_false"):
+- TODAS las tarjetas DEBEN ser formuladas estrictamente en formato "true_false".
+- En "front" formula una afirmación clara y categórica para evaluar.
+- En "back" indica obligatoriamente "Verdadero" o "Falso" acompañado de una justificación rigurosa basada en el texto. Queda terminantemente PROHIBIDO devolver tarjetas en otro formato.`;
+      break;
+    case 'cloze':
+      formatInstruction = `📋 FORMATO DE EVALUACIÓN EXCLUSIVO: SOLO TEXTO CON HUECOS / CLOZE (FORMATO "cloze"):
+- TODAS las tarjetas DEBEN ser formuladas estrictamente en formato "cloze".
+- En "front" presenta una oración o párrafo contextualizado donde los conceptos clave a evaluar estén encerrados entre corchetes [como este].
+- En "back" incluye los términos ocultos con una explicación concisa. Queda terminantemente PROHIBIDO devolver tarjetas en otro formato.`;
+      break;
+    case 'basic':
+      formatInstruction = `📋 FORMATO DE EVALUACIÓN EXCLUSIVO: SOLO PREGUNTA CORTA / DIRECTA (FORMATO "basic"):
+- TODAS las tarjetas DEBEN ser formuladas estrictamente en formato "basic".
+- En "front" formula una pregunta directa y concisa sobre un concepto clave.
+- En "back" redacta la respuesta directa y sintetizada. Queda terminantemente PROHIBIDO devolver tarjetas en otro formato.`;
+      break;
+    case 'open_cases':
+      formatInstruction = `📋 FORMATO DE EVALUACIÓN EXCLUSIVO: CASOS DE DESARROLLO CON RÚBRICA (FORMATO "basic"):
+- TODAS las tarjetas DEBEN ser formuladas estrictamente en formato "basic".
+- ANVERSO ("front"): Presenta un caso de estudio práctico, situación hipotética o problema del mundo real ("Caso práctico: ...", "Supuesto real: ...", "Problema aplicado: ...").
+- REVERSO ("back"): Debe incluir obligatoriamente:
+  1. "Respuesta Modelo / Solución": Desarrollo completo y justificación técnica esperada del alumno.
+  2. "Rúbrica de Corrección Docente": Criterios de evaluación desglosados (criterios de logro, penalizaciones y escala de calificación para que el profesor califique al estudiante).`;
+      break;
+    case 'mixed_test':
+    default:
+      formatInstruction = `📝 FORMATO DE EVALUACIÓN: TEST VARIADO / MIXTO (LIBERTAD COMPLETA DE FORMATOS):
+- TIENES ABSOLUTA LIBERTAD para alternar dinámicamente entre los 4 formatos disponibles ("multiple_choice", "basic", "cloze", "true_false") según lo que mejor evalúe cada concepto y nivel taxonómico de Bloom:
+  * "multiple_choice": Para discriminación de conceptos, reglas y opciones excluyentes (4 alternativas en array options).
+  * "cloze": Para fijar definiciones exactas, vocabulario o términos técnicos entre corchetes [...].
+  * "true_false": Para evaluar afirmaciones críticas y contrastar errores comunes.
+  * "basic": Para conceptos clave o explicaciones breves.
+- Diseña un conjunto variado y equilibrado de formatos respetando las cuotas de Bloom (30% básico, 40% intermedio, 30% avanzado).`;
+      break;
+  }
+
+  return `DIRECTIVA EXCLUSIVA PARA MODO DOCENTE / DIDÁCTICO:
+- Este modo está diseñado para profesores que preparan baterías de examen, ejercicios y evaluaciones para sus estudiantes.
+- PROHIBICIÓN ABSOLUTA DE METADATOS DE AULA: Queda terminantemente PROHIBIDO utilizar fórmulas como 'Según el Bloque X', 'En la Unidad Y', 'En el Ejercicio Z', '¿Cuál es la frase de ejemplo del autor?' o hacer referencia a partes físicas de la ficha. La pregunta debe formularse como un examen directo, profesional e independiente.
+- TRANSFORMACIÓN EN CASOS PRÁCTICOS:
+  * Si el material contiene vocabulario o idiomas, formula frases incompletas con huecos ('______') para evaluar el uso en contexto, o preguntas de equivalencia/traducción directa e inversa.
   * Queda terminantemente PROHIBIDO generar preguntas sobre símbolos fonéticos o pronunciación figurada escrita (ej. /tiː.tʃər/).
-  * Si el material es de ciencias o humanidades, transforma las listas y ejemplos en problemas o preguntas de razonamiento competencial ('¿Qué ocurre si...?', 'Identifica el caso en el que...').`;
+  * Transforma las listas en problemas o preguntas de razonamiento competencial.
+
+${audienceInstruction}
+
+${bloomTaxonomyInstruction}
+
+${formatInstruction}
+
+REGLA DE COBERTURA HOMOGÉNEA Y BARRIDO INTEGRAL (DE PRINCIPIO A FIN):
+- Es OBLIGATORIO realizar un barrido homogéneo y equilibrado por la TOTALIDAD del texto fuente aportado (desde la primera página o párrafo inicial hasta la última sección).
+- Queda terminantemente prohibido concentrar las preguntas en la introducción o los primeros temas dejando el resto del documento sin evaluar.
+- LÍMITE MÁXIMO ESTRICTO: Hasta 40 preguntas por documento/lote.`;
+}
+
+/**
+ * Genera la sección de formato e integridad para el Modo Docente en lotes de página (PDF / DOCX).
+ */
+function getDidacticFormatSection(docenteFormat: DocenteFormat = 'mixed_test'): string {
+  switch (docenteFormat) {
+    case 'open_cases':
+      return `${getFormatRule('basic')}
+${getFormatInstructions('basic')}
+
+REGLA DE INTEGRIDAD: Devuelve un objeto JSON estructurado con "conceptos_identificados" (array de strings con los conceptos encontrados en esta página), "core_exhausted" (booleano) y "cards" (array dinámico con casos prácticos en formato "basic" con caso/pregunta abierta en "front" y respuesta modelo + rúbrica de calificación docente en "back").`;
+
+    case 'multiple_choice':
+      return `${getFormatRule('multiple_choice')}
+${getFormatInstructions('multiple_choice')}
+
+REGLA DE INTEGRIDAD: Devuelve un objeto JSON estructurado con "conceptos_identificados", "core_exhausted" y "cards" (array dinámico formulado estrictamente en formato "multiple_choice" con sus 4 alternativas en array options y justificación clara en back).`;
+
+    case 'true_false':
+      return `${getFormatRule('true_false')}
+${getFormatInstructions('true_false')}
+
+REGLA DE INTEGRIDAD: Devuelve un objeto JSON estructurado con "conceptos_identificados", "core_exhausted" y "cards" (array dinámico formulado estrictamente en formato "true_false" con afirmación categórica en front y "Verdadero" o "Falso" con justificación rigurosa en back).`;
+
+    case 'cloze':
+      return `${getFormatRule('cloze')}
+${getFormatInstructions('cloze')}
+
+REGLA DE INTEGRIDAD: Devuelve un objeto JSON estructurado con "conceptos_identificados", "core_exhausted" y "cards" (array dinámico formulado estrictamente en formato "cloze" con conceptos clave entre corchetes [...] en front y términos ocultos con explicación en back).`;
+
+    case 'basic':
+      return `${getFormatRule('basic')}
+${getFormatInstructions('basic')}
+
+REGLA DE INTEGRIDAD: Devuelve un objeto JSON estructurado con "conceptos_identificados", "core_exhausted" y "cards" (array dinámico formulado estrictamente en formato "basic" con pregunta directa en front y respuesta concisa en back).`;
+
+    case 'mixed_test':
+    default:
+      return `FORMATO TEST VARIADO / MIXTO: Tienes absoluta libertad para alternar dinámicamente entre los 4 formatos ("multiple_choice", "basic", "cloze", "true_false") según lo que mejor evalúe cada concepto y nivel de la taxonomía de Bloom (30% básico, 40% intermedio, 30% avanzado).
+
+REGLA DE INTEGRIDAD: Devuelve un objeto JSON estructurado con "conceptos_identificados", "core_exhausted" y "cards" (array dinámico combinando de forma variada y equilibrada formatos test, básica, cloze y verdadero/falso).`;
+  }
+}
 
 /**
  * PROTOCOLO OBLIGATORIO DE EXTRACCIÓN DE TABLAS, ESQUEMAS E IMÁGENES:
@@ -302,7 +448,9 @@ const buildSystemPrompt = (
   existingCardsLength: number,
   coreExhaustedPrevious: boolean,
   existingTopicsList: string = '',
-  pedagogicalMode?: 'academic' | 'didactic'
+  pedagogicalMode?: 'academic' | 'didactic',
+  docenteFormat: DocenteFormat = 'mixed_test',
+  targetAudience: TargetAudience = 'auto'
 ) => {
   // 1. EL NÚCLEO DEL COMPORTAMIENTO (Universal y Exhaustivo)
   let prompt = `Eres Flashmente, un motor de extracción de conocimiento de alto rendimiento. Tu objetivo es diseccionar el texto proporcionado y generar tarjetas de estudio (flashcards) rigurosas. No resumas el texto. Actúa como un interrogador minucioso.
@@ -327,9 +475,6 @@ ${STRICT_GROUNDING_DIRECTIVE}
 \n`;
 
   // 2. LÓGICA DINÁMICA DE ENFOQUE (Tiradas)
-  // En lugar de asumir en qué "tirada" estamos por un número, nos basamos en 
-  // si la IA reportó previamente que el núcleo estaba agotado.
-  
   if (!coreExhaustedPrevious) {
     prompt += `ENFOQUE ACTUAL: EXTRACCIÓN TRONCAL. Sigue extrayendo definiciones y procesos. EXTREMADAMENTE IMPORTANTE: Es matemáticamente imposible que agotes la teoría principal de un documento denso en un solo lote. TIENES PROHIBIDO marcar "core_exhausted: true" a menos que el texto sea minúsculo o estés 100% seguro de que no puedes formular NI UNA SOLA PREGUNTA MÁS sobre los conceptos base. Ante la duda, devuelve "core_exhausted: false" para permitir más lotes troncales.\n`;
   } else {
@@ -349,7 +494,7 @@ DEBES explorar conceptos, relaciones, celdas de tablas o párrafos que aún NO h
   }
 
   if (pedagogicalMode === 'didactic') {
-    prompt += `\n${DIDACTIC_MODE_DIRECTIVE}\n`;
+    prompt += `\n${buildDidacticModeDirective(docenteFormat, targetAudience)}\n`;
   }
 
   prompt += `\n${EDITORIAL_ARTIFACTS_DIRECTIVE}\n`;
@@ -364,11 +509,39 @@ function getGlobalRules(
   format: CardFormat = 'multiple_choice',
   requestedCount?: number,
   existingCardsCount: number = 0,
-  pedagogicalMode?: 'academic' | 'didactic'
+  pedagogicalMode?: 'academic' | 'didactic',
+  docenteFormat: DocenteFormat = 'mixed_test',
+  targetAudience: TargetAudience = 'auto'
 ): string {
-  const formatRule = getFormatRule(format);
+  let formatRule = '';
+  if (pedagogicalMode === 'didactic') {
+    switch (docenteFormat) {
+      case 'multiple_choice':
+        formatRule = getFormatRule('multiple_choice');
+        break;
+      case 'true_false':
+        formatRule = getFormatRule('true_false');
+        break;
+      case 'cloze':
+        formatRule = getFormatRule('cloze');
+        break;
+      case 'basic':
+      case 'open_cases':
+        formatRule = getFormatRule('basic');
+        break;
+      case 'mixed_test':
+      default:
+        formatRule =
+          'FORMATO TEST VARIADO / MIXTO: Tienes libertad total para alternar dinámicamente entre "multiple_choice", "basic", "cloze" y "true_false" según cada concepto y nivel de la taxonomía de Bloom (30% básico, 40% intermedio, 30% avanzado).';
+        break;
+    }
+  } else {
+    formatRule = getFormatRule(format);
+  }
+
   const countStr = requestedCount ? String(requestedCount) : '{requested_count}';
   const isReGeneration = existingCardsCount > 0;
+  const maxBatchLimit = pedagogicalMode === 'didactic' ? 40 : 30;
 
   const cardRequirement = isReGeneration
     ? (format === 'multiple_choice'
@@ -379,12 +552,15 @@ function getGlobalRules(
         : `array dinámico de hasta ${countStr} tarjetas formuladas estrictamente según el formato "${format}" y generation_index del 1 al N`);
 
   const directiveRule = isReGeneration
-    ? `2. DIRECTIVA DE EXPANSIÓN Y ANTI-DUPLICADOS: Intenta alcanzar hasta ${countStr} tarjetas nuevas basándote en conceptos aún no evaluados y datos visuales. SIN EMBARGO, ATENCIÓN: EL ESQUEMA JSON TE PERMITE DEVOLVER MENOS DE 30 TARJETAS. SI HAS AGOTADO EL MATERIAL NUEVO DEL TEXTO E IMÁGENES, DEBES DETENERTE Y DEVOLVER UN ARRAY MÁS CORTO (ej. 12, 18 o 25 tarjetas). NUNCA INVENTES NI REPITAS CONCEPTOS DEL HISTORIAL SÓLO PARA LLEGAR A LA CUOTA.
+    ? `2. DIRECTIVA DE EXPANSIÓN Y ANTI-DUPLICADOS: Intenta alcanzar hasta ${countStr} tarjetas nuevas basándote en conceptos aún no evaluados y datos visuales. SIN EMBARGO, ATENCIÓN: EL ESQUEMA JSON TE PERMITE DEVOLVER MENOS DE ${maxBatchLimit} TARJETAS. SI HAS AGOTADO EL MATERIAL NUEVO DEL TEXTO E IMÁGENES, DEBES DETENERTE Y DEVOLVER UN ARRAY MÁS CORTO (ej. 12, 18 o 25 tarjetas). NUNCA INVENTES NI REPITAS CONCEPTOS DEL HISTORIAL SÓLO PARA LLEGAR A LA CUOTA.
 3. ÍNDICE DE SEGUIMIENTO: Para cada tarjeta, asigna un \`generation_index\` estrictamente secuencial (1, 2, 3...). Detén la generación cuando alcances las ${countStr} tarjetas o cuando hayas evaluado todos los conceptos únicos posibles sin duplicar nada del historial.`
     : `2. ${STRICT_GROUNDING_DIRECTIVE} Objetivo de extracción: hasta ${countStr} tarjetas reales respaldadas por la fuente.
 3. ÍNDICE DE SEGUIMIENTO OBLIGATORIO: Para cada tarjeta, asigna un \`generation_index\` estrictamente secuencial (1, 2, 3...). Detén la generación al alcanzar las ${countStr} tarjetas o si el material académico real se ha agotado por completo sin inventar datos externos.`;
 
-  const didacticRule = pedagogicalMode === 'didactic' ? `\n\n13. ${DIDACTIC_MODE_DIRECTIVE}` : '';
+  const didacticRule =
+    pedagogicalMode === 'didactic'
+      ? `\n\n13. ${buildDidacticModeDirective(docenteFormat, targetAudience)}`
+      : '';
 
   return `REGLAS GLOBALES INQUEBRANTABLES DE BLINDAJE (ESTILO NOTEBOOKLM):
 1. REGLA DE ORO (Estilo NotebookLM): NO inventes información. Tu única fuente de verdad es el texto. Si un concepto, dato o respuesta no se puede deducir directa y explícitamente del texto proporcionado, DEBES omitirlo. No uses conocimiento previo externo.
@@ -517,6 +693,92 @@ async function sliceSinglePdfPage(
   const [copiedPage] = await subDoc.copyPages(srcDoc, [pageNumber - 1]);
   subDoc.addPage(copiedPage);
   return await subDoc.saveAsBase64({ dataUri: false });
+}
+
+/**
+ * Aísla un rango continuo de páginas de un documento PDF en memoria y lo devuelve en Base64.
+ */
+async function slicePdfPageRange(
+  srcDoc: PDFDocument,
+  startPage: number,
+  endPage: number
+): Promise<string> {
+  const subDoc = await PDFDocument.create();
+  const indices: number[] = [];
+  for (let p = startPage; p <= endPage; p++) {
+    indices.push(p - 1);
+  }
+  const copiedPages = await subDoc.copyPages(srcDoc, indices);
+  for (const page of copiedPages) {
+    subDoc.addPage(page);
+  }
+  return await subDoc.saveAsBase64({ dataUri: false });
+}
+
+interface PageChunk {
+  chunkIndex: number;
+  totalChunks: number;
+  startPage: number;
+  endPage: number;
+  quota: number;
+}
+
+/**
+ * MOTOR DE CHUNKING Y BATCHING MATEMÁTICO:
+ * Divide un rango de páginas en segmentos equilibrados (chunks) y distribuye proporcionalmente
+ * el total de tarjetas solicitadas entre dichos segmentos para garantizar que el 100% de las páginas
+ * aporten preguntas al examen y evitar la saturación de contexto.
+ */
+function partitionPagesIntoChunks(
+  startPage: number,
+  finalPage: number,
+  targetCount: number
+): PageChunk[] {
+  const totalPages = finalPage - startPage + 1;
+  if (totalPages <= 0) return [];
+
+  // Determinar número óptimo de bloques (entre 1 y 6 chunks)
+  let numChunks: number;
+  if (totalPages === 1) {
+    numChunks = 1;
+  } else if (totalPages <= 3) {
+    numChunks = totalPages;
+  } else if (totalPages <= 6) {
+    numChunks = Math.min(totalPages, 3);
+  } else if (totalPages <= 12) {
+    numChunks = Math.min(totalPages, 4);
+  } else if (totalPages <= 20) {
+    numChunks = Math.min(totalPages, 5);
+  } else {
+    numChunks = Math.min(totalPages, 6);
+  }
+
+  const basePagesPerChunk = Math.floor(totalPages / numChunks);
+  const extraPages = totalPages % numChunks;
+
+  const baseQuota = Math.floor(targetCount / numChunks);
+  const extraQuota = targetCount % numChunks;
+
+  const chunks: PageChunk[] = [];
+  let currentStart = startPage;
+
+  for (let i = 0; i < numChunks; i++) {
+    const pagesInThisChunk = basePagesPerChunk + (i < extraPages ? 1 : 0);
+    const chunkEnd = currentStart + pagesInThisChunk - 1;
+    const chunkQuota = Math.max(1, baseQuota + (i < extraQuota ? 1 : 0));
+
+    chunks.push({
+      chunkIndex: i,
+      totalChunks: numChunks,
+      startPage: currentStart,
+      endPage: chunkEnd,
+      quota: chunkQuota,
+    });
+
+    currentStart = chunkEnd + 1;
+  }
+
+  return chunks;
 }
 
 interface ExistingCardHistoryItem {
@@ -774,12 +1036,21 @@ function getGeminiConfig(
   coreExhaustedPrevious: boolean = false,
   existingTopicsList: string = '',
   isExhaustiveMode: boolean = false,
-  pedagogicalMode?: 'academic' | 'didactic'
+  pedagogicalMode?: 'academic' | 'didactic',
+  docenteFormat: DocenteFormat = 'mixed_test',
+  targetAudience: TargetAudience = 'auto'
 ) {
   void format;
   void requestedCount;
   return {
-    systemInstruction: buildSystemPrompt(existingCardsCount, coreExhaustedPrevious, existingTopicsList, pedagogicalMode),
+    systemInstruction: buildSystemPrompt(
+      existingCardsCount,
+      coreExhaustedPrevious,
+      existingTopicsList,
+      pedagogicalMode,
+      docenteFormat,
+      targetAudience
+    ),
     temperature: isExhaustiveMode ? 0.1 : 0.15,
     responseMimeType: 'application/json',
     responseJsonSchema: flashcardSchema,
@@ -1086,7 +1357,9 @@ export async function generateCardsAction(
   userId?: string,
   language: string = 'es',
   coreExhaustedPrevious: boolean = false,
-  pedagogicalMode: 'academic' | 'didactic' = 'academic'
+  pedagogicalMode: 'academic' | 'didactic' = 'academic',
+  docenteFormat: DocenteFormat = 'mixed_test',
+  targetAudience: TargetAudience = 'auto'
 ): Promise<GenerateCardsResult> {
   const cleanTopic = topic.trim();
   if (!cleanTopic) {
@@ -1115,8 +1388,9 @@ export async function generateCardsAction(
   }
   const apiCheck = checkResult.check;
 
-  // Límite seguro de 30 tarjetas por petición para evitar saturación y truncamientos
-  const targetCount = Math.max(1, Math.min(30, cardCount || 10));
+  // Límite seguro: hasta 40 tarjetas en Modo Didáctico y 30 en Modo Estudio
+  const maxAllowed = pedagogicalMode === 'didactic' ? 40 : 30;
+  const targetCount = Math.max(1, Math.min(maxAllowed, cardCount || 10));
 
   try {
     // 1. Consultar historial de tarjetas existentes en este mazo para la Memoria de Progreso
@@ -1193,7 +1467,9 @@ ${languageDirective}`;
             coreExhaustedPrevious,
             existingTopicsList,
             false,
-            pedagogicalMode
+            pedagogicalMode,
+            docenteFormat,
+            targetAudience
           ),
         }),
         ai.models.generateContent({
@@ -1206,7 +1482,9 @@ ${languageDirective}`;
             coreExhaustedPrevious,
             existingTopicsList,
             false,
-            pedagogicalMode
+            pedagogicalMode,
+            docenteFormat,
+            targetAudience
           ),
         }),
       ]);
@@ -1287,7 +1565,9 @@ ${languageDirective}`;
           coreExhaustedPrevious,
           existingTopicsList,
           false,
-          pedagogicalMode
+          pedagogicalMode,
+          docenteFormat,
+          targetAudience
         ),
       });
 
@@ -1452,6 +1732,8 @@ export async function generateCardsFromDocumentAction(
     coreExhaustedPrevious = false,
     isExhaustiveMode = false,
     pedagogicalMode = 'academic',
+    docenteFormat = 'mixed_test',
+    targetAudience = 'auto',
   } = input;
 
   if (!storagePath && !signedUrl) {
@@ -1480,8 +1762,9 @@ export async function generateCardsFromDocumentAction(
   }
   const apiCheck = checkResult.check;
 
-  // Límite seguro de 30 tarjetas por petición para evitar saturación y truncamientos
-  const targetCount = Math.max(1, Math.min(30, cardCount || 10));
+  // Límite seguro: hasta 40 tarjetas en Modo Didáctico y 30 en Modo Estudio
+  const maxAllowed = pedagogicalMode === 'didactic' ? 40 : 30;
+  const targetCount = Math.max(1, Math.min(maxAllowed, cardCount || 10));
 
   try {
     let fileArrayBuffer: ArrayBuffer;
@@ -1692,7 +1975,7 @@ Esta instrucción tiene PRIORIDAD ABSOLUTA y actúa como un filtro estricto sobr
       }
 
       if (pedagogicalMode === 'didactic') {
-        singlePageSystemPrompt += `${DIDACTIC_MODE_DIRECTIVE}\n\n`;
+        singlePageSystemPrompt += `${buildDidacticModeDirective(docenteFormat, targetAudience)}\n\n`;
       }
 
       // Si el modo exhaustivo está activo, REEMPLAZA la directiva estándar para anular cualquier síntesis pedagógica o brevedad
@@ -1702,78 +1985,90 @@ Esta instrucción tiene PRIORIDAD ABSOLUTA y actúa como un filtro estricto sobr
         singlePageSystemPrompt += `${universalDirective}\n\n`;
       }
 
-      singlePageSystemPrompt += `${getFormatRule(cardFormat)}`;
-      singlePageSystemPrompt += `\n${getFormatInstructions(cardFormat)}`;
-      singlePageSystemPrompt += `\n\nREGLA DE INTEGRIDAD: Devuelve un objeto JSON estructurado con "conceptos_identificados" (array de strings con los conceptos encontrados en esta página), "core_exhausted" (booleano) y "cards" (array dinámico con todas las tarjetas extraídas sin límite máximo ni mínimo artificial, formuladas según el formato "${cardFormat}").`;
       if (pedagogicalMode === 'didactic') {
-        singlePageSystemPrompt += `\nRECORDATORIO MODO DOCENTE / DIDÁCTICO: Transforma el contenido en ejercicios y preguntas de examen prácticas para alumnos, omitiendo metadatos de aula (ejercicios, bloques, unidades) y omitiendo preguntas sobre transcripciones fonéticas.`;
+        singlePageSystemPrompt += `${getDidacticFormatSection(docenteFormat)}\n`;
+      } else {
+        singlePageSystemPrompt += `${getFormatRule(cardFormat)}`;
+        singlePageSystemPrompt += `\n${getFormatInstructions(cardFormat)}`;
+        singlePageSystemPrompt += `\n\nREGLA DE INTEGRIDAD: Devuelve un objeto JSON estructurado con "conceptos_identificados" (array de strings con los conceptos encontrados en esta página), "core_exhausted" (booleano) y "cards" (array dinámico con todas las tarjetas extraídas sin límite máximo ni mínimo artificial, formuladas según el formato "${cardFormat}").`;
+      }
+
+      if (pedagogicalMode === 'didactic') {
+        singlePageSystemPrompt += `\nRECORDATORIO MODO DOCENTE / DIDÁCTICO: Realiza un barrido homogéneo por todo el texto, transformando el contenido en ejercicios y problemas prácticos de examen para alumnos, omitiendo metadatos de aula (ejercicios, bloques, unidades) y omitiendo preguntas sobre transcripciones fonéticas.`;
       }
       if (isExhaustiveMode) {
         singlePageSystemPrompt += `\nRECORDATORIO MODO EXHAUSTIVO: Extrae cada celda, fila, columna y dato sustancial sin resumir ni abreviar, priorizando el conocimiento pedagógico real y respetando la prohibición estricta de metadatos o recuadros de vocabulario al margen.`;
       }
       singlePageSystemPrompt += buildLanguageDirective(language);
 
-      // 4. Bucle Secuencial (Backend):
-      // while (tarjetasAcumuladas.length < targetCount && currentPage <= finalPage)
-      // En cada iteración del bucle, corta y envía a Gemini EXACTAMENTE 1 PÁGINA sin límites artificiales por página.
+      // 4. MOTOR DE CHUNKING Y BATCHING MATEMÁTICO (PDF):
+      // Divide el rango de páginas en bloques proporcionales y asigna una cuota matemática a cada bloque
+      // para evitar la "Saturación de Contexto" y garantizar que el 100% de las páginas aporten al examen.
+      const chunks = partitionPagesIntoChunks(startPage, finalPage, targetCount);
       let tarjetasAcumuladas: GeneratedCard[] = [];
       const accumulatedHistory: ExistingCardHistoryItem[] = [...existingCards];
-      let currentPage = startPage;
-      let lastProcessedPage = currentPage;
+      let deficitCarryOver = 0;
+      let lastProcessedPage = finalPage;
 
       console.log(
-        `[Bucle Acumulador Backend] Iniciando: Desde pág. ${startPage} hasta pág. ${finalPage}. Meta: ${targetCount} tarjetas.`
+        `[Motor Chunking PDF] Dividiendo rango págs ${startPage}-${finalPage} en ${chunks.length} bloques. Meta total: ${targetCount} tarjetas.`
       );
 
-      while (tarjetasAcumuladas.length < targetCount && currentPage <= finalPage) {
-        lastProcessedPage = currentPage;
-        const remainingToTarget = targetCount - tarjetasAcumuladas.length;
+      for (const chunk of chunks) {
+        lastProcessedPage = chunk.endPage;
+        const currentChunkQuota = Math.max(1, chunk.quota + deficitCarryOver);
+        deficitCarryOver = 0;
 
         console.log(
-          `[Bucle Acumulador Backend] Procesando Página ${currentPage} de ${finalPage}... (Acumuladas: ${tarjetasAcumuladas.length}/${targetCount}, Restan: ${remainingToTarget})`
+          `[Motor Chunking PDF] Procesando Bloque ${chunk.chunkIndex + 1}/${chunk.totalChunks} (Págs ${chunk.startPage} a ${chunk.endPage}). Cuota asignada: ${currentChunkQuota} tarjetas.`
         );
 
-        // Cortar EXACTAMENTE 1 PÁGINA
-        const singlePageBase64 = await sliceSinglePdfPage(srcDoc, currentPage);
+        // Cortar el rango de páginas del bloque
+        const chunkBase64 =
+          chunk.startPage === chunk.endPage
+            ? await sliceSinglePdfPage(srcDoc, chunk.startPage)
+            : await slicePdfPageRange(srcDoc, chunk.startPage, chunk.endPage);
 
-        // Extraer lista de tópicos ya cubiertos (BD + páginas previas del lote) para evitar repeticiones a ciegas
+        // Extraer lista de tópicos ya cubiertos
         const coveredTopics = extractUniqueTopicsList(accumulatedHistory);
         const historyDirective = coveredTopics
-          ? `\n\nCONCEPTOS YA EVALUADOS EN ESTE MAZO O PÁGINAS PREVIAS: ${coveredTopics}.
-DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de esta página que aún NO hayan sido preguntados. No repitas la misma pregunta con ligeras variaciones de redacción.`
+          ? `\n\nCONCEPTOS YA EVALUADOS EN ESTE MAZO O BLOQUES PREVIOS: ${coveredTopics}.
+DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de este bloque que aún NO hayan sido preguntados. No repitas la misma pregunta con ligeras variaciones de redacción.`
           : '';
 
-        const exhaustiveQuotaMandate = isExhaustiveMode
-          ? `\n\n🚨 DIRECTIVA DE COBERTURA Y CALIDAD (CUOTA RESTANTE: ${remainingToTarget} TARJETAS):
-- Si la página contiene tablas, matrices de datos o clasificaciones densas, extrae preguntas independientes de tantas filas y cruces numéricos como existan hasta cumplir la cuota requerida.
-- Si la página es texto continuo (prosa/teoría), extrae con rigor quirúrgico cada dato fáctico, definición, mecanismo y excepción relevante.
-- IMPORTANTE: No dupliques preguntas con diferente redacción ni inventes preguntas sobre listas de palabras al margen o datos ajenos al documento para alcanzar un número artificial. Si has extraído todos los hechos sustanciales de esta página, concluye tu respuesta; el motor secuencial del servidor continuará acumulando tarjetas en las siguientes páginas del documento hasta completar el objetivo.`
-          : '';
+        const chunkQuotaMandate = `\n\n🚨 DIRECTIVA DE CUOTA MATEMÁTICA DEL BLOQUE (EXACTAMENTE ${currentChunkQuota} PREGUNTAS):
+- Tu objetivo OBLIGATORIO para este bloque (páginas ${chunk.startPage} a ${chunk.endPage}) es generar exactamente ${currentChunkQuota} preguntas.
+- Realiza un barrido homogéneo cubriendo todas las páginas de este bloque (${chunk.startPage} a ${chunk.endPage}) para que este segmento aporte equitativamente al examen global sin saturar el inicio del documento.`;
 
-        const currentPageSystemPrompt = `${singlePageSystemPrompt}${historyDirective}${exhaustiveQuotaMandate}`;
+        const currentChunkSystemPrompt = `${singlePageSystemPrompt}${historyDirective}${chunkQuotaMandate}`;
 
-        const pageUserPrompt = isExhaustiveMode
-          ? `Analiza la Página ${currentPage} del documento adjunto aplicando la DIRECTIVA DE COBERTURA Y CALIDAD (cuota restante: ${remainingToTarget} tarjetas). ${pedagogicalMode === 'didactic' ? 'Aplica la DIRECTIVA DE MODO DOCENTE / DIDÁCTICO para crear ejercicios prácticos de evaluación sin metadatos de aula. ' : ''}Si hay tablas o matrices de datos, extrae preguntas independientes por cada fila o cruce numérico. Si es texto continuo, extrae hechos y definiciones sustanciales sin duplicar ni inventar preguntas sobre términos al margen, concluyendo cuando los datos sustanciales se agoten para que el servidor avance de página. Formato: "${cardFormat}".`
-          : `Analiza la Página ${currentPage} del documento adjunto y extrae todos los conceptos clave, datos precisos, normativas o hechos únicos posibles en formato "${cardFormat}".${pedagogicalMode === 'didactic' ? ' Aplica el Modo Docente / Didáctico: preguntas prácticas de examen sin metadatos de aula.' : ''}`;
+        const pageLabel =
+          chunk.startPage === chunk.endPage
+            ? `Página ${chunk.startPage}`
+            : `Páginas ${chunk.startPage} a ${chunk.endPage}`;
 
-        let pageCandidateCards: GeneratedCard[] = [];
+        const chunkUserPrompt = isExhaustiveMode
+          ? `Analiza el bloque (${pageLabel}) del documento aplicando la DIRECTIVA DE COBERTURA Y CALIDAD (cuota asignada: ${currentChunkQuota} tarjetas). ${pedagogicalMode === 'didactic' ? 'Aplica la DIRECTIVA DE MODO DOCENTE / DIDÁCTICO para crear ejercicios prácticos de evaluación sin metadatos de aula. ' : ''}Si hay tablas o matrices, extrae preguntas independientes por celda o cruce. Formato: "${cardFormat}".`
+          : `Analiza el bloque (${pageLabel}) del documento adjunto y extrae exactamente ${currentChunkQuota} preguntas en formato "${cardFormat}".${pedagogicalMode === 'didactic' ? ' Aplica el Modo Docente / Didáctico: preguntas prácticas de examen sin metadatos de aula.' : ''} Asegúrate de cubrir equilibradamente el contenido de todas las páginas del bloque.`;
+
+        let chunkCandidateCards: GeneratedCard[] = [];
 
         try {
-          const pageResponse = await ai.models.generateContent({
+          const chunkResponse = await ai.models.generateContent({
             model: GEMINI_MODEL,
             contents: [
               {
                 inlineData: {
-                  data: singlePageBase64,
+                  data: chunkBase64,
                   mimeType: 'application/pdf',
                 },
               },
               {
-                text: pageUserPrompt,
+                text: chunkUserPrompt,
               },
             ],
             config: {
-              systemInstruction: currentPageSystemPrompt,
+              systemInstruction: currentChunkSystemPrompt,
               temperature: isExhaustiveMode ? 0.1 : 0.15,
               responseMimeType: 'application/json',
               responseJsonSchema: singlePageExtractionSchema,
@@ -1781,33 +2076,31 @@ DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de esta pági
             },
           });
 
-          if (pageResponse.text) {
+          if (chunkResponse.text) {
             try {
-              const parsed = parseGeminiBatchResponse(pageResponse.text);
-              pageCandidateCards = parsed.cards || [];
+              const parsed = parseGeminiBatchResponse(chunkResponse.text);
+              chunkCandidateCards = parsed.cards || [];
               console.log(
-                `[Bucle Acumulador Backend] Página ${currentPage}: Gemini devolvió ${pageCandidateCards.length} tarjetas brutas.`
+                `[Motor Chunking PDF] Bloque ${chunk.chunkIndex + 1}: Gemini devolvió ${chunkCandidateCards.length} tarjetas brutas.`
               );
             } catch (parseErr) {
               console.warn(
-                `[Bucle Acumulador Backend] Página ${currentPage}: Sin tarjetas válidas o poca información:`,
+                `[Motor Chunking PDF] Bloque ${chunk.chunkIndex + 1}: Error parseando respuesta de Gemini:`,
                 parseErr
               );
             }
           }
         } catch (geminiErr) {
           console.warn(
-            `[Bucle Acumulador Backend] Error en llamada a Gemini para Página ${currentPage}:`,
+            `[Motor Chunking PDF] Error en llamada a Gemini para Bloque ${chunk.chunkIndex + 1}:`,
             geminiErr
           );
         }
 
-        // Acumulación y Deduplicación:
-        // Dentro del bucle por página aplicamos el filtro léxico rápido contra accumulatedHistory
-        // (sin recalcular embeddings del historial de BD en cada iteración de página).
-        if (pageCandidateCards.length > 0) {
+        // Acumulación y Deduplicación rápida del bloque
+        if (chunkCandidateCards.length > 0) {
           const { uniqueCards, duplicateCount } = await deduplicateCandidateCards({
-            candidateCards: pageCandidateCards,
+            candidateCards: chunkCandidateCards,
             existingCards: accumulatedHistory,
             similarityThreshold: isExhaustiveMode ? 0.92 : 0.80,
             isExhaustiveMode,
@@ -1815,7 +2108,7 @@ DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de esta pági
 
           if (duplicateCount > 0) {
             console.log(
-              `[Bucle Acumulador Backend] Página ${currentPage}: Gatekeeper léxico filtró ${duplicateCount} duplicados.`
+              `[Motor Chunking PDF] Bloque ${chunk.chunkIndex + 1}: Se filtraron ${duplicateCount} duplicados.`
             );
           }
 
@@ -1825,25 +2118,16 @@ DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de esta pági
               accumulatedHistory.push({ front: uc.front, back: uc.back });
             }
             console.log(
-              `[Bucle Acumulador Backend] Página ${currentPage}: Se acumularon ${uniqueCards.length} tarjetas únicas. Total acumulado: ${tarjetasAcumuladas.length}/${targetCount}.`
+              `[Motor Chunking PDF] Bloque ${chunk.chunkIndex + 1}: Acumuladas ${uniqueCards.length} tarjetas. Total: ${tarjetasAcumuladas.length}/${targetCount}.`
             );
           }
-        }
 
-        // Si al sumar se supera el targetCount, recorta el array exactamente al límite solicitado
-        if (tarjetasAcumuladas.length > targetCount) {
-          tarjetasAcumuladas = tarjetasAcumuladas.slice(0, targetCount);
+          if (uniqueCards.length < currentChunkQuota) {
+            deficitCarryOver = currentChunkQuota - uniqueCards.length;
+          }
+        } else {
+          deficitCarryOver = currentChunkQuota;
         }
-
-        // Si alcanzamos el límite exacto de tarjetas solicitadas para este lote, detenemos el bucle
-        if (tarjetasAcumuladas.length >= targetCount) {
-          console.log(
-            `[Bucle Acumulador Backend] 🎯 Objetivo alcanzado: ${tarjetasAcumuladas.length} tarjetas exactas en Página ${currentPage}.`
-          );
-          break;
-        }
-
-        currentPage++;
       }
 
       // Pase único de deduplicación semántica vectorial al finalizar el bucle (si hay historial previo en BD)
@@ -1953,7 +2237,7 @@ Esta instrucción tiene PRIORIDAD ABSOLUTA y actúa como un filtro estricto sobr
       }
 
       if (pedagogicalMode === 'didactic') {
-        singlePageSystemPrompt += `${DIDACTIC_MODE_DIRECTIVE}\n\n`;
+        singlePageSystemPrompt += `${buildDidacticModeDirective(docenteFormat, targetAudience)}\n\n`;
       }
 
       // Si el modo exhaustivo está activo, REEMPLAZA la directiva estándar para anular cualquier síntesis pedagógica o brevedad
@@ -1963,76 +2247,91 @@ Esta instrucción tiene PRIORIDAD ABSOLUTA y actúa como un filtro estricto sobr
         singlePageSystemPrompt += `${universalDirective}\n\n`;
       }
 
-      singlePageSystemPrompt += `${getFormatRule(cardFormat)}`;
-      singlePageSystemPrompt += `\n${getFormatInstructions(cardFormat)}`;
-      singlePageSystemPrompt += `\n\nREGLA DE INTEGRIDAD: Devuelve un objeto JSON estructurado con "conceptos_identificados" (array de strings con los conceptos encontrados en esta página virtual), "core_exhausted" (booleano) y "cards" (array dinámico con todas las tarjetas extraídas sin límite máximo ni mínimo artificial, formuladas según el formato "${cardFormat}").`;
       if (pedagogicalMode === 'didactic') {
-        singlePageSystemPrompt += `\nRECORDATORIO MODO DOCENTE / DIDÁCTICO: Transforma el contenido en ejercicios y preguntas de examen prácticas para alumnos, omitiendo metadatos de aula (ejercicios, bloques, unidades) y omitiendo preguntas sobre transcripciones fonéticas.`;
+        singlePageSystemPrompt += `${getDidacticFormatSection(docenteFormat)}\n`;
+      } else {
+        singlePageSystemPrompt += `${getFormatRule(cardFormat)}`;
+        singlePageSystemPrompt += `\n${getFormatInstructions(cardFormat)}`;
+        singlePageSystemPrompt += `\n\nREGLA DE INTEGRIDAD: Devuelve un objeto JSON estructurado con "conceptos_identificados" (array de strings con los conceptos encontrados en esta página virtual), "core_exhausted" (booleano) y "cards" (array dinámico con todas las tarjetas extraídas sin límite máximo ni mínimo artificial, formuladas según el formato "${cardFormat}").`;
+      }
+
+      if (pedagogicalMode === 'didactic') {
+        singlePageSystemPrompt += `\nRECORDATORIO MODO DOCENTE / DIDÁCTICO: Realiza un barrido homogéneo por todo el texto, transformando el contenido en ejercicios y problemas prácticos de examen para alumnos, omitiendo metadatos de aula (ejercicios, bloques, unidades) y omitiendo preguntas sobre transcripciones fonéticas.`;
       }
       if (isExhaustiveMode) {
         singlePageSystemPrompt += `\nRECORDATORIO MODO EXHAUSTIVO: Extrae cada celda, fila, columna y dato sustancial sin resumir ni abreviar, priorizando el conocimiento pedagógico real y respetando la prohibición estricta de metadatos o recuadros de vocabulario al margen.`;
       }
       singlePageSystemPrompt += buildLanguageDirective(language);
 
-      // 4. Bucle Secuencial Virtual (Backend):
-      // while (tarjetasAcumuladas.length < targetCount && currentPage <= finalPage)
+      // 4. MOTOR DE CHUNKING Y BATCHING MATEMÁTICO DOCX:
+      // Divide el rango de páginas virtuales en bloques proporcionales y asigna una cuota matemática a cada bloque
+      // para evitar la "Saturación de Contexto" y garantizar que el 100% de las páginas aporten al examen.
+      const chunks = partitionPagesIntoChunks(startPage, finalPage, targetCount);
       let tarjetasAcumuladas: GeneratedCard[] = [];
       const accumulatedHistory: ExistingCardHistoryItem[] = [...existingCards];
-      let currentPage = startPage;
-      let lastProcessedPage = currentPage;
+      let deficitCarryOver = 0;
+      let lastProcessedPage = finalPage;
 
       console.log(
-        `[Bucle Acumulador Backend DOCX] Iniciando: Desde pág. virtual ${startPage} hasta pág. virtual ${finalPage}. Meta: ${targetCount} tarjetas.`
+        `[Motor Chunking DOCX] Dividiendo rango págs virtuales ${startPage}-${finalPage} en ${chunks.length} bloques. Meta total: ${targetCount} tarjetas.`
       );
 
-      while (tarjetasAcumuladas.length < targetCount && currentPage <= finalPage) {
-        lastProcessedPage = currentPage;
-        const remainingToTarget = targetCount - tarjetasAcumuladas.length;
-        const currentVirtualPage = wordPages[currentPage - 1];
-        const currentPageText = currentVirtualPage?.text || '';
-        const currentPageImages = (currentVirtualPage?.images || []).slice(0, 3);
+      for (const chunk of chunks) {
+        lastProcessedPage = chunk.endPage;
+        const currentChunkQuota = Math.max(1, chunk.quota + deficitCarryOver);
+        deficitCarryOver = 0;
 
         console.log(
-          `[Bucle Acumulador Backend DOCX] Procesando Página Virtual ${currentPage} de ${finalPage}... (Acumuladas: ${tarjetasAcumuladas.length}/${targetCount}, Restan: ${remainingToTarget}, Imágenes: ${currentPageImages.length})`
+          `[Motor Chunking DOCX] Procesando Bloque ${chunk.chunkIndex + 1}/${chunk.totalChunks} (Págs Virtuales ${chunk.startPage} a ${chunk.endPage}). Cuota asignada: ${currentChunkQuota} tarjetas.`
         );
 
-        // Extraer lista de tópicos ya cubiertos (BD + páginas previas del lote) para evitar repeticiones a ciegas
+        const chunkVirtualPages = wordPages.slice(chunk.startPage - 1, chunk.endPage);
+        const chunkText = chunkVirtualPages
+          .map((p, idx) => `=== PÁGINA VIRTUAL ${chunk.startPage + idx} ===\n${p.text}`)
+          .join('\n\n');
+        const chunkImages = chunkVirtualPages
+          .flatMap((p) => p.images || [])
+          .slice(0, 4);
+
+        // Extraer lista de tópicos ya cubiertos
         const coveredTopics = extractUniqueTopicsList(accumulatedHistory);
         const historyDirective = coveredTopics
-          ? `\n\nCONCEPTOS YA EVALUADOS EN ESTE MAZO O PÁGINAS PREVIAS: ${coveredTopics}.
-DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de esta página que aún NO hayan sido preguntados. No repitas la misma pregunta con ligeras variaciones de redacción.`
+          ? `\n\nCONCEPTOS YA EVALUADOS EN ESTE MAZO O BLOQUES PREVIOS: ${coveredTopics}.
+DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de este bloque que aún NO hayan sido preguntados. No repitas la misma pregunta con ligeras variaciones de redacción.`
           : '';
 
-        const exhaustiveQuotaMandate = isExhaustiveMode
-          ? `\n\n🚨 DIRECTIVA DE COBERTURA Y CALIDAD (CUOTA RESTANTE: ${remainingToTarget} TARJETAS):
-- Si la sección contiene tablas, imágenes o clasificaciones densas, extrae preguntas independientes de tantas filas, cruces o diagramas como existan hasta cumplir la cuota requerida.
-- Si la sección es texto continuo (prosa/teoría), extrae con rigor quirúrgico cada dato fáctico, definición, mecanismo y excepción relevante.
-- IMPORTANTE: No dupliques preguntas con diferente redacción ni inventes preguntas sobre listas de palabras al margen o datos ajenos al documento para alcanzar un número artificial. Si has extraído todos los hechos sustanciales de esta página virtual, concluye tu respuesta; el motor secuencial del servidor continuará acumulando tarjetas en las siguientes páginas del documento hasta completar el objetivo.`
-          : '';
+        const chunkQuotaMandate = `\n\n🚨 DIRECTIVA DE CUOTA MATEMÁTICA DEL BLOQUE (EXACTAMENTE ${currentChunkQuota} PREGUNTAS):
+- Tu objetivo OBLIGATORIO para este bloque (páginas virtuales ${chunk.startPage} a ${chunk.endPage}) es generar exactamente ${currentChunkQuota} preguntas.
+- Realiza un barrido homogéneo cubriendo todas las páginas de este bloque (${chunk.startPage} a ${chunk.endPage}) para que este segmento aporte equitativamente al examen global sin saturar el inicio del documento.`;
 
-        const currentPageSystemPrompt = `${singlePageSystemPrompt}${historyDirective}${exhaustiveQuotaMandate}`;
+        const currentChunkSystemPrompt = `${singlePageSystemPrompt}${historyDirective}${chunkQuotaMandate}`;
 
-        const imageNotice = currentPageImages.length > 0
-          ? ` Se adjuntan ${currentPageImages.length} imagen(es) o diagrama(s) incrustados en esta sección del documento Word. Analízalos visualmente con precisión para extraer datos, esquemas, clasificaciones o conceptos presentes en ellos.`
-          : '';
+        const pageLabel =
+          chunk.startPage === chunk.endPage
+            ? `Página Virtual ${chunk.startPage}`
+            : `Páginas Virtuales ${chunk.startPage} a ${chunk.endPage}`;
 
-        const pageUserPrompt = isExhaustiveMode
-          ? `Analiza el contenido de la Página Virtual ${currentPage} del documento Word adjunto aplicando la DIRECTIVA DE COBERTURA Y CALIDAD (cuota restante: ${remainingToTarget} tarjetas). ${pedagogicalMode === 'didactic' ? 'Aplica la DIRECTIVA DE MODO DOCENTE / DIDÁCTICO para crear ejercicios prácticos de evaluación sin metadatos de aula. ' : ''}${imageNotice}Si hay tablas, diagramas o datos estructurados, extrae preguntas independientes por cada dato relevante. Si es texto continuo, extrae hechos y definiciones sustanciales sin duplicar ni inventar preguntas sobre términos al margen, concluyendo cuando los datos sustanciales se agoten para que el servidor avance de página. Formato: "${cardFormat}".
+        const imageNotice =
+          chunkImages.length > 0
+            ? ` Se adjuntan ${chunkImages.length} imagen(es) o diagrama(s) de este bloque.`
+            : '';
 
---- TEXTO DE LA PÁGINA VIRTUAL ${currentPage} (${fileName || 'documento.docx'}) ---
-${currentPageText}`
-          : `Analiza el contenido de la Página Virtual ${currentPage} del documento Word adjunto y extrae todos los conceptos clave, datos precisos, normativas o hechos únicos posibles en formato "${cardFormat}".${pedagogicalMode === 'didactic' ? ' Aplica el Modo Docente / Didáctico: preguntas prácticas de examen sin metadatos de aula.' : ''}${imageNotice}
+        const chunkUserPrompt = isExhaustiveMode
+          ? `Analiza el bloque (${pageLabel}) del documento Word aplicando la DIRECTIVA DE COBERTURA Y CALIDAD (cuota asignada: ${currentChunkQuota} tarjetas). ${pedagogicalMode === 'didactic' ? 'Aplica la DIRECTIVA DE MODO DOCENTE / DIDÁCTICO para crear ejercicios prácticos de evaluación sin metadatos de aula. ' : ''}${imageNotice}Si hay tablas, diagramas o clasificaciones, extrae preguntas independientes por celda o cruce. Formato: "${cardFormat}".
 
---- TEXTO DE LA PÁGINA VIRTUAL ${currentPage} (${fileName || 'documento.docx'}) ---
-${currentPageText}`;
+--- TEXTO DEL BLOQUE (${pageLabel}) ---
+${chunkText}`
+          : `Analiza el bloque (${pageLabel}) del documento Word adjunto y extrae exactamente ${currentChunkQuota} preguntas en formato "${cardFormat}".${pedagogicalMode === 'didactic' ? ' Aplica el Modo Docente / Didáctico: preguntas prácticas de examen sin metadatos de aula.' : ''}${imageNotice} Asegúrate de cubrir equilibradamente el contenido de todas las páginas virtuales del bloque.
 
-        // Construir contenido multimodal para Gemini: imágenes + texto
+--- TEXTO DEL BLOQUE (${pageLabel}) ---
+${chunkText}`;
+
         const geminiContentParts: Array<
           | { inlineData: { mimeType: string; data: string } }
           | { text: string }
         > = [];
 
-        for (const img of currentPageImages) {
+        for (const img of chunkImages) {
           if (img.dataBase64 && img.mimeType) {
             geminiContentParts.push({
               inlineData: {
@@ -2044,17 +2343,17 @@ ${currentPageText}`;
         }
 
         geminiContentParts.push({
-          text: pageUserPrompt,
+          text: chunkUserPrompt,
         });
 
-        let pageCandidateCards: GeneratedCard[] = [];
+        let chunkCandidateCards: GeneratedCard[] = [];
 
         try {
-          const pageResponse = await ai.models.generateContent({
+          const chunkResponse = await ai.models.generateContent({
             model: GEMINI_MODEL,
             contents: geminiContentParts,
             config: {
-              systemInstruction: currentPageSystemPrompt,
+              systemInstruction: currentChunkSystemPrompt,
               temperature: isExhaustiveMode ? 0.1 : 0.15,
               responseMimeType: 'application/json',
               responseJsonSchema: singlePageExtractionSchema,
@@ -2062,33 +2361,31 @@ ${currentPageText}`;
             },
           });
 
-          if (pageResponse.text) {
+          if (chunkResponse.text) {
             try {
-              const parsed = parseGeminiBatchResponse(pageResponse.text);
-              pageCandidateCards = parsed.cards || [];
+              const parsed = parseGeminiBatchResponse(chunkResponse.text);
+              chunkCandidateCards = parsed.cards || [];
               console.log(
-                `[Bucle Acumulador Backend DOCX] Página Virtual ${currentPage}: Gemini devolvió ${pageCandidateCards.length} tarjetas brutas.`
+                `[Motor Chunking DOCX] Bloque ${chunk.chunkIndex + 1}: Gemini devolvió ${chunkCandidateCards.length} tarjetas brutas.`
               );
             } catch (parseErr) {
               console.warn(
-                `[Bucle Acumulador Backend DOCX] Página Virtual ${currentPage}: Sin tarjetas válidas o poca información:`,
+                `[Motor Chunking DOCX] Bloque ${chunk.chunkIndex + 1}: Error parseando respuesta de Gemini:`,
                 parseErr
               );
             }
           }
         } catch (geminiErr) {
           console.warn(
-            `[Bucle Acumulador Backend DOCX] Error en llamada a Gemini para Página Virtual ${currentPage}:`,
+            `[Motor Chunking DOCX] Error en llamada a Gemini para Bloque ${chunk.chunkIndex + 1}:`,
             geminiErr
           );
         }
 
-        // Acumulación y Deduplicación:
-        // Dentro del bucle aplicamos el filtro léxico rápido contra accumulatedHistory
-        // (sin recalcular embeddings de la base de datos en cada iteración de página).
-        if (pageCandidateCards.length > 0) {
+        // Acumulación y Deduplicación rápida del bloque
+        if (chunkCandidateCards.length > 0) {
           const { uniqueCards, duplicateCount } = await deduplicateCandidateCards({
-            candidateCards: pageCandidateCards,
+            candidateCards: chunkCandidateCards,
             existingCards: accumulatedHistory,
             similarityThreshold: isExhaustiveMode ? 0.92 : 0.80,
             isExhaustiveMode,
@@ -2096,7 +2393,7 @@ ${currentPageText}`;
 
           if (duplicateCount > 0) {
             console.log(
-              `[Bucle Acumulador Backend DOCX] Página Virtual ${currentPage}: Gatekeeper léxico filtró ${duplicateCount} duplicados.`
+              `[Motor Chunking DOCX] Bloque ${chunk.chunkIndex + 1}: Se filtraron ${duplicateCount} duplicados.`
             );
           }
 
@@ -2106,23 +2403,16 @@ ${currentPageText}`;
               accumulatedHistory.push({ front: uc.front, back: uc.back });
             }
             console.log(
-              `[Bucle Acumulador Backend DOCX] Página Virtual ${currentPage}: Se acumularon ${uniqueCards.length} tarjetas únicas. Total acumulado: ${tarjetasAcumuladas.length}/${targetCount}.`
+              `[Motor Chunking DOCX] Bloque ${chunk.chunkIndex + 1}: Acumuladas ${uniqueCards.length} tarjetas. Total: ${tarjetasAcumuladas.length}/${targetCount}.`
             );
           }
-        }
 
-        if (tarjetasAcumuladas.length > targetCount) {
-          tarjetasAcumuladas = tarjetasAcumuladas.slice(0, targetCount);
+          if (uniqueCards.length < currentChunkQuota) {
+            deficitCarryOver = currentChunkQuota - uniqueCards.length;
+          }
+        } else {
+          deficitCarryOver = currentChunkQuota;
         }
-
-        if (tarjetasAcumuladas.length >= targetCount) {
-          console.log(
-            `[Bucle Acumulador Backend DOCX] 🎯 Objetivo alcanzado: ${tarjetasAcumuladas.length} tarjetas exactas en Página Virtual ${currentPage}.`
-          );
-          break;
-        }
-
-        currentPage++;
       }
 
       // Pase único de deduplicación semántica vectorial al finalizar el bucle (si hay historial previo en BD)
@@ -2236,7 +2526,9 @@ REGLA ESTRICTA: Si el usuario proporciona una instrucción de enfoque (ej. un ca
             coreExhaustedPrevious,
             existingTopicsList,
             isExhaustiveMode,
-            pedagogicalMode
+            pedagogicalMode,
+            docenteFormat,
+            targetAudience
           ),
         }),
         ai.models.generateContent({
@@ -2249,7 +2541,9 @@ REGLA ESTRICTA: Si el usuario proporciona una instrucción de enfoque (ej. un ca
             coreExhaustedPrevious,
             existingTopicsList,
             isExhaustiveMode,
-            pedagogicalMode
+            pedagogicalMode,
+            docenteFormat,
+            targetAudience
           ),
         }),
       ]);
@@ -2316,7 +2610,7 @@ ${coverageText}${fileName ? ` Documento de referencia: "${fileName}".` : ''}
 
 ${RIGOR_WARNING_DIRECTIVE}
 
-${focusRuleSection ? `${focusRuleSection}\n\n` : ''}${getGlobalRules(cardFormat, requestCount, existingCards.length, pedagogicalMode)}
+${focusRuleSection ? `${focusRuleSection}\n\n` : ''}${getGlobalRules(cardFormat, requestCount, existingCards.length, pedagogicalMode, docenteFormat, targetAudience)}
 
 ${getFormatInstructions(cardFormat)}
 
@@ -2357,7 +2651,9 @@ ${buildLanguageDirective(language)}`;
           coreExhaustedPrevious,
           existingTopicsList,
           isExhaustiveMode,
-          pedagogicalMode
+          pedagogicalMode,
+          docenteFormat,
+          targetAudience
         ),
       });
 
@@ -2484,6 +2780,8 @@ export async function generateCardsFromUrlAction(
     language = 'es',
     coreExhaustedPrevious = false,
     pedagogicalMode = 'academic',
+    docenteFormat = 'mixed_test',
+    targetAudience = 'auto',
   } = input;
 
   const cleanUrl = (url || '').trim();
@@ -2524,7 +2822,8 @@ export async function generateCardsFromUrlAction(
   }
   const apiCheck = checkResult.check;
 
-  const targetCount = Math.max(1, Math.min(30, cardCount || 10));
+  const maxAllowed = pedagogicalMode === 'didactic' ? 40 : 30;
+  const targetCount = Math.max(1, Math.min(maxAllowed, cardCount || 10));
 
   try {
     const youtubeVideoId = extractYouTubeVideoId(parsedUrl.href);
@@ -2566,7 +2865,7 @@ ${coverageText} Fuente: ${sourceLabel} ("${sourceRef}").
 
 ${RIGOR_WARNING_DIRECTIVE}
 
-${focusRuleSection ? `${focusRuleSection}\n\n` : ''}${getGlobalRules(cardFormat, targetCount, existingCards.length, pedagogicalMode)}
+${focusRuleSection ? `${focusRuleSection}\n\n` : ''}${getGlobalRules(cardFormat, targetCount, existingCards.length, pedagogicalMode, docenteFormat, targetAudience)}
 
 ${getFormatInstructions(cardFormat)}
 
@@ -2606,7 +2905,9 @@ ${buildLanguageDirective(language)}`;
             coreExhaustedPrevious,
             existingTopicsList,
             false,
-            pedagogicalMode
+            pedagogicalMode,
+            docenteFormat,
+            targetAudience
           ),
         });
         responseText = nativeResponse.text;
@@ -2649,7 +2950,11 @@ ${buildLanguageDirective(language)}`;
               requestCount,
               existingCards.length,
               coreExhaustedPrevious,
-              existingTopicsList
+              existingTopicsList,
+              false,
+              pedagogicalMode,
+              docenteFormat,
+              targetAudience
             ),
           });
           responseText = fallbackResponse.text;
@@ -2726,7 +3031,9 @@ ${buildLanguageDirective(language)}`;
           coreExhaustedPrevious,
           existingTopicsList,
           false,
-          pedagogicalMode
+          pedagogicalMode,
+          docenteFormat,
+          targetAudience
         ),
       });
       responseText = webResponse.text;
