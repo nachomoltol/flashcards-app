@@ -6,8 +6,6 @@ import { parseDocxIntoVirtualPages } from '@/lib/docxPagination';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore, useCardStore, useDeckStore, useProModalStore, useLanguageStore } from '@/stores';
 import { generateCardsFromDocumentAction } from '@/app/actions/generateCards';
-import { showAdMobRewardedAd } from '@/lib/admob';
-import { claimAdRewardAction } from '@/app/actions/claimAdReward';
 import type { CardFormat, GeneratedCard, DocenteFormat, TargetAudience } from '@/types/cards';
 import { FormattedCardView } from './FormattedCardView';
 import { PrintExamSheet } from '@/components/decks';
@@ -582,30 +580,9 @@ export function DocumentUploader({
 
       // Validar resultado de la IA sin lanzar errores fatales
       if (!result.success || !result.cards || result.cards.length === 0) {
-        if (result.error === 'LIMIT_REACHED') {
+        if (result.error === 'LIMIT_REACHED' || result.error === 'AD_REQUIRED') {
           setStatus('idle');
           openProModal(true);
-          return;
-        }
-
-        if (result.error === 'AD_REQUIRED') {
-          try {
-            const adResult = await showAdMobRewardedAd();
-            if (adResult.completed) {
-              const claim = await claimAdRewardAction(user?.id);
-              if (claim.success) {
-                return handleProcessDocument(startPageForRun);
-              } else {
-                setErrorMessage(claim.message || (language === 'en' ? 'Could not claim ad reward.' : 'No se pudo reclamar la recompensa del anuncio.'));
-              }
-            } else if (adResult.error) {
-              setErrorMessage(adResult.error);
-            }
-          } catch (adErr) {
-            console.warn('Error en flujo de anuncio bonificado:', adErr);
-            setErrorMessage(language === 'en' ? 'Unexpected error during ad viewing.' : 'Error inesperado durante el anuncio.');
-          }
-          setStatus('idle');
           return;
         }
 

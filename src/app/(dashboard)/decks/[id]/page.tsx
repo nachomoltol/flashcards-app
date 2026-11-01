@@ -8,8 +8,6 @@ import { supabase } from '@/lib/supabase';
 import { CardEditor, DocumentUploader, FormattedCardView, UrlCardGenerator } from '@/components/cards';
 import { ShareDeckModal, QuickStudyGuideModal, StudyModesHelpModal, PrintExamSheet } from '@/components/decks';
 import { generateCardsAction } from '@/app/actions/generateCards';
-import { showAdMobRewardedAd } from '@/lib/admob';
-import { claimAdRewardAction } from '@/app/actions/claimAdReward';
 import { getDeckColorStyles } from '@/lib/colors';
 import type { CardFormat } from '@/types/database';
 
@@ -136,31 +134,9 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
     );
 
     if (!result.success || !result.cards) {
-      if (result.error === 'LIMIT_REACHED') {
+      if (result.error === 'LIMIT_REACHED' || result.error === 'AD_REQUIRED') {
         setIsGenerating(false);
         openProModal(true);
-        return;
-      }
-
-      if (result.error === 'AD_REQUIRED') {
-        try {
-          const adResult = await showAdMobRewardedAd();
-          if (adResult.completed) {
-            const claim = await claimAdRewardAction(user?.id);
-            if (claim.success) {
-              // Disparar la generación de las tarjetas automáticamente para que la experiencia sea fluida
-              return handleGenerateCardsByTopic();
-            } else {
-              setAiError(claim.message || t('deck_detail.unexpected_error'));
-            }
-          } else if (adResult.error) {
-            setAiError(adResult.error);
-          }
-        } catch (adErr) {
-          console.warn('Error en flujo de anuncio bonificado:', adErr);
-          setAiError(t('deck_detail.unexpected_error'));
-        }
-        setIsGenerating(false);
         return;
       }
 

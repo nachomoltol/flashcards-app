@@ -423,18 +423,18 @@ export function ProModal({
               {platform.isNativeAndroid ? (
                 <div className="space-y-3.5">
                   {/* NIVEL 1 (PRIORITARIO / BOTÓN PRINCIPAL): PLAN PRO STRIPE */}
-                  <div className="relative p-5 rounded-2xl bg-gradient-to-b from-purple-50/80 via-white to-purple-50/40 dark:from-purple-950/40 dark:to-neutral-900 border-2 border-purple-500 shadow-xl shadow-purple-500/10 dark:shadow-purple-950/40 space-y-3.5">
+                  <div className="relative p-5 rounded-2xl bg-gradient-to-b from-purple-50/80 via-white to-purple-50/40 dark:from-purple-950/40 dark:to-neutral-900 border-2 border-purple-500 shadow-xl shadow-purple-500/10 dark:shadow-purple-950/40 space-y-4">
                     <div className="flex items-start justify-between">
                       <div className="space-y-1">
                         <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-500/30 border border-purple-300 dark:border-purple-400/50 text-purple-800 dark:text-purple-200 text-[10px] font-bold uppercase tracking-wider">
                           <Sparkles className="w-3 h-3 text-purple-600 dark:text-purple-300" />
-                          OPCIÓN RECOMENDADA • SIN LÍMITES
+                          OPCIÓN 1 • RECOMENDADA
                         </div>
                         <h3 className="text-base font-bold text-neutral-900 dark:text-white">
                           Flashmente PRO Ilimitado
                         </h3>
                         <p className="text-xs text-neutral-600 dark:text-neutral-300 leading-snug">
-                          Generaciones ilimitadas con Gemini Flash sin esperas, sin pausas y desbloqueo total de PDF, Audio y YouTube.
+                          Genera sin límites mensuales, sin pausas publicitarias y desbloquea Audio, YouTube e Impresión.
                         </p>
                       </div>
 
@@ -447,12 +447,12 @@ export function ProModal({
                       </div>
                     </div>
 
-                    {/* BOTÓN PRINCIPAL: CHECKOUT STRIPE */}
+                    {/* BOTÓN 1: GRANDE Y DESTACADO A STRIPE */}
                     <button
                       type="button"
                       onClick={handleSubscribe}
                       disabled={isSubscribing}
-                      className="w-full min-h-[48px] inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-violet-600 hover:from-purple-500 hover:via-indigo-500 hover:to-violet-500 text-white font-bold text-sm shadow-xl shadow-purple-700/30 active:scale-[0.99] transition cursor-pointer disabled:opacity-70 group"
+                      className="w-full min-h-[50px] inline-flex items-center justify-center gap-2.5 px-6 py-3 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-violet-600 hover:from-purple-500 hover:via-indigo-500 hover:to-violet-500 text-white font-bold text-sm shadow-xl shadow-purple-700/30 active:scale-[0.99] transition cursor-pointer disabled:opacity-70 group"
                     >
                       {isSubscribing ? (
                         <>
@@ -462,7 +462,7 @@ export function ProModal({
                       ) : (
                         <>
                           <CreditCard className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                          <span>Activar Plan PRO — 3,50 €/mes</span>
+                          <span>Hacerme PRO (3,50 €/mes) - Generaciones Ilimitadas</span>
                           <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
                         </>
                       )}
@@ -475,46 +475,45 @@ export function ProModal({
                     )}
                   </div>
 
-                  {/* NIVEL 2 (SECUNDARIO / BOTÓN INFERIOR): ADMOB REWARDED VIDEO */}
-                  <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-neutral-950/70 border border-neutral-200 dark:border-neutral-800 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="p-1.5 rounded-lg bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300">
-                          <Tv className="w-4 h-4" />
+                  {/* NIVEL 2 (ALTERNATIVA GRATUITA POR ANUNCIO): BOTÓN GRANDE Y VISTOSO */}
+                  <div className="relative p-5 rounded-2xl bg-gradient-to-b from-amber-50/70 via-white to-amber-50/30 dark:from-amber-950/30 dark:to-neutral-900 border-2 border-amber-400 dark:border-amber-500/50 shadow-lg shadow-amber-500/5 space-y-4">
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-1">
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-500/20 border border-amber-300 dark:border-amber-400/50 text-amber-800 dark:text-amber-200 text-[10px] font-bold uppercase tracking-wider">
+                          <Tv className="w-3 h-3 text-amber-600 dark:text-amber-300" />
+                          OPCIÓN 2 • GRATUITA
                         </div>
-                        <span className="text-xs font-bold text-amber-800 dark:text-amber-200 uppercase tracking-wider">
-                          Google AdMob • Recompensa
+                        <h3 className="text-base font-bold text-neutral-900 dark:text-white">
+                          Obtén saldo con un vídeo corto
+                        </h3>
+                        <p className="text-xs text-neutral-600 dark:text-neutral-300 leading-snug">
+                          Mira un anuncio patrocinado de Google AdMob para sumar +1 generación gratuita a tu cuenta de inmediato.
+                        </p>
+                      </div>
+
+                      <div className="text-right pl-3 shrink-0">
+                        <span className="inline-block px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-500/20 border border-emerald-300 dark:border-emerald-500/40 text-emerald-800 dark:text-emerald-300 font-bold text-xs">
+                          +1 GRATIS
                         </span>
                       </div>
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 border border-emerald-300 dark:border-emerald-500/40 text-emerald-800 dark:text-emerald-300 font-bold text-[10px]">
-                        +1 GENERACIÓN GRATIS
-                      </span>
                     </div>
 
-                    <div className="space-y-0.5">
-                      <h4 className="text-xs font-bold text-neutral-900 dark:text-white">
-                        O mira un vídeo corto para obtener 1 generación gratis
-                      </h4>
-                      <p className="text-[11px] text-neutral-600 dark:text-neutral-400 leading-relaxed">
-                        Completa la visualización de un anuncio patrocinado para recibir +1 generación inmediata en tu saldo.
-                      </p>
-                    </div>
-
+                    {/* BOTÓN 2: GRANDE, VISTOSO Y CON ICONO DE REPRODUCCIÓN */}
                     <button
                       type="button"
                       onClick={handleWatchAd}
                       disabled={isWatchingAd}
-                      className="w-full min-h-[44px] inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-neutral-200 hover:bg-neutral-300 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-900 dark:text-neutral-100 font-semibold text-xs active:scale-[0.99] transition cursor-pointer disabled:opacity-60"
+                      className="w-full min-h-[50px] inline-flex items-center justify-center gap-2.5 px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:via-orange-400 hover:to-amber-500 text-neutral-950 font-bold text-sm shadow-xl shadow-amber-600/25 active:scale-[0.99] transition cursor-pointer disabled:opacity-70 group"
                     >
                       {isWatchingAd ? (
                         <>
-                          <div className="w-3.5 h-3.5 border-2 border-neutral-900 dark:border-white border-t-transparent rounded-full animate-spin" />
+                          <div className="w-4 h-4 border-2 border-neutral-950 border-t-transparent rounded-full animate-spin" />
                           <span>{t('pro_modal.admob_watching', 'Reproduciendo anuncio...')}</span>
                         </>
                       ) : (
                         <>
-                          <PlayCircle className="w-4 h-4 text-amber-500" />
-                          <span>Ver Vídeo Corto (+1 Generación Gratis)</span>
+                          <PlayCircle className="w-5 h-5 fill-neutral-950 text-amber-300 group-hover:scale-110 transition-transform" />
+                          <span>Ver vídeo corto (+1 generación gratis)</span>
                         </>
                       )}
                     </button>

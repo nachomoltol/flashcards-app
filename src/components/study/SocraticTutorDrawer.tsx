@@ -2,10 +2,8 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { ArrowRight, Sparkles, Loader2, AlertCircle, Video, CheckCircle2, Send } from 'lucide-react';
-import { useLanguageStore, useAuthStore } from '@/stores';
+import { useLanguageStore, useAuthStore, useProModalStore } from '@/stores';
 import { askSocraticTutorAction, getTutorQuotaStatusAction, type TutorQuotaStatus } from '@/app/actions/socraticTutor';
-import { showAdMobRewardedAd } from '@/lib/admob';
-import { claimAdRewardAction } from '@/app/actions/claimAdReward';
 
 interface SocraticTutorDrawerProps {
   isOpen: boolean;
@@ -32,7 +30,7 @@ export function SocraticTutorDrawer({
   const [quotaStatus, setQuotaStatus] = useState<TutorQuotaStatus | null>(null);
   const [explanation, setExplanation] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isWatchingAd, setIsWatchingAd] = useState(false);
+  const [isWatchingAd] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Estados para el turno único de repregunta interactiva
@@ -71,31 +69,8 @@ export function SocraticTutorDrawer({
 
     // Si es usuario Free y requiere ver anuncio
     if (quotaStatus && !quotaStatus.isPro && quotaStatus.requiresAd) {
-      try {
-        setIsWatchingAd(true);
-        const adResult = await showAdMobRewardedAd();
-        if (adResult.completed) {
-          const claim = await claimAdRewardAction(user?.id);
-          if (!claim.success) {
-            setErrorMsg(claim.message || t('socratic_tutor.ad_failed', 'Debes completar el anuncio para consultar al tutor.'));
-            setIsWatchingAd(false);
-            return;
-          }
-          // Actualizar estado de cuota
-          await fetchQuota();
-        } else {
-          setErrorMsg(adResult.error || t('socratic_tutor.ad_failed', 'Debes completar el anuncio para consultar al tutor.'));
-          setIsWatchingAd(false);
-          return;
-        }
-      } catch (adErr) {
-        console.warn('Error en flujo de anuncio recompensado:', adErr);
-        setErrorMsg(t('socratic_tutor.ad_failed', 'Debes completar el anuncio para consultar al tutor.'));
-        setIsWatchingAd(false);
-        return;
-      } finally {
-        setIsWatchingAd(false);
-      }
+      useProModalStore.getState().openProModal(true);
+      return;
     }
 
     // Iniciar consulta a Gemini con el Server Action
@@ -124,10 +99,10 @@ export function SocraticTutorDrawer({
               }
             : null
         );
-      } else if (res.error === 'AD_REQUIRED') {
-        // Exigir anuncio
+      } else if (res.error === 'AD_REQUIRED' || res.error === 'LIMIT_REACHED') {
         setQuotaStatus((prev) => (prev ? { ...prev, requiresAd: true, remainingFree: 0 } : null));
-        setErrorMsg(t('socratic_tutor.badge_ad_required', 'Ver anuncio (+1)'));
+        useProModalStore.getState().openProModal(true);
+        return;
       } else {
         setErrorMsg(res.error || t('socratic_tutor.error_generic', 'No se pudo consultar al tutor en este momento.'));
       }
