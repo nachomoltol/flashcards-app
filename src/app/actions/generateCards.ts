@@ -1389,7 +1389,7 @@ export async function generateCardsAction(
   const apiCheck = checkResult.check;
 
   // Límite seguro: hasta 40 tarjetas en Modo Didáctico y 30 en Modo Estudio
-  const maxAllowed = pedagogicalMode === 'didactic' ? 40 : 30;
+  const maxAllowed = 30;
   const targetCount = Math.max(1, Math.min(maxAllowed, cardCount || 10));
 
   try {
@@ -1763,7 +1763,7 @@ export async function generateCardsFromDocumentAction(
   const apiCheck = checkResult.check;
 
   // Límite seguro: hasta 40 tarjetas en Modo Didáctico y 30 en Modo Estudio
-  const maxAllowed = pedagogicalMode === 'didactic' ? 40 : 30;
+  const maxAllowed = 30;
   const targetCount = Math.max(1, Math.min(maxAllowed, cardCount || 10));
 
   try {
@@ -1981,6 +1981,17 @@ ${STRICT_GROUNDING_DIRECTIVE}
 
 ${EDITORIAL_ARTIFACTS_DIRECTIVE}`;
 
+      const isDocenteMode = pedagogicalMode === 'didactic' || (pedagogicalMode as unknown as string) === 'docente';
+
+      console.log('[DEBUG GENERATION]', {
+        pedagogicalMode,
+        isDocenteMode,
+        isExhaustiveMode,
+        startPage,
+        finalPage,
+        targetCount,
+      });
+
       let singlePageSystemPrompt = '';
 
       if (focusInstruction) {
@@ -1989,7 +2000,7 @@ El usuario ha establecido el siguiente enfoque temático: "${focusInstruction}".
 Esta instrucción tiene PRIORIDAD ABSOLUTA y actúa como un filtro estricto sobre la extracción por defecto. Debes extraer conceptos clave, datos, tablas, normativas o hechos de esta página EXCLUSIVAMENTE o prioritariamente alineados con este enfoque. Si esta página no contiene información relacionada con dicho enfoque, no inventes preguntas ni introduzcas datos de relleno: devuelve un array vacío [] en "cards".\n\n`;
       }
 
-      if (pedagogicalMode === 'didactic') {
+      if (isDocenteMode) {
         singlePageSystemPrompt += `${buildDidacticModeDirective(docenteFormat, targetAudience)}\n\n`;
       }
 
@@ -2000,148 +2011,280 @@ Esta instrucción tiene PRIORIDAD ABSOLUTA y actúa como un filtro estricto sobr
         singlePageSystemPrompt += `${universalDirective}\n\n`;
       }
 
-      if (pedagogicalMode === 'didactic') {
+      if (isDocenteMode) {
         singlePageSystemPrompt += `${getDidacticFormatSection(docenteFormat)}\n`;
+        singlePageSystemPrompt += `\nRECORDATORIO MODO DOCENTE / DIDÁCTICO: Realiza un barrido homogéneo por todo el texto, transformando el contenido en ejercicios y problemas prácticos de examen para alumnos, omitiendo metadatos de aula (ejercicios, bloques, unidades) y omitiendo preguntas sobre transcripciones fonéticas.`;
       } else {
         singlePageSystemPrompt += `${getFormatRule(cardFormat)}`;
         singlePageSystemPrompt += `\n${getFormatInstructions(cardFormat)}`;
         singlePageSystemPrompt += `\n\nREGLA DE INTEGRIDAD: Devuelve un objeto JSON estructurado con "conceptos_identificados" (array de strings con los conceptos encontrados en esta página), "core_exhausted" (booleano) y "cards" (array dinámico con todas las tarjetas extraídas sin límite máximo ni mínimo artificial, formuladas según el formato "${cardFormat}").`;
       }
 
-      if (pedagogicalMode === 'didactic') {
-        singlePageSystemPrompt += `\nRECORDATORIO MODO DOCENTE / DIDÁCTICO: Realiza un barrido homogéneo por todo el texto, transformando el contenido en ejercicios y problemas prácticos de examen para alumnos, omitiendo metadatos de aula (ejercicios, bloques, unidades) y omitiendo preguntas sobre transcripciones fonéticas.`;
-      }
       if (isExhaustiveMode) {
         singlePageSystemPrompt += `\nRECORDATORIO MODO EXHAUSTIVO: Extrae cada celda, fila, columna y dato sustancial sin resumir ni abreviar, priorizando el conocimiento pedagógico real y respetando la prohibición estricta de metadatos o recuadros de vocabulario al margen.`;
       }
       singlePageSystemPrompt += buildLanguageDirective(language);
 
-      // 4. MOTOR DE CHUNKING Y BATCHING MATEMÁTICO (PDF):
-      // Divide el rango de páginas en bloques proporcionales y asigna una cuota matemática a cada bloque
-      // para evitar la "Saturación de Contexto" y garantizar que el 100% de las páginas aporten al examen.
-      const chunks = partitionPagesIntoChunks(startPage, finalPage, targetCount);
       let tarjetasAcumuladas: GeneratedCard[] = [];
       const accumulatedHistory: ExistingCardHistoryItem[] = [...existingCards];
-      let deficitCarryOver = 0;
-      let lastProcessedPage = finalPage;
+      let lastProcessedPage = startPage;
 
-      console.log(
-        `[Motor Chunking PDF] Dividiendo rango págs ${startPage}-${finalPage} en ${chunks.length} bloques. Meta total: ${targetCount} tarjetas.`
-      );
-
-      for (const chunk of chunks) {
-        lastProcessedPage = chunk.endPage;
-        const currentChunkQuota = Math.max(1, chunk.quota + deficitCarryOver);
-        deficitCarryOver = 0;
+      if (isDocenteMode) {
+        // 4A. MOTOR DE CHUNKING Y BATCHING MATEMÁTICO (EXCLUSIVO MODO DOCENTE / EVALUACIÓN BLOOM):
+        // Divide el rango de páginas en bloques proporcionales y asigna una cuota matemática a cada bloque
+        // para evitar la "Saturación de Contexto" y garantizar que el 100% de las páginas aporten al examen.
+        const chunks = partitionPagesIntoChunks(startPage, finalPage, targetCount);
+        let deficitCarryOver = 0;
+        lastProcessedPage = finalPage;
 
         console.log(
-          `[Motor Chunking PDF] Procesando Bloque ${chunk.chunkIndex + 1}/${chunk.totalChunks} (Págs ${chunk.startPage} a ${chunk.endPage}). Cuota asignada: ${currentChunkQuota} tarjetas.`
+          `[Motor Chunking PDF - Modo Docente] Dividiendo rango págs ${startPage}-${finalPage} en ${chunks.length} bloques. Meta total: ${targetCount} tarjetas.`
         );
 
-        // Cortar el rango de páginas del bloque
-        const chunkBase64 =
-          chunk.startPage === chunk.endPage
-            ? await sliceSinglePdfPage(srcDoc, chunk.startPage)
-            : await slicePdfPageRange(srcDoc, chunk.startPage, chunk.endPage);
+        for (const chunk of chunks) {
+          lastProcessedPage = chunk.endPage;
+          const currentChunkQuota = Math.max(1, chunk.quota + deficitCarryOver);
+          deficitCarryOver = 0;
 
-        // Extraer lista de tópicos ya cubiertos
-        const coveredTopics = extractUniqueTopicsList(accumulatedHistory);
-        const historyDirective = coveredTopics
-          ? `\n\nCONCEPTOS YA EVALUADOS EN ESTE MAZO O BLOQUES PREVIOS: ${coveredTopics}.
+          console.log(
+            `[Motor Chunking PDF - Modo Docente] Procesando Bloque ${chunk.chunkIndex + 1}/${chunk.totalChunks} (Págs ${chunk.startPage} a ${chunk.endPage}). Cuota asignada: ${currentChunkQuota} tarjetas.`
+          );
+
+          // Cortar el rango de páginas del bloque
+          const chunkBase64 =
+            chunk.startPage === chunk.endPage
+              ? await sliceSinglePdfPage(srcDoc, chunk.startPage)
+              : await slicePdfPageRange(srcDoc, chunk.startPage, chunk.endPage);
+
+          // Extraer lista de tópicos ya cubiertos
+          const coveredTopics = extractUniqueTopicsList(accumulatedHistory);
+          const historyDirective = coveredTopics
+            ? `\n\nCONCEPTOS YA EVALUADOS EN ESTE MAZO O BLOQUES PREVIOS: ${coveredTopics}.
 DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de este bloque que aún NO hayan sido preguntados. No repitas la misma pregunta con ligeras variaciones de redacción.`
-          : '';
+            : '';
 
-        const chunkQuotaMandate = `\n\n🚨 DIRECTIVA DE CUOTA MATEMÁTICA DEL BLOQUE (EXACTAMENTE ${currentChunkQuota} PREGUNTAS):
+          const chunkQuotaMandate = `\n\n🚨 DIRECTIVA DE CUOTA MATEMÁTICA DEL BLOQUE (EXACTAMENTE ${currentChunkQuota} PREGUNTAS):
 - Tu objetivo OBLIGATORIO para este bloque (páginas ${chunk.startPage} a ${chunk.endPage}) es generar exactamente ${currentChunkQuota} preguntas.
 - Realiza un barrido homogéneo cubriendo todas las páginas de este bloque (${chunk.startPage} a ${chunk.endPage}) para que este segmento aporte equitativamente al examen global sin saturar el inicio del documento.`;
 
-        const currentChunkSystemPrompt = `${singlePageSystemPrompt}${historyDirective}${chunkQuotaMandate}`;
+          const currentChunkSystemPrompt = `${singlePageSystemPrompt}${historyDirective}${chunkQuotaMandate}`;
 
-        const pageLabel =
-          chunk.startPage === chunk.endPage
-            ? `Página ${chunk.startPage}`
-            : `Páginas ${chunk.startPage} a ${chunk.endPage}`;
+          const pageLabel =
+            chunk.startPage === chunk.endPage
+              ? `Página ${chunk.startPage}`
+              : `Páginas ${chunk.startPage} a ${chunk.endPage}`;
 
-        const chunkUserPrompt = isExhaustiveMode
-          ? `Analiza el bloque (${pageLabel}) del documento aplicando la DIRECTIVA DE COBERTURA Y CALIDAD (cuota asignada: ${currentChunkQuota} tarjetas). ${pedagogicalMode === 'didactic' ? 'Aplica la DIRECTIVA DE MODO DOCENTE / DIDÁCTICO para crear ejercicios prácticos de evaluación sin metadatos de aula. ' : ''}Si hay tablas o matrices, extrae preguntas independientes por celda o cruce. Formato: "${cardFormat}".`
-          : `Analiza el bloque (${pageLabel}) del documento adjunto y extrae exactamente ${currentChunkQuota} preguntas en formato "${cardFormat}".${pedagogicalMode === 'didactic' ? ' Aplica el Modo Docente / Didáctico: preguntas prácticas de examen sin metadatos de aula.' : ''} Asegúrate de cubrir equilibradamente el contenido de todas las páginas del bloque.`;
+          const chunkUserPrompt = isExhaustiveMode
+            ? `Analiza el bloque (${pageLabel}) del documento aplicando la DIRECTIVA DE COBERTURA Y CALIDAD (cuota asignada: ${currentChunkQuota} tarjetas). Aplica la DIRECTIVA DE MODO DOCENTE / DIDÁCTICO para crear ejercicios prácticos de evaluación sin metadatos de aula. Si hay tablas o matrices, extrae preguntas independientes por celda o cruce. Formato: "${cardFormat}".`
+            : `Analiza el bloque (${pageLabel}) del documento adjunto y extrae exactamente ${currentChunkQuota} preguntas en formato "${cardFormat}". Aplica el Modo Docente / Didáctico: preguntas prácticas de examen sin metadatos de aula. Asegúrate de cubrir equilibradamente el contenido de todas las páginas del bloque.`;
 
-        let chunkCandidateCards: GeneratedCard[] = [];
+          let chunkCandidateCards: GeneratedCard[] = [];
 
-        try {
-          const chunkResponse = await ai.models.generateContent({
-            model: GEMINI_MODEL,
-            contents: [
-              {
-                inlineData: {
-                  data: chunkBase64,
-                  mimeType: 'application/pdf',
+          try {
+            const chunkResponse = await ai.models.generateContent({
+              model: GEMINI_MODEL,
+              contents: [
+                {
+                  inlineData: {
+                    data: chunkBase64,
+                    mimeType: 'application/pdf',
+                  },
                 },
+                {
+                  text: chunkUserPrompt,
+                },
+              ],
+              config: {
+                systemInstruction: currentChunkSystemPrompt,
+                temperature: isExhaustiveMode ? 0.1 : 0.15,
+                responseMimeType: 'application/json',
+                responseJsonSchema: singlePageExtractionSchema,
+                maxOutputTokens: 8192,
               },
-              {
-                text: chunkUserPrompt,
-              },
-            ],
-            config: {
-              systemInstruction: currentChunkSystemPrompt,
-              temperature: isExhaustiveMode ? 0.1 : 0.15,
-              responseMimeType: 'application/json',
-              responseJsonSchema: singlePageExtractionSchema,
-              maxOutputTokens: 8192,
-            },
-          });
+            });
 
-          if (chunkResponse.text) {
-            try {
-              const parsed = parseGeminiBatchResponse(chunkResponse.text);
-              chunkCandidateCards = parsed.cards || [];
+            if (chunkResponse.text) {
+              try {
+                const parsed = parseGeminiBatchResponse(chunkResponse.text);
+                chunkCandidateCards = parsed.cards || [];
+                console.log(
+                  `[Motor Chunking PDF - Modo Docente] Bloque ${chunk.chunkIndex + 1}: Gemini devolvió ${chunkCandidateCards.length} tarjetas brutas.`
+                );
+              } catch (parseErr) {
+                console.warn(
+                  `[Motor Chunking PDF - Modo Docente] Bloque ${chunk.chunkIndex + 1}: Error parseando respuesta de Gemini:`,
+                  parseErr
+                );
+              }
+            }
+          } catch (geminiErr) {
+            console.warn(
+              `[Motor Chunking PDF - Modo Docente] Error en llamada a Gemini para Bloque ${chunk.chunkIndex + 1}:`,
+              geminiErr
+            );
+          }
+
+          // Acumulación y Deduplicación rápida del bloque
+          if (chunkCandidateCards.length > 0) {
+            const { uniqueCards, duplicateCount } = await deduplicateCandidateCards({
+              candidateCards: chunkCandidateCards,
+              existingCards: accumulatedHistory,
+              similarityThreshold: isExhaustiveMode ? 0.92 : 0.80,
+              isExhaustiveMode,
+            });
+
+            if (duplicateCount > 0) {
               console.log(
-                `[Motor Chunking PDF] Bloque ${chunk.chunkIndex + 1}: Gemini devolvió ${chunkCandidateCards.length} tarjetas brutas.`
-              );
-            } catch (parseErr) {
-              console.warn(
-                `[Motor Chunking PDF] Bloque ${chunk.chunkIndex + 1}: Error parseando respuesta de Gemini:`,
-                parseErr
+                `[Motor Chunking PDF - Modo Docente] Bloque ${chunk.chunkIndex + 1}: Se filtraron ${duplicateCount} duplicados.`
               );
             }
+
+            if (uniqueCards.length > 0) {
+              tarjetasAcumuladas.push(...uniqueCards);
+              for (const uc of uniqueCards) {
+                accumulatedHistory.push({ front: uc.front, back: uc.back });
+              }
+              console.log(
+                `[Motor Chunking PDF - Modo Docente] Bloque ${chunk.chunkIndex + 1}: Acumuladas ${uniqueCards.length} tarjetas. Total: ${tarjetasAcumuladas.length}/${targetCount}.`
+              );
+            }
+
+            if (uniqueCards.length < currentChunkQuota) {
+              deficitCarryOver = currentChunkQuota - uniqueCards.length;
+            }
+          } else {
+            deficitCarryOver = currentChunkQuota;
           }
-        } catch (geminiErr) {
-          console.warn(
-            `[Motor Chunking PDF] Error en llamada a Gemini para Bloque ${chunk.chunkIndex + 1}:`,
-            geminiErr
-          );
         }
+      } else {
+        // 4B. MOTOR ORIGINAL MODO ESTUDIO (RECUPERADO DE COMMIT 57e614e):
+        // Bucle Secuencial Página a Página con Marcapáginas y Modo Minucioso/Exhaustivo.
+        // while (tarjetasAcumuladas.length < targetCount && currentPage <= finalPage)
+        let currentPage = startPage;
+        lastProcessedPage = currentPage;
 
-        // Acumulación y Deduplicación rápida del bloque
-        if (chunkCandidateCards.length > 0) {
-          const { uniqueCards, duplicateCount } = await deduplicateCandidateCards({
-            candidateCards: chunkCandidateCards,
-            existingCards: accumulatedHistory,
-            similarityThreshold: isExhaustiveMode ? 0.92 : 0.80,
-            isExhaustiveMode,
-          });
+        console.log(
+          `[Bucle Acumulador Backend - Modo Estudio] Iniciando: Desde pág. ${startPage} hasta pág. ${finalPage}. Meta: ${targetCount} tarjetas.`
+        );
 
-          if (duplicateCount > 0) {
-            console.log(
-              `[Motor Chunking PDF] Bloque ${chunk.chunkIndex + 1}: Se filtraron ${duplicateCount} duplicados.`
-            );
-          }
+        while (tarjetasAcumuladas.length < targetCount && currentPage <= finalPage) {
+          lastProcessedPage = currentPage;
+          const remainingToTarget = targetCount - tarjetasAcumuladas.length;
 
-          if (uniqueCards.length > 0) {
-            tarjetasAcumuladas.push(...uniqueCards);
-            for (const uc of uniqueCards) {
-              accumulatedHistory.push({ front: uc.front, back: uc.back });
+          console.log(
+            `[Bucle Acumulador Backend - Modo Estudio] Procesando Página ${currentPage} de ${finalPage}... (Acumuladas: ${tarjetasAcumuladas.length}/${targetCount}, Restan: ${remainingToTarget})`
+          );
+
+          // Cortar EXACTAMENTE 1 PÁGINA
+          const singlePageBase64 = await sliceSinglePdfPage(srcDoc, currentPage);
+
+          // Extraer lista de tópicos ya cubiertos (BD + páginas previas del lote) para evitar repeticiones a ciegas
+          const coveredTopics = extractUniqueTopicsList(accumulatedHistory);
+          const historyDirective = coveredTopics
+            ? `\n\nCONCEPTOS YA EVALUADOS EN ESTE MAZO O PÁGINAS PREVIAS: ${coveredTopics}.
+DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de esta página que aún NO hayan sido preguntados. No repitas la misma pregunta con ligeras variaciones de redacción.`
+            : '';
+
+          const exhaustiveQuotaMandate = isExhaustiveMode
+            ? `\n\n🚨 DIRECTIVA DE COBERTURA Y CALIDAD (CUOTA RESTANTE: ${remainingToTarget} TARJETAS):
+- Si la página contiene tablas, matrices de datos o clasificaciones densas, extrae preguntas independientes de tantas filas y cruces numéricos como existan hasta cumplir la cuota requerida.
+- Si la página es texto continuo (prosa/teoría), extrae con rigor quirúrgico cada dato fáctico, definición, mecanismo y excepción relevante.
+- IMPORTANTE: No dupliques preguntas con diferente redacción ni inventes preguntas sobre listas de palabras al margen o datos ajenos al documento para alcanzar un número artificial. Si has extraído todos los hechos sustanciales de esta página, concluye tu respuesta; el motor secuencial del servidor continuará acumulando tarjetas en las siguientes páginas del documento hasta completar el objetivo.`
+            : '';
+
+          const currentPageSystemPrompt = `${singlePageSystemPrompt}${historyDirective}${exhaustiveQuotaMandate}`;
+
+          const pageUserPrompt = isExhaustiveMode
+            ? `Analiza la Página ${currentPage} del documento adjunto aplicando la DIRECTIVA DE COBERTURA Y CALIDAD (cuota restante: ${remainingToTarget} tarjetas). Si hay tablas o matrices de datos, extrae preguntas independientes por cada fila o cruce numérico. Si es texto continuo, extrae hechos y definiciones sustanciales sin duplicar ni inventar preguntas sobre términos al margen, concluyendo cuando los datos sustanciales se agoten para que el servidor avance de página. Formato: "${cardFormat}".`
+            : `Analiza la Página ${currentPage} del documento adjunto y extrae todos los conceptos clave, datos precisos, normativas o hechos únicos posibles en formato "${cardFormat}".`;
+
+          let pageCandidateCards: GeneratedCard[] = [];
+
+          try {
+            const pageResponse = await ai.models.generateContent({
+              model: GEMINI_MODEL,
+              contents: [
+                {
+                  inlineData: {
+                    data: singlePageBase64,
+                    mimeType: 'application/pdf',
+                  },
+                },
+                {
+                  text: pageUserPrompt,
+                },
+              ],
+              config: {
+                systemInstruction: currentPageSystemPrompt,
+                temperature: isExhaustiveMode ? 0.1 : 0.15,
+                responseMimeType: 'application/json',
+                responseJsonSchema: singlePageExtractionSchema,
+                maxOutputTokens: 8192,
+              },
+            });
+
+            if (pageResponse.text) {
+              try {
+                const parsed = parseGeminiBatchResponse(pageResponse.text);
+                pageCandidateCards = parsed.cards || [];
+                console.log(
+                  `[Bucle Acumulador Backend - Modo Estudio] Página ${currentPage}: Gemini devolvió ${pageCandidateCards.length} tarjetas brutas.`
+                );
+              } catch (parseErr) {
+                console.warn(
+                  `[Bucle Acumulador Backend - Modo Estudio] Página ${currentPage}: Sin tarjetas válidas o poca información:`,
+                  parseErr
+                );
+              }
             }
-            console.log(
-              `[Motor Chunking PDF] Bloque ${chunk.chunkIndex + 1}: Acumuladas ${uniqueCards.length} tarjetas. Total: ${tarjetasAcumuladas.length}/${targetCount}.`
+          } catch (geminiErr) {
+            console.warn(
+              `[Bucle Acumulador Backend - Modo Estudio] Error en llamada a Gemini para Página ${currentPage}:`,
+              geminiErr
             );
           }
 
-          if (uniqueCards.length < currentChunkQuota) {
-            deficitCarryOver = currentChunkQuota - uniqueCards.length;
+          // Acumulación y Deduplicación:
+          // Dentro del bucle por página aplicamos el filtro léxico rápido contra accumulatedHistory
+          if (pageCandidateCards.length > 0) {
+            const { uniqueCards, duplicateCount } = await deduplicateCandidateCards({
+              candidateCards: pageCandidateCards,
+              existingCards: accumulatedHistory,
+              similarityThreshold: isExhaustiveMode ? 0.92 : 0.80,
+              isExhaustiveMode,
+            });
+
+            if (duplicateCount > 0) {
+              console.log(
+                `[Bucle Acumulador Backend - Modo Estudio] Página ${currentPage}: Gatekeeper léxico filtró ${duplicateCount} duplicados.`
+              );
+            }
+
+            if (uniqueCards.length > 0) {
+              tarjetasAcumuladas.push(...uniqueCards);
+              for (const uc of uniqueCards) {
+                accumulatedHistory.push({ front: uc.front, back: uc.back });
+              }
+              console.log(
+                `[Bucle Acumulador Backend - Modo Estudio] Página ${currentPage}: Se acumularon ${uniqueCards.length} tarjetas únicas. Total acumulado: ${tarjetasAcumuladas.length}/${targetCount}.`
+              );
+            }
           }
-        } else {
-          deficitCarryOver = currentChunkQuota;
+
+          // Si al sumar se supera el targetCount, recorta el array exactamente al límite solicitado
+          if (tarjetasAcumuladas.length > targetCount) {
+            tarjetasAcumuladas = tarjetasAcumuladas.slice(0, targetCount);
+          }
+
+          // Si alcanzamos el límite exacto de tarjetas solicitadas para este lote, detenemos el bucle
+          if (tarjetasAcumuladas.length >= targetCount) {
+            console.log(
+              `[Bucle Acumulador Backend - Modo Estudio] 🎯 Objetivo alcanzado: ${tarjetasAcumuladas.length} tarjetas exactas en Página ${currentPage}.`
+            );
+            break;
+          }
+
+          currentPage++;
         }
       }
 
@@ -2175,13 +2318,17 @@ DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de este bloqu
 
       const isExhausted = tarjetasAcumuladas.length < targetCount && lastProcessedPage >= finalPage;
 
+      const nextCursor = tarjetasAcumuladas.length >= targetCount
+        ? lastProcessedPage + 1
+        : lastProcessedPage;
+
       // Retorno del Cursor (El Marcapáginas):
-      // El Server Action debe devolver al cliente la página exacta donde se detuvo el bucle (nextCursorPage).
+      // El Server Action debe devolver al cliente la página exacta para la siguiente extracción (nextCursorPage).
       return {
         success: true,
         core_exhausted: isExhausted,
         cards: processedCards,
-        nextCursorPage: lastProcessedPage,
+        nextCursorPage: nextCursor,
         startCursorPage: startPage,
       };
     }
@@ -2243,6 +2390,17 @@ ${STRICT_GROUNDING_DIRECTIVE}
 
 ${EDITORIAL_ARTIFACTS_DIRECTIVE}`;
 
+      const isDocenteMode = pedagogicalMode === 'didactic' || (pedagogicalMode as unknown as string) === 'docente';
+
+      console.log('[DEBUG GENERATION]', {
+        pedagogicalMode,
+        isDocenteMode,
+        isExhaustiveMode,
+        startPage,
+        finalPage,
+        targetCount,
+      });
+
       let singlePageSystemPrompt = '';
 
       if (focusInstruction) {
@@ -2251,7 +2409,7 @@ El usuario ha establecido el siguiente enfoque temático: "${focusInstruction}".
 Esta instrucción tiene PRIORIDAD ABSOLUTA y actúa como un filtro estricto sobre la extracción por defecto. Debes extraer conceptos clave, datos, tablas, normativas o hechos de esta página virtual EXCLUSIVAMENTE o prioritariamente alineados con este enfoque. Si esta página virtual no contiene información relacionada con dicho enfoque, no inventes preguntas ni introduzcas datos de relleno: devuelve un array vacío [] en "cards".\n\n`;
       }
 
-      if (pedagogicalMode === 'didactic') {
+      if (isDocenteMode) {
         singlePageSystemPrompt += `${buildDidacticModeDirective(docenteFormat, targetAudience)}\n\n`;
       }
 
@@ -2262,171 +2420,321 @@ Esta instrucción tiene PRIORIDAD ABSOLUTA y actúa como un filtro estricto sobr
         singlePageSystemPrompt += `${universalDirective}\n\n`;
       }
 
-      if (pedagogicalMode === 'didactic') {
+      if (isDocenteMode) {
         singlePageSystemPrompt += `${getDidacticFormatSection(docenteFormat)}\n`;
+        singlePageSystemPrompt += `\nRECORDATORIO MODO DOCENTE / DIDÁCTICO: Realiza un barrido homogéneo por todo el texto, transformando el contenido en ejercicios y problemas prácticos de examen para alumnos, omitiendo metadatos de aula (ejercicios, bloques, unidades) y omitiendo preguntas sobre transcripciones fonéticas.`;
       } else {
         singlePageSystemPrompt += `${getFormatRule(cardFormat)}`;
         singlePageSystemPrompt += `\n${getFormatInstructions(cardFormat)}`;
         singlePageSystemPrompt += `\n\nREGLA DE INTEGRIDAD: Devuelve un objeto JSON estructurado con "conceptos_identificados" (array de strings con los conceptos encontrados en esta página virtual), "core_exhausted" (booleano) y "cards" (array dinámico con todas las tarjetas extraídas sin límite máximo ni mínimo artificial, formuladas según el formato "${cardFormat}").`;
       }
 
-      if (pedagogicalMode === 'didactic') {
-        singlePageSystemPrompt += `\nRECORDATORIO MODO DOCENTE / DIDÁCTICO: Realiza un barrido homogéneo por todo el texto, transformando el contenido en ejercicios y problemas prácticos de examen para alumnos, omitiendo metadatos de aula (ejercicios, bloques, unidades) y omitiendo preguntas sobre transcripciones fonéticas.`;
-      }
       if (isExhaustiveMode) {
         singlePageSystemPrompt += `\nRECORDATORIO MODO EXHAUSTIVO: Extrae cada celda, fila, columna y dato sustancial sin resumir ni abreviar, priorizando el conocimiento pedagógico real y respetando la prohibición estricta de metadatos o recuadros de vocabulario al margen.`;
       }
       singlePageSystemPrompt += buildLanguageDirective(language);
 
-      // 4. MOTOR DE CHUNKING Y BATCHING MATEMÁTICO DOCX:
-      // Divide el rango de páginas virtuales en bloques proporcionales y asigna una cuota matemática a cada bloque
-      // para evitar la "Saturación de Contexto" y garantizar que el 100% de las páginas aporten al examen.
-      const chunks = partitionPagesIntoChunks(startPage, finalPage, targetCount);
       let tarjetasAcumuladas: GeneratedCard[] = [];
       const accumulatedHistory: ExistingCardHistoryItem[] = [...existingCards];
-      let deficitCarryOver = 0;
-      let lastProcessedPage = finalPage;
+      let lastProcessedPage = startPage;
 
-      console.log(
-        `[Motor Chunking DOCX] Dividiendo rango págs virtuales ${startPage}-${finalPage} en ${chunks.length} bloques. Meta total: ${targetCount} tarjetas.`
-      );
-
-      for (const chunk of chunks) {
-        lastProcessedPage = chunk.endPage;
-        const currentChunkQuota = Math.max(1, chunk.quota + deficitCarryOver);
-        deficitCarryOver = 0;
+      if (isDocenteMode) {
+        // 4A. MOTOR DE CHUNKING Y BATCHING MATEMÁTICO DOCX (MODO DOCENTE):
+        // Divide el rango de páginas virtuales en bloques proporcionales y asigna una cuota matemática a cada bloque
+        // para evitar la "Saturación de Contexto" y garantizar que el 100% de las páginas aporten al examen.
+        const chunks = partitionPagesIntoChunks(startPage, finalPage, targetCount);
+        let deficitCarryOver = 0;
+        lastProcessedPage = finalPage;
 
         console.log(
-          `[Motor Chunking DOCX] Procesando Bloque ${chunk.chunkIndex + 1}/${chunk.totalChunks} (Págs Virtuales ${chunk.startPage} a ${chunk.endPage}). Cuota asignada: ${currentChunkQuota} tarjetas.`
+          `[Motor Chunking DOCX - Modo Docente] Dividiendo rango págs virtuales ${startPage}-${finalPage} en ${chunks.length} bloques. Meta total: ${targetCount} tarjetas.`
         );
 
-        const chunkVirtualPages = wordPages.slice(chunk.startPage - 1, chunk.endPage);
-        const chunkText = chunkVirtualPages
-          .map((p, idx) => `=== PÁGINA VIRTUAL ${chunk.startPage + idx} ===\n${p.text}`)
-          .join('\n\n');
-        const chunkImages = chunkVirtualPages
-          .flatMap((p) => p.images || [])
-          .slice(0, 4);
+        for (const chunk of chunks) {
+          lastProcessedPage = chunk.endPage;
+          const currentChunkQuota = Math.max(1, chunk.quota + deficitCarryOver);
+          deficitCarryOver = 0;
 
-        // Extraer lista de tópicos ya cubiertos
-        const coveredTopics = extractUniqueTopicsList(accumulatedHistory);
-        const historyDirective = coveredTopics
-          ? `\n\nCONCEPTOS YA EVALUADOS EN ESTE MAZO O BLOQUES PREVIOS: ${coveredTopics}.
+          console.log(
+            `[Motor Chunking DOCX - Modo Docente] Procesando Bloque ${chunk.chunkIndex + 1}/${chunk.totalChunks} (Págs Virtuales ${chunk.startPage} a ${chunk.endPage}). Cuota asignada: ${currentChunkQuota} tarjetas.`
+          );
+
+          const chunkVirtualPages = wordPages.slice(chunk.startPage - 1, chunk.endPage);
+          const chunkText = chunkVirtualPages
+            .map((p, idx) => `=== PÁGINA VIRTUAL ${chunk.startPage + idx} ===\n${p.text}`)
+            .join('\n\n');
+          const chunkImages = chunkVirtualPages
+            .flatMap((p) => p.images || [])
+            .slice(0, 4);
+
+          // Extraer lista de tópicos ya cubiertos
+          const coveredTopics = extractUniqueTopicsList(accumulatedHistory);
+          const historyDirective = coveredTopics
+            ? `\n\nCONCEPTOS YA EVALUADOS EN ESTE MAZO O BLOQUES PREVIOS: ${coveredTopics}.
 DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de este bloque que aún NO hayan sido preguntados. No repitas la misma pregunta con ligeras variaciones de redacción.`
-          : '';
+            : '';
 
-        const chunkQuotaMandate = `\n\n🚨 DIRECTIVA DE CUOTA MATEMÁTICA DEL BLOQUE (EXACTAMENTE ${currentChunkQuota} PREGUNTAS):
+          const chunkQuotaMandate = `\n\n🚨 DIRECTIVA DE CUOTA MATEMÁTICA DEL BLOQUE (EXACTAMENTE ${currentChunkQuota} PREGUNTAS):
 - Tu objetivo OBLIGATORIO para este bloque (páginas virtuales ${chunk.startPage} a ${chunk.endPage}) es generar exactamente ${currentChunkQuota} preguntas.
 - Realiza un barrido homogéneo cubriendo todas las páginas de este bloque (${chunk.startPage} a ${chunk.endPage}) para que este segmento aporte equitativamente al examen global sin saturar el inicio del documento.`;
 
-        const currentChunkSystemPrompt = `${singlePageSystemPrompt}${historyDirective}${chunkQuotaMandate}`;
+          const currentChunkSystemPrompt = `${singlePageSystemPrompt}${historyDirective}${chunkQuotaMandate}`;
 
-        const pageLabel =
-          chunk.startPage === chunk.endPage
-            ? `Página Virtual ${chunk.startPage}`
-            : `Páginas Virtuales ${chunk.startPage} a ${chunk.endPage}`;
+          const pageLabel =
+            chunk.startPage === chunk.endPage
+              ? `Página Virtual ${chunk.startPage}`
+              : `Páginas Virtuales ${chunk.startPage} a ${chunk.endPage}`;
 
-        const imageNotice =
-          chunkImages.length > 0
-            ? ` Se adjuntan ${chunkImages.length} imagen(es) o diagrama(s) de este bloque.`
-            : '';
+          const imageNotice =
+            chunkImages.length > 0
+              ? ` Se adjuntan ${chunkImages.length} imagen(es) o diagrama(s) de este bloque.`
+              : '';
 
-        const chunkUserPrompt = isExhaustiveMode
-          ? `Analiza el bloque (${pageLabel}) del documento Word aplicando la DIRECTIVA DE COBERTURA Y CALIDAD (cuota asignada: ${currentChunkQuota} tarjetas). ${pedagogicalMode === 'didactic' ? 'Aplica la DIRECTIVA DE MODO DOCENTE / DIDÁCTICO para crear ejercicios prácticos de evaluación sin metadatos de aula. ' : ''}${imageNotice}Si hay tablas, diagramas o clasificaciones, extrae preguntas independientes por celda o cruce. Formato: "${cardFormat}".
+          const chunkUserPrompt = isExhaustiveMode
+            ? `Analiza el bloque (${pageLabel}) del documento Word aplicando la DIRECTIVA DE COBERTURA Y CALIDAD (cuota asignada: ${currentChunkQuota} tarjetas). Aplica la DIRECTIVA DE MODO DOCENTE / DIDÁCTICO para crear ejercicios prácticos de evaluación sin metadatos de aula. ${imageNotice}Si hay tablas, diagramas o clasificaciones, extrae preguntas independientes por celda o cruce. Formato: "${cardFormat}".
 
 --- TEXTO DEL BLOQUE (${pageLabel}) ---
 ${chunkText}`
-          : `Analiza el bloque (${pageLabel}) del documento Word adjunto y extrae exactamente ${currentChunkQuota} preguntas en formato "${cardFormat}".${pedagogicalMode === 'didactic' ? ' Aplica el Modo Docente / Didáctico: preguntas prácticas de examen sin metadatos de aula.' : ''}${imageNotice} Asegúrate de cubrir equilibradamente el contenido de todas las páginas virtuales del bloque.
+            : `Analiza el bloque (${pageLabel}) del documento Word adjunto y extrae exactamente ${currentChunkQuota} preguntas en formato "${cardFormat}". Aplica el Modo Docente / Didáctico: preguntas prácticas de examen sin metadatos de aula.${imageNotice} Asegúrate de cubrir equilibradamente el contenido de todas las páginas virtuales del bloque.
 
 --- TEXTO DEL BLOQUE (${pageLabel}) ---
 ${chunkText}`;
 
-        const geminiContentParts: Array<
-          | { inlineData: { mimeType: string; data: string } }
-          | { text: string }
-        > = [];
+          const geminiContentParts: Array<
+            | { inlineData: { mimeType: string; data: string } }
+            | { text: string }
+          > = [];
 
-        for (const img of chunkImages) {
-          if (img.dataBase64 && img.mimeType) {
-            geminiContentParts.push({
-              inlineData: {
-                mimeType: img.mimeType,
-                data: img.dataBase64,
+          for (const img of chunkImages) {
+            if (img.dataBase64 && img.mimeType) {
+              geminiContentParts.push({
+                inlineData: {
+                  mimeType: img.mimeType,
+                  data: img.dataBase64,
+                },
+              });
+            }
+          }
+
+          geminiContentParts.push({
+            text: chunkUserPrompt,
+          });
+
+          let chunkCandidateCards: GeneratedCard[] = [];
+
+          try {
+            const chunkResponse = await ai.models.generateContent({
+              model: GEMINI_MODEL,
+              contents: geminiContentParts,
+              config: {
+                systemInstruction: currentChunkSystemPrompt,
+                temperature: isExhaustiveMode ? 0.1 : 0.15,
+                responseMimeType: 'application/json',
+                responseJsonSchema: singlePageExtractionSchema,
+                maxOutputTokens: 8192,
               },
             });
+
+            if (chunkResponse.text) {
+              try {
+                const parsed = parseGeminiBatchResponse(chunkResponse.text);
+                chunkCandidateCards = parsed.cards || [];
+                console.log(
+                  `[Motor Chunking DOCX - Modo Docente] Bloque ${chunk.chunkIndex + 1}: Gemini devolvió ${chunkCandidateCards.length} tarjetas brutas.`
+                );
+              } catch (parseErr) {
+                console.warn(
+                  `[Motor Chunking DOCX - Modo Docente] Bloque ${chunk.chunkIndex + 1}: Error parseando respuesta de Gemini:`,
+                  parseErr
+                );
+              }
+            }
+          } catch (geminiErr) {
+            console.warn(
+              `[Motor Chunking DOCX - Modo Docente] Error en llamada a Gemini para Bloque ${chunk.chunkIndex + 1}:`,
+              geminiErr
+            );
           }
-        }
 
-        geminiContentParts.push({
-          text: chunkUserPrompt,
-        });
+          // Acumulación y Deduplicación rápida del bloque
+          if (chunkCandidateCards.length > 0) {
+            const { uniqueCards, duplicateCount } = await deduplicateCandidateCards({
+              candidateCards: chunkCandidateCards,
+              existingCards: accumulatedHistory,
+              similarityThreshold: isExhaustiveMode ? 0.92 : 0.80,
+              isExhaustiveMode,
+            });
 
-        let chunkCandidateCards: GeneratedCard[] = [];
-
-        try {
-          const chunkResponse = await ai.models.generateContent({
-            model: GEMINI_MODEL,
-            contents: geminiContentParts,
-            config: {
-              systemInstruction: currentChunkSystemPrompt,
-              temperature: isExhaustiveMode ? 0.1 : 0.15,
-              responseMimeType: 'application/json',
-              responseJsonSchema: singlePageExtractionSchema,
-              maxOutputTokens: 8192,
-            },
-          });
-
-          if (chunkResponse.text) {
-            try {
-              const parsed = parseGeminiBatchResponse(chunkResponse.text);
-              chunkCandidateCards = parsed.cards || [];
+            if (duplicateCount > 0) {
               console.log(
-                `[Motor Chunking DOCX] Bloque ${chunk.chunkIndex + 1}: Gemini devolvió ${chunkCandidateCards.length} tarjetas brutas.`
-              );
-            } catch (parseErr) {
-              console.warn(
-                `[Motor Chunking DOCX] Bloque ${chunk.chunkIndex + 1}: Error parseando respuesta de Gemini:`,
-                parseErr
+                `[Motor Chunking DOCX - Modo Docente] Bloque ${chunk.chunkIndex + 1}: Se filtraron ${duplicateCount} duplicados.`
               );
             }
-          }
-        } catch (geminiErr) {
-          console.warn(
-            `[Motor Chunking DOCX] Error en llamada a Gemini para Bloque ${chunk.chunkIndex + 1}:`,
-            geminiErr
-          );
-        }
 
-        // Acumulación y Deduplicación rápida del bloque
-        if (chunkCandidateCards.length > 0) {
-          const { uniqueCards, duplicateCount } = await deduplicateCandidateCards({
-            candidateCards: chunkCandidateCards,
-            existingCards: accumulatedHistory,
-            similarityThreshold: isExhaustiveMode ? 0.92 : 0.80,
-            isExhaustiveMode,
+            if (uniqueCards.length > 0) {
+              tarjetasAcumuladas.push(...uniqueCards);
+              for (const uc of uniqueCards) {
+                accumulatedHistory.push({ front: uc.front, back: uc.back });
+              }
+              console.log(
+                `[Motor Chunking DOCX - Modo Docente] Bloque ${chunk.chunkIndex + 1}: Acumuladas ${uniqueCards.length} tarjetas. Total: ${tarjetasAcumuladas.length}/${targetCount}.`
+              );
+            }
+
+            if (uniqueCards.length < currentChunkQuota) {
+              deficitCarryOver = currentChunkQuota - uniqueCards.length;
+            }
+          } else {
+            deficitCarryOver = currentChunkQuota;
+          }
+        }
+      } else {
+        // 4B. MOTOR ORIGINAL MODO ESTUDIO DOCX (RECUPERADO DE COMMIT 57e614e):
+        // Bucle Secuencial Virtual Página a Página con Marcapáginas y Modo Minucioso/Exhaustivo.
+        // while (tarjetasAcumuladas.length < targetCount && currentPage <= finalPage)
+        let currentPage = startPage;
+        lastProcessedPage = currentPage;
+
+        console.log(
+          `[Bucle Acumulador Backend DOCX - Modo Estudio] Iniciando: Desde pág. virtual ${startPage} hasta pág. virtual ${finalPage}. Meta: ${targetCount} tarjetas.`
+        );
+
+        while (tarjetasAcumuladas.length < targetCount && currentPage <= finalPage) {
+          lastProcessedPage = currentPage;
+          const remainingToTarget = targetCount - tarjetasAcumuladas.length;
+          const currentVirtualPage = wordPages[currentPage - 1];
+          const currentPageText = currentVirtualPage?.text || '';
+          const currentPageImages = (currentVirtualPage?.images || []).slice(0, 3);
+
+          console.log(
+            `[Bucle Acumulador Backend DOCX - Modo Estudio] Procesando Página Virtual ${currentPage} de ${finalPage}... (Acumuladas: ${tarjetasAcumuladas.length}/${targetCount}, Restan: ${remainingToTarget}, Imágenes: ${currentPageImages.length})`
+          );
+
+          // Extraer lista de tópicos ya cubiertos (BD + páginas previas del lote) para evitar repeticiones a ciegas
+          const coveredTopics = extractUniqueTopicsList(accumulatedHistory);
+          const historyDirective = coveredTopics
+            ? `\n\nCONCEPTOS YA EVALUADOS EN ESTE MAZO O PÁGINAS PREVIAS: ${coveredTopics}.
+DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de esta página que aún NO hayan sido preguntados. No repitas la misma pregunta con ligeras variaciones de redacción.`
+            : '';
+
+          const exhaustiveQuotaMandate = isExhaustiveMode
+            ? `\n\n🚨 DIRECTIVA DE COBERTURA Y CALIDAD (CUOTA RESTANTE: ${remainingToTarget} TARJETAS):
+- Si la sección contiene tablas, imágenes o clasificaciones densas, extrae preguntas independientes de tantas filas, cruces o diagramas como existan hasta cumplir la cuota requerida.
+- Si la sección es texto continuo (prosa/teoría), extrae con rigor quirúrgico cada dato fáctico, definición, mecanismo y excepción relevante.
+- IMPORTANTE: No dupliques preguntas con diferente redacción ni inventes preguntas sobre listas de palabras al margen o datos ajenos al documento para alcanzar un número artificial. Si has extraído todos los hechos sustanciales de esta página virtual, concluye tu respuesta; el motor secuencial del servidor continuará acumulando tarjetas en las siguientes páginas del documento hasta completar el objetivo.`
+            : '';
+
+          const currentPageSystemPrompt = `${singlePageSystemPrompt}${historyDirective}${exhaustiveQuotaMandate}`;
+
+          const imageNotice = currentPageImages.length > 0
+            ? ` Se adjuntan ${currentPageImages.length} imagen(es) o diagrama(s) incrustados en esta sección del documento Word. Analízalos visualmente con precisión para extraer datos, esquemas, clasificaciones o conceptos presentes en ellos.`
+            : '';
+
+          const pageUserPrompt = isExhaustiveMode
+            ? `Analiza el contenido de la Página Virtual ${currentPage} del documento Word adjunto aplicando la DIRECTIVA DE COBERTURA Y CALIDAD (cuota restante: ${remainingToTarget} tarjetas). ${imageNotice}Si hay tablas, diagramas o datos estructurados, extrae preguntas independientes por cada dato relevante. Si es texto continuo, extrae hechos y definiciones sustanciales sin duplicar ni inventar preguntas sobre términos al margen, concluyendo cuando los datos sustanciales se agoten para que el servidor avance de página. Formato: "${cardFormat}".
+
+--- TEXTO DE LA PÁGINA VIRTUAL ${currentPage} (${fileName || 'documento.docx'}) ---
+${currentPageText}`
+            : `Analiza el contenido de la Página Virtual ${currentPage} del documento Word adjunto y extrae todos los conceptos clave, datos precisos, normativas o hechos únicos posibles en formato "${cardFormat}".${imageNotice}
+
+--- TEXTO DE LA PÁGINA VIRTUAL ${currentPage} (${fileName || 'documento.docx'}) ---
+${currentPageText}`;
+
+          // Construir contenido multimodal para Gemini: imágenes + texto
+          const geminiContentParts: Array<
+            | { inlineData: { mimeType: string; data: string } }
+            | { text: string }
+          > = [];
+
+          for (const img of currentPageImages) {
+            if (img.dataBase64 && img.mimeType) {
+              geminiContentParts.push({
+                inlineData: {
+                  mimeType: img.mimeType,
+                  data: img.dataBase64,
+                },
+              });
+            }
+          }
+
+          geminiContentParts.push({
+            text: pageUserPrompt,
           });
 
-          if (duplicateCount > 0) {
-            console.log(
-              `[Motor Chunking DOCX] Bloque ${chunk.chunkIndex + 1}: Se filtraron ${duplicateCount} duplicados.`
-            );
-          }
+          let pageCandidateCards: GeneratedCard[] = [];
 
-          if (uniqueCards.length > 0) {
-            tarjetasAcumuladas.push(...uniqueCards);
-            for (const uc of uniqueCards) {
-              accumulatedHistory.push({ front: uc.front, back: uc.back });
+          try {
+            const pageResponse = await ai.models.generateContent({
+              model: GEMINI_MODEL,
+              contents: geminiContentParts,
+              config: {
+                systemInstruction: currentPageSystemPrompt,
+                temperature: isExhaustiveMode ? 0.1 : 0.15,
+                responseMimeType: 'application/json',
+                responseJsonSchema: singlePageExtractionSchema,
+                maxOutputTokens: 8192,
+              },
+            });
+
+            if (pageResponse.text) {
+              try {
+                const parsed = parseGeminiBatchResponse(pageResponse.text);
+                pageCandidateCards = parsed.cards || [];
+                console.log(
+                  `[Bucle Acumulador Backend DOCX - Modo Estudio] Página Virtual ${currentPage}: Gemini devolvió ${pageCandidateCards.length} tarjetas brutas.`
+                );
+              } catch (parseErr) {
+                console.warn(
+                  `[Bucle Acumulador Backend DOCX - Modo Estudio] Página Virtual ${currentPage}: Sin tarjetas válidas o poca información:`,
+                  parseErr
+                );
+              }
             }
-            console.log(
-              `[Motor Chunking DOCX] Bloque ${chunk.chunkIndex + 1}: Acumuladas ${uniqueCards.length} tarjetas. Total: ${tarjetasAcumuladas.length}/${targetCount}.`
+          } catch (geminiErr) {
+            console.warn(
+              `[Bucle Acumulador Backend DOCX - Modo Estudio] Error en llamada a Gemini para Página Virtual ${currentPage}:`,
+              geminiErr
             );
           }
 
-          if (uniqueCards.length < currentChunkQuota) {
-            deficitCarryOver = currentChunkQuota - uniqueCards.length;
+          // Acumulación y Deduplicación rápida
+          if (pageCandidateCards.length > 0) {
+            const { uniqueCards, duplicateCount } = await deduplicateCandidateCards({
+              candidateCards: pageCandidateCards,
+              existingCards: accumulatedHistory,
+              similarityThreshold: isExhaustiveMode ? 0.92 : 0.80,
+              isExhaustiveMode,
+            });
+
+            if (duplicateCount > 0) {
+              console.log(
+                `[Bucle Acumulador Backend DOCX - Modo Estudio] Página Virtual ${currentPage}: Gatekeeper léxico filtró ${duplicateCount} duplicados.`
+              );
+            }
+
+            if (uniqueCards.length > 0) {
+              tarjetasAcumuladas.push(...uniqueCards);
+              for (const uc of uniqueCards) {
+                accumulatedHistory.push({ front: uc.front, back: uc.back });
+              }
+              console.log(
+                `[Bucle Acumulador Backend DOCX - Modo Estudio] Página Virtual ${currentPage}: Se acumularon ${uniqueCards.length} tarjetas únicas. Total acumulado: ${tarjetasAcumuladas.length}/${targetCount}.`
+              );
+            }
           }
-        } else {
-          deficitCarryOver = currentChunkQuota;
+
+          if (tarjetasAcumuladas.length > targetCount) {
+            tarjetasAcumuladas = tarjetasAcumuladas.slice(0, targetCount);
+          }
+
+          if (tarjetasAcumuladas.length >= targetCount) {
+            console.log(
+              `[Bucle Acumulador Backend DOCX - Modo Estudio] 🎯 Objetivo alcanzado: ${tarjetasAcumuladas.length} tarjetas exactas en Página Virtual ${currentPage}.`
+            );
+            break;
+          }
+
+          currentPage++;
         }
       }
 
@@ -2459,11 +2767,15 @@ ${chunkText}`;
 
       const isExhausted = tarjetasAcumuladas.length < targetCount && lastProcessedPage >= finalPage;
 
+      const nextCursor = tarjetasAcumuladas.length >= targetCount
+        ? lastProcessedPage + 1
+        : lastProcessedPage;
+
       return {
         success: true,
         core_exhausted: isExhausted,
         cards: processedCards,
-        nextCursorPage: lastProcessedPage,
+        nextCursorPage: nextCursor,
         startCursorPage: startPage,
       };
     }

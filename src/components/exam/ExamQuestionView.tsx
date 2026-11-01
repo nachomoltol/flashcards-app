@@ -107,11 +107,11 @@ export function ExamQuestionView({ card, index, total }: ExamQuestionViewProps) 
 
         {/* Options Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 pt-2">
-          {options.map((opt) => {
+          {options.map((opt, optIndex) => {
             const isSelected = currentAnswer.toLowerCase() === opt.key.toLowerCase();
             return (
               <button
-                key={opt.key}
+                key={`exam-opt-${card.id || ''}-${opt.key || ''}-${optIndex}`}
                 type="button"
                 onClick={() => selectAnswer(card.id, opt.key)}
                 className={`p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border text-left transition-all duration-150 flex items-start gap-3 active:scale-[0.99] cursor-pointer ${

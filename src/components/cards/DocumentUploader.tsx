@@ -523,14 +523,25 @@ export function DocumentUploader({
 
       const existingFronts = cards && cards.length > 0 ? cards.map((c) => c.front) : [];
 
+      const effectivePedagogicalMode: 'academic' | 'didactic' =
+        pedagogicalMode === 'didactic' ? 'didactic' : 'academic';
+
       const effectiveCardFormat: CardFormat =
-        pedagogicalMode === 'didactic'
+        effectivePedagogicalMode === 'didactic'
           ? (docenteFormat === 'open_cases'
               ? 'basic'
               : docenteFormat === 'mixed_test'
               ? cardFormat
               : docenteFormat)
           : cardFormat;
+
+      console.log('[FRONTEND PAYLOAD -> BACKEND]', {
+        pedagogicalMode: effectivePedagogicalMode,
+        isExhaustiveMode: Boolean(isExhaustiveMode),
+        startPage: startPageForRun,
+        finalPage: endPageForRun,
+        cardCount,
+      });
 
       let result: Awaited<ReturnType<typeof generateCardsFromDocumentAction>>;
       try {
@@ -551,8 +562,8 @@ export function DocumentUploader({
           pageEnd: endPageForRun,
           language,
           coreExhaustedPrevious: coreExhausted || isMeticulousPhase,
-          isExhaustiveMode,
-          pedagogicalMode,
+          isExhaustiveMode: Boolean(isExhaustiveMode),
+          pedagogicalMode: effectivePedagogicalMode,
           docenteFormat,
           targetAudience,
         });
@@ -1416,7 +1427,7 @@ export function DocumentUploader({
                     const isSelected = cardFormat === opt.id;
                     return (
                       <button
-                        key={opt.id}
+                        key={`uploader-card-fmt-${opt.id}`}
                         type="button"
                         disabled={isBusy}
                         onClick={() => {
@@ -1776,7 +1787,7 @@ export function DocumentUploader({
                           const isSelected = docenteFormat === item.id;
                           return (
                             <button
-                              key={item.id}
+                              key={`uploader-docente-fmt-${item.id}`}
                               type="button"
                               disabled={isBusy}
                               onClick={() => {
@@ -1860,7 +1871,7 @@ export function DocumentUploader({
                           }
                         ].map(item => (
                           <button
-                            key={item.id}
+                            key={`uploader-target-aud-${item.id}`}
                             type="button"
                             disabled={isBusy}
                             onClick={() => setTargetAudience(item.id)}

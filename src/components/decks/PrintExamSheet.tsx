@@ -147,9 +147,9 @@ export function PrintExamSheet({
                               : 'space-y-1'
                           }`}
                         >
-                          {parsed.options.map((opt) => (
+                          {parsed.options.map((opt, optIndex) => (
                             <div
-                              key={opt.key}
+                              key={`print-opt-${card.id || index}-${opt.key || ''}-${optIndex}`}
                               className="flex items-start gap-1.5 text-[9.5pt]"
                             >
                               <span className="inline-block w-3.5 h-3.5 border border-black rounded-[2px] shrink-0 mt-0.5" />
