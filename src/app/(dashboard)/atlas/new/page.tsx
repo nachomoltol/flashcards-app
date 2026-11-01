@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { useAtlasStore, useLanguageStore, type AtlasBox } from '@/stores';
+import { compressImage } from '@/lib/imageCompression';
 import {
   Map,
   ArrowLeft,
@@ -72,19 +73,35 @@ export default function NewAtlasPage() {
     setUploadError(null);
 
     try {
+      // 1. Compresión en el cliente con HTML5 Canvas (resolución máx 1920px, WebP, calidad 0.8, < 500 KB)
+      let fileToUpload: File = file;
+      try {
+        const compressed = await compressImage(file, {
+          maxWidth: 1920,
+          maxHeight: 1920,
+          quality: 0.8,
+          format: 'image/webp',
+          maxFileSizeKB: 500,
+        });
+        fileToUpload = compressed.file;
+      } catch (compErr) {
+        console.warn('Advertencia no bloqueante en compresión, utilizando archivo original:', compErr);
+      }
+
       const {
         data: { user },
       } = await supabase.auth.getUser();
 
       const userId = user?.id || 'anon';
-      const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+      const fileExt = fileToUpload.name.split('.').pop()?.toLowerCase() || 'webp';
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
       const filePath = `${userId}/${fileName}`;
 
       const { error: uploadErr } = await supabase.storage
         .from('atlas-images')
-        .upload(filePath, file, {
+        .upload(filePath, fileToUpload, {
           cacheControl: '3600',
+          contentType: fileToUpload.type || 'image/webp',
           upsert: true,
         });
 
@@ -507,15 +524,15 @@ export default function NewAtlasPage() {
               onPointerUp={handlePointerUp}
               onPointerCancel={handlePointerCancel}
               style={{ touchAction: 'none' }}
-              className="relative max-w-full rounded-2xl overflow-hidden border-2 border-neutral-300 dark:border-neutral-800 bg-neutral-950 shadow-2xl select-none cursor-crosshair inline-block group"
+              className="relative max-w-full rounded-2xl overflow-hidden border-2 border-neutral-300 dark:border-neutral-700 bg-white shadow-2xl select-none cursor-crosshair inline-block group"
             >
-              {/* Imagen base */}
+              {/* Imagen base con fondo blanco explícito para soportar PNGs transparentes */}
               <img
                 ref={imageElementRef}
                 src={imageUrl}
                 alt={title || 'Atlas'}
                 draggable={false}
-                className="block max-h-[66vh] w-auto max-w-full object-contain pointer-events-none select-none rounded-2xl"
+                className="block max-h-[66vh] w-auto max-w-full object-contain pointer-events-none select-none rounded-2xl bg-white"
               />
 
               {/* Cajas de oclusión guardadas */}

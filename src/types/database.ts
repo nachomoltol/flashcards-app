@@ -562,6 +562,13 @@ export interface AtlasBox {
   height: number;
   label: string;
   note?: string;
+  due_date?: string;
+  stability?: number;
+  difficulty?: number;
+  reps?: number;
+  state?: number;
+  lapses?: number;
+  last_review?: string;
 }
 
 export type InteractiveImageRow = Database['public']['Tables']['interactive_images']['Row'];

@@ -1517,7 +1517,7 @@ function DecksViewContent() {
                     className="group rounded-2xl overflow-hidden border border-neutral-200/90 dark:border-neutral-800 bg-white dark:bg-neutral-900/70 hover:border-emerald-500/50 hover:shadow-xl hover:shadow-emerald-950/15 hover:-translate-y-1 transition-all duration-200 flex flex-col justify-between cursor-pointer"
                   >
                     {/* Thumbnail con imagen de fondo */}
-                    <div className="relative aspect-video w-full overflow-hidden bg-neutral-950 flex items-center justify-center">
+                    <div className="relative aspect-video w-full overflow-hidden bg-white flex items-center justify-center">
                       <img
                         src={atlas.image_url}
                         alt={atlas.title}

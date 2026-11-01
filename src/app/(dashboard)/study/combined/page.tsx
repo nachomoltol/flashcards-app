@@ -24,6 +24,7 @@ import {
 } from '@/lib/fsrs';
 import { FormattedCardView, parseMultipleChoice } from '@/components/cards';
 import { StudyRatingHelpModal, SocraticTutorDrawer } from '@/components/study';
+import { compressImage } from '@/lib/imageCompression';
 
 // Helper para formatear intervalo relativo de próxima revisión
 function formatInterval(dueIso: string): string {
@@ -349,18 +350,33 @@ function CombinedStudyContent() {
 
     setIsUploadingNoteImage(true);
     try {
+      let fileToUpload: File = file;
+      try {
+        const compressed = await compressImage(file, {
+          maxWidth: 1600,
+          maxHeight: 1600,
+          quality: 0.8,
+          format: 'image/webp',
+          maxFileSizeKB: 400,
+        });
+        fileToUpload = compressed.file;
+      } catch (compErr) {
+        console.warn('Compresión omitida:', compErr);
+      }
+
       const {
         data: { user },
       } = await supabase.auth.getUser();
       const userId = user?.id || 'anon';
-      const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+      const fileExt = fileToUpload.name.split('.').pop()?.toLowerCase() || 'webp';
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
       const filePath = `${userId}/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('study-notes')
-        .upload(filePath, file, {
+        .upload(filePath, fileToUpload, {
           cacheControl: '3600',
+          contentType: fileToUpload.type || 'image/webp',
           upsert: true,
         });
 
