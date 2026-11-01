@@ -113,7 +113,7 @@ export function UrlCardGenerator({
           ? 'Generating flashcards from YouTube videos is exclusive to PRO members. Upgrade to PRO to unlock video learning.'
           : 'La generación de tarjetas a partir de vídeos de YouTube es exclusiva para miembros PRO. Actualiza tu cuenta para procesar vídeos.'
       );
-      openProModal(false);
+      openProModal(false, 'youtube');
       return;
     }
 
@@ -443,9 +443,13 @@ export function UrlCardGenerator({
                   <span>{t('url_generator.youtube_detected', 'Vídeo detectado: Gemini analizará el contenido del vídeo directamente en la nube de Google para generar las tarjetas.')}</span>
                 </div>
                 {!isPro && (
-                  <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white shrink-0 shadow-xs">
+                  <button
+                    type="button"
+                    onClick={() => openProModal(false, 'youtube')}
+                    className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white shrink-0 shadow-xs cursor-pointer hover:opacity-90 active:scale-95 transition"
+                  >
                     👑 PRO
-                  </span>
+                  </button>
                 )}
               </div>
             )}

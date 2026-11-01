@@ -340,11 +340,20 @@ export function DocumentUploader({
           ? 'Audio and Voice processing is exclusive to PRO members. Upgrade to PRO to generate flashcards from audio recordings.'
           : 'El procesamiento de archivos de Audio y Grabaciones es exclusivo para miembros PRO. Actualiza tu cuenta para generar tarjetas desde audios.'
       );
-      openProModal(false);
+      openProModal(false, 'audio');
       return;
     }
 
     const isPdf = file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf';
+    if (isPdf && !isPro) {
+      setErrorMessage(
+        isEn
+          ? 'PDF document processing is exclusive to PRO members. Upgrade to PRO to generate flashcards from PDF files.'
+          : 'El procesamiento de documentos PDF es exclusivo para miembros PRO. Actualiza tu cuenta para generar tarjetas desde archivos PDF.'
+      );
+      openProModal(false, 'pdf');
+      return;
+    }
     if (isPdf) {
       try {
         const arrayBuffer = await file.arrayBuffer();
@@ -892,7 +901,7 @@ export function DocumentUploader({
               type="button"
               onClick={() => {
                 if (!isPro) {
-                  openProModal(false);
+                  openProModal(false, 'print');
                   return;
                 }
                 window.print();
@@ -1126,8 +1135,9 @@ export function DocumentUploader({
 
                     {/* Formats Pills */}
                     <div className="flex flex-wrap items-center justify-center gap-1.5 pt-1 sm:pt-2">
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-rose-500/10 border border-rose-500/25 text-rose-700 dark:text-rose-300">
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-rose-500/10 border border-rose-500/25 text-rose-700 dark:text-rose-300 inline-flex items-center gap-1">
                         PDF (.pdf)
+                        <span className="text-[8px] font-bold px-1 py-0.2 rounded bg-amber-500 text-white leading-none">PRO</span>
                       </span>
                       <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/25 text-blue-700 dark:text-blue-300">
                         Word (.docx, .doc)

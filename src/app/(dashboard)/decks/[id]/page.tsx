@@ -106,7 +106,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
 
   const handlePrintExam = () => {
     if (!isPro) {
-      openProModal(false);
+      openProModal(false, 'print');
       return;
     }
     if (typeof window !== 'undefined') {

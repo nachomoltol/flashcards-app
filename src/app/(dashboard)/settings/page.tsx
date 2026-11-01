@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Ticket, CheckCircle2, AlertCircle, ShieldCheck } from 'lucide-react';
-import { useAuthStore, useSettingsStore, useTutorialStore, useLanguageStore, DEFAULT_FSRS_SETTINGS } from '@/stores';
+import { useAuthStore, useSettingsStore, useTutorialStore, useLanguageStore, useProModalStore, DEFAULT_FSRS_SETTINGS } from '@/stores';
 import { redeemPromoCodeAction } from '@/app/actions/redeemPromoCode';
 import { TUTORIAL_STORAGE_KEY } from '@/components/onboarding/WelcomeTutorial';
 
@@ -23,6 +23,7 @@ export default function SettingsPage() {
     clearErrors,
   } = useSettingsStore();
   const { openTutorial } = useTutorialStore();
+  const { openProModal } = useProModalStore();
 
   // Estado local del formulario
   const [retention, setRetention] = useState<number>(0.90);
@@ -449,7 +450,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Sección: Suscripción y Bonos Promocionales (VIP / PRO) */}
-        <div className="p-6 rounded-2xl bg-white dark:bg-neutral-900 border border-purple-200 dark:border-purple-500/25 shadow-sm space-y-4">
+        <div className="p-6 rounded-2xl bg-white dark:bg-neutral-900 border border-purple-200 dark:border-purple-500/25 shadow-sm space-y-5">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <h2 className="text-base font-bold text-neutral-900 dark:text-white tracking-tight flex items-center gap-2">
@@ -460,12 +461,35 @@ export default function SettingsPage() {
                 </span>
               </h2>
               <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
-                {t('settings.promo_section_desc', 'Canjea un código promocional o bono VIP (ej. PROMO50) para desbloquear generaciones ilimitadas sin restricciones.')}
+                {t('settings.promo_section_desc', 'Gestiona tu suscripción mensual o canjea un código promocional/VIP para generaciones ilimitadas.')}
               </p>
             </div>
           </div>
 
-          <div className="pt-2 max-w-xl">
+          {/* Tarjeta Plan PRO Ilimitado (Stripe Direct Checkout) */}
+          <div className="p-4 rounded-xl bg-gradient-to-r from-purple-500/10 via-indigo-500/10 to-violet-500/10 border border-purple-500/25 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-sm text-neutral-900 dark:text-white">Flashmente PRO Ilimitado</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-600 text-white">3,50 €/mes</span>
+              </div>
+              <p className="text-xs text-neutral-600 dark:text-neutral-400">
+                {t('settings.pro_card_desc', 'Generaciones con IA ilimitadas, procesamiento de PDF, Audio y YouTube, y algoritmo FSRS sin esperas.')}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => openProModal(false)}
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold text-xs transition active:scale-95 cursor-pointer shrink-0 shadow-md shadow-purple-600/25 flex items-center justify-center gap-1.5"
+            >
+              <span>{t('settings.manage_pro_btn', 'Gestionar o Activar PRO')}</span>
+            </button>
+          </div>
+
+          <div className="pt-1 max-w-xl space-y-2">
+            <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block">
+              {t('settings.have_promo_code', '¿Tienes un código promocional o bono VIP?')}
+            </span>
             <div className="flex gap-2">
               <input
                 type="text"
