@@ -19,7 +19,6 @@ import {
   Tv,
   Apple,
   Mail,
-  FileText,
   Volume2,
   Video,
   Printer,
@@ -285,15 +284,6 @@ export function ProModal({
   // Información contextual del encabezado según si fue disparado por una función PRO específica
   const getFeatureHeadline = () => {
     switch (featureName) {
-      case 'pdf':
-        return {
-          icon: FileText,
-          badge: isEn ? 'PRO EXCLUSIVE • PDF OCR' : 'EXCLUSIVO PRO • DOCUMENTOS PDF',
-          title: isEn ? 'Unlock PDF Document Scanning' : 'Desbloquea la Extracción de Documentos PDF',
-          subtitle: isEn
-            ? 'Deep scanning of textbooks, syllabi and complex PDFs with sequential chunking is exclusive to Flashmente PRO.'
-            : 'La lectura profunda de apuntes, libros de texto y exámenes en PDF con chunking secuencial es una función 100% exclusiva de Flashmente PRO.',
-        };
       case 'audio':
         return {
           icon: Volume2,
@@ -313,13 +303,14 @@ export function ProModal({
             : 'El análisis de conferencias y clases magistrales de YouTube directamente en la nube de Google es una función 100% exclusiva de Flashmente PRO.',
         };
       case 'print':
+      case 'pdf':
         return {
           icon: Printer,
-          badge: isEn ? 'PRO EXCLUSIVE • PDF EXPORT' : 'EXCLUSIVO PRO • EXPORTACIÓN E IMPRESIÓN',
-          title: isEn ? 'Unlock Exam PDF Export & Print' : 'Desbloquea la Impresión y Exportación a PDF',
+          badge: isEn ? 'PRO EXCLUSIVE • PDF EXPORT' : 'EXCLUSIVO PRO • EXPORTACIÓN A PDF',
+          title: isEn ? 'Unlock Exam PDF Export & Print' : 'Desbloquea la Exportación a PDF e Impresión',
           subtitle: isEn
-            ? 'Exporting ultra-compact exam sheets and teacher answer keys is exclusive to Flashmente PRO.'
-            : 'La maquetación ultra-compacta para imprimir exámenes y solucionarios oficiales en PDF es una función 100% exclusiva de Flashmente PRO.',
+            ? 'Exporting ultra-compact exam sheets and official teacher answer keys to PDF is exclusive to Flashmente PRO.'
+            : 'La exportación e impresión ultra-compacta de exámenes y solucionarios oficiales en PDF es una función 100% exclusiva de Flashmente PRO.',
         };
       default:
         return {
