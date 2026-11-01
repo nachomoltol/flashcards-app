@@ -1862,6 +1862,21 @@ export async function generateCardsFromDocumentAction(
       else if (ext === 'txt') normalizedMime = 'text/plain';
     }
 
+    // Gatekeeper PRO: Validación estricta de suscripción para archivos de Audio y Vídeo
+    const isAudio =
+      normalizedMime?.startsWith('audio/') ||
+      normalizedMime === 'audio/mpeg' ||
+      normalizedMime === 'audio/wav' ||
+      Boolean(fileName && /\.(mp3|wav|ogg|m4a|aac|flac)$/i.test(fileName));
+
+    if (isAudio && apiCheck.tier !== 'pro' && apiCheck.tier !== 'vip') {
+      return {
+        success: false,
+        error:
+          'El procesamiento de archivos de Audio y Vídeo es exclusivo para miembros PRO. Por favor actualiza tu suscripción en Flashmente PRO para desbloquear esta funcionalidad.',
+      };
+    }
+
     // Identificar si es un documento de Word (.docx o .doc)
     const isWordDocument =
       normalizedMime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
@@ -2829,6 +2844,15 @@ export async function generateCardsFromUrlAction(
     const youtubeVideoId = extractYouTubeVideoId(parsedUrl.href);
     const isYouTube = Boolean(youtubeVideoId);
     const canonicalYouTubeUrl = youtubeVideoId ? `https://www.youtube.com/watch?v=${youtubeVideoId}` : '';
+
+    // Gatekeeper PRO: Validación estricta de suscripción para extracción de Vídeos de YouTube
+    if (isYouTube && apiCheck.tier !== 'pro' && apiCheck.tier !== 'vip') {
+      return {
+        success: false,
+        error:
+          'La generación de tarjetas a partir de vídeos de YouTube es exclusiva para miembros PRO. Por favor actualiza tu suscripción en Flashmente PRO para desbloquear esta funcionalidad.',
+      };
+    }
 
     // 1. Consultar historial de tarjetas existentes en este mazo para la Memoria de Progreso
     const existingCards = await fetchExistingCardsHistory(deckId, existingQuestions);

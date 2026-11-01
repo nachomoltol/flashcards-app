@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuthStore, useCardStore, useDeckStore, useProModalStore, useLanguageStore } from '@/stores';
+import { supabase } from '@/lib/supabase';
 import { generateCardsFromUrlAction } from '@/app/actions/generateCards';
 import { showAdMobRewardedAd } from '@/lib/admob';
 import { claimAdRewardAction } from '@/app/actions/claimAdReward';
@@ -53,6 +54,30 @@ export function UrlCardGenerator({
     }
   }, [initialMeticulousPhase]);
 
+  // Estatus de suscripción PRO / VIP del usuario
+  const [isPro, setIsPro] = useState(false);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const uid: string = user.id;
+    async function checkTier() {
+      try {
+        const { data } = await supabase
+          .from('api_limits')
+          .select('tier')
+          .eq('user_id', uid)
+          .maybeSingle();
+
+        if (data && (data.tier === 'pro' || data.tier === 'vip')) {
+          setIsPro(true);
+        }
+      } catch (err) {
+        console.warn('Error al verificar estatus PRO:', err);
+      }
+    }
+    checkTier();
+  }, [user?.id]);
+
   // Detectar dinámicamente si es YouTube o URL web
   const trimmedUrl = url.trim().toLowerCase();
   const isYouTube = trimmedUrl.includes('youtube.com') || trimmedUrl.includes('youtu.be');
@@ -79,6 +104,16 @@ export function UrlCardGenerator({
 
     if (!user) {
       setErrorMessage(language === 'en' ? 'You must be logged in to save cards to your deck.' : 'Debes iniciar sesión para guardar tarjetas en tu mazo.');
+      return;
+    }
+
+    if (isYouTube && !isPro) {
+      setErrorMessage(
+        language === 'en'
+          ? 'Generating flashcards from YouTube videos is exclusive to PRO members. Upgrade to PRO to unlock video learning.'
+          : 'La generación de tarjetas a partir de vídeos de YouTube es exclusiva para miembros PRO. Actualiza tu cuenta para procesar vídeos.'
+      );
+      openProModal(false);
       return;
     }
 
@@ -402,9 +437,16 @@ export function UrlCardGenerator({
 
             {/* Badges de detección dinámica */}
             {isYouTube && (
-              <div className="p-2 rounded-lg bg-rose-500/10 border border-rose-500/25 text-rose-700 dark:text-rose-300 text-[11px] flex items-center gap-2">
-                <span className="font-bold text-rose-600 dark:text-rose-400 text-xs">▶ YouTube</span>
-                <span>{t('url_generator.youtube_detected', 'Vídeo detectado: Gemini analizará el contenido del vídeo directamente en la nube de Google para generar las tarjetas.')}</span>
+              <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/25 text-rose-700 dark:text-rose-300 text-[11px] flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-rose-600 dark:text-rose-400 text-xs">▶ YouTube</span>
+                  <span>{t('url_generator.youtube_detected', 'Vídeo detectado: Gemini analizará el contenido del vídeo directamente en la nube de Google para generar las tarjetas.')}</span>
+                </div>
+                {!isPro && (
+                  <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white shrink-0 shadow-xs">
+                    👑 PRO
+                  </span>
+                )}
               </div>
             )}
 

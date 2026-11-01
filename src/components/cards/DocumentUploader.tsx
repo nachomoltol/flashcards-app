@@ -242,6 +242,30 @@ export function DocumentUploader({
   const [generatedCardsPreview, setGeneratedCardsPreview] = useState<GeneratedCard[]>([]);
   const [materialExhaustedNotice, setMaterialExhaustedNotice] = useState<{ generated: number; requested: number } | null>(null);
 
+  // Estatus de suscripción PRO / VIP del usuario
+  const [isPro, setIsPro] = useState(false);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const uid: string = user.id;
+    async function checkTier() {
+      try {
+        const { data } = await supabase
+          .from('api_limits')
+          .select('tier')
+          .eq('user_id', uid)
+          .maybeSingle();
+
+        if (data && (data.tier === 'pro' || data.tier === 'vip')) {
+          setIsPro(true);
+        }
+      } catch (err) {
+        console.warn('Error al verificar estatus PRO:', err);
+      }
+    }
+    checkTier();
+  }, [user?.id]);
+
   // Marcapáginas (Cursor) y Bucle Acumulador Backend
   const [nextCursorPage, setNextCursorPage] = useState<number | null>(null);
   const [lastStartPage, setLastStartPage] = useState<number | null>(null);
@@ -308,6 +332,18 @@ export function DocumentUploader({
       return;
     }
 
+    const ext = '.' + (file.name.split('.').pop()?.toLowerCase() || '');
+    const isAudio = ext === '.mp3' || ext === '.wav' || file.type.startsWith('audio/');
+    if (isAudio && !isPro) {
+      setErrorMessage(
+        isEn
+          ? 'Audio and Voice processing is exclusive to PRO members. Upgrade to PRO to generate flashcards from audio recordings.'
+          : 'El procesamiento de archivos de Audio y Grabaciones es exclusivo para miembros PRO. Actualiza tu cuenta para generar tarjetas desde audios.'
+      );
+      openProModal(false);
+      return;
+    }
+
     const isPdf = file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf';
     if (isPdf) {
       try {
@@ -338,7 +374,7 @@ export function DocumentUploader({
 
     setSelectedFile(file);
     setStatus('idle');
-  }, []);
+  }, [isPro, isEn, openProModal, uploadedStorage]);
 
   // Drag & drop handlers
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -843,14 +879,31 @@ export function DocumentUploader({
             {/* Exportar a PDF / Imprimir */}
             <button
               type="button"
-              onClick={() => window.print()}
+              onClick={() => {
+                if (!isPro) {
+                  openProModal(false);
+                  return;
+                }
+                window.print();
+              }}
               className="px-3.5 py-2.5 text-xs rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 font-semibold transition flex items-center gap-1.5 active:scale-95 cursor-pointer shadow-sm"
-              title="Guardar como PDF o Imprimir tarjetas"
+              title={
+                !isPro
+                  ? isEn
+                    ? 'Export to PDF / Print is exclusive to PRO'
+                    : 'Exportar a PDF / Imprimir es exclusivo para PRO'
+                  : 'Guardar como PDF o Imprimir tarjetas'
+              }
             >
               <svg className="w-3.5 h-3.5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
               </svg>
               <span>{t('ai_uploader.export_pdf_btn', isEn ? 'Export to PDF / Print' : 'Exportar a PDF / Imprimir')}</span>
+              {!isPro && (
+                <span className="px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white leading-none shadow-xs">
+                  PRO
+                </span>
+              )}
             </button>
             {isPageableDoc && typeof nextCursorPage === 'number' ? (
               <button
@@ -1068,8 +1121,9 @@ export function DocumentUploader({
                       <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/25 text-blue-700 dark:text-blue-300">
                         Word (.docx, .doc)
                       </span>
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/25 text-emerald-700 dark:text-emerald-300">
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/25 text-emerald-700 dark:text-emerald-300 inline-flex items-center gap-1">
                         Audio (.mp3, .wav)
+                        <span className="text-[8px] font-bold px-1 py-0.2 rounded bg-amber-500 text-white leading-none">PRO</span>
                       </span>
                       <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/25 text-amber-700 dark:text-amber-300">
                         Texto (.txt)
