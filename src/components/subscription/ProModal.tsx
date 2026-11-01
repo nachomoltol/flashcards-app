@@ -83,14 +83,21 @@ export function ProModal({
       import('@/lib/supabase').then(({ supabase }) => {
         supabase
           .from('api_limits')
-          .select('tier, generations_count')
+          .select('tier, generations_count, last_generation_date')
           .eq('user_id', user.id)
           .maybeSingle()
           .then(({ data }) => {
             if (data) {
+              // Validar si el consumo corresponde al mes en curso (Lazy Reset en frontend)
+              const currentMonth = new Date().toISOString().slice(0, 7); // "YYYY-MM"
+              const lastMonth = data.last_generation_date
+                ? String(data.last_generation_date).slice(0, 7)
+                : null;
+              const isSameMonth = lastMonth === currentMonth;
+
               setUserLimits({
                 tier: (data.tier as 'free' | 'pro' | 'vip') || 'free',
-                count: data.generations_count || 0,
+                count: isSameMonth ? (data.generations_count || 0) : 0,
               });
             }
           });
