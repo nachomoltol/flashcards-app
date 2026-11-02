@@ -1562,20 +1562,20 @@ function DecksViewContent() {
       {/* Modal: Creación Contextual Inteligente (Carpeta vs Mazo) */}
       {isCreateModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 dark:bg-black/75 backdrop-blur-sm animate-in fade-in">
-          <div className="w-full max-w-md max-h-[88vh] sm:max-h-[85vh] overflow-y-auto overscroll-contain pr-1 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 sm:p-6 shadow-2xl relative space-y-3 sm:space-y-4 scrollbar-thin scrollbar-thumb-neutral-300 dark:scrollbar-thumb-neutral-800">
+          <div className="w-full max-w-md max-h-[92vh] sm:max-h-[85vh] overflow-y-auto overscroll-contain pr-1 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-3.5 sm:p-6 shadow-2xl relative space-y-2.5 sm:space-y-4 scrollbar-thin scrollbar-thumb-neutral-300 dark:scrollbar-thumb-neutral-800">
             <div className="flex items-center justify-between">
-              <h3 className="text-base sm:text-lg font-bold text-neutral-900 dark:text-white tracking-tight flex items-center gap-2">
+              <h3 className="text-sm sm:text-lg font-bold text-neutral-900 dark:text-white tracking-tight flex items-center gap-1.5 sm:gap-2">
                 <span>{createType === 'folder' ? t('dashboard.modal_create_folder_title', '📁 Crear Nueva Carpeta') : t('dashboard.modal_create_deck_title', '🃏 Crear Mazo de Estudio')}</span>
               </h3>
               <button
                 onClick={handleCloseCreateModal}
                 className="text-neutral-400 hover:text-neutral-900 dark:hover:text-white p-1 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 transition cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleCreate} className="space-y-3 sm:space-y-4">
+            <form onSubmit={handleCreate} className="space-y-2.5 sm:space-y-4">
               {/* Entradas ocultas de respaldo para garantizar sincronización de datos */}
               <input type="hidden" name="isFolder" value={createType === 'folder' ? 'true' : 'false'} />
               <input type="hidden" name="parentId" value={createParentId || ''} />
@@ -1589,28 +1589,28 @@ function DecksViewContent() {
                   onClick={() => {
                     setCreateType('folder');
                   }}
-                  className={`p-3 sm:p-3.5 rounded-xl sm:rounded-2xl border text-left transition-all duration-150 flex flex-col justify-between relative cursor-pointer ${
+                  className={`p-2 sm:p-3.5 rounded-xl sm:rounded-2xl border text-left transition-all duration-150 flex flex-col justify-between relative cursor-pointer ${
                     createType === 'folder'
                       ? 'border-amber-500 bg-amber-500/15 shadow-lg shadow-amber-500/10 ring-2 ring-amber-500/30'
                       : 'border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950/60 hover:border-neutral-300 dark:hover:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-900/60'
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-1.5 sm:mb-2">
-                    <span className="text-xl sm:text-2xl">📁</span>
+                  <div className="flex items-center justify-between mb-1 sm:mb-2">
+                    <span className="text-lg sm:text-2xl">📁</span>
                     <span
-                      className={`w-4 h-4 rounded-full border flex items-center justify-center transition ${
+                      className={`w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full border flex items-center justify-center transition ${
                         createType === 'folder'
                           ? 'border-amber-500 bg-amber-500'
                           : 'border-neutral-300 dark:border-neutral-600'
                       }`}
                     >
                       {createType === 'folder' && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-white dark:bg-neutral-950" />
+                        <span className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-white dark:bg-neutral-950" />
                       )}
                     </span>
                   </div>
                   <div className="font-bold text-neutral-900 dark:text-white text-xs sm:text-sm">{t('dashboard.modal_create_folder_title', '📁 Crear Carpeta')}</div>
-                  <div className="text-[10px] sm:text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5 sm:mt-1 leading-snug">
+                  <div className="text-[9.5px] sm:text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5 sm:mt-1 leading-tight sm:leading-snug">
                     {t('dashboard.new_folder_desc', 'Agrupa asignaturas o temas')}
                   </div>
                 </button>
@@ -1622,28 +1622,28 @@ function DecksViewContent() {
                   onClick={() => {
                     setCreateType('deck');
                   }}
-                  className={`p-3 sm:p-3.5 rounded-xl sm:rounded-2xl border text-left transition-all duration-150 flex flex-col justify-between relative cursor-pointer ${
+                  className={`p-2 sm:p-3.5 rounded-xl sm:rounded-2xl border text-left transition-all duration-150 flex flex-col justify-between relative cursor-pointer ${
                     createType === 'deck'
                       ? 'border-indigo-500 bg-indigo-500/15 shadow-lg shadow-indigo-500/10 ring-2 ring-indigo-500/30'
                       : 'border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950/60 hover:border-neutral-300 dark:hover:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-900/60'
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-1.5 sm:mb-2">
-                    <span className="text-xl sm:text-2xl">🃏</span>
+                  <div className="flex items-center justify-between mb-1 sm:mb-2">
+                    <span className="text-lg sm:text-2xl">🃏</span>
                     <span
-                      className={`w-4 h-4 rounded-full border flex items-center justify-center transition ${
+                      className={`w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full border flex items-center justify-center transition ${
                         createType === 'deck'
                           ? 'border-indigo-500 bg-indigo-500'
                           : 'border-neutral-300 dark:border-neutral-600'
                       }`}
                     >
                       {createType === 'deck' && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-white dark:bg-neutral-950" />
+                        <span className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-white dark:bg-neutral-950" />
                       )}
                     </span>
                   </div>
                   <div className="font-bold text-neutral-900 dark:text-white text-xs sm:text-sm">{t('dashboard.modal_create_deck_title', '🃏 Crear Mazo')}</div>
-                  <div className="text-[10px] sm:text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5 sm:mt-1 leading-snug">
+                  <div className="text-[9.5px] sm:text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5 sm:mt-1 leading-tight sm:leading-snug">
                     {t('dashboard.new_deck_desc', 'Tarjetas con repasos FSRS')}
                   </div>
                 </button>
@@ -1653,15 +1653,15 @@ function DecksViewContent() {
               <Link
                 href="/atlas/new"
                 onClick={handleCloseCreateModal}
-                className="flex items-center justify-between p-2.5 sm:p-3 rounded-xl sm:rounded-2xl border border-emerald-500/25 bg-emerald-500/10 hover:bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 transition text-xs font-medium cursor-pointer"
+                className="flex items-center justify-between p-2 sm:p-3 rounded-xl sm:rounded-2xl border border-emerald-500/25 bg-emerald-500/10 hover:bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 transition text-xs font-medium cursor-pointer"
               >
-                <div className="flex items-center gap-2.5">
-                  <span className="text-xl">🗺️</span>
+                <div className="flex items-center gap-2 sm:gap-2.5">
+                  <span className="text-base sm:text-xl">🗺️</span>
                   <div>
-                    <div className="font-semibold text-emerald-950 dark:text-emerald-200">
+                    <div className="font-semibold text-emerald-950 dark:text-emerald-200 text-xs sm:text-sm">
                       {t('dashboard.new_visual_atlas', 'Nuevo Atlas Visual')}
                     </div>
-                    <div className="text-[10px] text-emerald-700/80 dark:text-emerald-300/80">
+                    <div className="text-[9px] sm:text-[10px] text-emerald-700/80 dark:text-emerald-300/80">
                       {t('dashboard.new_visual_atlas_desc', 'Oclusión de imágenes y diagramas interactivos')}
                     </div>
                   </div>
@@ -1673,7 +1673,7 @@ function DecksViewContent() {
               <div>
                 <label
                   htmlFor="create-parent-folder-select"
-                  className="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1.5"
+                  className="block text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1 sm:mb-1.5"
                 >
                   {t('dashboard.modal_dest_location', '📍 Ubicación de destino')}
                 </label>
@@ -1682,7 +1682,7 @@ function DecksViewContent() {
                     id="create-parent-folder-select"
                     value={createParentId}
                     onChange={(e) => setCreateParentId(e.target.value)}
-                    className="w-full text-xs sm:text-sm px-3.5 py-2.5 rounded-xl bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition appearance-none cursor-pointer pr-10 font-medium"
+                    className="w-full text-xs sm:text-sm px-3 py-1.5 sm:py-2.5 rounded-xl bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition appearance-none cursor-pointer pr-10 font-medium"
                   >
                     <option value="">
                       🏠 {t('dashboard.modal_dest_root', 'Nivel raíz (Inicio)')}
@@ -1700,14 +1700,14 @@ function DecksViewContent() {
                     <ChevronDown className="w-4 h-4" />
                   </div>
                 </div>
-                <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-1">
+                <p className="text-[10px] sm:text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5 sm:mt-1">
                   {createParentId
                     ? t('dashboard.modal_dest_folder_hint', 'El elemento se creará dentro de la carpeta seleccionada.')
                     : t('dashboard.modal_dest_root_hint', 'El elemento se creará en el nivel principal (biblioteca general).')}
                 </p>
               </div>
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1.5">
+                <label className="block text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1 sm:mb-1.5">
                   {createType === 'folder'
                     ? t('dashboard.modal_folder_name_label', 'Nombre de la Carpeta o Asignatura')
                     : t('dashboard.modal_deck_name_label', 'Título del Mazo')}{' '}
@@ -1723,7 +1723,7 @@ function DecksViewContent() {
                       ? t('dashboard.modal_folder_placeholder', 'ej. Biología, Derecho Constitucional, Tema 1...')
                       : t('dashboard.modal_deck_placeholder', 'ej. Mitosis y Meiosis, Artículos 1 al 10...')
                   }
-                  className={`w-full text-sm px-3.5 py-2.5 rounded-xl bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none transition ${
+                  className={`w-full text-xs sm:text-sm px-3 py-1.5 sm:py-2.5 rounded-xl bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none transition ${
                     createType === 'folder'
                       ? 'focus:border-amber-500 focus:ring-1 focus:ring-amber-500'
                       : 'focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
@@ -1733,7 +1733,7 @@ function DecksViewContent() {
 
               {/* Descripción del elemento (Mazo o Carpeta) */}
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-800 dark:text-neutral-300 mb-1.5">
+                <label className="block text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-slate-800 dark:text-neutral-300 mb-1 sm:mb-1.5">
                   {createType === 'folder'
                     ? t('dashboard.modal_folder_desc_label', 'Descripción de la Carpeta (Opcional)')
                     : t('dashboard.modal_deck_desc_label', 'Descripción del Mazo (Opcional)')}
@@ -1747,22 +1747,22 @@ function DecksViewContent() {
                       ? t('dashboard.modal_folder_desc_placeholder', 'Temario, asignatura o notas de esta carpeta...')
                       : t('dashboard.modal_deck_desc_placeholder', 'Objetivos o temario de este mazo...')
                   }
-                  className="w-full text-xs px-3.5 py-2.5 rounded-xl bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-neutral-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition resize-none"
+                  className="w-full text-xs px-3 py-1.5 sm:py-2.5 rounded-xl bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-neutral-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition resize-none"
                 />
               </div>
 
               {/* Selector de Color */}
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1.5 sm:mb-2">
+                <label className="block text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1 sm:mb-1.5">
                   {t('dashboard.modal_color_label', 'Color Distintivo')}
                 </label>
-                <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                   {COLOR_PALETTE.map((c) => (
                     <button
                       key={c.hex}
                       type="button"
                       onClick={() => setNewColor(c.hex)}
-                      className={`w-6 h-6 sm:w-7 sm:h-7 rounded-full transition-transform cursor-pointer ${
+                      className={`w-5 h-5 sm:w-7 sm:h-7 rounded-full transition-transform cursor-pointer ${
                         newColor === c.hex
                           ? 'scale-125 ring-2 ring-offset-2 ring-offset-white dark:ring-offset-neutral-900 shadow-md ring-neutral-800 dark:ring-white'
                           : 'hover:scale-110 opacity-70 hover:opacity-100'
@@ -1774,18 +1774,18 @@ function DecksViewContent() {
                 </div>
               </div>
 
-              <div className="pt-2 sm:pt-3 flex items-center justify-end gap-2 sm:gap-3">
+              <div className="pt-1.5 sm:pt-3 flex items-center justify-end gap-2 sm:gap-3">
                 <button
                   type="button"
                   onClick={handleCloseCreateModal}
-                  className="px-3.5 py-2 sm:px-4 sm:py-2 text-xs text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 transition cursor-pointer"
+                  className="px-3 py-1.5 sm:px-4 sm:py-2 text-xs text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 transition cursor-pointer"
                 >
                   {t('common.cancel', 'Cancelar')}
                 </button>
                 <button
                   type="submit"
                   disabled={isCreating || !newTitle.trim()}
-                  className={`px-4 py-2 sm:px-5 sm:py-2.5 text-xs font-medium text-white disabled:opacity-50 rounded-xl transition shadow-lg active:scale-95 cursor-pointer ${
+                  className={`px-3.5 py-1.5 sm:px-5 sm:py-2.5 text-xs font-medium text-white disabled:opacity-50 rounded-xl transition shadow-lg active:scale-95 cursor-pointer ${
                     createType === 'folder'
                       ? 'bg-amber-600 hover:bg-amber-500 shadow-amber-600/25'
                       : 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-600/25'

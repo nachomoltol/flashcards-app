@@ -11,6 +11,36 @@ export async function ensureQuickGuideDeck(userId: string): Promise<string | nul
   if (!userId) return null;
 
   try {
+    // 0. Comprobar si el usuario ha descartado o eliminado voluntariamente la Guía Rápida
+    if (typeof window !== 'undefined') {
+      if (
+        localStorage.getItem(`flashcards_guide_dismissed_${userId}`) === 'true' ||
+        localStorage.getItem('flashcards_guide_dismissed_global') === 'true'
+      ) {
+        return null;
+      }
+    }
+
+    // Verificar en los metadatos persistentes del usuario en Supabase Auth
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (
+        user &&
+        (user.user_metadata?.guide_deck_dismissed === true ||
+          user.user_metadata?.tutorial_dismissed === true)
+      ) {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(`flashcards_guide_dismissed_${userId}`, 'true');
+        }
+        return null;
+      }
+    } catch {
+      // Continuar si hay fallo puntual de red al consultar sesión
+    }
+
     // 1. Verificar si el usuario ya posee un mazo con el título "Guía Rápida"
     const { data: existingDeck, error: fetchError } = await supabase
       .from('decks')

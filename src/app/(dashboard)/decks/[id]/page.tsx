@@ -500,50 +500,29 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
               </span>
             </h2>
 
-            {/* Barra de Búsqueda Dinámica y Botón Imprimir */}
+            {/* Barra de Búsqueda Dinámica */}
             {cards.length > 0 && (
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <div className="relative flex-1 sm:w-64">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-neutral-400 dark:text-neutral-500">
-                    <Search className="w-4 h-4" />
-                  </div>
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder={t('deck_detail.search_cards_placeholder', 'Buscar por pregunta o respuesta...')}
-                    className="w-full pl-9 pr-8 py-2 rounded-xl text-xs bg-neutral-100/80 dark:bg-neutral-800/60 border border-neutral-200 dark:border-neutral-700/70 text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition shadow-sm"
-                  />
-                  {searchQuery && (
-                    <button
-                      type="button"
-                      onClick={() => setSearchQuery('')}
-                      className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 cursor-pointer"
-                      title={t('common.clear', 'Limpiar')}
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
+              <div className="relative w-full sm:w-72">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-neutral-400 dark:text-neutral-500">
+                  <Search className="w-4 h-4" />
                 </div>
-
-                <button
-                  type="button"
-                  onClick={handlePrintExam}
-                  className="py-2 px-3 rounded-xl font-semibold text-xs text-neutral-700 dark:text-neutral-200 hover:text-neutral-950 dark:hover:text-white bg-white hover:bg-neutral-100 dark:bg-neutral-800 dark:hover:bg-neutral-700 border border-neutral-300 dark:border-neutral-700 shadow-sm transition flex items-center gap-1.5 cursor-pointer shrink-0"
-                  title={
-                    !isPro
-                      ? t('deck_detail.print_pro_only', 'Exportar a PDF / Imprimir es exclusivo para PRO')
-                      : t('deck_detail.export_pdf_btn', 'Exportar a PDF / Imprimir')
-                  }
-                >
-                  <Printer className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-                  <span className="hidden sm:inline">{t('deck_detail.export_pdf_short', 'Imprimir')}</span>
-                  {!isPro && (
-                    <span className="px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white leading-none shadow-xs">
-                      PRO
-                    </span>
-                  )}
-                </button>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={t('deck_detail.search_cards_placeholder', 'Buscar por pregunta o respuesta...')}
+                  className="w-full pl-9 pr-8 py-2 rounded-xl text-xs bg-neutral-100/80 dark:bg-neutral-800/60 border border-neutral-200 dark:border-neutral-700/70 text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition shadow-sm"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 cursor-pointer"
+                    title={t('common.clear', 'Limpiar')}
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
             )}
           </div>

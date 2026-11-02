@@ -72,7 +72,20 @@ export const useDeckStore = create<DeckState>((set, get) => ({
       // Asegurar que el nuevo usuario cuente con el mazo de demostración "Guía Rápida" y el tutorial de bienvenida
       try {
         const seededKey = `flashcards_guide_seeded_${user.id}`;
-        if (typeof window !== 'undefined' && !localStorage.getItem(seededKey)) {
+        const dismissedKey = `flashcards_guide_dismissed_${user.id}`;
+        const isDismissed =
+          (typeof window !== 'undefined' &&
+            (localStorage.getItem(dismissedKey) === 'true' ||
+              localStorage.getItem('flashcards_guide_dismissed_global') === 'true')) ||
+          user.user_metadata?.guide_deck_dismissed === true ||
+          user.user_metadata?.tutorial_dismissed === true;
+
+        if (isDismissed) {
+          if (typeof window !== 'undefined') {
+            localStorage.setItem(dismissedKey, 'true');
+            localStorage.setItem(seededKey, 'true');
+          }
+        } else if (typeof window !== 'undefined' && !localStorage.getItem(seededKey)) {
           await ensureQuickGuideDeck(user.id);
           localStorage.setItem(seededKey, 'true');
           try {
@@ -248,6 +261,36 @@ export const useDeckStore = create<DeckState>((set, get) => ({
 
   deleteDeck: async (id: string) => {
     try {
+      // Si el usuario elimina voluntariamente la "Guía Rápida", persistir la marca para que no vuelva a crearse
+      const deckToDelete = get().decks.find((d) => d.id === id);
+      const isGuideDeck =
+        deckToDelete &&
+        (deckToDelete.title.trim().toLowerCase() === 'guía rápida' ||
+          deckToDelete.title.trim().toLowerCase() === 'guia rapida');
+
+      if (isGuideDeck) {
+        try {
+          const {
+            data: { user },
+          } = await supabase.auth.getUser();
+
+          if (user) {
+            if (typeof window !== 'undefined') {
+              localStorage.setItem(`flashcards_guide_dismissed_${user.id}`, 'true');
+              localStorage.setItem(`flashcards_guide_seeded_${user.id}`, 'true');
+              localStorage.setItem('flashcards_guide_dismissed_global', 'true');
+            }
+
+            // Persistir de forma permanente en los metadatos de Supabase Auth
+            await supabase.auth.updateUser({
+              data: { guide_deck_dismissed: true, tutorial_dismissed: true },
+            });
+          }
+        } catch (metaErr) {
+          console.warn('No se pudo guardar la marca de persistencia del mazo demo:', metaErr);
+        }
+      }
+
       const { error } = await supabase.from('decks').delete().eq('id', id);
       if (error) throw error;
 
