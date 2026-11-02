@@ -1211,7 +1211,25 @@ async function enforceApiLimit(
       const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
       const lastMonth = lastDate ? lastDate.slice(0, 7) : null;
       const isSameMonth = lastMonth === currentMonth;
-      const count = isSameMonth ? generationsCount : 0;
+      let count = isSameMonth ? generationsCount : 0;
+
+      // Reseteo mensual perezoso (Lazy Reset) persistente en base de datos si se detecta cambio de mes
+      if (!isSameMonth && lastDate) {
+        count = 0;
+        const todayStr = new Date().toISOString().slice(0, 10);
+        try {
+          await supabase
+            .from('api_limits')
+            .update({
+              generations_count: 0,
+              last_generation_date: todayStr,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('user_id', userId);
+        } catch (resetErr) {
+          console.warn('Advertencia no bloqueante al persistir lazy reset en fallback de cuota:', resetErr);
+        }
+      }
 
       // 1. TIER 'pro' o 'vip': límite 120 mensuales
       if (tier === 'pro' || tier === 'vip') {

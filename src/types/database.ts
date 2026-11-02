@@ -26,6 +26,8 @@ export type Database = {
           stripe_subscription_id?: string | null
           bonus_credits: number
           welcome_generations: number
+          current_period_end?: string | null
+          subscription_status?: string | null
           created_at: string
           updated_at: string
         }
@@ -40,6 +42,8 @@ export type Database = {
           stripe_subscription_id?: string | null
           bonus_credits?: number
           welcome_generations?: number
+          current_period_end?: string | null
+          subscription_status?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -54,6 +58,8 @@ export type Database = {
           stripe_subscription_id?: string | null
           bonus_credits?: number
           welcome_generations?: number
+          current_period_end?: string | null
+          subscription_status?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -429,6 +435,8 @@ export type Database = {
           p_tier: string
           p_customer_id?: string | null
           p_subscription_id?: string | null
+          p_current_period_end?: string | null
+          p_subscription_status?: string | null
         }
         Returns: void
       }
@@ -458,6 +466,7 @@ export type Database = {
         Args: {
           p_subscription_id?: string | null
           p_customer_id?: string | null
+          p_subscription_status?: string | null
         }
         Returns: void
       }
