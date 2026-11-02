@@ -218,16 +218,18 @@ export function ProModal({
               ),
           });
 
-          // Auto-reanudación: cerrar modal y ejecutar de inmediato la generación pendiente
+          // Auto-reanudación con desacoplamiento visual: cerrar modal y ejecutar la acción pendiente tras desmontaje
           const resumeAction = store.onRewardSuccess;
           setTimeout(() => {
             handleClose();
             if (typeof resumeAction === 'function') {
-              try {
-                resumeAction();
-              } catch (resumeErr) {
-                console.error('Error al auto-reanudar la generación pendiente:', resumeErr);
-              }
+              setTimeout(() => {
+                try {
+                  resumeAction();
+                } catch (resumeErr) {
+                  console.error('Error al auto-reanudar la acción pendiente:', resumeErr);
+                }
+              }, 50);
             }
           }, 600);
         } else {

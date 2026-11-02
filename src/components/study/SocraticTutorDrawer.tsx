@@ -64,12 +64,12 @@ export function SocraticTutorDrawer({
   }, [isOpen, question, fetchQuota]);
 
   // Manejar consulta inicial al Tutor Socrático
-  const handleAskTutor = async () => {
+  const handleAskTutor = async (forceBypassAdCheck: boolean = false) => {
     setErrorMsg(null);
 
-    // Si es usuario Free y requiere ver anuncio
-    if (quotaStatus && !quotaStatus.isPro && quotaStatus.requiresAd) {
-      useProModalStore.getState().openProModal(true, null, () => handleAskTutor());
+    // Si es usuario Free y requiere ver anuncio (omitido si venimos de desbloquearlo por anuncio)
+    if (!forceBypassAdCheck && quotaStatus && !quotaStatus.isPro && quotaStatus.requiresAd) {
+      useProModalStore.getState().openProModal(true, null, () => handleAskTutor(true));
       return;
     }
 
@@ -88,7 +88,7 @@ export function SocraticTutorDrawer({
 
       if (res.success && res.explanation) {
         setExplanation(res.explanation);
-        // Actualizar cuota localmente
+        // Actualizar cuota localmente y sincronizar con la base de datos
         setQuotaStatus((prev) =>
           prev
             ? {
@@ -99,9 +99,10 @@ export function SocraticTutorDrawer({
               }
             : null
         );
+        fetchQuota();
       } else if (res.error === 'AD_REQUIRED' || res.error === 'LIMIT_REACHED') {
         setQuotaStatus((prev) => (prev ? { ...prev, requiresAd: true, remainingFree: 0 } : null));
-        useProModalStore.getState().openProModal(true, null, () => handleAskTutor());
+        useProModalStore.getState().openProModal(true, null, () => handleAskTutor(true));
         return;
       } else {
         setErrorMsg(res.error || t('socratic_tutor.error_generic', 'No se pudo consultar al tutor en este momento.'));
@@ -164,7 +165,7 @@ export function SocraticTutorDrawer({
           {/* Botón principal del Tutor */}
           <button
             type="button"
-            onClick={handleAskTutor}
+            onClick={() => handleAskTutor()}
             disabled={isWatchingAd}
             className="flex-1 py-2.5 sm:py-3 px-3 sm:px-4 rounded-xl sm:rounded-2xl bg-amber-500/20 hover:bg-amber-500/30 active:bg-amber-500/40 text-amber-800 dark:text-amber-200 border border-amber-500/40 hover:border-amber-500/60 transition-all duration-150 flex items-center justify-between gap-2 group cursor-pointer active:scale-[0.99] shadow-sm min-w-0"
           >
