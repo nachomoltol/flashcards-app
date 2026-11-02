@@ -582,7 +582,7 @@ export function DocumentUploader({
       if (!result.success || !result.cards || result.cards.length === 0) {
         if (result.error === 'LIMIT_REACHED' || result.error === 'AD_REQUIRED') {
           setStatus('idle');
-          openProModal(true);
+          openProModal(true, null, () => handleProcessDocument(startPageForRun));
           return;
         }
 

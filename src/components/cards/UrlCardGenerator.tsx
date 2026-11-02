@@ -138,7 +138,7 @@ export function UrlCardGenerator({
       if (!result.success || !result.cards) {
         if (result.error === 'LIMIT_REACHED' || result.error === 'AD_REQUIRED') {
           setStatus('idle');
-          openProModal(true);
+          openProModal(true, null, () => handleGenerate());
           return;
         }
 

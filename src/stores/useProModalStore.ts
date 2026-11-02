@@ -6,7 +6,12 @@ interface ProModalState {
   isOpen: boolean;
   isLimitReached: boolean;
   featureName?: ProFeatureName;
-  openProModal: (isLimitReached?: boolean, featureName?: ProFeatureName) => void;
+  onRewardSuccess?: (() => void) | null;
+  openProModal: (
+    isLimitReached?: boolean,
+    featureName?: ProFeatureName,
+    onRewardSuccess?: (() => void) | null
+  ) => void;
   closeProModal: () => void;
 }
 
@@ -14,7 +19,9 @@ export const useProModalStore = create<ProModalState>((set) => ({
   isOpen: false,
   isLimitReached: false,
   featureName: null,
-  openProModal: (isLimitReached = false, featureName = null) =>
-    set({ isOpen: true, isLimitReached, featureName }),
-  closeProModal: () => set({ isOpen: false, isLimitReached: false, featureName: null }),
+  onRewardSuccess: null,
+  openProModal: (isLimitReached = false, featureName = null, onRewardSuccess = null) =>
+    set({ isOpen: true, isLimitReached, featureName, onRewardSuccess }),
+  closeProModal: () =>
+    set({ isOpen: false, isLimitReached: false, featureName: null, onRewardSuccess: null }),
 }));

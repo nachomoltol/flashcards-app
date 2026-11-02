@@ -136,7 +136,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
     if (!result.success || !result.cards) {
       if (result.error === 'LIMIT_REACHED' || result.error === 'AD_REQUIRED') {
         setIsGenerating(false);
-        openProModal(true);
+        openProModal(true, null, () => handleGenerateCardsByTopic());
         return;
       }
 

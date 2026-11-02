@@ -69,7 +69,7 @@ export function SocraticTutorDrawer({
 
     // Si es usuario Free y requiere ver anuncio
     if (quotaStatus && !quotaStatus.isPro && quotaStatus.requiresAd) {
-      useProModalStore.getState().openProModal(true);
+      useProModalStore.getState().openProModal(true, null, () => handleAskTutor());
       return;
     }
 
@@ -101,7 +101,7 @@ export function SocraticTutorDrawer({
         );
       } else if (res.error === 'AD_REQUIRED' || res.error === 'LIMIT_REACHED') {
         setQuotaStatus((prev) => (prev ? { ...prev, requiresAd: true, remainingFree: 0 } : null));
-        useProModalStore.getState().openProModal(true);
+        useProModalStore.getState().openProModal(true, null, () => handleAskTutor());
         return;
       } else {
         setErrorMsg(res.error || t('socratic_tutor.error_generic', 'No se pudo consultar al tutor en este momento.'));
