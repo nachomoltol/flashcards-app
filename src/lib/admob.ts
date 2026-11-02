@@ -42,42 +42,85 @@ declare global {
   }
 }
 
+/**
+ * Eventos oficiales del plugin de anuncios bonificados de @capacitor-community/admob.
+ * Se definen de forma estática para desacoplar el bundle web del import dinámico.
+ */
+export const RewardAdPluginEvents = {
+  Loaded: 'onRewardedVideoAdLoaded',
+  FailedToLoad: 'onRewardedVideoAdFailedToLoad',
+  Showed: 'onRewardedVideoAdShowed',
+  FailedToShow: 'onRewardedVideoAdFailedToShow',
+  Dismissed: 'onRewardedVideoAdDismissed',
+  Rewarded: 'onRewardedVideoAdReward',
+  AdImpression: 'onRewardedVideoAdImpression',
+} as const;
+
+/**
+ * Obtiene de forma segura el SDK de AdMob inyectado por Capacitor en la ventana global.
+ * Si no estamos en entorno nativo Capacitor, retorna null sin provocar errores de red.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getCapacitorAdMobPlugin(): any {
+  if (typeof window === 'undefined') return null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (window as any).Capacitor?.Plugins?.AdMob || null;
+}
+
 let isAdMobInitialized = false;
 
 /**
  * Inicializa el SDK de AdMob si se ejecuta dentro del entorno Capacitor nativo.
- * Utiliza importación dinámica para evitar fallos de empaquetado en entornos web/SSR.
+ * Utiliza el objeto inyectado en window.Capacitor.Plugins.AdMob.
  */
 export async function initializeAdMob(): Promise<boolean> {
   if (typeof window === 'undefined') return false;
   if (isAdMobInitialized) return true;
 
   const platform = detectPlatform();
+  if (!platform.isNativeAndroid) {
+    isAdMobInitialized = true;
+    return true;
+  }
 
-  // Si estamos en Capacitor Android, intentar cargar @capacitor-community/admob dinámicamente
-  if (platform.isCapacitorAndroid) {
+  const AdMob = getCapacitorAdMobPlugin();
+  if (AdMob) {
     try {
-      // Dynamic import para no requerir la dependencia nativa en entornos web puros
-      const admobModule = await import(
-        /* webpackIgnore: true */ '@capacitor-community/admob'
-      ).catch(() => null);
-
-      if (admobModule?.AdMob) {
-        const isDev = process.env.NODE_ENV === 'development';
-        await admobModule.AdMob.initialize({
-          testingDevices: isDev ? ['EMULATOR'] : [],
-          initializeForTesting: isDev,
-        });
-        isAdMobInitialized = true;
-        return true;
-      }
+      const isDev = process.env.NODE_ENV !== 'production';
+      await AdMob.initialize({
+        testingDevices: isDev ? ['EMULATOR'] : [],
+        initializeForTesting: isDev,
+      });
+      isAdMobInitialized = true;
+      return true;
     } catch (e) {
-      console.warn('No se pudo inicializar @capacitor-community/admob:', e);
+      console.warn('No se pudo inicializar AdMob nativo:', e);
+      return false;
     }
   }
 
-  isAdMobInitialized = true;
-  return true;
+  return false;
+}
+
+/**
+ * Determina el ID de bloque bonificado a utilizar.
+ * PROTECCIÓN DE CUENTA: Si el entorno no es producción, fuerza el ID de prueba oficial de Google.
+ */
+function getEffectiveRewardedAdUnitId(requestedId?: string): { adId: string; isTesting: boolean } {
+  const isDev = process.env.NODE_ENV !== 'production';
+
+  // Si no estamos en producción, OBLIGAR a usar los IDs de prueba oficiales de Google
+  if (isDev) {
+    return {
+      adId: ADMOB_CONFIG.TEST_REWARDED_AD_UNIT_ID,
+      isTesting: true,
+    };
+  }
+
+  // En producción real y plataforma nativa, usar el ID oficial configurado
+  const adId = requestedId || ADMOB_CONFIG.REWARDED_AD_UNIT_ID;
+  const isTesting = adId === ADMOB_CONFIG.TEST_REWARDED_AD_UNIT_ID;
+  return { adId, isTesting };
 }
 
 /**
@@ -85,11 +128,11 @@ export async function initializeAdMob(): Promise<boolean> {
  * completa la visualización requerida para recibir la bonificación (+1 crédito).
  */
 export async function showAdMobRewardedAd(
-  adUnitId: string = ADMOB_CONFIG.REWARDED_AD_UNIT_ID
+  adUnitId?: string
 ): Promise<ShowRewardedAdResult> {
   const platform = detectPlatform();
 
-  // Si la plataforma NO es Android nativo, los anuncios bonificados no aplican:
+  // Si la plataforma NO es Android nativo (Capacitor Android), los anuncios bonificados no aplican:
   // Se bloquea cualquier crédito simulado y se abre directamente el modal PRO.
   if (!platform.isNativeAndroid) {
     if (typeof window !== 'undefined') {
@@ -101,78 +144,79 @@ export async function showAdMobRewardedAd(
     };
   }
 
-  // 1. Canal 1: Capacitor Nativo con @capacitor-community/admob
-  if (platform.isCapacitorAndroid) {
+  const { adId, isTesting } = getEffectiveRewardedAdUnitId(adUnitId);
+
+  // 1. Canal 1: Capacitor Nativo con AdMob inyectado en window.Capacitor.Plugins.AdMob
+  const AdMob = getCapacitorAdMobPlugin();
+  if (AdMob) {
     try {
-      const admobModule = await import(
-        /* webpackIgnore: true */ '@capacitor-community/admob'
-      ).catch(() => null);
+      // Inicializar el SDK de AdMob de forma condicional si no se ha inicializado ya
+      if (!isAdMobInitialized) {
+        await initializeAdMob();
+      }
 
-      if (admobModule?.AdMob) {
-        const { AdMob, RewardAdPluginEvents } = admobModule;
+      // Registrar listener de recompensa
+      const nativeAdPromise = new Promise<ShowRewardedAdResult>((resolve) => {
+        let rewarded = false;
 
-        // Registrar listener de recompensa
-        const nativeAdPromise = new Promise<ShowRewardedAdResult>((resolve) => {
-          let rewarded = false;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const rewardListener = AdMob.addListener(
+          RewardAdPluginEvents.Rewarded,
+          (rewardItem: { amount: number; type: string }) => {
+            rewarded = true;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            rewardListener?.then?.((l: any) => l?.remove?.());
+            resolve({
+              completed: true,
+              reward: {
+                amount: rewardItem?.amount || 1,
+                type: rewardItem?.type || 'generation_credit',
+              },
+            });
+          }
+        );
 
-          const rewardListener = AdMob.addListener(
-            RewardAdPluginEvents.Rewarded,
-            (rewardItem: { amount: number; type: string }) => {
-              rewarded = true;
-              rewardListener.then((l: { remove: () => void }) => l.remove());
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const dismissListener = AdMob.addListener(
+          RewardAdPluginEvents.Dismissed,
+          () => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            dismissListener?.then?.((l: any) => l?.remove?.());
+            if (!rewarded) {
               resolve({
-                completed: true,
-                reward: {
-                  amount: rewardItem?.amount || 1,
-                  type: rewardItem?.type || 'generation_credit',
-                },
+                completed: false,
+                error: 'El anuncio se cerró antes de completar la visualización obligatoria.',
               });
             }
-          );
+          }
+        );
 
-          const dismissListener = AdMob.addListener(
-            RewardAdPluginEvents.Dismissed,
-            () => {
-              dismissListener.then((l: { remove: () => void }) => l.remove());
-              if (!rewarded) {
-                resolve({
-                  completed: false,
-                  error: 'El anuncio se cerró antes de completar la visualización obligatoria.',
-                });
-              }
-            }
-          );
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const failedListener = AdMob.addListener(
+          RewardAdPluginEvents.FailedToShow,
+          (err: { message?: string }) => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            failedListener?.then?.((l: any) => l?.remove?.());
+            console.warn('AdMob FailedToShow, activando emulación de respaldo:', err);
+            emulateRewardedAdDialog().then(resolve);
+          }
+        );
 
-          const failedListener = AdMob.addListener(
-            RewardAdPluginEvents.FailedToShow,
-            (err: { message?: string }) => {
-              failedListener.then((l: { remove: () => void }) => l.remove());
-              // En lugar de rechazar y bloquear al usuario si AdMob no tiene fill o falla el despliegue nativo,
-              // activamos la simulación con cuenta atrás garantizada en Android
-              console.warn('AdMob FailedToShow, activando emulación de respaldo:', err);
-              emulateRewardedAdDialog().then(resolve);
-            }
-          );
+        // Preparar y desplegar el anuncio bonificado
+        AdMob.prepareRewardVideoAd({
+          adId,
+          isTesting,
+        })
+          .then(() => AdMob.showRewardVideoAd())
+          .catch((err: Error) => {
+            console.warn('Fallo en AdMob.prepareRewardVideoAd, activando emulación de respaldo:', err);
+            emulateRewardedAdDialog().then(resolve);
+          });
+      });
 
-          // Preparar y desplegar el anuncio bonificado
-          const isTestAd = adUnitId === ADMOB_CONFIG.TEST_REWARDED_AD_UNIT_ID;
-          AdMob.prepareRewardVideoAd({
-            adId: adUnitId,
-            isTesting: isTestAd,
-          })
-            .then(() => AdMob.showRewardVideoAd())
-            .catch((err: Error) => {
-              // Si falla al preparar (ej. No Fill o plugin nativo en APK no enlazado),
-              // recurrimos a la emulación controlada en lugar de bloquear
-              console.warn('Fallo en AdMob.prepareRewardVideoAd, activando emulación de respaldo:', err);
-              emulateRewardedAdDialog().then(resolve);
-            });
-        });
-
-        return await nativeAdPromise;
-      }
+      return await nativeAdPromise;
     } catch (err) {
-      console.warn('Fallo en canal @capacitor-community/admob, recurriendo a emulación:', err);
+      console.warn('Fallo en canal AdMob nativo, recurriendo a emulación:', err);
       return emulateRewardedAdDialog();
     }
   }
@@ -205,7 +249,7 @@ export async function showAdMobRewardedAd(
       window.addEventListener('admob:rewarded', handleAdComplete);
       window.addEventListener('admob:cancelled', handleAdCancelled);
 
-      window.AndroidAdMob?.showRewardedAd(adUnitId);
+      window.AndroidAdMob?.showRewardedAd(adId);
     });
   }
 

@@ -66,7 +66,9 @@ export function detectPlatform(): PlatformInfo {
       /Version\/[\d.]+/i.test(userAgent) ||
       hasAndroidBridge);
 
-  const isNativeAndroid = isAndroidOS || isCapacitorAndroid || isTWA || isAndroidWebView || hasAndroidBridge;
+  // isNativeAndroid depende EXCLUSIVAMENTE de Capacitor en entorno nativo Android
+  // Los usuarios en Chrome móvil sobre Android son tratados como navegación web móvil estándar
+  const isNativeAndroid = isCapacitorAndroid;
   const isMobileDevice = isAndroidOS || isIOS;
   const isWebDesktop = !isNativeAndroid && !isMobileDevice;
   const isMobileBrowser = isMobileDevice && !isNativeAndroid;
