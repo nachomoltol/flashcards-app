@@ -1389,7 +1389,10 @@ export async function generateCardsAction(
   const apiCheck = checkResult.check;
 
   // Límite seguro: hasta 40 tarjetas en Modo Didáctico y 30 en Modo Estudio
-  const maxAllowed = 30;
+  const maxAllowed =
+    pedagogicalMode === 'didactic' || (pedagogicalMode as unknown as string) === 'docente'
+      ? 40
+      : 30;
   const targetCount = Math.max(1, Math.min(maxAllowed, cardCount || 10));
 
   try {
@@ -1763,7 +1766,10 @@ export async function generateCardsFromDocumentAction(
   const apiCheck = checkResult.check;
 
   // Límite seguro: hasta 40 tarjetas en Modo Didáctico y 30 en Modo Estudio
-  const maxAllowed = 30;
+  const maxAllowed =
+    pedagogicalMode === 'didactic' || (pedagogicalMode as unknown as string) === 'docente'
+      ? 40
+      : 30;
   const targetCount = Math.max(1, Math.min(maxAllowed, cardCount || 10));
 
   try {
@@ -3149,7 +3155,10 @@ export async function generateCardsFromUrlAction(
   }
   const apiCheck = checkResult.check;
 
-  const maxAllowed = pedagogicalMode === 'didactic' ? 40 : 30;
+  const maxAllowed =
+    pedagogicalMode === 'didactic' || (pedagogicalMode as unknown as string) === 'docente'
+      ? 40
+      : 30;
   const targetCount = Math.max(1, Math.min(maxAllowed, cardCount || 10));
 
   try {
