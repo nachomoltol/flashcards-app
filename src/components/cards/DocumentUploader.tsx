@@ -22,7 +22,7 @@ interface DocumentUploaderProps {
   onStepChange?: (step: 1 | 2 | 3) => void;
 }
 
-type FileTypeCategory = 'pdf' | 'docx' | 'audio' | 'text';
+type FileTypeCategory = 'pdf' | 'docx' | 'audio' | 'video' | 'text';
 
 interface FileTypeInfo {
   category: FileTypeCategory;
@@ -34,7 +34,7 @@ interface FileTypeInfo {
   mime: string;
 }
 
-const SUPPORTED_EXTENSIONS = ['.pdf', '.docx', '.doc', '.mp3', '.wav', '.txt'];
+const SUPPORTED_EXTENSIONS = ['.pdf', '.docx', '.doc', '.mp3', '.wav', '.m4a', '.mp4', '.mov', '.webm', '.txt'];
 const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50MB matching Supabase bucket limit
 
 // Helper para identificar la categoría visual del archivo
@@ -70,15 +70,33 @@ function getFileTypeInfo(file: File): FileTypeInfo {
         : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     };
   }
-  if (ext === '.mp3' || ext === '.wav' || file.type.startsWith('audio/')) {
+  if (
+    ext === '.mp4' ||
+    ext === '.mov' ||
+    ext === '.webm' ||
+    file.type.startsWith('video/')
+  ) {
+    const isMov = ext === '.mov' || file.type === 'video/quicktime';
+    const isWebm = ext === '.webm' || file.type === 'video/webm';
+    return {
+      category: 'video',
+      label: isMov ? 'Vídeo MOV' : isWebm ? 'Vídeo WebM' : 'Vídeo MP4',
+      badgeBg: 'bg-purple-500/15',
+      badgeText: 'text-purple-400',
+      borderCol: 'border-purple-500/30',
+      iconBg: 'bg-purple-500/20 text-purple-300',
+      mime: isMov ? 'video/quicktime' : isWebm ? 'video/webm' : 'video/mp4',
+    };
+  }
+  if (ext === '.mp3' || ext === '.wav' || ext === '.m4a' || file.type.startsWith('audio/')) {
     return {
       category: 'audio',
-      label: ext === '.wav' ? 'Audio WAV' : 'Audio MP3',
+      label: ext === '.wav' ? 'Audio WAV' : ext === '.m4a' ? 'Audio M4A' : 'Audio MP3',
       badgeBg: 'bg-emerald-500/15',
       badgeText: 'text-emerald-400',
       borderCol: 'border-emerald-500/30',
       iconBg: 'bg-emerald-500/20 text-emerald-300',
-      mime: ext === '.wav' ? 'audio/wav' : 'audio/mpeg',
+      mime: ext === '.wav' ? 'audio/wav' : ext === '.m4a' ? 'audio/mp4' : 'audio/mpeg',
     };
   }
   return {
@@ -105,14 +123,21 @@ function validateFile(file: File): string | null {
     file.type === 'application/pdf' ||
     file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
     file.type === 'application/msword' ||
+    file.type.startsWith('audio/') ||
+    file.type.startsWith('video/') ||
     file.type === 'audio/mpeg' ||
     file.type === 'audio/mp3' ||
     file.type === 'audio/wav' ||
     file.type === 'audio/x-wav' ||
+    file.type === 'audio/mp4' ||
+    file.type === 'audio/x-m4a' ||
+    file.type === 'video/mp4' ||
+    file.type === 'video/quicktime' ||
+    file.type === 'video/webm' ||
     file.type === 'text/plain';
 
   if (!isSupportedExt && !isSupportedMime) {
-    return `Tipo de archivo no soportado. Formatos admitidos: PDF, Word (.docx, .doc), Audio (.mp3, .wav) y TXT.`;
+    return `Tipo de archivo no soportado. Formatos admitidos: PDF, Word (.docx, .doc), Audio (.mp3, .wav, .m4a), Vídeo (.mp4, .mov, .webm) y TXT.`;
   }
 
   if (file.size > MAX_FILE_SIZE_BYTES) {
@@ -331,14 +356,15 @@ export function DocumentUploader({
     }
 
     const ext = '.' + (file.name.split('.').pop()?.toLowerCase() || '');
-    const isAudio = ext === '.mp3' || ext === '.wav' || file.type.startsWith('audio/');
-    if (isAudio && !isPro) {
+    const isVideo = ext === '.mp4' || ext === '.mov' || ext === '.webm' || file.type.startsWith('video/');
+    const isAudio = ext === '.mp3' || ext === '.wav' || ext === '.m4a' || file.type.startsWith('audio/');
+    if ((isAudio || isVideo) && !isPro) {
       setErrorMessage(
         isEn
-          ? 'Audio and Voice processing is exclusive to PRO members. Upgrade to PRO to generate flashcards from audio recordings.'
-          : 'El procesamiento de archivos de Audio y Grabaciones es exclusivo para miembros PRO. Actualiza tu cuenta para generar tarjetas desde audios.'
+          ? `${isVideo ? 'Video' : 'Audio'} processing is exclusive to PRO members. Upgrade to PRO to generate flashcards from multimedia files.`
+          : `El procesamiento de archivos de ${isVideo ? 'Vídeo' : 'Audio'} y Grabaciones es exclusivo para miembros PRO. Actualiza tu cuenta para generar tarjetas desde archivos multimedia.`
       );
-      openProModal(false, 'audio');
+      openProModal(false, isVideo ? 'video' : 'audio');
       return;
     }
 
@@ -485,6 +511,14 @@ export function DocumentUploader({
           uploadContentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
         } else if (fileExt === '.doc') {
           uploadContentType = 'application/msword';
+        } else if (fileExt === '.mp4') {
+          uploadContentType = 'video/mp4';
+        } else if (fileExt === '.mov') {
+          uploadContentType = 'video/quicktime';
+        } else if (fileExt === '.webm') {
+          uploadContentType = 'video/webm';
+        } else if (fileExt === '.m4a') {
+          uploadContentType = 'audio/mp4';
         } else if (!uploadContentType) {
           uploadContentType = fileInfo.mime || 'application/octet-stream';
         }
@@ -952,7 +986,7 @@ export function DocumentUploader({
           <input
             ref={fileInputRef}
             type="file"
-            accept=".pdf,.docx,.doc,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,audio/mpeg,audio/mp3,audio/wav,audio/x-wav,text/plain"
+            accept=".pdf,.docx,.doc,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/mp4,audio/x-m4a,video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm,.m4a,text/plain"
             className="hidden"
             onChange={(e) => {
               if (e.target.files && e.target.files.length > 0) {
@@ -1110,7 +1144,11 @@ export function DocumentUploader({
                         Word (.docx, .doc)
                       </span>
                       <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/25 text-emerald-700 dark:text-emerald-300 inline-flex items-center gap-1">
-                        Audio (.mp3, .wav)
+                        Audio (.mp3, .wav, .m4a)
+                        <span className="text-[8px] font-bold px-1 py-0.2 rounded bg-amber-500 text-white leading-none">PRO</span>
+                      </span>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-purple-500/10 border border-purple-500/25 text-purple-700 dark:text-purple-300 inline-flex items-center gap-1">
+                        Vídeo (.mp4, .mov, .webm)
                         <span className="text-[8px] font-bold px-1 py-0.2 rounded bg-amber-500 text-white leading-none">PRO</span>
                       </span>
                       <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/25 text-amber-700 dark:text-amber-300">
@@ -1171,6 +1209,11 @@ export function DocumentUploader({
                               {info.category === 'audio' && (
                                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                                </svg>
+                              )}
+                              {info.category === 'video' && (
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                                 </svg>
                               )}
                               {info.category === 'text' && (

@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   Sparkles,
   Zap,
-  Infinity,
   Brain,
   X,
   ChevronRight,
@@ -299,38 +298,47 @@ export function ProModal({
         return {
           icon: Volume2,
           badge: isEn ? 'PRO EXCLUSIVE • AUDIO & VOICE' : 'EXCLUSIVO PRO • AUDIO Y GRABACIONES',
-          title: isEn ? 'Unlock Audio & Voice Processing' : 'Desbloquea el Procesamiento de Audio y Voz',
+          title: isEn ? 'Master Any Subject from Audio' : 'Domina tus asignaturas desde audio',
           subtitle: isEn
-            ? 'Transcribing lectures, voice recordings and podcasts with Google Cloud AI is exclusive to Flashmente PRO.'
-            : 'La transcripción y generación de tarjetas desde notas de voz, conferencias y clases grabadas es una función 100% exclusiva de Flashmente PRO.',
+            ? 'Convert recorded lectures, voice notes and podcasts into high-retention flashcards in seconds.'
+            : 'Convierte tus clases grabadas, notas de voz y conferencias en flashcards de alta retención al instante.',
+        };
+      case 'video':
+        return {
+          icon: Video,
+          badge: isEn ? 'PRO EXCLUSIVE • VIDEO PROCESSING' : 'EXCLUSIVO PRO • VÍDEO Y CLASES',
+          title: isEn ? 'Master Any Topic from Video' : 'Domina cualquier tema desde vídeo',
+          subtitle: isEn
+            ? 'Transform recorded classes and video files (.mp4, .mov, .webm) into flashcards without manual typing.'
+            : 'Transforma clases grabadas y archivos de vídeo (.mp4, .mov, .webm) en tarjetas de estudio sin perder tiempo transcribiendo a mano.',
         };
       case 'youtube':
         return {
           icon: Video,
           badge: isEn ? 'PRO EXCLUSIVE • YOUTUBE AI' : 'EXCLUSIVO PRO • VÍDEOS DE YOUTUBE',
-          title: isEn ? 'Unlock YouTube Video Flashcards' : 'Desbloquea la Generación desde YouTube',
+          title: isEn ? 'Learn Faster with YouTube' : 'Aprende más rápido con YouTube',
           subtitle: isEn
-            ? 'Direct video analysis on Google Cloud AI without downloading is exclusive to Flashmente PRO.'
-            : 'El análisis de conferencias y clases magistrales de YouTube directamente en la nube de Google es una función 100% exclusiva de Flashmente PRO.',
+            ? 'Turn lectures and educational masterclasses from YouTube into smart study cards in one click.'
+            : 'Convierte clases magistrales y tutoriales de YouTube en tarjetas de estudio inteligentes con un solo clic.',
         };
       case 'print':
       case 'pdf':
         return {
           icon: Printer,
           badge: isEn ? 'PRO EXCLUSIVE • PDF EXPORT' : 'EXCLUSIVO PRO • EXPORTACIÓN A PDF',
-          title: isEn ? 'Unlock Exam PDF Export & Print' : 'Desbloquea la Exportación a PDF e Impresión',
+          title: isEn ? 'Ace Your Exams Anywhere' : 'Aprueba tus exámenes en papel y digital',
           subtitle: isEn
-            ? 'Exporting ultra-compact exam sheets and official teacher answer keys to PDF is exclusive to Flashmente PRO.'
-            : 'La exportación e impresión ultra-compacta de exámenes y solucionarios oficiales en PDF es una función 100% exclusiva de Flashmente PRO.',
+            ? 'Generate ready-to-print compact exam sheets and official answer keys for realistic exam prep.'
+            : 'Genera exámenes oficiales listos para imprimir y hojas de estudio compactas para preparar tus pruebas con éxito.',
         };
       default:
         return {
           icon: Sparkles,
-          badge: isEn ? 'FLASHCARDS PRO' : 'FLASHCARDS PRO',
-          title: isEn ? 'Unlock Limitless Superpowers' : 'Desbloquea el poder sin límites',
+          badge: isEn ? 'FLASHMENTE PRO' : 'FLASHMENTE PRO',
+          title: isEn ? 'Master Any Subject' : 'Domina cualquier tema',
           subtitle: isEn
-            ? 'Boost your memory and pass your exams with unlimited AI generations, Gemini Flash and FSRS-5.'
-            : 'Impulsa tu memoria y aprueba tus exámenes con inteligencia artificial ilimitada y algoritmo cognitivo FSRS-5.',
+            ? 'Study smarter, memorize faster, and ace your exams with advanced AI assistance.'
+            : 'Estudia de forma más inteligente, memoriza el doble de rápido y aprueba con mejores notas gracias a la IA avanzada.',
         };
     }
   };
@@ -415,7 +423,7 @@ export function ProModal({
               >
                 {featureInfo.title}{' '}
                 <span className="block text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-indigo-600 to-violet-600 dark:from-purple-400 dark:via-violet-300 dark:to-indigo-300">
-                  — Gemini Flash & FSRS-5
+                  {isEn ? 'Study Smarter, Not Harder' : 'Estudia de forma inteligente'}
                 </span>
               </h2>
 
@@ -437,29 +445,29 @@ export function ProModal({
               {platform.isNativeAndroid ? (
                 <div className="space-y-2.5 sm:space-y-3">
                   {/* NIVEL 1 (PRIORITARIO / BOTÓN PRINCIPAL): PLAN PRO STRIPE */}
-                  <div className="relative p-3.5 sm:p-4 rounded-2xl bg-gradient-to-b from-purple-50/80 via-white to-purple-50/40 dark:from-purple-950/40 dark:to-neutral-900 border-2 border-purple-500 shadow-md shadow-purple-500/10 dark:shadow-purple-950/40 space-y-2.5">
+                  <div className="relative p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-neutral-900 border-2 border-purple-600 dark:border-purple-500 shadow-md shadow-purple-500/10 dark:shadow-purple-950/40 space-y-2.5">
                     <div className="flex items-center justify-between">
                       <div className="space-y-0.5">
-                        <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-500/30 border border-purple-300 dark:border-purple-400/50 text-purple-800 dark:text-purple-200 text-[9px] font-bold uppercase tracking-wider">
+                        <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-500/25 border border-purple-300 dark:border-purple-400/40 text-purple-900 dark:text-purple-200 text-[9px] font-bold uppercase tracking-wider">
                           <Sparkles className="w-2.5 h-2.5 text-purple-600 dark:text-purple-300" />
                           OPCIÓN 1 • RECOMENDADA
                         </div>
                         <h3 className="text-sm sm:text-base font-bold text-neutral-900 dark:text-white">
-                          Flashmente PRO Ilimitado
+                          Flashmente PRO — Alta Capacidad
                         </h3>
                       </div>
 
                       <div className="text-right pl-2 shrink-0">
-                        <div className="flex items-baseline justify-end gap-0.5">
-                          <span className="text-xl sm:text-2xl font-black text-neutral-900 dark:text-white tracking-tight">3,50€</span>
-                          <span className="text-[11px] font-semibold text-purple-600 dark:text-purple-300">/mes</span>
+                        <div className="flex items-baseline justify-end gap-1">
+                          <span className="text-xl sm:text-2xl font-black text-neutral-950 dark:text-white tracking-tight">3,50€</span>
+                          <span className="text-xs font-bold text-purple-700 dark:text-purple-300">/mes</span>
                         </div>
-                        <span className="text-[9px] text-neutral-500 dark:text-neutral-400 block -mt-0.5">Sin permanencia</span>
+                        <span className="text-[10px] font-medium text-neutral-600 dark:text-neutral-300 block -mt-0.5">Sin permanencia</span>
                       </div>
                     </div>
 
-                    <p className="text-[11px] text-neutral-600 dark:text-neutral-300 leading-snug">
-                      Generaciones ilimitadas, sin pausas por anuncios y desbloqueo total de funciones.
+                    <p className="text-xs text-neutral-700 dark:text-neutral-300 leading-snug">
+                      Alta Capacidad: Hasta 120 generaciones de mazos al mes (¡suficiente para todo tu temario!), sin pausas por anuncios y con acceso total.
                     </p>
 
                     {/* BOTÓN 1: GRANDE Y DESTACADO A STRIPE */}
@@ -477,7 +485,7 @@ export function ProModal({
                       ) : (
                         <>
                           <CreditCard className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                          <span>Hacerme PRO (3,50 €/mes) - Ilimitado</span>
+                          <span>Hacerme PRO (3,50 €/mes)</span>
                           <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
                         </>
                       )}
@@ -557,30 +565,30 @@ export function ProModal({
                    IPHONE / IOS: BOTÓN STRIPE + CAPTURA DE WAITLIST APP STORE
                    ======================================================= */
                 <div className="space-y-3">
-                  {/* Tarjeta Plan Mensual Ilimitado (3,50€/mes) */}
-                  <div className="relative p-4 rounded-2xl bg-gradient-to-b from-purple-50/70 via-white to-purple-50/30 dark:from-purple-900/40 dark:to-neutral-900 border-2 border-purple-500 shadow-md shadow-purple-500/10 space-y-3">
+                  {/* Tarjeta Plan Mensual Alta Capacidad (3,50€/mes) */}
+                  <div className="relative p-4 rounded-2xl bg-white dark:bg-neutral-900 border-2 border-purple-600 dark:border-purple-500 shadow-md shadow-purple-500/10 dark:shadow-purple-950/40 space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="space-y-0.5">
-                        <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-500/30 border border-purple-300 dark:border-purple-400/50 text-purple-800 dark:text-purple-200 text-[9px] font-bold uppercase tracking-wider">
+                        <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-500/25 border border-purple-300 dark:border-purple-400/40 text-purple-900 dark:text-purple-200 text-[9px] font-bold uppercase tracking-wider">
                           <Sparkles className="w-2.5 h-2.5 text-purple-600 dark:text-purple-300" />
-                          ACCESO TOTAL ILIMITADO
+                          ACCESO TOTAL PRO
                         </div>
                         <h3 className="text-sm sm:text-base font-bold text-neutral-900 dark:text-white">
-                          Plan Mensual Ilimitado
+                          Plan Mensual Alta Capacidad
                         </h3>
                       </div>
 
                       <div className="text-right pl-2 shrink-0">
-                        <div className="flex items-baseline justify-end gap-0.5">
-                          <span className="text-xl sm:text-2xl font-black text-neutral-900 dark:text-white tracking-tight">3,50€</span>
-                          <span className="text-[11px] font-semibold text-purple-600 dark:text-purple-300">/mes</span>
+                        <div className="flex items-baseline justify-end gap-1">
+                          <span className="text-xl sm:text-2xl font-black text-neutral-950 dark:text-white tracking-tight">3,50€</span>
+                          <span className="text-xs font-bold text-purple-700 dark:text-purple-300">/mes</span>
                         </div>
-                        <span className="text-[9px] text-neutral-500 dark:text-neutral-400 block -mt-0.5">Sin permanencia</span>
+                        <span className="text-[10px] font-medium text-neutral-600 dark:text-neutral-300 block -mt-0.5">Sin permanencia</span>
                       </div>
                     </div>
 
-                    <p className="text-[11px] text-neutral-600 dark:text-neutral-300 leading-snug">
-                      Generaciones ilimitadas en Safari sin pausas ni esperas con acceso a todas las funciones premium.
+                    <p className="text-xs text-neutral-700 dark:text-neutral-300 leading-snug">
+                      Alta Capacidad: Hasta 120 generaciones de mazos al mes (¡suficiente para todo tu temario!), sin pausas ni esperas con acceso a todas las funciones premium.
                     </p>
 
                     <button
@@ -674,30 +682,30 @@ export function ProModal({
                    PC / MAC / WEB: BOTÓN STRIPE + MENSAJE DE APP ANDROID
                    ======================================================= */
                 <div className="space-y-3">
-                  {/* Tarjeta Plan Mensual Ilimitado (3,50€/mes) */}
-                  <div className="relative p-4 rounded-2xl bg-gradient-to-b from-purple-50/70 via-white to-purple-50/30 dark:from-purple-900/40 dark:to-neutral-900 border-2 border-purple-500 shadow-md shadow-purple-500/10 space-y-3">
+                  {/* Tarjeta Plan Mensual Alta Capacidad (3,50€/mes) */}
+                  <div className="relative p-4 rounded-2xl bg-white dark:bg-neutral-900 border-2 border-purple-600 dark:border-purple-500 shadow-md shadow-purple-500/10 dark:shadow-purple-950/40 space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="space-y-0.5">
-                        <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-500/30 border border-purple-300 dark:border-purple-400/50 text-purple-800 dark:text-purple-200 text-[9px] font-bold uppercase tracking-wider">
+                        <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-500/25 border border-purple-300 dark:border-purple-400/40 text-purple-900 dark:text-purple-200 text-[9px] font-bold uppercase tracking-wider">
                           <Sparkles className="w-2.5 h-2.5 text-purple-600 dark:text-purple-300" />
-                          ACCESO TOTAL ILIMITADO
+                          ACCESO TOTAL PRO
                         </div>
                         <h3 className="text-sm sm:text-base font-bold text-neutral-900 dark:text-white">
-                          Plan Mensual Ilimitado
+                          Plan Mensual Alta Capacidad
                         </h3>
                       </div>
 
                       <div className="text-right pl-2 shrink-0">
-                        <div className="flex items-baseline justify-end gap-0.5">
-                          <span className="text-xl sm:text-2xl font-black text-neutral-900 dark:text-white tracking-tight">3,50€</span>
-                          <span className="text-[11px] font-semibold text-purple-600 dark:text-purple-300">/mes</span>
+                        <div className="flex items-baseline justify-end gap-1">
+                          <span className="text-xl sm:text-2xl font-black text-neutral-950 dark:text-white tracking-tight">3,50€</span>
+                          <span className="text-xs font-bold text-purple-700 dark:text-purple-300">/mes</span>
                         </div>
-                        <span className="text-[9px] text-neutral-500 dark:text-neutral-400 block -mt-0.5">Sin permanencia</span>
+                        <span className="text-[10px] font-medium text-neutral-600 dark:text-neutral-300 block -mt-0.5">Sin permanencia</span>
                       </div>
                     </div>
 
-                    <p className="text-[11px] text-neutral-600 dark:text-neutral-300 leading-snug">
-                      Generaciones ilimitadas. Sin anuncios, máxima velocidad y cancelación flexible.
+                    <p className="text-xs text-neutral-700 dark:text-neutral-300 leading-snug">
+                      Alta Capacidad: Hasta 120 generaciones de mazos al mes (¡suficiente para todo tu temario!). Sin anuncios, máxima velocidad y cancelación flexible.
                     </p>
 
                     <button
@@ -757,28 +765,28 @@ export function ProModal({
                100% PRO en todas las plataformas — CERO ANUNCIOS NI ADMOB.
                ========================================================================= */
             <div className="space-y-4 animate-in fade-in">
-              {/* Tarjeta Plan Mensual Ilimitado (3,50€/mes) */}
-              <div className="relative p-5 sm:p-6 rounded-2xl bg-gradient-to-b from-purple-50/80 via-white to-purple-50/40 dark:from-purple-900/40 dark:to-neutral-900 border-2 border-purple-500 shadow-xl shadow-purple-500/10 dark:shadow-purple-950/40 space-y-4">
-                <div className="flex items-start justify-between">
-                  <div className="space-y-1">
-                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-500/30 border border-purple-300 dark:border-purple-400/50 text-purple-800 dark:text-purple-200 text-[10px] font-bold uppercase tracking-wider">
+              {/* Tarjeta Plan Mensual Alta Capacidad (3,50€/mes) */}
+              <div className="relative p-5 sm:p-6 rounded-2xl bg-white dark:bg-neutral-900 border-2 border-purple-600 dark:border-purple-500 shadow-xl shadow-purple-500/10 dark:shadow-purple-950/40 space-y-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1.5">
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-500/25 border border-purple-300 dark:border-purple-400/40 text-purple-900 dark:text-purple-200 text-[10px] font-bold uppercase tracking-wider">
                       <Sparkles className="w-3 h-3 text-purple-600 dark:text-purple-300" />
                       SUSCRIPCIÓN FLASHMENTE PRO
                     </div>
                     <h3 className="text-base sm:text-lg font-bold text-neutral-900 dark:text-white">
-                      Plan Mensual Ilimitado
+                      Plan Mensual Alta Capacidad
                     </h3>
-                    <p className="text-xs text-neutral-600 dark:text-neutral-300 leading-relaxed max-w-md">
-                      Acceso total a generación con IA, lectura de PDF/Audio/YouTube, maquetación de exámenes y algoritmo FSRS sin restricciones.
+                    <p className="text-xs text-neutral-700 dark:text-neutral-300 leading-relaxed max-w-md">
+                      Alta Capacidad: Hasta 120 generaciones de mazos al mes (¡suficiente para todo tu temario!), generación desde Vídeo, Audio, PDF, Tutor Socrático 24/7 y exportación a PDF.
                     </p>
                   </div>
 
                   <div className="text-right pl-3 shrink-0">
-                    <div className="flex items-baseline justify-end gap-0.5">
-                      <span className="text-3xl sm:text-4xl font-black text-neutral-900 dark:text-white tracking-tight">3,50€</span>
-                      <span className="text-xs font-semibold text-purple-600 dark:text-purple-300">/mes</span>
+                    <div className="flex items-baseline justify-end gap-1">
+                      <span className="text-3xl sm:text-4xl font-black text-neutral-950 dark:text-white tracking-tight">3,50€</span>
+                      <span className="text-xs font-bold text-purple-700 dark:text-purple-300">/mes</span>
                     </div>
-                    <span className="text-[10px] text-neutral-500 dark:text-neutral-400 block mt-0.5">Sin permanencia</span>
+                    <span className="text-[10px] font-medium text-neutral-600 dark:text-neutral-300 block mt-0.5">Sin permanencia</span>
                   </div>
                 </div>
 
@@ -937,7 +945,7 @@ export function ProModal({
                           <span className="uppercase font-bold tracking-wider">
                             {redeemStatus.tier}
                           </span>{' '}
-                          {t('pro_modal.unlimited_gens', '(Generaciones ilimitadas)')}
+                          {t('pro_modal.unlimited_gens', '(Hasta 120 generaciones/mes)')}
                         </p>
                       )}
                     </div>
@@ -949,59 +957,68 @@ export function ProModal({
 
           {/* Tarjeta de Beneficios Destacados (Solo en Hard Paywall, ocultos en límite agotado para asegurar cero scroll móvil) */}
           {!isLimitReached && (
-            <div className="space-y-2">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-purple-700 dark:text-purple-300/80">
+            <div className="space-y-2.5">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-purple-700 dark:text-purple-300">
                 {t('pro_modal.benefits_title', 'LO QUE INCLUYE EL PLAN PRO')}
               </p>
 
-              <div className="grid grid-cols-1 gap-2">
-                <div className="flex items-start gap-3 p-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-950/40 border border-neutral-200 dark:border-neutral-800/80">
-                  <div className="p-1.5 rounded-lg bg-purple-100 dark:bg-purple-500/15 text-purple-700 dark:text-purple-300 shrink-0 mt-0.5">
-                    <Infinity className="w-3.5 h-3.5" />
+              <div className="grid grid-cols-1 gap-2.5">
+                {/* BENEFICIO 1: VÍDEO Y AUDIO */}
+                <div className="flex items-start gap-3 p-3 rounded-xl bg-neutral-50 dark:bg-neutral-950/60 border border-neutral-200 dark:border-neutral-800">
+                  <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 shrink-0 mt-0.5">
+                    <Video className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-semibold text-neutral-900 dark:text-white">
-                      {t('pro_modal.benefit_1_title', 'Generación de Tarjetas Ilimitada')}
+                    <h4 className="text-xs font-bold text-neutral-900 dark:text-white">
+                      Generación desde Vídeo y Audio (Clases, YouTube, MP4)
                     </h4>
-                    <p className="text-[11px] text-neutral-600 dark:text-neutral-400">
-                      {t(
-                        'pro_modal.benefit_1_desc',
-                        'Sube documentos extensos (PDF, Word), notas de audio y vídeos de YouTube sin límites.'
-                      )}
+                    <p className="text-[11px] text-neutral-600 dark:text-neutral-300 leading-snug mt-0.5">
+                      Sube clases grabadas, audios (.mp3, .wav, .m4a), vídeos (.mp4, .mov, .webm) o enlaces de YouTube para generar flashcards sin escribir a mano.
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-start gap-3 p-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-950/40 border border-neutral-200 dark:border-neutral-800/80">
-                  <div className="p-1.5 rounded-lg bg-violet-100 dark:bg-violet-500/15 text-violet-700 dark:text-violet-300 shrink-0 mt-0.5">
-                    <Brain className="w-3.5 h-3.5" />
+                {/* BENEFICIO 2: TUTOR SOCRÁTICO IA */}
+                <div className="flex items-start gap-3 p-3 rounded-xl bg-neutral-50 dark:bg-neutral-950/60 border border-neutral-200 dark:border-neutral-800">
+                  <div className="p-2 rounded-lg bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 shrink-0 mt-0.5">
+                    <Brain className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-semibold text-neutral-900 dark:text-white">
-                      {t('pro_modal.benefit_2_title', 'FSRS Avanzado y Modelos Optimizados')}
+                    <h4 className="text-xs font-bold text-neutral-900 dark:text-white">
+                      Tutor Socrático IA (Resolución de dudas 24/7)
                     </h4>
-                    <p className="text-[11px] text-neutral-600 dark:text-neutral-400">
-                      {t(
-                        'pro_modal.benefit_2_desc',
-                        'Modelos Gemini ultra-rápidos con memoria anti-duplicados y retención científica FSRS v5.'
-                      )}
+                    <p className="text-[11px] text-neutral-600 dark:text-neutral-300 leading-snug mt-0.5">
+                      Tu preparador particular siempre disponible para resolver dudas paso a paso y afianzar conceptos complejos mediante razonamiento guiado.
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-start gap-3 p-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-950/40 border border-neutral-200 dark:border-neutral-800/80">
-                  <div className="p-1.5 rounded-lg bg-indigo-100 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 shrink-0 mt-0.5">
-                    <Zap className="w-3.5 h-3.5" />
+                {/* BENEFICIO 3: EXPORTACIÓN E IMPRESIÓN */}
+                <div className="flex items-start gap-3 p-3 rounded-xl bg-neutral-50 dark:bg-neutral-950/60 border border-neutral-200 dark:border-neutral-800">
+                  <div className="p-2 rounded-lg bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-300 shrink-0 mt-0.5">
+                    <Printer className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-semibold text-neutral-900 dark:text-white">
-                      {t('pro_modal.benefit_3_title', 'Prioridad Máxima y Procesamiento Rápido')}
+                    <h4 className="text-xs font-bold text-neutral-900 dark:text-white">
+                      Exportación e Impresión a PDF
                     </h4>
-                    <p className="text-[11px] text-neutral-600 dark:text-neutral-400">
-                      {t(
-                        'pro_modal.benefit_3_desc',
-                        'Extracción y ordenación de conceptos en segundos sin tiempos de espera en servidores.'
-                      )}
+                    <p className="text-[11px] text-neutral-600 dark:text-neutral-300 leading-snug mt-0.5">
+                      Exporta e imprime simulacros de examen reales, solucionarios oficiales y hojas de estudio ultra-compactas en PDF para repasar en papel.
+                    </p>
+                  </div>
+                </div>
+
+                {/* BENEFICIO 4: ALTA CAPACIDAD */}
+                <div className="flex items-start gap-3 p-3 rounded-xl bg-neutral-50 dark:bg-neutral-950/60 border border-neutral-200 dark:border-neutral-800">
+                  <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 shrink-0 mt-0.5">
+                    <Zap className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-neutral-900 dark:text-white">
+                      Alta Capacidad: Hasta 120 generaciones de mazos al mes
+                    </h4>
+                    <p className="text-[11px] text-neutral-600 dark:text-neutral-300 leading-snug mt-0.5">
+                      Suficiente para todo tu temario de estudio mensual, procesamiento prioritario de alta velocidad sin colas ni esperas.
                     </p>
                   </div>
                 </div>

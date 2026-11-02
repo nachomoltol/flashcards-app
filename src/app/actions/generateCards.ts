@@ -1872,8 +1872,6 @@ export async function generateCardsFromDocumentAction(
       throw new Error('Ruta de archivo de Supabase Storage no proporcionada o no válida tras el saneamiento.');
     }
 
-    const base64Data = Buffer.from(fileArrayBuffer).toString('base64');
-
     // 2. Normalizar tipo MIME soportado
     let normalizedMime = mimeType;
     if (fileName) {
@@ -1883,17 +1881,22 @@ export async function generateCardsFromDocumentAction(
       else if (ext === 'doc') normalizedMime = 'application/msword';
       else if (ext === 'mp3') normalizedMime = 'audio/mpeg';
       else if (ext === 'wav') normalizedMime = 'audio/wav';
+      else if (ext === 'm4a') normalizedMime = 'audio/mp4';
+      else if (ext === 'mp4') normalizedMime = 'video/mp4';
+      else if (ext === 'mov') normalizedMime = 'video/quicktime';
+      else if (ext === 'webm') normalizedMime = 'video/webm';
       else if (ext === 'txt') normalizedMime = 'text/plain';
     }
 
     // Gatekeeper PRO: Validación estricta de suscripción para archivos de Audio y Vídeo
-    const isAudio =
+    const isAudioOrVideo =
       normalizedMime?.startsWith('audio/') ||
+      normalizedMime?.startsWith('video/') ||
       normalizedMime === 'audio/mpeg' ||
       normalizedMime === 'audio/wav' ||
-      Boolean(fileName && /\.(mp3|wav|ogg|m4a|aac|flac)$/i.test(fileName));
+      Boolean(fileName && /\.(mp3|wav|ogg|m4a|aac|flac|mp4|mov|webm)$/i.test(fileName));
 
-    if (isAudio && apiCheck.tier !== 'pro' && apiCheck.tier !== 'vip') {
+    if (isAudioOrVideo && apiCheck.tier !== 'pro' && apiCheck.tier !== 'vip') {
       return {
         success: false,
         error:
@@ -2820,143 +2823,191 @@ REGLA ESTRICTA: Si el usuario proporciona una instrucción de enfoque (ej. un ca
     let candidateCards: GeneratedCard[] = [];
     let coreExhausted = false;
 
-    if (targetCount >= 20) {
-      // =========================================================================
-      // CONCURRENT BATCHING (Peticiones Paralelas con Partición de Páginas)
-      // =========================================================================
-      // Dividimos la solicitud en 2 llamadas concurrentes (Promise.all) solicitando la mitad de tarjetas a cada una.
-      // Cada promesa se enfoca en una mitad distinta de las páginas del micro-chunk para erradicar el límite de maxOutputTokens.
-      const totalRequestedCards = targetCount; // Sin sobreaprovisionamiento masivo
-      const batch1Target = Math.ceil(totalRequestedCards / 2);
-      const batch2Target = totalRequestedCards - batch1Target;
-
-      const { directive: dirBatch1 } = buildTargetCountDirective(
-        batch1Target,
-        existingCards.length
-      );
-      const { directive: dirBatch2 } = buildTargetCountDirective(
-        batch2Target,
-        existingCards.length
-      );
-
-      let contentsBatch1: Array<{ text: string } | { inlineData: { data: string; mimeType: string } }>;
-      let contentsBatch2: Array<{ text: string } | { inlineData: { data: string; mimeType: string } }>;
-
-      if (isWordDocument) {
-        const halfLen = Math.floor(extractedWordText.length / 2);
-        const splitIdx = extractedWordText.indexOf('\n\n', halfLen);
-        const effectiveSplit = splitIdx !== -1 && splitIdx < extractedWordText.length * 0.75 ? splitIdx : halfLen;
-        const wordPart1 = extractedWordText.slice(0, effectiveSplit);
-        const wordPart2 = extractedWordText.slice(effectiveSplit);
-
-        const prompt1 = `Eres un pedagogo experto en diseño pedagógico. LOTE PARALELO (1/2): Concéntrate en la PRIMERA MITAD del documento. ${dirBatch1} ${getGlobalRules(cardFormat, batch1Target, existingCards.length, pedagogicalMode)} ${getFormatInstructions(cardFormat)} ${buildLanguageDirective(language)}`;
-        const prompt2 = `Eres un pedagogo experto en diseño pedagógico. LOTE PARALELO (2/2): Concéntrate en la SEGUNDA MITAD del documento. ${dirBatch2} ${getGlobalRules(cardFormat, batch2Target, existingCards.length, pedagogicalMode)} ${getFormatInstructions(cardFormat)} ${buildLanguageDirective(language)}`;
-
-        contentsBatch1 = [{ text: `${prompt1}\n\n${wordPart1}` }];
-        contentsBatch2 = [{ text: `${prompt2}\n\n${wordPart2}` }];
-      } else {
-        const prompt1 = `Eres un pedagogo experto en diseño pedagógico. LOTE PARALELO (1/2): Concéntrate en la primera mitad del audio/archivo. ${dirBatch1} ${getGlobalRules(cardFormat, batch1Target, existingCards.length, pedagogicalMode)} ${getFormatInstructions(cardFormat)} ${buildLanguageDirective(language)}`;
-        const prompt2 = `Eres un pedagogo experto en diseño pedagógico. LOTE PARALELO (2/2): Concéntrate en la segunda mitad del audio/archivo. ${dirBatch2} ${getGlobalRules(cardFormat, batch2Target, existingCards.length, pedagogicalMode)} ${getFormatInstructions(cardFormat)} ${buildLanguageDirective(language)}`;
-
-        contentsBatch1 = [{ inlineData: { data: base64Data, mimeType: normalizedMime } }, { text: prompt1 }];
-        contentsBatch2 = [{ inlineData: { data: base64Data, mimeType: normalizedMime } }, { text: prompt2 }];
-      }
-
-      console.log(
-        `[Concurrent Batching Documento] Invocando 2 llamadas paralelas a Gemini Flash-Lite (${batch1Target} y ${batch2Target} tarjetas objetivo)...`
-      );
-
-      const [res1, res2] = await Promise.allSettled([
-        ai.models.generateContent({
-          model: GEMINI_MODEL,
-          contents: contentsBatch1,
-          config: getGeminiConfig(
-            cardFormat,
-            batch1Target,
-            existingCards.length,
-            coreExhaustedPrevious,
-            existingTopicsList,
-            isExhaustiveMode,
-            pedagogicalMode,
-            docenteFormat,
-            targetAudience
-          ),
-        }),
-        ai.models.generateContent({
-          model: GEMINI_MODEL,
-          contents: contentsBatch2,
-          config: getGeminiConfig(
-            cardFormat,
-            batch2Target,
-            existingCards.length,
-            coreExhaustedPrevious,
-            existingTopicsList,
-            isExhaustiveMode,
-            pedagogicalMode,
-            docenteFormat,
-            targetAudience
-          ),
-        }),
-      ]);
-
-      let b1Exhausted = false;
-      let b2Exhausted = false;
-      let atLeastOneSuccess = false;
-
-      if (res1.status === 'fulfilled' && res1.value.text) {
-        try {
-          const parsed1 = parseGeminiBatchResponse(res1.value.text);
-          candidateCards.push(...parsed1.cards);
-          b1Exhausted = parsed1.coreExhausted;
-          atLeastOneSuccess = true;
-          console.log(`[Concurrent Batching Documento] Lote 1 OK: ${parsed1.cards.length} tarjetas.`);
-        } catch (e1) {
-          console.warn('[Concurrent Batching Documento] Error parseando Lote 1:', e1);
+    // Si no es documento Word (es decir, es Audio u otro archivo multimedia), subirlo a Gemini File API
+    let uploadedMediaFile: { uri: string; mimeType?: string; name: string } | null = null;
+    if (!isWordDocument) {
+      try {
+        const mediaBlob = new Blob([fileArrayBuffer], { type: normalizedMime });
+        console.log(
+          `[Gemini File API] Subiendo archivo multimedia a Google (${normalizedMime}, ${(fileArrayBuffer.byteLength / (1024 * 1024)).toFixed(2)} MB)...`
+        );
+        const fileResult = await ai.files.upload({
+          file: mediaBlob,
+          config: {
+            mimeType: normalizedMime,
+          },
+        });
+        if (!fileResult.uri || !fileResult.name) {
+          throw new Error('Gemini File API no devolvió una URI o nombre de archivo válido.');
         }
-      } else if (res1.status === 'rejected') {
-        console.warn('[Concurrent Batching Documento] Lote 1 falló:', res1.reason);
-      }
-
-      if (res2.status === 'fulfilled' && res2.value.text) {
-        try {
-          const parsed2 = parseGeminiBatchResponse(res2.value.text);
-          candidateCards.push(...parsed2.cards);
-          b2Exhausted = parsed2.coreExhausted;
-          atLeastOneSuccess = true;
-          console.log(`[Concurrent Batching Documento] Lote 2 OK: ${parsed2.cards.length} tarjetas.`);
-        } catch (e2) {
-          console.warn('[Concurrent Batching Documento] Error parseando Lote 2:', e2);
-        }
-      } else if (res2.status === 'rejected') {
-        console.warn('[Concurrent Batching Documento] Lote 2 falló:', res2.reason);
-      }
-
-      if (!atLeastOneSuccess || candidateCards.length === 0) {
-        const suggestedCount = targetCount >= 20 ? 10 : 5;
-        const formatSuffix = cardFormat === 'multiple_choice' ? ' tipo test' : '';
-        return {
-          success: false,
-          error: `El documento es demasiado denso para ${targetCount} tarjetas${formatSuffix}. Por favor, intenta generar ${suggestedCount}.`,
+        uploadedMediaFile = {
+          uri: fileResult.uri,
+          mimeType: fileResult.mimeType || normalizedMime,
+          name: fileResult.name,
         };
+        console.log(`[Gemini File API] Archivo subido con éxito: ${fileResult.name} (URI: ${fileResult.uri})`);
+      } catch (uploadErr) {
+        console.error('[Gemini File API] Error al subir archivo multimedia a Gemini File API:', uploadErr);
+        throw new Error(
+          `Error al transferir el archivo multimedia a Google Gemini File API: ${uploadErr instanceof Error ? uploadErr.message : String(uploadErr)}`
+        );
       }
+    }
 
-      coreExhausted = b1Exhausted && b2Exhausted;
-    } else {
-      // Flujo de lote individual para targetCount < 20 (ej. 5, 10, 15)
-      const requestCount = targetCount; // Sin sobreaprovisionamiento masivo
-      const { directive: targetCountDirective, integrityNote } = buildTargetCountDirective(
-        requestCount,
-        existingCards.length
-      );
+    try {
+      if (targetCount >= 20) {
+        // =========================================================================
+        // CONCURRENT BATCHING (Peticiones Paralelas con Partición de Páginas)
+        // =========================================================================
+        // Dividimos la solicitud en 2 llamadas concurrentes (Promise.all) solicitando la mitad de tarjetas a cada una.
+        // Cada promesa se enfoca en una mitad distinta de las páginas del micro-chunk para erradicar el límite de maxOutputTokens.
+        const totalRequestedCards = targetCount; // Sin sobreaprovisionamiento masivo
+        const batch1Target = Math.ceil(totalRequestedCards / 2);
+        const batch2Target = totalRequestedCards - batch1Target;
 
-      const rangeLabel = parsedRange.rangeLabel ? ` [${parsedRange.rangeLabel}]` : '';
-      const coverageText = isContinuation
-        ? `ATENCIÓN: Este es un lote de continuación sobre el documento${rangeLabel}. El usuario ya ha extraído ${existingCards.length} tarjetas de los conceptos iniciales y troncales. TIENES ESTRICTAMENTE PROHIBIDO repetir preguntas o formular tarjetas equivalentes sobre los conceptos ya evaluados. Avanza en profundidad: extrae tarjetas EXCLUSIVAMENTE de las secciones, tablas, detalles técnicos, fórmulas y páginas del fragmento que aún no hayan sido exploradas.`
-        : (focusInstruction
-          ? `Debes analizar el documento dando PRIORIDAD ABSOLUTA a la sección solicitada ("${focusInstruction}"${rangeLabel}). ${targetCountDirective} Extrae la información EXCLUSIVAMENTE de esa parte del documento.`
-          : `Debes analizar el documento completo${rangeLabel}. ${targetCountDirective} Cubre los conceptos clave de forma equitativa desde el principio hasta el final del contenido.`);
+        const { directive: dirBatch1 } = buildTargetCountDirective(
+          batch1Target,
+          existingCards.length
+        );
+        const { directive: dirBatch2 } = buildTargetCountDirective(
+          batch2Target,
+          existingCards.length
+        );
 
-      const promptText = `Eres un pedagogo experto en diseño pedagógico y repetición espaciada (algoritmo FSRS).
+        let contentsBatch1: Array<{ text?: string; fileData?: { fileUri?: string; mimeType?: string } }>;
+        let contentsBatch2: Array<{ text?: string; fileData?: { fileUri?: string; mimeType?: string } }>;
+
+        if (isWordDocument) {
+          const halfLen = Math.floor(extractedWordText.length / 2);
+          const splitIdx = extractedWordText.indexOf('\n\n', halfLen);
+          const effectiveSplit = splitIdx !== -1 && splitIdx < extractedWordText.length * 0.75 ? splitIdx : halfLen;
+          const wordPart1 = extractedWordText.slice(0, effectiveSplit);
+          const wordPart2 = extractedWordText.slice(effectiveSplit);
+
+          const prompt1 = `Eres un pedagogo experto en diseño pedagógico. LOTE PARALELO (1/2): Concéntrate en la PRIMERA MITAD del documento. ${dirBatch1} ${getGlobalRules(cardFormat, batch1Target, existingCards.length, pedagogicalMode)} ${getFormatInstructions(cardFormat)} ${buildLanguageDirective(language)}`;
+          const prompt2 = `Eres un pedagogo experto en diseño pedagógico. LOTE PARALELO (2/2): Concéntrate en la SEGUNDA MITAD del documento. ${dirBatch2} ${getGlobalRules(cardFormat, batch2Target, existingCards.length, pedagogicalMode)} ${getFormatInstructions(cardFormat)} ${buildLanguageDirective(language)}`;
+
+          contentsBatch1 = [{ text: `${prompt1}\n\n${wordPart1}` }];
+          contentsBatch2 = [{ text: `${prompt2}\n\n${wordPart2}` }];
+        } else {
+          const prompt1 = `Eres un pedagogo experto en diseño pedagógico. LOTE PARALELO (1/2): Concéntrate en la primera mitad del audio/archivo. ${dirBatch1} ${getGlobalRules(cardFormat, batch1Target, existingCards.length, pedagogicalMode)} ${getFormatInstructions(cardFormat)} ${buildLanguageDirective(language)}`;
+          const prompt2 = `Eres un pedagogo experto en diseño pedagógico. LOTE PARALELO (2/2): Concéntrate en la segunda mitad del audio/archivo. ${dirBatch2} ${getGlobalRules(cardFormat, batch2Target, existingCards.length, pedagogicalMode)} ${getFormatInstructions(cardFormat)} ${buildLanguageDirective(language)}`;
+
+          contentsBatch1 = [
+            {
+              fileData: {
+                fileUri: uploadedMediaFile?.uri,
+                mimeType: uploadedMediaFile?.mimeType || normalizedMime,
+              },
+            },
+            { text: prompt1 },
+          ];
+          contentsBatch2 = [
+            {
+              fileData: {
+                fileUri: uploadedMediaFile?.uri,
+                mimeType: uploadedMediaFile?.mimeType || normalizedMime,
+              },
+            },
+            { text: prompt2 },
+          ];
+        }
+
+        console.log(
+          `[Concurrent Batching Documento] Invocando 2 llamadas paralelas a Gemini Flash-Lite (${batch1Target} y ${batch2Target} tarjetas objetivo)...`
+        );
+
+        const [res1, res2] = await Promise.allSettled([
+          ai.models.generateContent({
+            model: GEMINI_MODEL,
+            contents: contentsBatch1,
+            config: getGeminiConfig(
+              cardFormat,
+              batch1Target,
+              existingCards.length,
+              coreExhaustedPrevious,
+              existingTopicsList,
+              isExhaustiveMode,
+              pedagogicalMode,
+              docenteFormat,
+              targetAudience
+            ),
+          }),
+          ai.models.generateContent({
+            model: GEMINI_MODEL,
+            contents: contentsBatch2,
+            config: getGeminiConfig(
+              cardFormat,
+              batch2Target,
+              existingCards.length,
+              coreExhaustedPrevious,
+              existingTopicsList,
+              isExhaustiveMode,
+              pedagogicalMode,
+              docenteFormat,
+              targetAudience
+            ),
+          }),
+        ]);
+
+        let b1Exhausted = false;
+        let b2Exhausted = false;
+        let atLeastOneSuccess = false;
+
+        if (res1.status === 'fulfilled' && res1.value.text) {
+          try {
+            const parsed1 = parseGeminiBatchResponse(res1.value.text);
+            candidateCards.push(...parsed1.cards);
+            b1Exhausted = parsed1.coreExhausted;
+            atLeastOneSuccess = true;
+            console.log(`[Concurrent Batching Documento] Lote 1 OK: ${parsed1.cards.length} tarjetas.`);
+          } catch (e1) {
+            console.warn('[Concurrent Batching Documento] Error parseando Lote 1:', e1);
+          }
+        } else if (res1.status === 'rejected') {
+          console.warn('[Concurrent Batching Documento] Lote 1 falló:', res1.reason);
+        }
+
+        if (res2.status === 'fulfilled' && res2.value.text) {
+          try {
+            const parsed2 = parseGeminiBatchResponse(res2.value.text);
+            candidateCards.push(...parsed2.cards);
+            b2Exhausted = parsed2.coreExhausted;
+            atLeastOneSuccess = true;
+            console.log(`[Concurrent Batching Documento] Lote 2 OK: ${parsed2.cards.length} tarjetas.`);
+          } catch (e2) {
+            console.warn('[Concurrent Batching Documento] Error parseando Lote 2:', e2);
+          }
+        } else if (res2.status === 'rejected') {
+          console.warn('[Concurrent Batching Documento] Lote 2 falló:', res2.reason);
+        }
+
+        if (!atLeastOneSuccess || candidateCards.length === 0) {
+          const suggestedCount = targetCount >= 20 ? 10 : 5;
+          const formatSuffix = cardFormat === 'multiple_choice' ? ' tipo test' : '';
+          return {
+            success: false,
+            error: `El documento es demasiado denso para ${targetCount} tarjetas${formatSuffix}. Por favor, intenta generar ${suggestedCount}.`,
+          };
+        }
+
+        coreExhausted = b1Exhausted && b2Exhausted;
+      } else {
+        // Flujo de lote individual para targetCount < 20 (ej. 5, 10, 15)
+        const requestCount = targetCount; // Sin sobreaprovisionamiento masivo
+        const { directive: targetCountDirective, integrityNote } = buildTargetCountDirective(
+          requestCount,
+          existingCards.length
+        );
+
+        const rangeLabel = parsedRange.rangeLabel ? ` [${parsedRange.rangeLabel}]` : '';
+        const coverageText = isContinuation
+          ? `ATENCIÓN: Este es un lote de continuación sobre el documento${rangeLabel}. El usuario ya ha extraído ${existingCards.length} tarjetas de los conceptos iniciales y troncales. TIENES ESTRICTAMENTE PROHIBIDO repetir preguntas o formular tarjetas equivalentes sobre los conceptos ya evaluados. Avanza en profundidad: extrae tarjetas EXCLUSIVAMENTE de las secciones, tablas, detalles técnicos, fórmulas y páginas del fragmento que aún no hayan sido exploradas.`
+          : (focusInstruction
+            ? `Debes analizar el documento dando PRIORIDAD ABSOLUTA a la sección solicitada ("${focusInstruction}"${rangeLabel}). ${targetCountDirective} Extrae la información EXCLUSIVAMENTE de esa parte del documento.`
+            : `Debes analizar el documento completo${rangeLabel}. ${targetCountDirective} Cubre los conceptos clave de forma equitativa desde el principio hasta el final del contenido.`);
+
+        const promptText = `Eres un pedagogo experto en diseño pedagógico y repetición espaciada (algoritmo FSRS).
 ${coverageText}${fileName ? ` Documento de referencia: "${fileName}".` : ''}
 
 ${RIGOR_WARNING_DIRECTIVE}
@@ -2970,56 +3021,66 @@ La integridad estructural del JSON es prioridad absoluta y DEBES devolver un obj
 
 ${buildLanguageDirective(language)}`;
 
-      let contents: Array<{ text: string } | { inlineData: { data: string; mimeType: string } }>;
+        let contents: Array<{ text?: string; fileData?: { fileUri?: string; mimeType?: string } }>;
 
-      if (isWordDocument) {
-        contents = [
-          {
-            text: `${promptText}\n\n=========================================\nCONTENIDO DEL DOCUMENTO DE WORD:\n=========================================\n${extractedWordText}\n=========================================`,
-          },
-        ];
-      } else {
-        contents = [
-          {
-            inlineData: {
-              data: base64Data,
-              mimeType: normalizedMime,
+        if (isWordDocument) {
+          contents = [
+            {
+              text: `${promptText}\n\n=========================================\nCONTENIDO DEL DOCUMENTO DE WORD:\n=========================================\n${extractedWordText}\n=========================================`,
             },
-          },
-          {
-            text: promptText,
-          },
-        ];
+          ];
+        } else {
+          contents = [
+            {
+              fileData: {
+                fileUri: uploadedMediaFile?.uri,
+                mimeType: uploadedMediaFile?.mimeType || normalizedMime,
+              },
+            },
+            {
+              text: promptText,
+            },
+          ];
+        }
+
+        const response = await ai.models.generateContent({
+          model: GEMINI_MODEL,
+          contents,
+          config: getGeminiConfig(
+            cardFormat,
+            requestCount,
+            existingCards.length,
+            coreExhaustedPrevious,
+            existingTopicsList,
+            isExhaustiveMode,
+            pedagogicalMode,
+            docenteFormat,
+            targetAudience
+          ),
+        });
+
+        try {
+          const parsed = parseGeminiBatchResponse(response.text);
+          candidateCards = parsed.cards;
+          coreExhausted = parsed.coreExhausted;
+        } catch (err: unknown) {
+          console.warn('Fallo al parsear el JSON de Gemini en generateCardsFromDocumentAction:', err);
+          const suggestedCount = targetCount >= 20 ? 10 : 5;
+          const formatSuffix = cardFormat === 'multiple_choice' ? ' tipo test' : '';
+          return {
+            success: false,
+            error: `El documento es demasiado denso para ${targetCount} tarjetas${formatSuffix}. Por favor, intenta generar ${suggestedCount}.`,
+          };
+        }
       }
-
-      const response = await ai.models.generateContent({
-        model: GEMINI_MODEL,
-        contents,
-        config: getGeminiConfig(
-          cardFormat,
-          requestCount,
-          existingCards.length,
-          coreExhaustedPrevious,
-          existingTopicsList,
-          isExhaustiveMode,
-          pedagogicalMode,
-          docenteFormat,
-          targetAudience
-        ),
-      });
-
-      try {
-        const parsed = parseGeminiBatchResponse(response.text);
-        candidateCards = parsed.cards;
-        coreExhausted = parsed.coreExhausted;
-      } catch (err: unknown) {
-        console.warn('Fallo al parsear el JSON de Gemini en generateCardsFromDocumentAction:', err);
-        const suggestedCount = targetCount >= 20 ? 10 : 5;
-        const formatSuffix = cardFormat === 'multiple_choice' ? ' tipo test' : '';
-        return {
-          success: false,
-          error: `El documento es demasiado denso para ${targetCount} tarjetas${formatSuffix}. Por favor, intenta generar ${suggestedCount}.`,
-        };
+    } finally {
+      if (uploadedMediaFile?.name) {
+        try {
+          await ai.files.delete({ name: uploadedMediaFile.name });
+          console.log(`[Gemini File API] Archivo temporal ${uploadedMediaFile.name} eliminado de Google con éxito.`);
+        } catch (delErr) {
+          console.warn(`[Gemini File API] Advertencia al eliminar archivo temporal ${uploadedMediaFile.name}:`, delErr);
+        }
       }
     }
 

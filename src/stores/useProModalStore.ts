@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type ProFeatureName = 'pdf' | 'audio' | 'youtube' | 'print' | 'general' | null;
+export type ProFeatureName = 'pdf' | 'audio' | 'video' | 'youtube' | 'print' | 'general' | null;
 
 interface ProModalState {
   isOpen: boolean;
