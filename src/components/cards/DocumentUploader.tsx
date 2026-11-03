@@ -1060,7 +1060,7 @@ export function DocumentUploader({
         </div>
       ) : (
         /* Stepper Flow (3 Pasos) */
-        <div className="space-y-4">
+        <div className="space-y-2.5 sm:space-y-3.5">
           <input
             ref={fileInputRef}
             type="file"
@@ -1388,10 +1388,10 @@ export function DocumentUploader({
               PASO 2: Rango y Formato
              ======================================================== */}
           {currentStep === 2 && selectedFile && (
-            <div className="space-y-3 sm:space-y-3.5 animate-in fade-in duration-150">
+            <div className="space-y-2 sm:space-y-2.5 animate-in fade-in duration-150">
               {/* Rango de Páginas si es PDF o DOCX */}
               {isPageableDoc ? (
-                <div className="p-3 sm:p-3.5 rounded-2xl bg-neutral-50 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 space-y-2.5">
+                <div className="p-2.5 sm:p-3 rounded-2xl bg-neutral-50 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 space-y-1.5 sm:space-y-2">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-semibold text-neutral-800 dark:text-neutral-200 flex items-center">
                       <span>
@@ -1445,7 +1445,7 @@ export function DocumentUploader({
                           setLastStartPage(null);
                         }}
                         placeholder="ej. 1"
-                        className="w-full text-xs font-semibold px-3 py-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition disabled:opacity-50"
+                        className="w-full text-xs font-semibold px-2.5 py-1.5 sm:py-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition disabled:opacity-50"
                       />
                     </div>
                     <div>
@@ -1464,7 +1464,7 @@ export function DocumentUploader({
                           setLastStartPage(null);
                         }}
                         placeholder={effectiveTotalPages ? (isEn ? `e.g. ${effectiveTotalPages}` : `ej. ${effectiveTotalPages}`) : (isEn ? 'e.g. 30' : 'ej. 30')}
-                        className="w-full text-xs font-semibold px-3 py-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition disabled:opacity-50"
+                        className="w-full text-xs font-semibold px-2.5 py-1.5 sm:py-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition disabled:opacity-50"
                       />
                     </div>
                   </div>
@@ -1514,7 +1514,7 @@ export function DocumentUploader({
                     </span>
                   )}
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5">
+                <div className="grid grid-cols-2 gap-1.5 sm:gap-2.5">
                   {[
                     {
                       id: 'multiple_choice' as CardFormat,
@@ -1553,16 +1553,16 @@ export function DocumentUploader({
                             setDocenteFormat(opt.id);
                           }
                         }}
-                        className={`p-2.5 sm:p-3 rounded-xl border text-left transition-all flex items-start gap-2.5 cursor-pointer active:scale-[0.99] ${
+                        className={`p-2 sm:p-2.5 rounded-xl border text-left transition-all flex items-start gap-2 cursor-pointer active:scale-[0.99] ${
                           isSelected
                             ? 'border-violet-500 bg-violet-500/10 ring-1 ring-violet-500 text-slate-900 dark:text-white shadow-sm'
                             : 'border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/60 hover:border-neutral-300 dark:hover:border-neutral-700 text-slate-800 dark:text-neutral-300'
                         }`}
                       >
-                        <span className="text-xl shrink-0 mt-0.5">{opt.icon}</span>
+                        <span className="text-base sm:text-lg shrink-0 mt-0.5">{opt.icon}</span>
                         <div className="min-w-0 flex-1">
-                          <p className="text-xs font-semibold">{opt.title}</p>
-                          <p className="text-[11px] sm:text-xs text-slate-600 dark:text-slate-400 leading-snug line-clamp-2 mt-0.5">
+                          <p className="text-[11px] sm:text-xs font-semibold leading-tight truncate">{opt.title}</p>
+                          <p className="text-[10px] sm:text-[11px] text-slate-600 dark:text-slate-400 leading-tight line-clamp-1 sm:line-clamp-2 mt-0.5">
                             {opt.subtitle}
                           </p>
                         </div>
@@ -1574,7 +1574,7 @@ export function DocumentUploader({
 
               {/* Cantidad de Tarjetas o Notificación Didáctica */}
               {pedagogicalMode === 'didactic' ? (
-                <div className="p-3 sm:p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-between gap-3 text-xs">
+                <div className="p-2.5 sm:p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-between gap-3 text-xs">
                   <div className="flex items-center gap-2 text-amber-900 dark:text-amber-200">
                     <span className="text-base">👨‍🏫</span>
                     <span className="font-medium">
@@ -1586,7 +1586,7 @@ export function DocumentUploader({
                   </span>
                 </div>
               ) : (
-                <div className="p-3 sm:p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 space-y-1.5">
+                <div className="p-2.5 sm:p-3 rounded-xl bg-neutral-50 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 space-y-1">
                   <div className="flex items-center justify-between">
                     <label htmlFor="cardCount" className="text-xs font-semibold uppercase tracking-wider text-slate-800 dark:text-neutral-300">
                       {t('ai_uploader.card_count_label', isEn ? 'Card Quantity' : 'Cantidad de Tarjetas')}
@@ -1614,7 +1614,7 @@ export function DocumentUploader({
                         setCardCount(Math.min(30, Math.max(1, val)));
                       }
                     }}
-                    className="w-full text-xs font-semibold px-3.5 py-2 sm:py-2.5 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition disabled:opacity-50"
+                    className="w-full text-xs font-semibold px-3 py-1.5 sm:py-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition disabled:opacity-50"
                     placeholder={isEn ? "1 to 30 cards" : "1 a 30 tarjetas"}
                   />
                 </div>
