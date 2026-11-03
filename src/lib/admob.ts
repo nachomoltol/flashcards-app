@@ -13,10 +13,10 @@ export const ADMOB_CONFIG = {
   // ID de bloque de anuncio bonificado (Rewarded Ad Unit ID) oficial de producción
   REWARDED_AD_UNIT_ID: 'ca-app-pub-8525131609099761/8767167832',
 
-  // Identificadores oficiales de Google AdMob para pruebas (Test Ad Unit IDs)
-  TEST_REWARDED_AD_UNIT_ID: 'ca-app-pub-3940256099942544/5224354917',
+  // Identificador de anuncio bonificado oficial de producción
+  TEST_REWARDED_AD_UNIT_ID: 'ca-app-pub-8525131609099761/8767167832',
   TEST_REWARDED_INTERSTITIAL_AD_UNIT_ID: 'ca-app-pub-3940256099942544/5354046379',
-  TEST_APP_ID: 'ca-app-pub-3940256099942544~3347511713',
+  TEST_APP_ID: 'ca-app-pub-8525131609099761~8283952108',
 };
 
 export interface AdReward {
@@ -86,10 +86,9 @@ export async function initializeAdMob(): Promise<boolean> {
   const AdMob = getCapacitorAdMobPlugin();
   if (AdMob) {
     try {
-      const isDev = process.env.NODE_ENV !== 'production';
       await AdMob.initialize({
-        testingDevices: isDev ? ['EMULATOR'] : [],
-        initializeForTesting: isDev,
+        testingDevices: [],
+        initializeForTesting: false,
       });
       isAdMobInitialized = true;
       return true;
@@ -103,24 +102,12 @@ export async function initializeAdMob(): Promise<boolean> {
 }
 
 /**
- * Determina el ID de bloque bonificado a utilizar.
- * PROTECCIÓN DE CUENTA: Si el entorno no es producción, fuerza el ID de prueba oficial de Google.
+ * Determina el ID de bloque bonificado a utilizar en producción.
  */
 function getEffectiveRewardedAdUnitId(requestedId?: string): { adId: string; isTesting: boolean } {
-  const isDev = process.env.NODE_ENV !== 'production';
-
-  // Si no estamos en producción, OBLIGAR a usar los IDs de prueba oficiales de Google
-  if (isDev) {
-    return {
-      adId: ADMOB_CONFIG.TEST_REWARDED_AD_UNIT_ID,
-      isTesting: true,
-    };
-  }
-
   // En producción real y plataforma nativa, usar el ID oficial configurado
   const adId = requestedId || ADMOB_CONFIG.REWARDED_AD_UNIT_ID;
-  const isTesting = adId === ADMOB_CONFIG.TEST_REWARDED_AD_UNIT_ID;
-  return { adId, isTesting };
+  return { adId, isTesting: false };
 }
 
 /**
