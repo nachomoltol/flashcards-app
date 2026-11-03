@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { ShieldCheck, Mail, ArrowLeft, Database, Globe, Cpu, Lock } from 'lucide-react';
+import { ShieldCheck, ArrowLeft, Database, Globe, Cpu, Lock } from 'lucide-react';
+import { DeleteAccountRequestButton } from '@/components/privacy/DeleteAccountRequestButton';
 
 export const metadata: Metadata = {
   title: 'Política de Privacidad | Flashmente',
@@ -218,13 +219,7 @@ export default function PrivacidadPage() {
                 plazo máximo de 30 días.
               </p>
               <div className="pt-1">
-                <a
-                  href="mailto:nachomoltol@gmail.com?subject=Eliminar%20cuenta"
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-medium text-xs rounded-lg transition-colors cursor-pointer shadow-xs"
-                >
-                  <Mail className="w-3.5 h-3.5" />
-                  <span>Enviar solicitud</span>
-                </a>
+                <DeleteAccountRequestButton />
               </div>
             </div>
           </section>

@@ -13,13 +13,13 @@ import {
   AlertCircle,
   Lock,
   CreditCard,
-  Smartphone,
   PlayCircle,
   Tv,
-  Apple,
   Volume2,
   Video,
   Printer,
+  Download,
+  Mail,
 } from 'lucide-react';
 import { useProModalStore, ProFeatureName } from '@/stores/useProModalStore';
 import { useAuthStore, useLanguageStore } from '@/stores';
@@ -74,10 +74,6 @@ export function ProModal({
     tier?: string;
   } | null>(null);
 
-  // Estado para captura de interés en App Store para usuarios de iOS
-  const [iosEmail, setIosEmail] = useState('');
-  const [iosSubmitted, setIosSubmitted] = useState(false);
-
   // Estado de nivel y consumo para mensajes de límite duros (50 Free / 120 Pro)
   const [userLimits, setUserLimits] = useState<{
     tier: 'free' | 'pro' | 'vip';
@@ -108,19 +104,7 @@ export function ProModal({
           });
       });
     }
-
-    if (user?.email && !iosEmail) {
-      setIosEmail(user.email);
-    }
-
-    try {
-      if (typeof window !== 'undefined' && localStorage.getItem('flashmente_ios_waitlist_email')) {
-        setIosSubmitted(true);
-      }
-    } catch {
-      // Ignorar fallo en acceso a localStorage
-    }
-  }, [isOpen, user?.id, user?.email, iosEmail]);
+  }, [isOpen, user?.id]);
 
   const handleClose = useCallback(() => {
     if (propOnClose) {
@@ -562,19 +546,19 @@ export function ProModal({
                 </div>
               ) : platform.isIOS ? (
                 /* =======================================================
-                   IPHONE / IOS: BOTÓN STRIPE + CAPTURA DE WAITLIST APP STORE
+                   IPHONE / IOS: BOTÓN STRIPE + OPCIÓN GRATUITA (AVISO IOS)
                    ======================================================= */
-                <div className="space-y-3">
+                <div className="space-y-2.5 sm:space-y-3">
                   {/* Tarjeta Plan Mensual Alta Capacidad (3,50€/mes) */}
-                  <div className="relative p-4 rounded-2xl bg-white dark:bg-neutral-900 border-2 border-purple-600 dark:border-purple-500 shadow-md shadow-purple-500/10 dark:shadow-purple-950/40 space-y-3">
+                  <div className="relative p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-neutral-900 border-2 border-purple-600 dark:border-purple-500 shadow-md shadow-purple-500/10 dark:shadow-purple-950/40 space-y-2.5">
                     <div className="flex items-center justify-between">
                       <div className="space-y-0.5">
                         <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-500/25 border border-purple-300 dark:border-purple-400/40 text-purple-900 dark:text-purple-200 text-[9px] font-bold uppercase tracking-wider">
                           <Sparkles className="w-2.5 h-2.5 text-purple-600 dark:text-purple-300" />
-                          ACCESO TOTAL PRO
+                          OPCIÓN 1 • RECOMENDADA
                         </div>
                         <h3 className="text-sm sm:text-base font-bold text-neutral-900 dark:text-white">
-                          Plan Mensual Alta Capacidad
+                          Flashmente PRO — Alta Capacidad
                         </h3>
                       </div>
 
@@ -595,7 +579,7 @@ export function ProModal({
                       type="button"
                       onClick={handleSubscribe}
                       disabled={isSubscribing}
-                      className="w-full min-h-[44px] inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-violet-600 hover:from-purple-500 hover:via-indigo-500 hover:to-violet-500 text-white font-bold text-xs sm:text-sm shadow-md shadow-purple-700/25 active:scale-[0.99] transition cursor-pointer disabled:opacity-70 group"
+                      className="w-full min-h-[44px] sm:min-h-[46px] inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-violet-600 hover:from-purple-500 hover:via-indigo-500 hover:to-violet-500 text-white font-bold text-xs sm:text-sm shadow-md shadow-purple-700/25 active:scale-[0.99] transition cursor-pointer disabled:opacity-70 group"
                     >
                       {isSubscribing ? (
                         <>
@@ -605,7 +589,7 @@ export function ProModal({
                       ) : (
                         <>
                           <CreditCard className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                          <span>Suscribirse ahora — 3,50 €/mes</span>
+                          <span>Hacerme PRO (3,50 €/mes)</span>
                           <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
                         </>
                       )}
@@ -618,80 +602,55 @@ export function ProModal({
                     )}
                   </div>
 
-                  {/* Módulo Lista de Espera App Store */}
-                  <div className="p-3.5 rounded-2xl bg-neutral-50 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 space-y-2 animate-in fade-in">
+                  {/* NIVEL 2: OPCIÓN GRATUITA (DISPOSITIVOS APPLE IOS) */}
+                  <div className="relative p-3.5 sm:p-4 rounded-2xl bg-gradient-to-b from-amber-50/70 via-white to-amber-50/30 dark:from-amber-950/30 dark:to-neutral-900 border-2 border-amber-400 dark:border-amber-500/50 shadow-md shadow-amber-500/5 space-y-2.5">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="p-1 rounded-lg bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200">
-                          <Apple className="w-3.5 h-3.5" />
+                      <div className="space-y-0.5">
+                        <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-500/20 border border-amber-300 dark:border-amber-400/50 text-amber-800 dark:text-amber-200 text-[9px] font-bold uppercase tracking-wider">
+                          <PlayCircle className="w-2.5 h-2.5 text-amber-600 dark:text-amber-300" />
+                          Opción Gratuita
                         </div>
-                        <h4 className="text-xs font-bold text-neutral-900 dark:text-white">
-                          Próximamente en Apple App Store (iOS)
-                        </h4>
+                        <h3 className="text-sm sm:text-base font-bold text-neutral-900 dark:text-white">
+                          Dispositivos Apple iOS
+                        </h3>
                       </div>
-                      <span className="px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-500/20 text-purple-800 dark:text-purple-300 font-bold text-[8px] uppercase tracking-wider">
-                        EN DESARROLLO
-                      </span>
-                    </div>
 
-                    <p className="text-[11px] text-neutral-600 dark:text-neutral-300 leading-tight">
-                      La app nativa para iPhone y iPad llegará próximamente. Déjanos tu correo y te notificaremos:
-                    </p>
-
-                    {iosSubmitted ? (
-                      <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/30 text-emerald-800 dark:text-emerald-200 text-xs flex items-center gap-2 animate-in fade-in">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                        <span className="font-medium text-[11px]">
-                          ¡Anotado! Te avisaremos al lanzar en App Store.
+                      <div className="text-right pl-2 shrink-0">
+                        <span className="inline-block px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-500/20 border border-purple-300 dark:border-purple-500/40 text-purple-800 dark:text-purple-300 font-bold text-[10px] uppercase tracking-wider">
+                          Próximamente en iOS
                         </span>
                       </div>
-                    ) : (
-                      <form
-                        onSubmit={(e) => {
-                          e.preventDefault();
-                          const targetEmail = (iosEmail || user?.email || '').trim();
-                          if (targetEmail) {
-                            try {
-                              localStorage.setItem('flashmente_ios_waitlist_email', targetEmail);
-                            } catch {}
-                            setIosSubmitted(true);
-                          }
-                        }}
-                        className="flex gap-2"
-                      >
-                        <input
-                          type="email"
-                          value={iosEmail}
-                          onChange={(e) => setIosEmail(e.target.value)}
-                          placeholder={user?.email || 'tu-email@ejemplo.com'}
-                          required
-                          className="flex-1 bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 focus:border-purple-500 rounded-xl px-3 py-1 text-xs text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none transition"
-                        />
-                        <button
-                          type="submit"
-                          className="px-3 py-1 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-200 text-white dark:text-neutral-900 font-semibold text-xs transition active:scale-95 cursor-pointer shrink-0"
-                        >
-                          Avisarme
-                        </button>
-                      </form>
-                    )}
+                    </div>
+
+                    <p className="text-[11px] text-neutral-600 dark:text-neutral-300 leading-snug">
+                      Actualmente los anuncios bonificados solo están disponibles en la App de Android. Estamos preparando el lanzamiento en la App Store de Apple.
+                    </p>
+
+                    <a
+                      href="mailto:nachomoltol@gmail.com?subject=Aviso%20disponibilidad%20iOS%20-%20Flashmente&body=Hola,%20deseo%20que%20me%20avises%20cuando%20Flashmente%20est%C3%A9%20disponible%20en%20la%20App%20Store%20de%20Apple."
+                      className="w-full min-h-[44px] sm:min-h-[46px] inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-200 text-white dark:text-neutral-900 font-bold text-xs sm:text-sm shadow-md active:scale-[0.99] transition cursor-pointer group"
+                    >
+                      <Mail className="w-4 h-4 text-purple-400 dark:text-purple-600 group-hover:scale-110 transition-transform" />
+                      <span>Avísame cuando esté disponible en iPhone</span>
+                      <ChevronRight className="w-3.5 h-3.5 text-neutral-400 dark:text-neutral-600 group-hover:translate-x-0.5 transition-transform" />
+                    </a>
                   </div>
                 </div>
               ) : (
                 /* =======================================================
-                   PC / MAC / WEB: BOTÓN STRIPE + MENSAJE DE APP ANDROID
+                   PC / MAC / WEB: BOTÓN STRIPE + OPCIÓN GRATUITA (APP ANDROID)
                    ======================================================= */
-                <div className="space-y-3">
+                <div className="space-y-2.5 sm:space-y-3">
                   {/* Tarjeta Plan Mensual Alta Capacidad (3,50€/mes) */}
-                  <div className="relative p-4 rounded-2xl bg-white dark:bg-neutral-900 border-2 border-purple-600 dark:border-purple-500 shadow-md shadow-purple-500/10 dark:shadow-purple-950/40 space-y-3">
+                  <div className="relative p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-neutral-900 border-2 border-purple-600 dark:border-purple-500 shadow-md shadow-purple-500/10 dark:shadow-purple-950/40 space-y-2.5">
                     <div className="flex items-center justify-between">
                       <div className="space-y-0.5">
                         <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-500/25 border border-purple-300 dark:border-purple-400/40 text-purple-900 dark:text-purple-200 text-[9px] font-bold uppercase tracking-wider">
                           <Sparkles className="w-2.5 h-2.5 text-purple-600 dark:text-purple-300" />
-                          ACCESO TOTAL PRO
+                          OPCIÓN 1 • RECOMENDADA
                         </div>
                         <h3 className="text-sm sm:text-base font-bold text-neutral-900 dark:text-white">
-                          Plan Mensual Alta Capacidad
+                          Flashmente PRO — Alta Capacidad
                         </h3>
                       </div>
 
@@ -712,7 +671,7 @@ export function ProModal({
                       type="button"
                       onClick={handleSubscribe}
                       disabled={isSubscribing}
-                      className="w-full min-h-[44px] inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-violet-600 hover:from-purple-500 hover:via-indigo-500 hover:to-violet-500 text-white font-bold text-xs sm:text-sm shadow-md shadow-purple-700/25 active:scale-[0.99] transition cursor-pointer disabled:opacity-70 group"
+                      className="w-full min-h-[44px] sm:min-h-[46px] inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-violet-600 hover:from-purple-500 hover:via-indigo-500 hover:to-violet-500 text-white font-bold text-xs sm:text-sm shadow-md shadow-purple-700/25 active:scale-[0.99] transition cursor-pointer disabled:opacity-70 group"
                     >
                       {isSubscribing ? (
                         <>
@@ -722,7 +681,7 @@ export function ProModal({
                       ) : (
                         <>
                           <CreditCard className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                          <span>Suscribirse ahora — 3,50 €/mes</span>
+                          <span>Hacerme PRO (3,50 €/mes)</span>
                           <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
                         </>
                       )}
@@ -735,25 +694,40 @@ export function ProModal({
                     )}
                   </div>
 
-                  {/* Mensaje Informativo de Android en Web */}
-                  <div className="p-3.5 rounded-2xl bg-neutral-50 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 space-y-1.5 animate-in fade-in">
+                  {/* NIVEL 2: OPCIÓN GRATUITA (DISPONIBLE EN APP ANDROID) */}
+                  <div className="relative p-3.5 sm:p-4 rounded-2xl bg-gradient-to-b from-amber-50/70 via-white to-amber-50/30 dark:from-amber-950/30 dark:to-neutral-900 border-2 border-amber-400 dark:border-amber-500/50 shadow-md shadow-amber-500/5 space-y-2.5">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="p-1 rounded-lg bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-400">
-                          <Smartphone className="w-3.5 h-3.5" />
+                      <div className="space-y-0.5">
+                        <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-500/20 border border-amber-300 dark:border-amber-400/50 text-amber-800 dark:text-amber-200 text-[9px] font-bold uppercase tracking-wider">
+                          <PlayCircle className="w-2.5 h-2.5 text-amber-600 dark:text-amber-300" />
+                          Opción Gratuita
                         </div>
-                        <h4 className="text-xs font-bold text-neutral-900 dark:text-white">
-                          Opción Gratuita: Genera desde la App Android
-                        </h4>
+                        <h3 className="text-sm sm:text-base font-bold text-neutral-900 dark:text-white">
+                          Disponible en la App de Android
+                        </h3>
                       </div>
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 font-bold text-[8px] uppercase tracking-wider">
-                        SIN COSTE
-                      </span>
+
+                      <div className="text-right pl-2 shrink-0">
+                        <span className="inline-block px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-500/20 border border-amber-300 dark:border-amber-500/40 text-amber-800 dark:text-amber-300 font-bold text-[10px] uppercase tracking-wider">
+                          Exclusivo en Android App
+                        </span>
+                      </div>
                     </div>
 
                     <p className="text-[11px] text-neutral-600 dark:text-neutral-300 leading-snug">
-                      ¿Prefieres no suscribirte? Obtén créditos viendo anuncios en nuestra app oficial de Android. Tus mazos se sincronizan automáticamente.
+                      La visualización de anuncios para crear tarjetas y estudiar gratis solo está disponible en nuestra App oficial de Android. Descarga Flashmente en Google Play para seguir estudiando gratis o hazte PRO para generar sin límites desde tu ordenador.
                     </p>
+
+                    <a
+                      href="https://play.google.com/store/apps/details?id=com.flashmente.app"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full min-h-[44px] sm:min-h-[46px] inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-200 text-white dark:text-neutral-900 font-bold text-xs sm:text-sm shadow-md active:scale-[0.99] transition cursor-pointer group"
+                    >
+                      <Download className="w-4 h-4 text-emerald-400 dark:text-emerald-600 group-hover:translate-y-0.5 transition-transform" />
+                      <span>Descargar en Google Play</span>
+                      <ChevronRight className="w-3.5 h-3.5 text-neutral-400 dark:text-neutral-600 group-hover:translate-x-0.5 transition-transform" />
+                    </a>
                   </div>
                 </div>
               )}

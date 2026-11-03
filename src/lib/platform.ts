@@ -38,7 +38,11 @@ export function detectPlatform(): PlatformInfo {
 
   const userAgent = navigator.userAgent || '';
   const isAndroidOS = /Android/i.test(userAgent);
-  const isIOS = /iPhone|iPad|iPod/i.test(userAgent);
+  const isIPadOS =
+    typeof navigator !== 'undefined' &&
+    navigator.platform === 'MacIntel' &&
+    navigator.maxTouchPoints > 1;
+  const isIOS = /iPhone|iPad|iPod/i.test(userAgent) || isIPadOS;
 
   // 1. Detección de Capacitor Nativo en Android (mediante SDK oficial de Capacitor)
   const isCapacitorAndroid = Boolean(
