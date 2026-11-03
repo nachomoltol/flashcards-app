@@ -5,6 +5,16 @@ import { resend, RESEND_FROM_EMAIL } from '@/lib/resend';
 export const maxDuration = 30;
 export const dynamic = 'force-dynamic';
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
 function getEmailTemplate(otpCode: string, actionLink: string): string {
   return `
 <!DOCTYPE html>
@@ -116,7 +126,7 @@ export async function POST(req: NextRequest) {
     if (!cleanEmail || !cleanEmail.includes('@')) {
       return NextResponse.json(
         { success: false, error: 'Por favor, introduce un correo electrónico válido.' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -127,7 +137,7 @@ export async function POST(req: NextRequest) {
       console.error('[send-otp] Error: Variables de entorno de Supabase Service Role no configuradas.');
       return NextResponse.json(
         { success: false, error: 'Error de configuración interna del servidor.' },
-        { status: 500 }
+        { status: 500, headers: corsHeaders }
       );
     }
 
@@ -155,11 +165,14 @@ export async function POST(req: NextRequest) {
 
       // Si el usuario ya está confirmado
       if (genResult.error.code === 'email_exists') {
-        return NextResponse.json({
-          success: false,
-          alreadyConfirmed: true,
-          message: 'Tu correo ya está verificado. Puedes iniciar sesión directamente.',
-        });
+        return NextResponse.json(
+          {
+            success: false,
+            alreadyConfirmed: true,
+            message: 'Tu correo ya está verificado. Puedes iniciar sesión directamente.',
+          },
+          { headers: corsHeaders }
+        );
       }
 
       // Si el usuario no existe y no se proporcionó contraseña
@@ -170,13 +183,13 @@ export async function POST(req: NextRequest) {
             notFound: true,
             error: 'No se encontró ninguna cuenta pendiente de verificación con este correo.',
           },
-          { status: 404 }
+          { status: 404, headers: corsHeaders }
         );
       }
 
       return NextResponse.json(
         { success: false, error: genResult.error.message || 'Error al generar código de verificación.' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -187,7 +200,7 @@ export async function POST(req: NextRequest) {
       console.error('[send-otp] No se pudo obtener el email_otp de Supabase Admin:', genResult.data);
       return NextResponse.json(
         { success: false, error: 'No se pudo generar el código numérico de verificación.' },
-        { status: 500 }
+        { status: 500, headers: corsHeaders }
       );
     }
 
@@ -197,7 +210,7 @@ export async function POST(req: NextRequest) {
       console.error('[send-otp] Error: RESEND_API_KEY no configurada en el servidor.');
       return NextResponse.json(
         { success: false, error: 'Servicio de correo temporalmente no disponible.' },
-        { status: 500 }
+        { status: 500, headers: corsHeaders }
       );
     }
 
@@ -207,32 +220,71 @@ export async function POST(req: NextRequest) {
 
     console.log(`[send-otp] Despachando correo Resend para ${cleanEmail} con OTP: [${otpCode}] desde ${fromAddress}...`);
 
-    const { data: resendData, error: resendError } = await resend.emails.send({
-      from: fromAddress,
-      to: [cleanEmail],
-      subject,
-      html: htmlContent,
-    });
+    let resendData: { id: string } | null = null;
+    let resendError: { message?: string } | null = null;
 
-    if (resendError) {
-      console.error('[send-otp] Error devuelto por Resend:', resendError);
-      return NextResponse.json(
-        { success: false, error: resendError.message || 'Error al entregar el correo de verificación con Resend.' },
-        { status: 500 }
-      );
+    try {
+      const primaryRes = await resend.emails.send({
+        from: fromAddress,
+        to: [cleanEmail],
+        subject,
+        html: htmlContent,
+      });
+      resendData = primaryRes.data;
+      resendError = primaryRes.error;
+    } catch (e: unknown) {
+      console.warn('[send-otp] Excepción al enviar correo con remitente principal:', e);
+      resendError = { message: e instanceof Error ? e.message : 'Error al invocar Resend' };
     }
 
-    console.log(`[send-otp] Correo enviado exitosamente con Resend. ID: ${resendData?.id}`);
+    // Fallback automático con remitente seguro onboarding@resend.dev si falla el dominio personalizado
+    if (resendError) {
+      const fallbackFrom = 'Flashmente <onboarding@resend.dev>';
+      console.warn(
+        `[send-otp] Falló remitente principal "${fromAddress}": ${resendError.message}. Reintentando automáticamente con remitente seguro: "${fallbackFrom}"...`
+      );
 
-    return NextResponse.json({
-      success: true,
-      message: 'Código de verificación enviado exitosamente por correo.',
-      messageId: resendData?.id,
-    });
+      try {
+        const retryRes = await resend.emails.send({
+          from: fallbackFrom,
+          to: [cleanEmail],
+          subject,
+          html: htmlContent,
+        });
+
+        if (retryRes.error) {
+          console.error('[send-otp] Error devuelto por Resend en retry con fallback:', retryRes.error);
+          return NextResponse.json(
+            { success: false, error: retryRes.error.message || 'Error al entregar el correo de verificación con Resend.' },
+            { status: 500, headers: corsHeaders }
+          );
+        }
+
+        resendData = retryRes.data;
+        resendError = null;
+        console.log(`[send-otp] Correo enviado exitosamente con remitente seguro (${fallbackFrom}). ID: ${resendData?.id}`);
+      } catch (retryErr: unknown) {
+        console.error('[send-otp] Excepción en reintento con fallback seguro:', retryErr);
+        return NextResponse.json(
+          { success: false, error: 'Error al entregar el correo con remitente fallback.' },
+          { status: 500, headers: corsHeaders }
+        );
+      }
+    } else {
+      console.log(`[send-otp] Correo enviado exitosamente con Resend. ID: ${resendData?.id}`);
+    }
+
+    return NextResponse.json(
+      {
+        success: true,
+        message: 'Código de verificación enviado exitosamente por correo.',
+        messageId: resendData?.id,
+      },
+      { headers: corsHeaders }
+    );
   } catch (err: unknown) {
     console.error('[send-otp] Excepción no controlada:', err);
     const message = err instanceof Error ? err.message : 'Error interno al procesar el envío del código OTP.';
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    return NextResponse.json({ success: false, error: message }, { status: 500, headers: corsHeaders });
   }
 }
-

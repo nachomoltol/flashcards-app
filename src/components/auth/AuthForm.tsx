@@ -55,6 +55,20 @@ function getFriendlyErrorMessage(errorMsg: string): string {
   return errorMsg;
 }
 
+function getSendOtpApiUrl(): string {
+  if (typeof window !== 'undefined') {
+    const isLocalOrNative =
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1' ||
+      window.location.protocol === 'capacitor:' ||
+      window.location.protocol === 'file:';
+    if (isLocalOrNative) {
+      return 'https://www.flashmente.com/api/auth/send-otp';
+    }
+  }
+  return '/api/auth/send-otp';
+}
+
 export function AuthForm({ initialMode = 'signin' }: AuthFormProps) {
   const router = useRouter();
   const { t } = useLanguageStore();
@@ -223,7 +237,8 @@ export function AuthForm({ initialMode = 'signin' }: AuthFormProps) {
 
     try {
       // 1. Invocar endpoint dedicado con SDK oficial de Resend y Supabase Admin
-      const response = await fetch('/api/auth/send-otp', {
+      const apiUrl = getSendOtpApiUrl();
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: cleanEmail }),
@@ -352,7 +367,8 @@ export function AuthForm({ initialMode = 'signin' }: AuthFormProps) {
 
           // Disparar envío de correo con código visible mediante Resend
           try {
-            const sendRes = await fetch('/api/auth/send-otp', {
+            const apiUrl = getSendOtpApiUrl();
+            const sendRes = await fetch(apiUrl, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ email: cleanEmail }),
