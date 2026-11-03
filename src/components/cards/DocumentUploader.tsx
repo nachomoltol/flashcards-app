@@ -268,6 +268,42 @@ export function DocumentUploader({
   // Estatus de suscripción PRO / VIP del usuario
   const [isPro, setIsPro] = useState(false);
 
+  // Mensajes de progreso dinámicos durante la generación con IA para evitar sensación de congelamiento
+  const [analyzingPhaseIndex, setAnalyzingPhaseIndex] = useState<number>(0);
+
+  const analyzingPhasesEs = [
+    'Extrayendo conceptos clave y estructura del documento...',
+    'Redactando flashcards con preguntas y respuestas...',
+    'Generando explicaciones pedagógicas y opciones...',
+    'Verificando cobertura de contenido y distractores...',
+    'Finalizando y optimizando el lote de tarjetas (casi listo)...',
+  ];
+
+  const analyzingPhasesEn = [
+    'Extracting key concepts and document structure...',
+    'Drafting flashcards with questions and answers...',
+    'Generating pedagogical explanations and options...',
+    'Verifying content coverage and distractors...',
+    'Finalizing and polishing card batch (almost done)...',
+  ];
+
+  const currentAnalyzingPhase = isEn
+    ? analyzingPhasesEn[analyzingPhaseIndex] || analyzingPhasesEn[0]
+    : analyzingPhasesEs[analyzingPhaseIndex] || analyzingPhasesEs[0];
+
+  useEffect(() => {
+    if (status !== 'analyzing') {
+      setAnalyzingPhaseIndex(0);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setAnalyzingPhaseIndex((prev) => (prev < 4 ? prev + 1 : prev));
+    }, 6500);
+
+    return () => clearInterval(interval);
+  }, [status]);
+
   useEffect(() => {
     if (!user?.id) return;
     const uid: string = user.id;
@@ -1102,31 +1138,50 @@ export function DocumentUploader({
 
           {/* Progress Indicator durante proceso en background */}
           {isBusy && (
-            <div className="p-4 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950/80 space-y-2 animate-in fade-in">
+            <div className="p-4 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950/80 space-y-2.5 animate-in fade-in">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-neutral-800 dark:text-neutral-300 font-medium flex items-center gap-2">
-                  <div className="w-3.5 h-3.5 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+                  <div className="w-3.5 h-3.5 border-2 border-violet-500 border-t-transparent rounded-full animate-spin shrink-0" />
                   {status === 'uploading' && t('ai_uploader.status_uploading', '1/3 Subiendo archivo a Supabase Storage...')}
-                  {status === 'analyzing' && t('ai_uploader.status_analyzing', '2/3 Gemini Flash generando {count} tarjetas ({format})...').replace('{count}', String(cardCount)).replace('{format}', cardFormat)}
+                  {status === 'analyzing' && (
+                    <span className="inline-flex items-center gap-1.5 flex-wrap">
+                      <span className="text-violet-600 dark:text-violet-400 font-semibold">2/3 Gemini Flash:</span>
+                      <span className="text-slate-700 dark:text-slate-200">{currentAnalyzingPhase}</span>
+                    </span>
+                  )}
                   {status === 'saving' && t('ai_uploader.status_saving', '3/3 Guardando tarjetas generadas en Supabase...')}
                 </span>
-                <span className="text-[11px] text-violet-600 dark:text-violet-400 font-mono uppercase">
+                <span className="text-[11px] text-violet-600 dark:text-violet-400 font-mono uppercase shrink-0">
                   {status === 'uploading' && 'Storage'}
-                  {status === 'analyzing' && 'Gemini Flash'}
+                  {status === 'analyzing' && `${cardCount} Cards`}
                   {status === 'saving' && 'Zustand / DB'}
                 </span>
               </div>
               <div className="h-1.5 w-full bg-neutral-200 dark:bg-neutral-900 rounded-full overflow-hidden">
                 <div
-                  className={`h-full bg-gradient-to-r from-violet-600 via-indigo-500 to-emerald-400 transition-all duration-500 ${
+                  className={`h-full bg-gradient-to-r from-violet-600 via-indigo-500 to-emerald-400 transition-all duration-700 ${
                     status === 'uploading'
-                      ? 'w-1/3'
+                      ? 'w-1/4'
                       : status === 'analyzing'
-                      ? 'w-2/3'
+                      ? analyzingPhaseIndex === 0
+                        ? 'w-1/3'
+                        : analyzingPhaseIndex === 1
+                        ? 'w-1/2'
+                        : analyzingPhaseIndex === 2
+                        ? 'w-2/3'
+                        : analyzingPhaseIndex === 3
+                        ? 'w-5/6'
+                        : 'w-[92%]'
                       : 'w-full'
                   }`}
                 />
               </div>
+              {status === 'analyzing' && (
+                <div className="flex items-center justify-between text-[11px] text-neutral-500 dark:text-neutral-400 pt-0.5">
+                  <span>Generando lote de {cardCount} flashcards ({cardFormat})</span>
+                  <span className="font-mono text-violet-500 font-semibold animate-pulse">Fase {analyzingPhaseIndex + 1} de 5</span>
+                </div>
+              )}
             </div>
           )}
 
@@ -2110,11 +2165,15 @@ export function DocumentUploader({
                 >
                   {isBusy ? (
                     <>
-                      <div className="w-4 h-4 border-2 border-white/80 border-t-transparent rounded-full animate-spin" />
-                      <span>
-                        {isPageableDoc
-                          ? (isEn ? 'Extracting meticulously...' : 'Extrayendo minuciosamente...')
-                          : t('ai_uploader.processing_file', isEn ? 'Processing file...' : 'Procesando archivo...')}
+                      <div className="w-4 h-4 border-2 border-white/80 border-t-transparent rounded-full animate-spin shrink-0" />
+                      <span className="truncate max-w-[240px] sm:max-w-xs">
+                        {status === 'uploading'
+                          ? (isEn ? 'Uploading document...' : 'Subiendo documento...')
+                          : status === 'analyzing'
+                          ? currentAnalyzingPhase
+                          : status === 'saving'
+                          ? (isEn ? 'Saving cards...' : 'Guardando tarjetas...')
+                          : (isEn ? 'Processing...' : 'Procesando...')}
                       </span>
                     </>
                   ) : (

@@ -5,8 +5,14 @@ const config: CapacitorConfig = {
   appName: 'Flashmente',
   webDir: 'public',
   server: {
-    url: 'https://flashmente.com',
-    cleartext: false
+    url: 'https://www.flashmente.com',
+    cleartext: false,
+    allowNavigation: [
+      'www.flashmente.com',
+      'flashmente.com',
+      '*.flashmente.com',
+      'fapjackhdqtnrpteujum.supabase.co'
+    ]
   },
   android: {
     allowMixedContent: false,

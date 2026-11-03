@@ -17,11 +17,14 @@ import {
   AlertCircle,
   CheckCircle2,
   Sparkles,
+  KeyRound,
+  ShieldCheck,
+  RefreshCw,
 } from 'lucide-react';
 import { ensureQuickGuideDeck } from '@/lib/onboarding/seedGuideDeck';
 
 interface AuthFormProps {
-  initialMode?: 'signin' | 'signup' | 'forgot';
+  initialMode?: 'signin' | 'signup' | 'forgot' | 'verify_otp';
 }
 
 function getFriendlyErrorMessage(errorMsg: string): string {
@@ -37,8 +40,14 @@ function getFriendlyErrorMessage(errorMsg: string): string {
   if (errorMsg.includes('Email not confirmed')) {
     return 'Debes confirmar tu correo electrónico antes de iniciar sesión.';
   }
-  if (errorMsg.includes('rate limit')) {
-    return 'Demasiados intentos. Espera unos momentos antes de volver a intentar.';
+  if (errorMsg.includes('Token has expired') || errorMsg.includes('token expired') || errorMsg.includes('otp_expired')) {
+    return 'El código ha caducado. Pulsa en reenviar para recibir uno nuevo.';
+  }
+  if (errorMsg.includes('Token is invalid') || errorMsg.includes('invalid token') || errorMsg.includes('invalid_grant')) {
+    return 'El código de verificación introducido no es válido. Compruébalo e inténtalo de nuevo.';
+  }
+  if (errorMsg.includes('rate limit') || errorMsg.includes('over_email_send_rate_limit')) {
+    return 'Demasiados intentos. Espera unos momentos antes de volver a solicitarlo.';
   }
   if (errorMsg.includes('invalid format') || errorMsg.includes('valid email')) {
     return 'Por favor, introduce un correo electrónico válido.';
@@ -49,12 +58,14 @@ function getFriendlyErrorMessage(errorMsg: string): string {
 export function AuthForm({ initialMode = 'signin' }: AuthFormProps) {
   const router = useRouter();
   const { t } = useLanguageStore();
-  const [mode, setMode] = useState<'signin' | 'signup' | 'forgot'>(initialMode);
+  const [mode, setMode] = useState<'signin' | 'signup' | 'forgot' | 'verify_otp'>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [demoLoading, setDemoLoading] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -65,7 +76,7 @@ export function AuthForm({ initialMode = 'signin' }: AuthFormProps) {
     return rawNext.startsWith('/') ? rawNext : `/${rawNext}`;
   };
 
-  // Redirigir si ya existe una sesión activa
+  // Redirigir si ya existe una sesión activa y detectar modo verificación por URL
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) {
@@ -76,7 +87,20 @@ export function AuthForm({ initialMode = 'signin' }: AuthFormProps) {
         router.push(nextUrl);
       }
     });
-  }, [router]);
+
+    if (typeof window !== 'undefined') {
+      const searchParams = new URLSearchParams(window.location.search);
+      const paramMode = searchParams.get('mode');
+      const paramVerify = searchParams.get('verify');
+      const paramEmail = searchParams.get('email');
+      if (paramEmail && !email) {
+        setEmail(paramEmail);
+      }
+      if (paramMode === 'verify' || paramVerify === 'true' || paramMode === 'verify_otp') {
+        setMode('verify_otp');
+      }
+    }
+  }, [router, email]);
 
   const handlePasswordReset = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,10 +116,7 @@ export function AuthForm({ initialMode = 'signin' }: AuthFormProps) {
     setLoading(true);
 
     try {
-      const redirectUrl =
-        typeof window !== 'undefined'
-          ? `${window.location.origin}/auth/callback?next=/update-password`
-          : 'https://flashmente.com/auth/callback?next=/update-password';
+      const redirectUrl = 'https://www.flashmente.com/auth/callback?next=/update-password';
 
       const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
         redirectTo: redirectUrl,
@@ -122,6 +143,103 @@ export function AuthForm({ initialMode = 'signin' }: AuthFormProps) {
           : 'Error inesperado al conectar con el servicio.';
       setError(message);
       setLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSuccessMessage(null);
+
+    const cleanEmail = email.trim();
+    const cleanToken = otpCode.trim().replace(/\s+/g, '');
+
+    if (!cleanEmail) {
+      setError('Por favor, indica tu correo electrónico.');
+      return;
+    }
+
+    if (!cleanToken || cleanToken.length < 6) {
+      setError('Por favor, introduce el código de 6 dígitos completo.');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const { data, error: verifyError } = await supabase.auth.verifyOtp({
+        email: cleanEmail,
+        token: cleanToken,
+        type: 'signup',
+      });
+
+      if (verifyError) {
+        console.error('Error verificando OTP:', verifyError);
+        setError(getFriendlyErrorMessage(verifyError.message));
+        setLoading(false);
+        return;
+      }
+
+      if (data?.session) {
+        try {
+          localStorage.removeItem('flashcards_welcome_tutorial_seen');
+        } catch {}
+        try {
+          await ensureQuickGuideDeck(data.session.user.id);
+        } catch (seedErr) {
+          console.warn('Error inicializando mazo demo en verifyOtp:', seedErr);
+        }
+        useAuthStore.getState().setSession(data.session);
+        setSuccessMessage('¡Cuenta confirmada con éxito! Entrando a Flashmente...');
+        setTimeout(() => {
+          router.push(getNextUrl());
+        }, 500);
+      } else {
+        setSuccessMessage('¡Cuenta confirmada con éxito! Ya puedes iniciar sesión con tu contraseña.');
+        setTimeout(() => {
+          setMode('signin');
+          setLoading(false);
+        }, 1200);
+      }
+    } catch (err: unknown) {
+      console.error('Excepción en verifyOtp:', err);
+      const message =
+        err instanceof Error ? err.message : 'Error inesperado al validar el código OTP.';
+      setError(message);
+      setLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    const cleanEmail = email.trim();
+    if (!cleanEmail) {
+      setError('Introduce tu correo electrónico para reenviar el código.');
+      return;
+    }
+
+    setResendLoading(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      const { error: resendError } = await supabase.auth.resend({
+        type: 'signup',
+        email: cleanEmail,
+        options: {
+          emailRedirectTo: 'https://www.flashmente.com/auth/callback',
+        },
+      });
+
+      if (resendError) {
+        setError(getFriendlyErrorMessage(resendError.message));
+      } else {
+        setSuccessMessage('Te hemos enviado un nuevo código de 6 dígitos a tu correo.');
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Error al solicitar el reenvío.';
+      setError(message);
+    } finally {
+      setResendLoading(false);
     }
   };
 
@@ -169,10 +287,7 @@ export function AuthForm({ initialMode = 'signin' }: AuthFormProps) {
         }
       } else {
         const nextUrl = getNextUrl();
-        const baseCallbackUrl =
-          typeof window !== 'undefined'
-            ? `${window.location.origin}/auth/callback`
-            : 'https://flashmente.com/auth/callback';
+        const baseCallbackUrl = 'https://www.flashmente.com/auth/callback';
         const redirectUrl =
           nextUrl && nextUrl !== '/'
             ? `${baseCallbackUrl}?next=${encodeURIComponent(nextUrl)}`
@@ -204,8 +319,11 @@ export function AuthForm({ initialMode = 'signin' }: AuthFormProps) {
           useAuthStore.getState().setSession(data.session);
           router.push(nextUrl);
         } else {
+          // Cuenta creada que requiere verificación -> Transición inmediata al modo de código OTP
+          setMode('verify_otp');
+          setOtpCode('');
           setSuccessMessage(
-            '¡Cuenta creada con éxito! Si requiere verificación, revisa tu bandeja de entrada para confirmar el correo.'
+            '¡Cuenta creada con éxito! Hemos enviado un código de 6 dígitos a tu correo.'
           );
           setLoading(false);
         }
@@ -254,7 +372,7 @@ export function AuthForm({ initialMode = 'signin' }: AuthFormProps) {
     }
   };
 
-  const toggleMode = (newMode: 'signin' | 'signup' | 'forgot') => {
+  const toggleMode = (newMode: 'signin' | 'signup' | 'forgot' | 'verify_otp') => {
     setMode(newMode);
     setError(null);
     setSuccessMessage(null);
@@ -288,6 +406,8 @@ export function AuthForm({ initialMode = 'signin' }: AuthFormProps) {
               ? 'Iniciar Sesión'
               : mode === 'signup'
               ? 'Crear Cuenta Nueva'
+              : mode === 'verify_otp'
+              ? 'Verificar Correo'
               : 'Recuperar Contraseña'}
           </h1>
           <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-1">
@@ -295,13 +415,15 @@ export function AuthForm({ initialMode = 'signin' }: AuthFormProps) {
               ? 'Accede a tu cuenta para continuar con tus repasos.'
               : mode === 'signup'
               ? 'Empieza a memorizar contenido con repetición espaciada inteligente.'
+              : mode === 'verify_otp'
+              ? `Introduce el código numérico de 6 dígitos enviado a ${email || 'tu correo'}.`
               : 'Introduce tu correo para recibir un enlace de restablecimiento seguro.'}
           </p>
         </div>
       </div>
 
-      {/* Mode Switch Tabs or Forgot Return Button */}
-      {mode !== 'forgot' ? (
+      {/* Mode Switch Tabs or Return Button */}
+      {mode !== 'forgot' && mode !== 'verify_otp' ? (
         <div className="grid grid-cols-2 p-1 rounded-xl bg-neutral-100 dark:bg-neutral-950/70 border border-neutral-200 dark:border-neutral-800 text-xs font-medium">
           <button
             type="button"
@@ -345,116 +467,237 @@ export function AuthForm({ initialMode = 'signin' }: AuthFormProps) {
         </div>
       )}
 
-      {/* Form */}
-      <form onSubmit={mode === 'forgot' ? handlePasswordReset : handleSubmit} className="space-y-4">
-        {/* Email Field */}
-        <div className="space-y-1.5">
-          <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300">
-            Correo Electrónico
-          </label>
-          <div className="relative">
-            <Mail className="w-4 h-4 text-neutral-400 dark:text-neutral-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => {
-                setEmail(e.target.value);
-                if (error) setError(null);
-              }}
-              placeholder="tu@correo.com"
-              required
-              autoComplete="email"
-              className="w-full bg-white dark:bg-neutral-950/70 border border-neutral-300 dark:border-neutral-800 hover:border-neutral-400 dark:hover:border-neutral-700 focus:border-indigo-500 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 rounded-xl pl-10 pr-3.5 py-2.5 text-sm transition focus:outline-none focus:ring-1 focus:ring-indigo-500/50"
-            />
+      {/* Formularios según Modo */}
+      {mode === 'verify_otp' ? (
+        /* Formulario Especial de Código OTP (6 dígitos) */
+        <form onSubmit={handleVerifyOtp} className="space-y-4">
+          {/* Email informativo / editable */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300">
+              Correo Electrónico
+            </label>
+            <div className="relative">
+              <Mail className="w-4 h-4 text-neutral-400 dark:text-neutral-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (error) setError(null);
+                }}
+                placeholder="tu@correo.com"
+                required
+                autoComplete="email"
+                className="w-full bg-white dark:bg-neutral-950/70 border border-neutral-300 dark:border-neutral-800 hover:border-neutral-400 dark:hover:border-neutral-700 focus:border-indigo-500 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 rounded-xl pl-10 pr-3.5 py-2.5 text-sm transition focus:outline-none focus:ring-1 focus:ring-indigo-500/50"
+              />
+            </div>
           </div>
 
-          {/* Mensaje de error explícito en rojo debajo del input */}
-          {error && (
-            <p className="text-xs text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-1.5 pt-1 animate-in fade-in">
-              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-              <span>{error}</span>
-            </p>
-          )}
-        </div>
-
-        {/* Password Field - only in signin and signup */}
-        {mode !== 'forgot' && (
+          {/* Input numérico de 6 dígitos */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300">
-                Contraseña
+                Código de Confirmación (6 dígitos)
               </label>
-              {mode === 'signup' && (
-                <span className="text-[10px] text-neutral-500">Mínimo 6 caracteres</span>
-              )}
-              {mode === 'signin' && (
-                <button
-                  type="button"
-                  onClick={() => toggleMode('forgot')}
-                  className="text-[11px] text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 font-medium transition cursor-pointer"
-                >
-                  ¿Olvidaste tu contraseña?
-                </button>
-              )}
+              <span className="text-[10px] text-neutral-500 font-mono">Solo números</span>
             </div>
             <div className="relative">
-              <Lock className="w-4 h-4 text-neutral-400 dark:text-neutral-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <KeyRound className="w-4 h-4 text-neutral-400 dark:text-neutral-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={6}
+                value={otpCode}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/[^0-9]/g, '');
+                  setOtpCode(val);
+                  if (error) setError(null);
+                }}
+                placeholder="123456"
                 required
-                minLength={6}
-                autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
-                className="w-full bg-white dark:bg-neutral-950/70 border border-neutral-300 dark:border-neutral-800 hover:border-neutral-400 dark:hover:border-neutral-700 focus:border-indigo-500 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 rounded-xl pl-10 pr-10 py-2.5 text-sm transition focus:outline-none focus:ring-1 focus:ring-indigo-500/50"
+                autoFocus
+                autoComplete="one-time-code"
+                className="w-full bg-white dark:bg-neutral-950/70 border border-neutral-300 dark:border-neutral-800 hover:border-neutral-400 dark:hover:border-neutral-700 focus:border-indigo-500 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 rounded-xl pl-10 pr-3.5 py-2.5 text-lg font-mono tracking-[0.35em] text-center font-bold transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
               />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                aria-label={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300 transition cursor-pointer p-1"
-              >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
             </div>
-          </div>
-        )}
 
-        {/* Submit Button */}
-        <button
-          type="submit"
-          disabled={loading || demoLoading}
-          className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-medium text-sm shadow-lg shadow-indigo-500/25 transition-all duration-150 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 mt-2"
-        >
-          {loading ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span>
-                {mode === 'signin'
-                  ? 'Iniciando sesión...'
-                  : mode === 'signup'
-                  ? 'Creando cuenta...'
-                  : 'Enviando enlace...'}
-              </span>
-            </>
-          ) : (
-            <>
-              <span>
-                {mode === 'signin'
-                  ? 'Iniciar Sesión'
-                  : mode === 'signup'
-                  ? 'Crear Cuenta'
-                  : 'Enviar Enlace de Recuperación'}
-              </span>
-              <ArrowRight className="w-4 h-4" />
-            </>
+            {error && (
+              <p className="text-xs text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-1.5 pt-1 animate-in fade-in">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                <span>{error}</span>
+              </p>
+            )}
+          </div>
+
+          {/* Submit Button */}
+          <button
+            type="submit"
+            disabled={loading || otpCode.length < 6}
+            className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-medium text-sm shadow-lg shadow-indigo-500/25 transition-all duration-150 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 mt-2"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Verificando código...</span>
+              </>
+            ) : (
+              <>
+                <ShieldCheck className="w-4 h-4" />
+                <span>Verificar y Activar Cuenta</span>
+              </>
+            )}
+          </button>
+
+          {/* Reenviar código OTP */}
+          <div className="pt-1 text-center">
+            <button
+              type="button"
+              disabled={resendLoading || loading}
+              onClick={handleResendOtp}
+              className="text-xs text-neutral-500 dark:text-neutral-400 hover:text-indigo-600 dark:hover:text-indigo-300 font-medium inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors"
+            >
+              {resendLoading ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Reenviando...</span>
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>¿No recibiste el correo? Reenviar código</span>
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      ) : (
+        /* Formulario para Iniciar Sesión / Registro / Recuperación */
+        <form onSubmit={mode === 'forgot' ? handlePasswordReset : handleSubmit} className="space-y-4">
+          {/* Email Field */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300">
+              Correo Electrónico
+            </label>
+            <div className="relative">
+              <Mail className="w-4 h-4 text-neutral-400 dark:text-neutral-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (error) setError(null);
+                }}
+                placeholder="tu@correo.com"
+                required
+                autoComplete="email"
+                className="w-full bg-white dark:bg-neutral-950/70 border border-neutral-300 dark:border-neutral-800 hover:border-neutral-400 dark:hover:border-neutral-700 focus:border-indigo-500 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 rounded-xl pl-10 pr-3.5 py-2.5 text-sm transition focus:outline-none focus:ring-1 focus:ring-indigo-500/50"
+              />
+            </div>
+
+            {/* Mensaje de error explícito con atajo directo si el email no está confirmado */}
+            {error && (
+              <div className="space-y-1.5 pt-1 animate-in fade-in">
+                <p className="text-xs text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-1.5">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{error}</span>
+                </p>
+                {error.includes('confirmar tu correo') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode('verify_otp');
+                      setError(null);
+                      setSuccessMessage('Introduce el código de 6 dígitos que enviamos a tu correo.');
+                    }}
+                    className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 font-semibold underline underline-offset-4 cursor-pointer block text-left"
+                  >
+                    ¿Tienes el código de 6 dígitos? Verificar mi cuenta ahora →
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Password Field - only in signin and signup */}
+          {mode !== 'forgot' && (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300">
+                  Contraseña
+                </label>
+                {mode === 'signup' && (
+                  <span className="text-[10px] text-neutral-500">Mínimo 6 caracteres</span>
+                )}
+                {mode === 'signin' && (
+                  <button
+                    type="button"
+                    onClick={() => toggleMode('forgot')}
+                    className="text-[11px] text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 font-medium transition cursor-pointer"
+                  >
+                    ¿Olvidaste tu contraseña?
+                  </button>
+                )}
+              </div>
+              <div className="relative">
+                <Lock className="w-4 h-4 text-neutral-400 dark:text-neutral-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                  minLength={6}
+                  autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
+                  className="w-full bg-white dark:bg-neutral-950/70 border border-neutral-300 dark:border-neutral-800 hover:border-neutral-400 dark:hover:border-neutral-700 focus:border-indigo-500 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 rounded-xl pl-10 pr-10 py-2.5 text-sm transition focus:outline-none focus:ring-1 focus:ring-indigo-500/50"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300 transition cursor-pointer p-1"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
           )}
-        </button>
-      </form>
+
+          {/* Submit Button */}
+          <button
+            type="submit"
+            disabled={loading || demoLoading}
+            className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-medium text-sm shadow-lg shadow-indigo-500/25 transition-all duration-150 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 mt-2"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>
+                  {mode === 'signin'
+                    ? 'Iniciando sesión...'
+                    : mode === 'signup'
+                    ? 'Creando cuenta...'
+                    : 'Enviando enlace...'}
+                </span>
+              </>
+            ) : (
+              <>
+                <span>
+                  {mode === 'signin'
+                    ? 'Iniciar Sesión'
+                    : mode === 'signup'
+                    ? 'Crear Cuenta'
+                    : 'Enviar Enlace de Recuperación'}
+                </span>
+                <ArrowRight className="w-4 h-4" />
+              </>
+            )}
+          </button>
+        </form>
+      )}
 
       {/* Quick Demo Access - only in signin/signup */}
-      {mode !== 'forgot' && (
+      {mode !== 'forgot' && mode !== 'verify_otp' && (
         <>
           {/* Divider */}
           <div className="relative">
@@ -509,6 +752,17 @@ export function AuthForm({ initialMode = 'signin' }: AuthFormProps) {
               className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 font-medium underline underline-offset-4 cursor-pointer transition-colors"
             >
               Iniciar sesión
+            </button>
+          </p>
+        ) : mode === 'verify_otp' ? (
+          <p className="text-xs text-neutral-500 dark:text-neutral-400">
+            ¿Quieres usar otra cuenta?{' '}
+            <button
+              type="button"
+              onClick={() => toggleMode('signup')}
+              className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 font-medium underline underline-offset-4 cursor-pointer transition-colors"
+            >
+              Registrar otro correo
             </button>
           </p>
         ) : (
