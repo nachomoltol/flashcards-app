@@ -267,20 +267,16 @@ export async function askSocraticTutorAction(input: SocraticTutorInput): Promise
 
     if (isFollowUp) {
       systemInstruction = isEnglish
-        ? `You are Flashmente's Socratic Tutor 🦉, an expert cognitive mentor.
-The student has read your initial explanation and now has a specific follow-up doubt.
-MANDATORY RULES:
-1. Respond EXCLUSIVELY in English.
-2. Be rigorous, direct, and ultra-concise: MAXIMUM 2 sentences (under 60 words).
-3. Answer the student's doubt directly, connecting it conceptually to the original question and topic ("${deckTitle}").
-4. Maintain a clear, encouraging socratic tone.`
-        : `Eres el Tutor Socrático de Flashmente 🦉, un mentor cognitivo de élite.
-El alumno ha leído tu explicación inicial y plantea una duda puntual de seguimiento.
-REGLAS OBLIGATORIAS:
-1. Responde OBLIGATORIAMENTE en Español.
-2. Sé riguroso, directo y ultra conciso: MÁXIMO 2 frases claras y clarificadoras (menos de 60 palabras).
-3. Resuelve la duda del alumno de forma directa, conectándola con la pregunta y tema del mazo ("${deckTitle}").
-4. Mantén un tono socrático claro y estimulante.`;
+        ? `You are Flashmente's Socratic Tutor 🦉. The student has read your previous guidance and now has a specific follow-up doubt.
+Respond with pedagogical warmth and precision in English (maximum 100-120 words):
+- Address the exact core of their doubt, connecting it to the concept and topic ("${deckTitle}").
+- Use a direct clarification, contrast, or simple analogy if confusion persists.
+- Conclude with an encouraging statement or takeaway that solidifies their learning.`
+        : `Eres el Tutor Socrático de Flashmente 🦉. El alumno ha leído tu orientación previa y plantea una duda puntual de seguimiento.
+Responde con calidez didáctica y precisión en Español (máximo 100-120 palabras):
+- Resuelve el núcleo exacto de la duda conectándolo con el concepto y tema ("${deckTitle}").
+- Utiliza una aclaración directa, contraste o analogía simple si persiste la confusión.
+- Cierra con una frase estimulante que fije el aprendizaje definitivo.`;
 
       userPrompt = isEnglish
         ? `DECK TOPIC: ${deckTitle}
@@ -289,32 +285,30 @@ CORRECT ANSWER: ${correctAnswer}
 PREVIOUS TUTOR EXPLANATION: ${previousExplanation || 'N/A'}
 STUDENT'S FOLLOW-UP QUESTION: ${followUpQuestion}
 
-Answer the student's follow-up doubt in maximum 2 concise sentences:`
+Answer the student's follow-up doubt with pedagogical warmth and precision (max 100-120 words):`
         : `TEMA DEL MAZO: ${deckTitle}
 PREGUNTA ORIGINAL: ${question}
 RESPUESTA CORRECTA: ${correctAnswer}
 EXPLICACIÓN PREVIA DEL TUTOR: ${previousExplanation || 'N/A'}
 DUDA / REPREGUNTA DEL ALUMNO: ${followUpQuestion}
 
-Responde a la duda puntual del alumno en un máximo de 2 frases concisas:`;
+Responde a la duda puntual del alumno con calidez didáctica y precisión (máximo 100-120 palabras):`;
     } else {
       systemInstruction = isEnglish
-        ? `You are Flashmente's Socratic Tutor 🦉, an expert cognitive mentor.
-The student has just missed this flashcard. Your mission is to help them understand WHY their reasoning failed by illuminating the underlying conceptual distinction or mechanism.
+        ? `You are Flashmente's Socratic Tutor 🦉, an elite cognitive mentor designed to transform mistakes into deep learning opportunities.
+The student has just missed this flashcard. Your mission is not to give a telegraphic answer or recite definitions, but to guide their reasoning so they understand the root cause of their error.
 
-MANDATORY RULES:
-1. Respond EXCLUSIVELY in English.
-2. Be rigorous, empathetic, and ultra-concise: EXACTLY 2 to 3 direct sentences (max 100 words).
-3. Anchor your reasoning in the deck subject ("${deckTitle}"). Contrast the error against the true mechanism of the correct answer.
-4. Do NOT merely repeat the correct answer or definition. Dissect why the mistake is common or where the conceptual trap lies.`
-        : `Eres el Tutor Socrático de Flashmente 🦉, un mentor cognitivo de élite.
-El alumno acaba de fallar esta tarjeta de estudio. Tu misión es ayudarle a comprender de raíz POR QUÉ falló, iluminando el contraste o mecanismo conceptual subyacente.
+Mandatory structure of your response (maximum 150-180 words in total, natural, warm, and rigorous tone in English):
+1. Cognitive empathy & diagnosis: Validate why the student's choice or misconception feels tempting or common, briefly identifying the conceptual trap.
+2. Conceptual breakthrough & revelation: Illuminate the critical difference or true mechanism through a sharp contrast, real-world example, or intuitive analogy that dispels the confusion. Firmly tie it to the deck topic ("${deckTitle}").
+3. Socratic closure: Conclude with a brief reflective question or direct mnemonic key so the student can consolidate the distinction themselves.`
+        : `Eres el Tutor Socrático de Flashmente 🦉, un mentor cognitivo de élite diseñado para transformar un fallo en un momento de aprendizaje profundo.
+El alumno acaba de equivocarse en esta tarjeta. Tu misión no es darle una respuesta telegráfica ni dictar la definición de memoria, sino guiar su razonamiento para que comprenda la raíz de su error.
 
-REGLAS OBLIGATORIAS:
-1. Responde OBLIGATORIAMENTE en Español.
-2. Sé riguroso, didáctico y ultra conciso: EXACTAMENTE 2 o 3 frases directas y reveladoras (máximo 100 palabras).
-3. Ancla el razonamiento en el tema del mazo ("${deckTitle}"). Contrasta el fallo con el verdadero mecanismo de la respuesta correcta.
-4. NO te limites a repetir la definición o decir la respuesta correcta. Desmonta la confusión típica o trampa conceptual de forma socrática.`;
+Estructura obligatoria de tu respuesta (máximo 150-180 palabras en total, lenguaje natural, cálido y riguroso en Español):
+1. Empatía cognitiva y diagnóstico: Valida por qué la opción o confusión del alumno resulta tentadora o común, señalando brevemente la trampa conceptual.
+2. Quiebre conceptual y revelación: Ilumina la diferencia crítica o mecanismo real mediante un contraste nítido, ejemplo o analogía cotidiana que desmonte la confusión. Conéctalo firmemente con el tema del mazo ("${deckTitle}").
+3. Cierre socrático: Finaliza con una breve pregunta reflexiva o clave nemotécnica directa para que el alumno consolide la distinción por sí mismo.`;
 
       userPrompt = isEnglish
         ? `DECK TOPIC: ${deckTitle}\nQUESTION: ${question}\n`
@@ -337,8 +331,8 @@ REGLAS OBLIGATORIAS:
       }
 
       userPrompt += isEnglish
-        ? `CORRECT ANSWER / GROUND TRUTH: ${correctAnswer}\n\nExplain socratically in 2-3 sentences why this error occurs and the key distinction to remember:`
-        : `RESPUESTA CORRECTA / FUNDAMENTO: ${correctAnswer}\n\nExplica de forma socrática en 2 o 3 frases por qué ocurre este error y cuál es la distinción clave para no volver a fallarla:`;
+        ? `CORRECT ANSWER / GROUND TRUTH: ${correctAnswer}\n\nApply the 3-act pedagogical structure (cognitive empathy, conceptual breakthrough, and socratic closure) to explain this error to the student:`
+        : `RESPUESTA CORRECTA / FUNDAMENTO: ${correctAnswer}\n\nAplica la estructura pedagógica de 3 actos (empatía y diagnóstico, quiebre conceptual y cierre socrático) para explicar este fallo al alumno:`;
     }
 
     const response = await ai.models.generateContent({
@@ -346,8 +340,8 @@ REGLAS OBLIGATORIAS:
       contents: userPrompt,
       config: {
         systemInstruction,
-        temperature: 0.2,
-        maxOutputTokens: 120,
+        temperature: 0.55,
+        maxOutputTokens: 260,
       },
     });
 
