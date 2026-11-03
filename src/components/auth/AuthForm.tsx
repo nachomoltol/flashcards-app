@@ -222,22 +222,46 @@ export function AuthForm({ initialMode = 'signin' }: AuthFormProps) {
     setSuccessMessage(null);
 
     try {
-      const { error: resendError } = await supabase.auth.resend({
-        type: 'signup',
-        email: cleanEmail,
-        options: {
-          emailRedirectTo: 'https://www.flashmente.com/auth/callback',
-        },
+      // 1. Invocar endpoint dedicado con SDK oficial de Resend y Supabase Admin
+      const response = await fetch('/api/auth/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: cleanEmail }),
       });
 
-      if (resendError) {
-        setError(getFriendlyErrorMessage(resendError.message));
+      const resData = await response.json();
+
+      if (!response.ok || !resData.success) {
+        if (resData.alreadyConfirmed) {
+          setSuccessMessage(resData.message || 'Tu cuenta ya está verificada. Puedes iniciar sesión.');
+          setMode('signin');
+          return;
+        }
+        setError(resData.error || 'Error al enviar el código de verificación.');
       } else {
-        setSuccessMessage('Te hemos enviado un nuevo código de 6 dígitos a tu correo.');
+        setSuccessMessage('Te hemos enviado un nuevo código de verificación por correo (Resend).');
       }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Error al solicitar el reenvío.';
-      setError(message);
+      console.warn('[handleResendOtp] Fallback a supabase.auth.resend:', err);
+      // Fallback de resiliencia
+      try {
+        const { error: resendError } = await supabase.auth.resend({
+          type: 'signup',
+          email: cleanEmail,
+          options: {
+            emailRedirectTo: 'https://www.flashmente.com/auth/callback',
+          },
+        });
+
+        if (resendError) {
+          setError(getFriendlyErrorMessage(resendError.message));
+        } else {
+          setSuccessMessage('Se ha enviado un nuevo código de confirmación a tu correo.');
+        }
+      } catch {
+        const message = err instanceof Error ? err.message : 'Error al solicitar el reenvío.';
+        setError(message);
+      }
     } finally {
       setResendLoading(false);
     }
@@ -319,12 +343,36 @@ export function AuthForm({ initialMode = 'signin' }: AuthFormProps) {
           useAuthStore.getState().setSession(data.session);
           router.push(nextUrl);
         } else {
-          // Cuenta creada que requiere verificación -> Transición inmediata al modo de código OTP
+          // Cuenta creada que requiere verificación -> Transición a verificación OTP y despacho por Resend
           setMode('verify_otp');
           setOtpCode('');
           setSuccessMessage(
-            '¡Cuenta creada con éxito! Hemos enviado un código de 6 dígitos a tu correo.'
+            '¡Cuenta creada! Enviando tu código de verificación por correo (Resend)...'
           );
+
+          // Disparar envío de correo con código visible mediante Resend
+          try {
+            const sendRes = await fetch('/api/auth/send-otp', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email: cleanEmail }),
+            });
+            const sendJson = await sendRes.json();
+            if (sendRes.ok && sendJson.success) {
+              setSuccessMessage(
+                '¡Cuenta creada con éxito! Hemos enviado tu código de verificación por correo.'
+              );
+            } else if (sendJson.alreadyConfirmed) {
+              setSuccessMessage('Tu cuenta ya estaba confirmada. Puedes iniciar sesión.');
+              setMode('signin');
+            }
+          } catch (e) {
+            console.warn('Advertencia al solicitar OTP vía Resend en signup:', e);
+            setSuccessMessage(
+              '¡Cuenta creada con éxito! Revisa tu bandeja de entrada para ver el código de confirmación.'
+            );
+          }
+
           setLoading(false);
         }
       }
@@ -493,13 +541,13 @@ export function AuthForm({ initialMode = 'signin' }: AuthFormProps) {
             </div>
           </div>
 
-          {/* Input numérico de 6 dígitos */}
+          {/* Input numérico de código OTP */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300">
-                Código de Confirmación (6 dígitos)
+                Código de Confirmación (OTP)
               </label>
-              <span className="text-[10px] text-neutral-500 font-mono">Solo números</span>
+              <span className="text-[10px] text-neutral-500 font-mono">6 a 8 números</span>
             </div>
             <div className="relative">
               <KeyRound className="w-4 h-4 text-neutral-400 dark:text-neutral-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -507,7 +555,7 @@ export function AuthForm({ initialMode = 'signin' }: AuthFormProps) {
                 type="text"
                 inputMode="numeric"
                 pattern="[0-9]*"
-                maxLength={6}
+                maxLength={8}
                 value={otpCode}
                 onChange={(e) => {
                   const val = e.target.value.replace(/[^0-9]/g, '');
