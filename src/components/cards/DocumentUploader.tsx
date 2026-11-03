@@ -501,6 +501,16 @@ export function DocumentUploader({
       // 1. Subir archivo al bucket 'user-documents' (reutilizando si ya está subido para este archivo)
       if (!storagePath) {
         setStatus('uploading');
+
+        // A) Refresco de sesión proactivo antes de subir
+        const {
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession();
+        if (sessionError || !session) {
+          throw new Error('Sesión no válida o expirada. Por favor, vuelve a iniciar sesión.');
+        }
+
         const sanitizedName = selectedFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
         const timestamp = Date.now();
         storagePath = `${user.id}/${timestamp}-${sanitizedName}`;
@@ -523,15 +533,47 @@ export function DocumentUploader({
           uploadContentType = fileInfo.mime || 'application/octet-stream';
         }
 
-        const { error: uploadError } = await supabase.storage
-          .from('user-documents')
-          .upload(storagePath, selectedFile, {
-            contentType: uploadContentType,
-            upsert: false,
-          });
+        // B) Mecanismo de reintento automático (resiliencia ante microcortes)
+        const maxAttempts = 3;
+        let lastUploadError: Error | null = null;
 
-        if (uploadError) {
-          throw new Error(`Error al subir a Supabase Storage: ${uploadError.message}`);
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+          const { error: uploadError } = await supabase.storage
+            .from('user-documents')
+            .upload(storagePath, selectedFile, {
+              contentType: uploadContentType,
+              upsert: attempt > 1,
+            });
+
+          if (!uploadError) {
+            lastUploadError = null;
+            break;
+          }
+
+          const errMsg = uploadError.message || String(uploadError);
+          const isRetryable =
+            errMsg.includes('Failed to fetch') ||
+            errMsg.toLowerCase().includes('timeout') ||
+            errMsg.toLowerCase().includes('network') ||
+            errMsg.toLowerCase().includes('aborted');
+
+          if (isRetryable && attempt < maxAttempts) {
+            console.warn(
+              `[DocumentUploader] Reintento ${attempt}/${maxAttempts} de subida a Supabase Storage tras error: ${errMsg}. Pausando ${attempt}s...`
+            );
+            await new Promise((resolve) => setTimeout(resolve, attempt * 1000));
+          } else {
+            lastUploadError = new Error(
+              isRetryable
+                ? `No se pudo completar la subida tras ${maxAttempts} intentos por problemas de conexión a internet. Por favor, verifica tu red y vuelve a intentarlo.`
+                : `Error al subir a Supabase Storage: ${errMsg}`
+            );
+            break;
+          }
+        }
+
+        if (lastUploadError) {
+          throw lastUploadError;
         }
 
         const { data: signedData, error: signedError } = await supabase.storage
