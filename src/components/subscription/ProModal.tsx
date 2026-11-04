@@ -26,7 +26,7 @@ import { useAuthStore, useLanguageStore } from '@/stores';
 import { redeemPromoCodeAction } from '@/app/actions/redeemPromoCode';
 import { claimAdRewardAction } from '@/app/actions/claimAdReward';
 import { usePlatform } from '@/lib/platform';
-import { showAdMobRewardedAd } from '@/lib/admob';
+import { showAdMobRewardedAd, preloadRewardedAd } from '@/lib/admob';
 
 interface ProModalProps {
   isOpen?: boolean;
@@ -59,10 +59,20 @@ export function ProModal({
 
   // Estado para visualización de anuncios bonificados de Google AdMob (Android)
   const [isWatchingAd, setIsWatchingAd] = useState(false);
+  const [adLoadingPhase, setAdLoadingPhase] = useState<'idle' | 'preparing' | 'claiming'>('idle');
   const [adRewardNotice, setAdRewardNotice] = useState<{
     type: 'success' | 'error';
     message: string;
   } | null>(null);
+
+  // Precarga proactiva en segundo plano del anuncio bonificado al abrir el modal en Android nativo
+  useEffect(() => {
+    if (isOpen && platform.isNativeAndroid) {
+      preloadRewardedAd().catch((err) => {
+        console.warn('Fallo en precarga reactiva de ProModal:', err);
+      });
+    }
+  }, [isOpen, platform.isNativeAndroid]);
 
   // Estado para el canje secundario de código promocional
   const [promoCode, setPromoCode] = useState('');
@@ -181,13 +191,16 @@ export function ProModal({
 
   // Flujo Android: Visualización de anuncio bonificado de AdMob (+1 crédito)
   const handleWatchAd = async () => {
+    if (isWatchingAd) return; // Bloqueo de pulsaciones repetidas
     setIsWatchingAd(true);
+    setAdLoadingPhase('preparing');
     setAdRewardNotice(null);
 
     try {
       const result = await showAdMobRewardedAd();
 
       if (result.completed) {
+        setAdLoadingPhase('claiming');
         const claim = await claimAdRewardAction(user?.id);
 
         if (claim.success) {
@@ -201,10 +214,12 @@ export function ProModal({
               ),
           });
 
-          // Auto-reanudación con desacoplamiento visual: cerrar modal y ejecutar la acción pendiente tras desmontaje
+          // Auto-reanudación con desacoplamiento visual: persistir feedback visual 800ms antes de cerrar
           const resumeAction = store.onRewardSuccess;
           setTimeout(() => {
             handleClose();
+            setIsWatchingAd(false);
+            setAdLoadingPhase('idle');
             if (typeof resumeAction === 'function') {
               setTimeout(() => {
                 try {
@@ -214,12 +229,14 @@ export function ProModal({
                 }
               }, 50);
             }
-          }, 600);
+          }, 800);
         } else {
           setAdRewardNotice({
             type: 'error',
             message: claim.message || 'Error al acreditar la bonificación en tu cuenta.',
           });
+          setIsWatchingAd(false);
+          setAdLoadingPhase('idle');
         }
       } else {
         setAdRewardNotice({
@@ -228,6 +245,8 @@ export function ProModal({
             result.error ||
             'No se completó la reproducción del anuncio requerida para la recompensa.',
         });
+        setIsWatchingAd(false);
+        setAdLoadingPhase('idle');
       }
     } catch (err) {
       console.error('Error al mostrar anuncio bonificado de AdMob:', err);
@@ -235,8 +254,8 @@ export function ProModal({
         type: 'error',
         message: 'Ocurrió un error al cargar el anuncio bonificado.',
       });
-    } finally {
       setIsWatchingAd(false);
+      setAdLoadingPhase('idle');
     }
   };
 
@@ -511,16 +530,20 @@ export function ProModal({
                       type="button"
                       onClick={handleWatchAd}
                       disabled={isWatchingAd}
-                      className="w-full min-h-[44px] sm:min-h-[46px] inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:via-orange-400 hover:to-amber-500 text-neutral-950 font-bold text-xs sm:text-sm shadow-md shadow-amber-600/20 active:scale-[0.99] transition cursor-pointer disabled:opacity-70 group"
+                      className="w-full min-h-[44px] sm:min-h-[46px] inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:via-orange-400 hover:to-amber-500 text-neutral-950 font-bold text-xs sm:text-sm shadow-md shadow-amber-600/20 active:scale-[0.99] transition cursor-pointer disabled:opacity-80 disabled:cursor-not-allowed group"
                     >
                       {isWatchingAd ? (
                         <>
-                          <div className="w-4 h-4 border-2 border-neutral-950 border-t-transparent rounded-full animate-spin" />
-                          <span>{t('pro_modal.admob_watching', 'Reproduciendo anuncio...')}</span>
+                          <div className="w-4 h-4 border-2 border-neutral-950 border-t-transparent rounded-full animate-spin shrink-0" />
+                          <span>
+                            {adLoadingPhase === 'claiming' || adRewardNotice?.type === 'success'
+                              ? t('pro_modal.admob_resuming', '¡Recompensa añadida! Reanudando...')
+                              : t('pro_modal.admob_preparing', 'Preparando anuncio...')}
+                          </span>
                         </>
                       ) : (
                         <>
-                          <PlayCircle className="w-4 h-4 fill-neutral-950 text-amber-300 group-hover:scale-110 transition-transform" />
+                          <PlayCircle className="w-4 h-4 fill-neutral-950 text-amber-300 group-hover:scale-110 transition-transform shrink-0" />
                           <span>Ver vídeo corto (+1 generación gratis)</span>
                         </>
                       )}

@@ -72,7 +72,9 @@
     "cancel_anytime": "Cancela en cualquier momento",
     "close_btn": "Cerrar",
     "back_to_review": "Volver a repasar",
-    "gateway_error": "No se pudo conectar con la pasarela de pago. Por favor intenta de nuevo más tarde."
+    "gateway_error": "No se pudo conectar con la pasarela de pago. Por favor intenta de nuevo más tarde.",
+    "admob_preparing": "Preparando anuncio...",
+    "admob_resuming": "¡+1 Generación añadida! Reanudando..."
   },
   "dashboard": {
     "title": "Tus Mazos y Carpetas",
@@ -857,7 +859,8 @@
     "watch_ad_btn": "🎬 Ver anuncio (+1)",
     "regenerate_btn": "Regenerar síntesis",
     "ad_failed": "Debes completar el anuncio para desbloquear.",
-    "error_generic": "No se pudo generar la guía de repaso rápido."
+    "error_generic": "No se pudo generar la guía de repaso rápido.",
+    "preparing_ad": "Preparando anuncio..."
   },
   "study_modes_help": {
     "button_title": "¿Cómo funcionan los modos de estudio?",
@@ -878,5 +881,3 @@
     "close_btn": "Entendido"
   }
 }
-
-

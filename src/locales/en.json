@@ -72,7 +72,9 @@
     "cancel_anytime": "Cancel anytime",
     "close_btn": "Close",
     "back_to_review": "Back to study",
-    "gateway_error": "Could not connect to payment gateway. Please try again later."
+    "gateway_error": "Could not connect to payment gateway. Please try again later.",
+    "admob_preparing": "Preparing ad...",
+    "admob_resuming": "+1 Credit earned! Resuming..."
   },
   "dashboard": {
     "title": "Your Decks & Folders",
@@ -858,7 +860,8 @@
     "watch_ad_btn": "🎬 Watch ad (+1)",
     "regenerate_btn": "Regenerate synthesis",
     "ad_failed": "You must complete the ad to unlock.",
-    "error_generic": "Could not generate quick study guide."
+    "error_generic": "Could not generate quick study guide.",
+    "preparing_ad": "Preparing ad..."
   },
   "study_modes_help": {
     "button_title": "How do study modes work?",

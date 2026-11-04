@@ -68,6 +68,78 @@ export function getCapacitorAdMobPlugin(): any {
 }
 
 let isAdMobInitialized = false;
+let isAdPreloaded = false;
+let isPreloading = false;
+
+/**
+ * Retorna true si un anuncio bonificado ya se encuentra cargado en memoria y listo para mostrarse.
+ */
+export function isRewardedAdReady(): boolean {
+  return isAdPreloaded;
+}
+
+/**
+ * Ejecuta AdMob.prepareRewardVideoAd con límite de tiempo estricto para evitar bloqueos
+ * si la red es inestable o la subasta de anuncios se demora.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function prepareRewardVideoWithTimeout(
+  AdMob: any,
+  options: { adId: string; isTesting: boolean },
+  timeoutMs = 12000
+): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error(`Timeout de ${timeoutMs}ms al preparar el anuncio bonificado.`));
+    }, timeoutMs);
+  });
+
+  try {
+    await Promise.race([AdMob.prepareRewardVideoAd(options), timeoutPromise]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/**
+ * Precarga de forma anticipada en segundo plano el anuncio bonificado de AdMob.
+ * Permite que al momento de pulsar el botón, el vídeo se reproduzca instantáneamente sin latencia de red.
+ */
+export async function preloadRewardedAd(adUnitId?: string): Promise<void> {
+  if (typeof window === 'undefined') return;
+
+  const platform = detectPlatform();
+  if (!platform.isNativeAndroid) return;
+
+  // Si ya está listo en memoria o actualmente cargándose, omitir llamada redundante
+  if (isAdPreloaded || isPreloading) return;
+
+  const AdMob = getCapacitorAdMobPlugin();
+  if (!AdMob) return;
+
+  isPreloading = true;
+
+  try {
+    if (!isAdMobInitialized) {
+      const initialized = await initializeAdMob();
+      if (!initialized) {
+        isPreloading = false;
+        return;
+      }
+    }
+
+    const { adId, isTesting } = getEffectiveRewardedAdUnitId(adUnitId);
+    await prepareRewardVideoWithTimeout(AdMob, { adId, isTesting }, 12000);
+    isAdPreloaded = true;
+    console.log('[AdMob] Anuncio bonificado precargado con éxito en memoria.');
+  } catch (err) {
+    console.warn('[AdMob] No se pudo precargar el anuncio bonificado en segundo plano:', err);
+    isAdPreloaded = false;
+  } finally {
+    isPreloading = false;
+  }
+}
 
 /**
  * Solicita y gestiona el consentimiento GDPR (UMP) a través del plugin oficial de AdMob.
@@ -115,6 +187,12 @@ export async function initializeAdMob(): Promise<boolean> {
         initializeForTesting: isDev,
       });
       isAdMobInitialized = true;
+
+      // Iniciar precarga inmediata del anuncio en segundo plano tras inicialización
+      preloadRewardedAd().catch((preloadErr) => {
+        console.warn('[AdMob] Error al precargar tras inicialización:', preloadErr);
+      });
+
       return true;
     } catch (e) {
       console.warn('No se pudo inicializar AdMob nativo:', e);
@@ -174,24 +252,63 @@ export async function showAdMobRewardedAd(
         await initializeAdMob();
       }
 
-      // Registrar listener de recompensa
+      // Si el anuncio NO estaba precargado en memoria, prepararlo con timeout controlado
+      if (!isAdPreloaded) {
+        try {
+          await prepareRewardVideoWithTimeout(AdMob, { adId, isTesting }, 10000);
+          isAdPreloaded = true;
+        } catch (prepErr) {
+          console.warn('[AdMob] Fallo o timeout al preparar anuncio, activando emulación de respaldo:', prepErr);
+          isAdPreloaded = false;
+          return emulateRewardedAdDialog();
+        }
+      }
+
+      // El anuncio precargado pasa a consumirse
+      isAdPreloaded = false;
+
+      // Registrar listeners para recompensa y cierre
       const nativeAdPromise = new Promise<ShowRewardedAdResult>((resolve) => {
         let rewarded = false;
+        const rewardData = { amount: 1, type: 'generation_credit' };
+        let isResolved = false;
+
+        const cleanupAndPreloadNext = () => {
+          if (isResolved) return;
+          isResolved = true;
+
+          // Limpiar listeners registrados
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          rewardListener?.then?.((l: any) => l?.remove?.());
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          dismissListener?.then?.((l: any) => l?.remove?.());
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          failedListener?.then?.((l: any) => l?.remove?.());
+
+          // Precarga automática en segundo plano del siguiente anuncio
+          preloadRewardedAd(adUnitId).catch((err) => {
+            console.warn('[AdMob] Fallo al precargar siguiente anuncio en segundo plano:', err);
+          });
+        };
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const rewardListener = AdMob.addListener(
           RewardAdPluginEvents.Rewarded,
           (rewardItem: { amount: number; type: string }) => {
             rewarded = true;
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            rewardListener?.then?.((l: any) => l?.remove?.());
-            resolve({
-              completed: true,
-              reward: {
-                amount: rewardItem?.amount || 1,
-                type: rewardItem?.type || 'generation_credit',
-              },
-            });
+            if (rewardItem?.amount) rewardData.amount = rewardItem.amount;
+            if (rewardItem?.type) rewardData.type = rewardItem.type;
+
+            // Fallback: si en algún dispositivo el evento Dismissed no se dispara tras finalizar
+            setTimeout(() => {
+              if (!isResolved && rewarded) {
+                cleanupAndPreloadNext();
+                resolve({
+                  completed: true,
+                  reward: rewardData,
+                });
+              }
+            }, 6000);
           }
         );
 
@@ -199,14 +316,21 @@ export async function showAdMobRewardedAd(
         const dismissListener = AdMob.addListener(
           RewardAdPluginEvents.Dismissed,
           () => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            dismissListener?.then?.((l: any) => l?.remove?.());
-            if (!rewarded) {
-              resolve({
-                completed: false,
-                error: 'El anuncio se cerró antes de completar la visualización obligatoria.',
-              });
-            }
+            // Breve margen de seguridad para garantizar la captura del callback Rewarded
+            setTimeout(() => {
+              cleanupAndPreloadNext();
+              if (rewarded) {
+                resolve({
+                  completed: true,
+                  reward: rewardData,
+                });
+              } else {
+                resolve({
+                  completed: false,
+                  error: 'El anuncio se cerró antes de completar la visualización obligatoria.',
+                });
+              }
+            }, 150);
           }
         );
 
@@ -214,28 +338,25 @@ export async function showAdMobRewardedAd(
         const failedListener = AdMob.addListener(
           RewardAdPluginEvents.FailedToShow,
           (err: { message?: string }) => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            failedListener?.then?.((l: any) => l?.remove?.());
-            console.warn('AdMob FailedToShow, activando emulación de respaldo:', err);
+            cleanupAndPreloadNext();
+            console.warn('[AdMob] FailedToShow recibido, activando emulación de respaldo:', err);
             emulateRewardedAdDialog().then(resolve);
           }
         );
 
-        // Preparar y desplegar el anuncio bonificado
-        AdMob.prepareRewardVideoAd({
-          adId,
-          isTesting,
-        })
-          .then(() => AdMob.showRewardVideoAd())
-          .catch((err: Error) => {
-            console.warn('Fallo en AdMob.prepareRewardVideoAd, activando emulación de respaldo:', err);
-            emulateRewardedAdDialog().then(resolve);
-          });
+        // Desplegar el anuncio ya cargado
+        AdMob.showRewardVideoAd().catch((err: Error) => {
+          cleanupAndPreloadNext();
+          console.warn('[AdMob] Fallo al invocar showRewardVideoAd, activando emulación de respaldo:', err);
+          emulateRewardedAdDialog().then(resolve);
+        });
       });
 
       return await nativeAdPromise;
     } catch (err) {
       console.warn('Fallo en canal AdMob nativo, recurriendo a emulación:', err);
+      // Precarga para el siguiente intento
+      preloadRewardedAd(adUnitId).catch(() => {});
       return emulateRewardedAdDialog();
     }
   }

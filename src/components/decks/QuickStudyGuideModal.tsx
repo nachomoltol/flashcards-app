@@ -23,7 +23,7 @@ import {
   getOrGenerateDeckSummaryAction,
   type DeckSummaryGuide,
 } from '@/app/actions/generateDeckSummary';
-import { showAdMobRewardedAd } from '@/lib/admob';
+import { showAdMobRewardedAd, preloadRewardedAd } from '@/lib/admob';
 import { claimAdRewardAction } from '@/app/actions/claimAdReward';
 
 interface QuickStudyGuideModalProps {
@@ -125,8 +125,16 @@ export function QuickStudyGuideModal({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
+  // Precarga reactiva del anuncio al desplegar la guía
+  useEffect(() => {
+    if (isOpen) {
+      preloadRewardedAd().catch(() => {});
+    }
+  }, [isOpen]);
+
   // Desbloqueo mediante anuncio bonificado AdMob
   const handleWatchAd = async () => {
+    if (isWatchingAd) return;
     setAdError(null);
     setIsWatchingAd(true);
     try {
@@ -752,16 +760,16 @@ export function QuickStudyGuideModal({
                             type="button"
                             onClick={handleWatchAd}
                             disabled={isWatchingAd}
-                            className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 text-xs font-semibold transition active:scale-95 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+                            className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 text-xs font-semibold transition active:scale-95 cursor-pointer disabled:opacity-75 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
                           >
                             {isWatchingAd ? (
                               <>
-                                <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />
-                                <span>Cargando...</span>
+                                <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400 shrink-0" />
+                                <span>{t('quick_guide.preparing_ad', 'Preparando anuncio...')}</span>
                               </>
                             ) : (
                               <>
-                                <PlayCircle className="w-3.5 h-3.5 text-amber-400" />
+                                <PlayCircle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                                 <span>{t('quick_guide.watch_ad_btn', '🎬 Ver anuncio (+1)')}</span>
                               </>
                             )}
