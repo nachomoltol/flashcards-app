@@ -157,7 +157,7 @@ export function SocraticTutorDrawer({
   return (
     <div
       id="socratic-tutor-container"
-      className="w-full mt-2.5 sm:mt-3.5 p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl bg-gradient-to-br from-amber-500/10 via-indigo-500/5 to-violet-500/10 dark:from-amber-950/20 dark:via-indigo-950/15 dark:to-violet-950/20 border border-amber-500/30 dark:border-amber-500/40 shadow-lg animate-in slide-in-from-bottom-2 duration-200 transition-all text-left"
+      className="w-full mt-2.5 sm:mt-3.5 p-3.5 sm:p-4 pb-8 rounded-2xl sm:rounded-3xl bg-gradient-to-br from-amber-500/10 via-indigo-500/5 to-violet-500/10 dark:from-amber-950/20 dark:via-indigo-950/15 dark:to-violet-950/20 border border-amber-500/30 dark:border-amber-500/40 shadow-lg animate-in slide-in-from-bottom-2 duration-200 transition-all text-left max-h-[70vh] overflow-y-auto"
     >
       {/* Estado: Aún no se ha solicitado explicación */}
       {!explanation && !isLoading && (
@@ -256,30 +256,36 @@ export function SocraticTutorDrawer({
       {/* Estado: Explicación Socrática Recibida */}
       {explanation && !isLoading && (
         <div className="space-y-3 animate-in fade-in duration-200">
-          <div className="flex items-center justify-between border-b border-amber-500/30 dark:border-amber-500/20 pb-2">
-            <div className="flex items-center gap-2">
-              <span className="text-xl">🦉</span>
-              <div>
-                <h4 className="text-xs sm:text-sm font-bold text-neutral-900 dark:text-white leading-tight">
+          {/* Cabecera: Título + Contador en fila flex superior, Subtítulo en fila flex independiente debajo */}
+          <div className="border-b border-amber-500/30 dark:border-amber-500/20 pb-2.5 space-y-1">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-xl shrink-0">🦉</span>
+                <h4 className="text-xs sm:text-sm font-bold text-neutral-900 dark:text-white leading-tight truncate">
                   {t('socratic_tutor.title', 'Explicación Socrática')}
                 </h4>
-                <p className="text-[10px] sm:text-[11px] text-amber-700 dark:text-amber-300/80">
-                  {t('socratic_tutor.subtitle', 'Comprensión de raíz y trampa conceptual')}
-                </p>
+              </div>
+
+              <div className="flex items-center justify-end shrink-0">
+                {quotaStatus?.isPro ? (
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30 shrink-0 whitespace-nowrap">
+                    👑 PRO
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-mono text-neutral-500 dark:text-neutral-400 shrink-0 whitespace-nowrap bg-neutral-100 dark:bg-neutral-800/60 px-2 py-0.5 rounded-full border border-neutral-200 dark:border-neutral-700/60">
+                    {quotaStatus?.remainingFree !== undefined
+                      ? t('socratic_tutor.badge_free_count', { count: quotaStatus.remainingFree })
+                      : ''}
+                  </span>
+                )}
               </div>
             </div>
 
-            {quotaStatus?.isPro ? (
-              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30 shrink-0 whitespace-nowrap">
-                👑 PRO
-              </span>
-            ) : (
-              <span className="text-[10px] font-mono text-neutral-500 dark:text-neutral-400 shrink-0 whitespace-nowrap">
-                {quotaStatus?.remainingFree !== undefined
-                  ? t('socratic_tutor.badge_free_count', { count: quotaStatus.remainingFree })
-                  : ''}
-              </span>
-            )}
+            <div className="flex items-center pl-7 sm:pl-7">
+              <p className="text-[10px] sm:text-[11px] text-amber-700 dark:text-amber-300/80 leading-normal">
+                {t('socratic_tutor.subtitle', 'Comprensión de raíz y trampa conceptual')}
+              </p>
+            </div>
           </div>
 
           {/* Texto de la primera explicación socrática */}

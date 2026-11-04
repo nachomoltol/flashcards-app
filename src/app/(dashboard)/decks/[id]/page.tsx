@@ -113,6 +113,28 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
     }
   };
 
+  // Apertura del configurador con verificación preventiva de saldo al hacer clic
+  const handleOpenAiModal = async () => {
+    const quota = await checkUserGenerationQuota(user?.id);
+    if (!quota.canGenerate) {
+      openProModal(true, null, () => {
+        // Tras ver el vídeo en Android (+1 crédito), abrir automáticamente el configurador
+        setAiError(null);
+        setAiSuccessMessage(null);
+        setAiCoreExhausted(false);
+        setAiMode('multimodal');
+        setIsAiModalOpen(true);
+      });
+      return;
+    }
+
+    setAiError(null);
+    setAiSuccessMessage(null);
+    setAiCoreExhausted(false);
+    setAiMode('multimodal');
+    setIsAiModalOpen(true);
+  };
+
   // Manejar generación con Gemini por tema y guardado automático en Supabase
   const handleGenerateCardsByTopic = async (e?: React.FormEvent) => {
     e?.preventDefault?.();
@@ -278,13 +300,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
             {/* Botón Principal Destacado: Generar preguntas con IA (Ancho completo) */}
             <button
               type="button"
-              onClick={() => {
-                setAiError(null);
-                setAiSuccessMessage(null);
-                setAiCoreExhausted(false);
-                setAiMode('multimodal');
-                setIsAiModalOpen(true);
-              }}
+              onClick={handleOpenAiModal}
               className="w-full py-2.5 sm:py-3 px-4 rounded-xl font-bold text-xs sm:text-sm text-white bg-gradient-to-r from-[var(--deck-accent)] via-indigo-600 to-indigo-700 hover:brightness-110 shadow-md shadow-[var(--deck-accent-40)] transition-all duration-150 active:scale-[0.99] border border-white/20 cursor-pointer flex items-center justify-center gap-2"
             >
               <Sparkles className="w-4 h-4 text-white animate-pulse shrink-0" />
@@ -565,11 +581,8 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
               </div>
 
               <button
-                onClick={() => {
-                  setAiMode('multimodal');
-                  setIsAiModalOpen(true);
-                }}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium text-violet-700 dark:text-violet-300 bg-violet-600/15 border border-violet-500/30 hover:bg-violet-600/25 transition active:scale-95"
+                onClick={handleOpenAiModal}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium text-violet-700 dark:text-violet-300 bg-violet-600/15 border border-violet-500/30 hover:bg-violet-600/25 transition active:scale-95 cursor-pointer"
               >
                 <svg className="w-4 h-4 text-violet-600 dark:text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />

@@ -765,7 +765,9 @@ export function ProModal({
                     </div>
 
                     <p className="text-xs sm:text-sm font-medium text-zinc-700 dark:text-zinc-200 leading-relaxed">
-                      La visualización de anuncios para crear tarjetas y estudiar gratis solo está disponible en nuestra App oficial de Android. Descarga Flashmente en Google Play para seguir estudiando gratis o hazte PRO para generar sin límites desde tu ordenador.
+                      {isEn
+                        ? 'Open Flashmente on your Android mobile device, and inside your deck menu tap “Generate questions with AI” to watch a short video and return here to create your deck for free'
+                        : 'Abre Flashmente en tu móvil Android, y dentro del menú de tu mazo, pulsa “Generar preguntas con IA” para ver un vídeo corto y vuelve aquí para crear tu mazo gratis'}
                     </p>
 
                     <a
