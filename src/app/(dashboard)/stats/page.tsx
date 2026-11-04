@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore, useStreakStore } from '@/stores';
+import { toLocalDateString } from '@/lib/stats/streak';
 import type { Database } from '@/types/database';
 import { RefreshCw, ShieldCheck, Flame, CheckCircle2 } from 'lucide-react';
 
@@ -52,15 +53,34 @@ export default function StatsPage() {
         return;
       }
 
-      // 2. Obtener solo las tarjetas pertenecientes a los mazos del usuario
+      // 2. Obtener solo las tarjetas pertenecientes a los mazos del usuario (con chunking para evitar desbordar la URL de PostgREST)
       const deckIds = loadedDecks.map((d) => d.id);
-      const { data: userCards, error: cardsErr } = await supabase
-        .from('cards')
-        .select('*')
-        .in('deck_id', deckIds);
+      let loadedCards: CardItem[] = [];
 
-      if (cardsErr) throw cardsErr;
-      const loadedCards = userCards || [];
+      const DECK_CHUNK_SIZE = 50;
+      if (deckIds.length <= DECK_CHUNK_SIZE) {
+        const { data: userCards, error: cardsErr } = await supabase
+          .from('cards')
+          .select('*')
+          .in('deck_id', deckIds);
+
+        if (cardsErr) throw cardsErr;
+        loadedCards = userCards || [];
+      } else {
+        const cardPromises = [];
+        for (let i = 0; i < deckIds.length; i += DECK_CHUNK_SIZE) {
+          const slice = deckIds.slice(i, i + DECK_CHUNK_SIZE);
+          cardPromises.push(
+            supabase.from('cards').select('*').in('deck_id', slice)
+          );
+        }
+        const cardResults = await Promise.all(cardPromises);
+        for (const res of cardResults) {
+          if (res.error) throw res.error;
+          if (res.data) loadedCards.push(...res.data);
+        }
+      }
+
       setCards(loadedCards);
 
       if (loadedCards.length === 0) {
@@ -69,16 +89,50 @@ export default function StatsPage() {
         return;
       }
 
-      // 3. Obtener solo los repasos pertenecientes a las tarjetas del usuario
-      const cardIds = loadedCards.map((c) => c.id);
-      const { data: userReviews, error: reviewsErr } = await supabase
+      // 3. Obtener repasos del usuario (hasta 2500 registros para evitar el límite de 1000 filas de PostgREST)
+      let loadedReviews: ReviewItem[] = [];
+
+      // Consulta directa por user_id: previene URLs gigantes y HTTP 414 de PostgREST
+      const { data: directReviews, error: directReviewsErr } = await supabase
         .from('reviews')
         .select('*')
-        .in('card_id', cardIds)
-        .order('created_at', { ascending: false });
+        .eq('user_id', currentUser.id)
+        .order('created_at', { ascending: false })
+        .limit(2500);
 
-      if (reviewsErr) throw reviewsErr;
-      setReviews(userReviews || []);
+      if (!directReviewsErr && directReviews && directReviews.length > 0) {
+        loadedReviews = directReviews;
+      } else {
+        // Fallback por lotes de card_id (máx 100 por lote para no exceder URI) si la consulta por user_id falla o viene vacía
+        const cardIds = loadedCards.map((c) => c.id);
+        const CARD_CHUNK_SIZE = 100;
+        const reviewPromises = [];
+
+        for (let i = 0; i < cardIds.length; i += CARD_CHUNK_SIZE) {
+          const slice = cardIds.slice(i, i + CARD_CHUNK_SIZE);
+          reviewPromises.push(
+            supabase
+              .from('reviews')
+              .select('*')
+              .in('card_id', slice)
+              .order('created_at', { ascending: false })
+              .limit(500)
+          );
+        }
+
+        const batchResults = await Promise.all(reviewPromises);
+        const combined: ReviewItem[] = [];
+        for (const res of batchResults) {
+          if (!res.error && res.data) {
+            combined.push(...res.data);
+          }
+        }
+        // Ordenar descendentemente y limitar a 2500
+        combined.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        loadedReviews = combined.slice(0, 2500);
+      }
+
+      setReviews(loadedReviews);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error al cargar las estadísticas';
       console.error('Error fetching stats:', err);
@@ -180,23 +234,49 @@ export default function StatsPage() {
     };
   }, [reviews]);
 
-  // Repasos de los últimos 7 días
+  // Repasos de los últimos 7 días (anclados en zona horaria local del cliente)
   const last7DaysData = useMemo(() => {
-    const days: { label: string; dateStr: string; count: number }[] = [];
-    const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+    // 1. Mapear conteo de repasos por fecha local (YYYY-MM-DD)
+    const countsByDate = new Map<string, number>();
+    for (const r of reviews) {
+      if (!r.created_at) continue;
+      const dStr = toLocalDateString(r.created_at);
+      if (dStr) {
+        countsByDate.set(dStr, (countsByDate.get(dStr) || 0) + 1);
+      }
+    }
 
+    const days: {
+      label: string;
+      dateStr: string;
+      count: number;
+      initial: string;
+      hasStudied: boolean;
+      isToday: boolean;
+    }[] = [];
+
+    const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+    const dayInitials = ['D', 'L', 'M', 'X', 'J', 'V', 'S'];
+
+    // 2. Construir los 7 días cronológicamente (desde hace 6 días hasta hoy)
     for (let i = 6; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().split('T')[0];
-      const label = dayNames[d.getDay()];
+      const dateStr = toLocalDateString(d);
+      const dayIdx = d.getDay();
+      const label = dayNames[dayIdx];
+      const initial = dayInitials[dayIdx];
+      const count = countsByDate.get(dateStr) || 0;
+      const isToday = i === 0;
 
-      const count = reviews.filter((r) => {
-        const reviewDateStr = new Date(r.created_at).toISOString().split('T')[0];
-        return reviewDateStr === dateStr;
-      }).length;
-
-      days.push({ label, dateStr, count });
+      days.push({
+        label,
+        dateStr,
+        count,
+        initial,
+        hasStudied: count > 0,
+        isToday,
+      });
     }
 
     const maxCount = Math.max(...days.map((d) => d.count), 1);
@@ -317,17 +397,39 @@ export default function StatsPage() {
               Racha máx: <strong className="text-amber-600 dark:text-amber-400">{streak.max}d</strong>
             </span>
           </div>
-          {/* Visual Streak Mini Dots */}
-          <div className="mt-2.5 flex items-center gap-1.5">
-            {[...Array(7)].map((_, idx) => {
-              const active = idx < Math.min(streak.current, 7);
+          {/* Indicador Cronológico de Racha (Últimos 7 días) */}
+          <div className="mt-3 pt-2 border-t border-neutral-100 dark:border-neutral-800/60 flex items-center justify-between gap-1.5">
+            {last7DaysData.days.map((day) => {
+              const tooltip = `${day.label} (${day.dateStr}): ${day.count} repaso${day.count === 1 ? '' : 's'}${day.isToday ? ' · Hoy' : ''}`;
               return (
                 <div
-                  key={idx}
-                  className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${
-                    active ? 'bg-amber-500 shadow-sm shadow-amber-500/50' : 'bg-neutral-200 dark:bg-neutral-800'
-                  }`}
-                />
+                  key={day.dateStr}
+                  title={tooltip}
+                  className="flex-1 flex flex-col items-center gap-1 cursor-default group/day"
+                >
+                  <span
+                    className={`text-[9px] font-bold uppercase transition-colors ${
+                      day.isToday
+                        ? 'text-amber-500 font-extrabold'
+                        : day.hasStudied
+                        ? 'text-neutral-700 dark:text-neutral-300'
+                        : 'text-neutral-400 dark:text-neutral-600'
+                    }`}
+                  >
+                    {day.initial}
+                  </span>
+                  <div
+                    className={`h-1.5 w-full rounded-full transition-all duration-300 ${
+                      day.hasStudied
+                        ? 'bg-amber-500 shadow-sm shadow-amber-500/50'
+                        : 'bg-neutral-200 dark:bg-neutral-800'
+                    } ${
+                      day.isToday
+                        ? 'ring-2 ring-amber-400/50 ring-offset-1 dark:ring-offset-neutral-900'
+                        : ''
+                    }`}
+                  />
+                </div>
               );
             })}
           </div>
@@ -584,9 +686,9 @@ export default function StatsPage() {
           </div>
 
           <div className="h-44 flex items-end justify-between gap-3 pt-4 px-2">
-            {last7DaysData.days.map((day, idx) => {
+            {last7DaysData.days.map((day) => {
               const heightPct = Math.max(8, Math.round((day.count / last7DaysData.maxCount) * 100));
-              const isToday = idx === 6;
+              const isToday = day.isToday;
 
               return (
                 <div key={day.dateStr} className="flex-1 flex flex-col items-center gap-2 h-full justify-end group">
