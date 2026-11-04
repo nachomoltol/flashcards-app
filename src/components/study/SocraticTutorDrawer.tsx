@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ArrowRight, Sparkles, Loader2, AlertCircle, Video, CheckCircle2, Send } from 'lucide-react';
 import { useLanguageStore, useAuthStore, useProModalStore } from '@/stores';
+import { supabase } from '@/lib/supabase';
 import { askSocraticTutorAction, getTutorQuotaStatusAction, type TutorQuotaStatus } from '@/app/actions/socraticTutor';
 
 interface SocraticTutorDrawerProps {
@@ -43,7 +44,9 @@ export function SocraticTutorDrawer({
   // Cargar cuota del tutor al abrirse
   const fetchQuota = useCallback(async () => {
     try {
-      const status = await getTutorQuotaStatusAction(user?.id);
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      const status = await getTutorQuotaStatusAction(user?.id, token);
       setQuotaStatus(status);
     } catch (err) {
       console.warn('Error al obtener estado de cuota del tutor:', err);
@@ -76,6 +79,9 @@ export function SocraticTutorDrawer({
     // Iniciar consulta a Gemini con el Server Action
     setIsLoading(true);
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+
       const res = await askSocraticTutorAction({
         deckTitle,
         question,
@@ -84,6 +90,7 @@ export function SocraticTutorDrawer({
         selectedAnswer,
         locale: language === 'en' ? 'en' : 'es',
         userId: user?.id,
+        accessToken: token,
       });
 
       if (res.success && res.explanation) {
@@ -125,6 +132,9 @@ export function SocraticTutorDrawer({
     setFollowUpError(null);
 
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+
       const res = await askSocraticTutorAction({
         deckTitle,
         question,
@@ -133,6 +143,7 @@ export function SocraticTutorDrawer({
         selectedAnswer,
         locale: language === 'en' ? 'en' : 'es',
         userId: user?.id,
+        accessToken: token,
         followUpQuestion: trimmed,
         previousExplanation: explanation,
       });

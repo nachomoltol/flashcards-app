@@ -11,6 +11,7 @@ export interface SocraticTutorInput {
   selectedAnswer?: string;
   locale: 'es' | 'en';
   userId?: string;
+  accessToken?: string;
   followUpQuestion?: string;
   previousExplanation?: string;
 }
@@ -36,24 +37,47 @@ export interface TutorQuotaStatus {
 const GEMINI_MODEL = 'gemini-3.1-flash-lite';
 
 /**
- * Resuelve el ID de usuario autenticado en la sesión o toma el provisto por el cliente
+ * Resuelve el ID de usuario autenticado en la sesión (cookie de servidor o JWT enviado por cliente Capacitor)
  */
-async function resolveAuthUserId(explicitUserId?: string): Promise<string | null> {
+async function resolveAuthUserId(explicitUserId?: string, accessToken?: string): Promise<string | null> {
+  // 1. Intento primario: Sesión por cookies en el servidor
   try {
     const {
       data: { user },
     } = await supabase.auth.getUser();
     if (user?.id) {
       if (explicitUserId && explicitUserId.trim() && explicitUserId.trim() !== user.id) {
-        console.warn('[socraticTutor] Discrepancia de userId detectada. Usando id de sesión autenticada.');
+        console.warn('[socraticTutor] Discrepancia de userId detectada en cookie. Usando id de sesión autenticada.');
       }
       return user.id;
     }
-    return null;
-  } catch (err) {
-    console.warn('Error al verificar sesión en resolveAuthUserId:', err);
-    return null;
+  } catch (cookieErr) {
+    console.warn('[socraticTutor] Error al verificar sesión por cookies en resolveAuthUserId:', cookieErr);
   }
+
+  // 2. Soporte para Capacitor / Mobile WebView: Validar token JWT de acceso si fue enviado
+  if (accessToken && accessToken.trim()) {
+    try {
+      const {
+        data: { user },
+        error,
+      } = await supabase.auth.getUser(accessToken.trim());
+      if (!error && user?.id) {
+        if (explicitUserId && explicitUserId.trim() && explicitUserId.trim() !== user.id) {
+          console.warn('[socraticTutor] Discrepancia de userId detectada en token. Usando id de usuario verificado.');
+        }
+        return user.id;
+      }
+      if (error) {
+        console.warn('[socraticTutor] Token de acceso de Capacitor no válido o expirado:', error.message);
+      }
+    } catch (tokenErr) {
+      console.warn('[socraticTutor] Excepción al validar accessToken en Supabase Auth:', tokenErr);
+    }
+  }
+
+  // 3. Ninguna vía produjo un usuario autenticado verificado
+  return null;
 }
 
 /**
@@ -72,8 +96,11 @@ function resolveGeminiApiKey(): string | null {
 /**
  * Consulta la cuota actual del Tutor Socrático para el usuario
  */
-export async function getTutorQuotaStatusAction(explicitUserId?: string): Promise<TutorQuotaStatus> {
-  const userId = await resolveAuthUserId(explicitUserId);
+export async function getTutorQuotaStatusAction(
+  explicitUserId?: string,
+  accessToken?: string
+): Promise<TutorQuotaStatus> {
+  const userId = await resolveAuthUserId(explicitUserId, accessToken);
   if (!userId) {
     return {
       isPro: false,
@@ -177,11 +204,12 @@ export async function askSocraticTutorAction(input: SocraticTutorInput): Promise
     selectedAnswer,
     locale = 'es',
     userId: explicitUserId,
+    accessToken,
     followUpQuestion,
     previousExplanation,
   } = input;
 
-  const userId = await resolveAuthUserId(explicitUserId);
+  const userId = await resolveAuthUserId(explicitUserId, accessToken);
   if (!userId) {
     return {
       success: false,
@@ -255,7 +283,7 @@ export async function askSocraticTutorAction(input: SocraticTutorInput): Promise
     }
 
     // 2. Verificar que el usuario tenga acceso válido y no tenga bloqueada la cuota
-    const quota = await getTutorQuotaStatusAction(userId);
+    const quota = await getTutorQuotaStatusAction(userId, accessToken);
     if (!quota.isPro && (quota.requiresAd || (quota.remainingFree <= 0 && quota.bonusCredits <= 0))) {
       return {
         success: false,
