@@ -1945,6 +1945,10 @@ export function DocumentUploader({
                                 <span className="text-neutral-300">{isEn ? 'AI adapts difficulty to document complexity.' : 'La IA analiza la complejidad léxica y sintáctica del material para calibrar la dificultad.'}</span>
                               </div>
                               <div>
+                                <span className="font-semibold text-amber-300 block">🎨 {isEn ? '9-11 years (Elementary / 4º-6º Primaria):' : 'Primaria (9-11 años):'}</span>
+                                <span className="text-neutral-300">{isEn ? 'Concepts explained with clear examples, simple language, and everyday metaphors.' : 'Conceptos explicados con ejemplos claros, lenguaje sencillo y metáforas cotidianas.'}</span>
+                              </div>
+                              <div>
                                 <span className="font-semibold text-amber-300 block">🎒 {isEn ? '12-14 years (Middle School / 1º-2º ESO):' : '12-14 años (1º-2º ESO):'}</span>
                                 <span className="text-neutral-300">{isEn ? 'Accessible vocabulary, direct conceptual understanding.' : 'Lenguaje accesible, enunciados directos y foco en conceptos troncales.'}</span>
                               </div>
@@ -1960,13 +1964,19 @@ export function DocumentUploader({
                           }
                         />
                       </label>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
                         {[
                           {
                             id: 'auto' as const,
                             icon: '🤖',
                             title: t('ai_uploader.target_audience_auto', isEn ? 'Auto-detection' : 'Detección Automática'),
                             desc: t('ai_uploader.target_audience_auto_desc', isEn ? 'Adapts to text complexity' : 'Adapta según el texto')
+                          },
+                          {
+                            id: '9-11_years' as const,
+                            icon: '🎨',
+                            title: t('ai_uploader.target_audience_9_11', isEn ? '9-11 years' : 'Primaria (9-11 años)'),
+                            desc: t('ai_uploader.target_audience_9_11_desc', isEn ? 'Elementary / Everyday metaphors' : 'Metáforas y lenguaje sencillo')
                           },
                           {
                             id: '12-14_years' as const,

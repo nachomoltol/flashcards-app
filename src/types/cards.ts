@@ -10,6 +10,9 @@ export interface GeneratedCard {
   cardFormat: CardFormat;
   cardType?: string;
   options?: string[];
+  question?: string;
+  justification?: string;
+  correct_option_index?: number;
 }
 
 export interface GenerateCardsResult {
@@ -29,7 +32,7 @@ export type DocenteFormat =
   | 'cloze'
   | 'basic'
   | 'open_cases';
-export type TargetAudience = 'auto' | '12-14_years' | '15-17_years' | 'university_plus';
+export type TargetAudience = '9-11_years' | '12-14_years' | '15-17_years' | 'university_plus' | 'auto';
 
 export interface MultimodalDocumentInput {
   deckId?: string;

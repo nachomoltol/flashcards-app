@@ -50,6 +50,29 @@ const flashcardSchema = {
             description:
               'Índice secuencial estricto obligatorio de la tarjeta (1, 2, 3... del lote generado).',
           },
+          justification: {
+            type: Type.STRING,
+            description:
+              'Razonamiento factual, cálculo o cita técnica extraída del documento que justifica con rigor absoluto la respuesta ANTES de marcar la opción correcta (Chain of Thought).',
+          },
+          question: {
+            type: Type.STRING,
+            description:
+              'Enunciado limpio y directo de la pregunta sin letras ni opciones.',
+          },
+          options: {
+            type: Type.ARRAY,
+            description:
+              'Array con exactamente 4 opciones de respuesta distintas para multiple_choice: [opción 0, opción 1, opción 2, opción 3]. Omitir o dejar vacío en basic, cloze o true_false.',
+            items: {
+              type: Type.STRING,
+            },
+          },
+          correct_option_index: {
+            type: Type.INTEGER,
+            description:
+              'Índice numérico de 0 a 3 de la opción verdadera en el array options (0 para la primera, 1 para la segunda, 2 para la tercera, 3 para la cuarta). Exclusivo de multiple_choice.',
+          },
           front: {
             type: Type.STRING,
             description:
@@ -63,14 +86,6 @@ const flashcardSchema = {
           cardFormat: {
             type: Type.STRING,
             description: 'Formato de la tarjeta: "multiple_choice", "basic", "cloze" o "true_false"',
-          },
-          options: {
-            type: Type.ARRAY,
-            description:
-              'Array con las 4 opciones de respuesta exclusivas para preguntas de opción múltiple: [a, b, c, d]. En formatos true_false, basic y cloze este campo DEBE OMITIRSE o dejarse vacío ([]).',
-            items: {
-              type: Type.STRING,
-            },
           },
         },
         required: ['generation_index', 'front', 'back', 'cardFormat'],
@@ -112,6 +127,29 @@ const singlePageExtractionSchema = {
             description:
               'Índice secuencial estricto obligatorio de la tarjeta (1, 2, 3... de la página procesada).',
           },
+          justification: {
+            type: Type.STRING,
+            description:
+              'Razonamiento factual, cálculo o cita técnica extraída del documento que justifica con rigor absoluto la respuesta ANTES de marcar la opción correcta (Chain of Thought).',
+          },
+          question: {
+            type: Type.STRING,
+            description:
+              'Enunciado limpio y directo de la pregunta sin letras ni opciones.',
+          },
+          options: {
+            type: Type.ARRAY,
+            description:
+              'Array con exactamente 4 opciones de respuesta distintas para multiple_choice: [opción 0, opción 1, opción 2, opción 3]. Omitir o dejar vacío en basic, cloze o true_false.',
+            items: {
+              type: Type.STRING,
+            },
+          },
+          correct_option_index: {
+            type: Type.INTEGER,
+            description:
+              'Índice numérico de 0 a 3 de la opción verdadera en el array options (0 para la primera, 1 para la segunda, 2 para la tercera, 3 para la cuarta). Exclusivo de multiple_choice.',
+          },
           front: {
             type: Type.STRING,
             description:
@@ -125,14 +163,6 @@ const singlePageExtractionSchema = {
           cardFormat: {
             type: Type.STRING,
             description: 'Formato de la tarjeta: "multiple_choice", "basic", "cloze" o "true_false"',
-          },
-          options: {
-            type: Type.ARRAY,
-            description:
-              'Array con las 4 opciones de respuesta exclusivas para preguntas de opción múltiple: [a, b, c, d]. En formatos true_false, basic y cloze este campo DEBE OMITIRSE o dejarse vacío ([]).',
-            items: {
-              type: Type.STRING,
-            },
           },
         },
         required: ['generation_index', 'front', 'back', 'cardFormat'],
@@ -163,7 +193,7 @@ const EDITORIAL_ARTIFACTS_DIRECTIVE = `REGLA DE EXCLUSIÓN DE METADATOS Y ESTRUC
 function getFormatRule(format: CardFormat = 'multiple_choice'): string {
   switch (format) {
     case 'multiple_choice':
-      return 'FORMATO OBLIGATORIO: Múltiple opción con exactamente 4 alternativas (a, b, c, d). Cada tarjeta DEBE incluir obligatoriamente el array "options" con las 4 opciones de respuesta. El campo "back" DEBE incluir obligatoriamente la opción correcta seguida de una explicación y justificación técnica profunda.';
+      return 'FORMATO OBLIGATORIO: Múltiple opción con exactamente 4 alternativas en array "options" (0 a 3) y "correct_option_index" (0 a 3). Cada tarjeta DEBE incluir "justification" previa con el razonamiento del documento, "question", "options" y "correct_option_index". En "back" se incluye la opción correcta con su justificación técnica.';
     case 'true_false':
       return `FORMATO OBLIGATORIO: Afirmación categórica. 
 - El campo 'front' DEBE contener la afirmación.
@@ -183,32 +213,24 @@ function getFormatRule(format: CardFormat = 'multiple_choice'): string {
 function getFormatInstructions(format: CardFormat = 'multiple_choice'): string {
   switch (format) {
     case 'multiple_choice':
-      return `FORMATO INNEGOCIABLE: multiple_choice (Opción Múltiple / Test):
-Cada tarjeta DEBE tener obligatoriamente exactamente 4 opciones de respuesta múltiples (a, b, c, d).
+      return `FORMATO INNEGOCIABLE: multiple_choice (Opción Múltiple / Test Determinista con Chain of Thought):
+Cada tarjeta tipo test DEBE seguir rigurosamente este flujo cognitivo de 4 pasos obligatorios:
 
-ESTRUCTURA EXACTA DE "front":
-[Escribe aquí ÚNICAMENTE el enunciado de la pregunta limpia, sin incluir ninguna letra a, b, c o d]
+1º "justification": Redacta PRIMERO el razonamiento factual, cálculo u operación matemática exacta citando el documento ANTES de elegir o marcar la opción correcta (Chain of Thought).
+2º "question": Escribe el enunciado limpio y directo de la pregunta de examen, sin incluir opciones ni letras a, b, c, d.
+3º "options": Proporciona un array con exactamente 4 alternativas plausibles [opción 0, opción 1, opción 2, opción 3] extraídas del texto.
+4º "correct_option_index": Asigna el número entero estricto (0, 1, 2 o 3) correspondiente a la opción verdadera justificada en "options".
 
-a) [Texto de la opción A]
-b) [Texto de la opción B]
-c) [Texto de la opción C]
-d) [Texto de la opción D]
-
-REGLAS CRÍTICAS PARA "front":
-1. Primero coloca ÚNICAMENTE el enunciado de la pregunta limpia, directo y riguroso.
-2. Añade obligatoriamente un salto de línea doble antes de empezar las opciones.
-3. Cada una de las exactamente 4 opciones (a, b, c, d) DEBE ir en su propia línea independiente separada por un salto de línea (\\n).
-4. NUNCA mezcles las letras a), b), c), d) dentro del enunciado de la pregunta.
-5. La opción correcta DEBE estar posicionada de manera aleatoria entre a, b, c o d. Los 3 distractores deben ser técnicamente plausibles y extraídos estrictamente de términos y conceptos presentes en el texto fuente.
-6. ${EDITORIAL_ARTIFACTS_DIRECTIVE}
-
-REGLAS CRÍTICAS PARA "back":
-El campo 'back' DEBE contener dos partes obligatorias:
-1) La opción correcta exacta con su letra y texto (ej: 'd) El germen').
-2) Una línea en blanco seguida de: 'Explicación: [Justificación técnica rigurosa extraída del texto, indicando con precisión por qué esta opción es la correcta y desglosando o contextualizando por qué los distractores no aplican según los datos o tablas del documento]'. NUNCA devuelvas solo la letra o frase corta.
-
+ESTRUCTURA DE COMPATIBILIDAD EN "front" Y "back":
+- "front": Coloca el enunciado limpio de la pregunta seguido de un salto de línea doble y las 4 opciones formateadas con:
+  a) [Texto opción 0]
+  b) [Texto opción 1]
+  c) [Texto opción 2]
+  d) [Texto opción 3]
+- "back": Debe contener la opción verdadera con su letra formal y su texto, seguida de:
+  '\\n\\nExplicación: [Justificación técnica extraída del campo justification]'.
 - "cardFormat": "multiple_choice"
-- "options": Array con exactamente las 4 alternativas [opción A, opción B, opción C, opción D].`;
+- ${EDITORIAL_ARTIFACTS_DIRECTIVE}`;
 
     case 'cloze':
       return `FORMATO OBLIGATORIO: cloze (Texto para rellenar / Cloze):
@@ -258,19 +280,35 @@ function buildDidacticModeDirective(
   docenteFormat: DocenteFormat = 'mixed_test',
   targetAudience: TargetAudience = 'auto'
 ): string {
+  const didacticTranslationClause = `
+PRINCIPIO DE FIDELIDAD FACTUAL Y TRADUCCIÓN DIDÁCTICA:
+- FIDELIDAD AL CONTENIDO: Todos los hechos, reglas, conceptos y respuestas deben provenir exclusivamente del texto fuente. Queda prohibido inventar materia o hechos no presentes en el documento.
+- DESCOMPRESIÓN LÉXICA Y ANALOGÍAS: Si el texto original contiene registro universitario, científico o denso, tu labor pedagógica consiste en traducir el concepto a un lenguaje accesible para la edad seleccionada mediante metáforas del entorno cotidiano (deportes, juegos, situaciones familiares o escolares), sin falsear la verdad del concepto.
+- TÉRMINOS CLAVE: Si un término técnico es indispensable, indícalo de forma clara y añade en el reverso una analogía o definición intuitiva para garantizar su comprensión real.`;
+
   let audienceInstruction = '';
   switch (targetAudience) {
+    case '9-11_years':
+      audienceInstruction = `🎯 CALIBRACIÓN POR EDAD - EDUCACIÓN PRIMARIA (9 A 11 AÑOS / 4º A 6º DE PRIMARIA / ELEMENTARY SCHOOL):
+- Adapta la complejidad cognitiva, sintaxis y vocabulario estrictamente a alumnos de 9 a 11 años.
+- Emplea oraciones cortas, dinámicas y claras con un tono estimulante, cercano y motivador.
+- Queda terminantemente PROHIBIDA la subordinación sintáctica innecesaria y los tecnicismos abstractos sin un puente explicativo directo.
+- Enfoque en la comprensión intuitiva de conceptos clave, curiosidad científica y relaciones causa-efecto elementales.
+${didacticTranslationClause}`;
+      break;
     case '12-14_years':
       audienceInstruction = `🎯 CALIBRACIÓN POR EDAD - ALUMNADO DE 12 A 14 AÑOS (SECUNDARIA INICIAL / MIDDLE SCHOOL / 1º-2º ESO):
 - Adapta la complejidad cognitiva, sintaxis y vocabulario estrictamente a estudiantes de 12-14 años.
 - Emplea oraciones directas, vocabulario accesible y contextualizado sin subordinación innecesaria ni jerga técnica abstracta.
-- Enfoque en la comprensión conceptual fundamental, relaciones causa-efecto claras y ejemplos cercanos y motivadores.`;
+- Enfoque en la comprensión conceptual fundamental, relaciones causa-efecto claras y ejemplos cercanos y motivadores.
+${didacticTranslationClause}`;
       break;
     case '15-17_years':
       audienceInstruction = `🎯 CALIBRACIÓN POR EDAD - ALUMNADO DE 15 A 17 AÑOS (SECUNDARIA SUPERIOR / HIGH SCHOOL / 3º-4º ESO / BACHILLERATO):
 - Nivel de abstracción formal medio-alto, lenguaje académico y científico adecuado para preparación preuniversitaria.
 - Enfoque en el análisis crítico, interrelación de variables, deducción lógica y aplicación rigurosa de principios.
-- Opciones de examen y distractores plausibles que exijan discernir matices conceptuales finos.`;
+- Opciones de examen y distractores plausibles que exijan discernir matices conceptuales finos.
+${didacticTranslationClause}`;
       break;
     case 'university_plus':
       audienceInstruction = `🎯 CALIBRACIÓN POR EDAD - UNIVERSIDAD Y OPOSICIONES (+18 AÑOS / HIGHER EDUCATION / EXÁMENES OFICIALES):
@@ -299,10 +337,14 @@ Debes estructurar la batería de preguntas distribuyendo el nivel cognitivo de l
   let formatInstruction = '';
   switch (docenteFormat) {
     case 'multiple_choice':
-      formatInstruction = `📋 FORMATO DE EVALUACIÓN EXCLUSIVO: SOLO TEST / OPCIÓN MÚLTIPLE (FORMATO "multiple_choice"):
+      formatInstruction = `📋 FORMATO DE EVALUACIÓN EXCLUSIVO: SOLO TEST / OPCIÓN MÚLTIPLE DETERMINISTA (FORMATO "multiple_choice"):
 - TODAS las tarjetas DEBEN ser formuladas estrictamente en formato "multiple_choice".
-- En cada tarjeta debes generar una pregunta clara en "front" y exactamente 4 alternativas plausibles en el array "options" (a, b, c, d).
-- En "back" especifica la letra y texto de la respuesta correcta junto a una explicación didáctica del motivo por el cual es correcta y por qué se descartan los distractores. Queda terminantemente PROHIBIDO devolver tarjetas en otro formato.`;
+- En cada tarjeta debes generar obligatoriamente:
+  1º "justification": Razonamiento técnico del texto antes de elegir la respuesta (Chain of Thought).
+  2º "question": Enunciado limpio de la pregunta sin opciones.
+  3º "options": Exactamente 4 alternativas plausibles en el array options [0, 1, 2, 3].
+  4º "correct_option_index": Número entero (0 a 3) de la opción verdadera justificada.
+- En "front" coloca la pregunta con sus 4 opciones a-d y en "back" la opción verdadera con su justificación. Queda terminantemente PROHIBIDO devolver tarjetas en otro formato.`;
       break;
     case 'true_false':
       formatInstruction = `📋 FORMATO DE EVALUACIÓN EXCLUSIVO: SOLO VERDADERO O FALSO (FORMATO "true_false"):
@@ -926,14 +968,48 @@ function processGeneratedCards(
   cardFormat: CardFormat
 ): GeneratedCard[] {
   return parsedCards.slice(0, targetCount).map((card, idx) => {
-    let front = card.front.trim();
-    const back = card.back.trim();
+    let front = (card.front || '').trim();
+    let back = (card.back || '').trim();
     const resolvedFormat = (card.cardFormat as CardFormat) || cardFormat;
 
     const isMultipleChoice = resolvedFormat === 'multiple_choice';
 
-    // Si el modelo devolvió options en un array y front no tiene aún las opciones a), b), c), d), formatearlas
+    // Ensamblado determinista Nivel 2: si viene con options y correct_option_index numérico
     if (
+      isMultipleChoice &&
+      card.options &&
+      Array.isArray(card.options) &&
+      card.options.length >= 4 &&
+      typeof card.correct_option_index === 'number' &&
+      card.correct_option_index >= 0 &&
+      card.correct_option_index < card.options.length
+    ) {
+      const letters = ['a', 'b', 'c', 'd'];
+      const rawOpts = card.options
+        .slice(0, 4)
+        .map((opt) => String(opt).replace(/^[a-d][\)\.\:\-]\s*/i, '').trim());
+      const correctIdx = Math.min(Math.max(0, Math.floor(card.correct_option_index)), 3);
+      const correctText = rawOpts[correctIdx];
+
+      // Obtener el enunciado limpio de la pregunta (priorizando question sobre front)
+      const qText = (card.question || front)
+        .replace(/(?:^|\r?\n|\s+)(?:\(?a\s*[\)\.\-\]\:]|\ba\))\s+[\s\S]*$/i, '')
+        .trim();
+
+      const formattedOpts = rawOpts.map((opt, i) => `${letters[i]}) ${opt}`).join('\n');
+      front = `${qText}\n\n${formattedOpts}`;
+
+      // Obtener la justificación (priorizando justification sobre el reverso existente)
+      const rawExplanation = (card.justification || back)
+        .replace(/^[a-d][\)\.\:\-]\s*/i, '')
+        .replace(/^(?:Explicación|Justificación):\s*/i, '')
+        .trim();
+
+      back = `${letters[correctIdx]}) ${correctText}${
+        rawExplanation ? `\n\nExplicación: ${rawExplanation}` : ''
+      }`;
+    } else if (
+      // Compatibilidad si el modelo devolvió options en un array y front no tiene aún las opciones a), b), c), d)
       isMultipleChoice &&
       card.options &&
       Array.isArray(card.options) &&
@@ -959,6 +1035,9 @@ function processGeneratedCards(
         isMultipleChoice && card.options && Array.isArray(card.options)
           ? card.options.map(String)
           : undefined,
+      question: card.question,
+      justification: card.justification,
+      correct_option_index: card.correct_option_index,
     };
 
     return randomizeMultipleChoiceCard(cleaned);

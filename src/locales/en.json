@@ -391,6 +391,8 @@
     "target_audience_label": "Target Audience / Educational Level",
     "target_audience_auto": "Auto-detection",
     "target_audience_auto_desc": "AI adapts difficulty based on text complexity.",
+    "target_audience_9_11": "9-11 years (Elementary School)",
+    "target_audience_9_11_desc": "Grades 4-6 • Concepts explained with clear daily metaphors and simple language.",
     "target_audience_12_14": "12-14 years (Middle School / Grades 6-8)",
     "target_audience_12_14_desc": "Accessible vocabulary, direct conceptual focus.",
     "target_audience_15_17": "15-17 years (High School / Upper Secondary)",
@@ -877,5 +879,3 @@
     "close_btn": "Got it"
   }
 }
-
-

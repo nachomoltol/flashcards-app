@@ -390,6 +390,8 @@
     "target_audience_label": "Audiencia / Nivel Educativo del Alumnado",
     "target_audience_auto": "Detección Automática",
     "target_audience_auto_desc": "La IA adapta la dificultad según la complejidad del texto.",
+    "target_audience_9_11": "Primaria (9-11 años)",
+    "target_audience_9_11_desc": "4º-6º Primaria • Conceptos explicados con metáforas cotidianas y lenguaje sencillo.",
     "target_audience_12_14": "12-14 años (Secundaria / Middle School)",
     "target_audience_12_14_desc": "1º-2º ESO • Lenguaje accesible y enfoque conceptual directo.",
     "target_audience_15_17": "15-17 años (Secundaria Superior / High School)",

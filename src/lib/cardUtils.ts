@@ -16,7 +16,8 @@ export function shuffleArray<T>(array: T[]): T[] {
 
 /**
  * Parsea y aleatoriza las opciones de las tarjetas multiple_choice usando el algoritmo Fisher-Yates.
- * Actualiza dinámicamente la nueva letra y posición de la respuesta correcta tanto en el front como en el back.
+ * Actualiza dinámicamente la nueva letra y posición de la respuesta correcta tanto en el front como en el back,
+ * garantizando que nunca se recorten palabras y sincronizando card.options.
  */
 export function randomizeMultipleChoiceCard(card: GeneratedCard): GeneratedCard {
   if (card.cardFormat !== 'multiple_choice') {
@@ -97,13 +98,71 @@ export function randomizeMultipleChoiceCard(card: GeneratedCard): GeneratedCard 
 
   // 2. Determinar la opción correcta original a partir del reverso (back)
   const backTrimmed = card.back.trim();
-  const backLetterMatch = backTrimmed.match(/^\s*\(?([a-dA-D])\s*[\)\.\-\]\:]?/i);
+
+  // REGEX BLINDADO: Exige delimitador formal OBLIGATORIO (paréntesis, punto, guion, dos puntos)
+  // Soporta opcionalmente prefijos de negrita (**a)** o **a) **)
+  const strictLetterRegex = /^\s*(?:\*\*)?\(?([a-dA-D])\s*[\)\.\-\]\:](?:\*\*)?\s*/i;
+  const backLetterMatch = backTrimmed.match(strictLetterRegex);
   const correctOrigKey = backLetterMatch ? backLetterMatch[1].toLowerCase() : null;
 
-  let correctOpt = options.find((o) => o.origKey === correctOrigKey);
-  if (!correctOpt) {
-    correctOpt = options.find((o) => backTrimmed.toLowerCase().includes(o.text.toLowerCase()));
+  // Extraer el texto limpio de la respuesta en el reverso (eliminando la viñeta inicial si existe y delimitadores de explicación)
+  const cleanBackText = backTrimmed
+    .replace(strictLetterRegex, '')
+    .split(/(?:\r?\n+|Explicación:|Justificación:|Fundamento:|Razón:)/i)[0]
+    .replace(/[.,;:]+$/, '')
+    .trim()
+    .toLowerCase();
+
+  let correctOpt: { origKey: string; text: string } | undefined;
+
+  // PASO A: Si hay letra detectada, verificar si el texto de la opción con esa clave coincide realmente
+  if (correctOrigKey) {
+    const candidateByLetter = options.find((o) => o.origKey === correctOrigKey);
+    if (candidateByLetter) {
+      const candTextLower = candidateByLetter.text.toLowerCase().replace(/[.,;:]+$/, '').trim();
+      if (
+        candTextLower &&
+        cleanBackText &&
+        (candTextLower === cleanBackText ||
+          cleanBackText.includes(candTextLower) ||
+          (candTextLower.length >= 3 && candTextLower.includes(cleanBackText)))
+      ) {
+        correctOpt = candidateByLetter;
+      }
+    }
   }
+
+  // PASO B (Escudo principal anti-alucinación de letra):
+  // Si no coincide (discrepancia letra vs texto generada por la IA), buscar en TODAS las opciones
+  // cuál es la que verdaderamente coincide por contenido o inclusión con la respuesta del reverso
+  if (!correctOpt && cleanBackText) {
+    // 1. Coincidencia directa o inclusión con el texto del veredicto
+    correctOpt = options.find((o) => {
+      const optLower = o.text.toLowerCase().replace(/[.,;:]+$/, '').trim();
+      if (!optLower) return false;
+      return (
+        optLower === cleanBackText ||
+        cleanBackText.includes(optLower) ||
+        (optLower.length >= 3 && optLower.includes(cleanBackText))
+      );
+    });
+
+    // 2. Coincidencia en todo el reverso completo si el corte de la primera línea fue muy breve
+    if (!correctOpt) {
+      const fullBackLower = backTrimmed.toLowerCase();
+      correctOpt = options.find((o) => {
+        const optLower = o.text.toLowerCase().replace(/[.,;:]+$/, '').trim();
+        return optLower.length >= 3 && fullBackLower.includes(optLower);
+      });
+    }
+  }
+
+  // PASO C: Fallback secundario si aún no se halló por texto: usar la letra detectada
+  if (!correctOpt && correctOrigKey) {
+    correctOpt = options.find((o) => o.origKey === correctOrigKey);
+  }
+
+  // PASO D: Fallback de seguridad final (primera opción)
   if (!correctOpt) {
     correctOpt = options[0];
   }
@@ -126,17 +185,20 @@ export function randomizeMultipleChoiceCard(card: GeneratedCard): GeneratedCard 
 
   const newFront = `${cleanQuestion || rawQuestion}\n\n${newOptionLines.join('\n')}`;
 
-  // 5. Actualizar dinámicamente el reverso con la nueva letra asignada
+  // 5. Actualizar dinámicamente el reverso preservando 100% el texto y las explicaciones
   let newBack = backTrimmed;
   if (backLetterMatch) {
-    newBack = backTrimmed.replace(/^\s*\(?[a-dA-D]\s*[\)\.\-\]\:]?\s*/i, `${newCorrectKey}) `);
+    // Si tenía viñeta formal, reemplazar ÚNICAMENTE la viñeta respetando el resto del texto
+    newBack = backTrimmed.replace(strictLetterRegex, `${newCorrectKey}) `);
   } else {
-    newBack = `${newCorrectKey}) ${correctOpt.text}`;
+    // Si NO tenía viñeta formal, anteponer la nueva viñeta SIN borrar el texto ni explicaciones
+    newBack = `${newCorrectKey}) ${backTrimmed}`;
   }
 
   return {
     ...card,
     front: newFront,
     back: newBack,
+    options: shuffledOptions.map((o) => o.text),
   };
 }

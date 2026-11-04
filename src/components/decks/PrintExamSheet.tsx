@@ -45,6 +45,73 @@ function formatClozeForTeacher(text: string): { highlighted: string; hiddenWords
   return { highlighted, hiddenWords };
 }
 
+/**
+ * Resuelve la solución canónica para preguntas tipo test conciliando
+ * las opciones reales del anverso con el texto del reverso.
+ * Previene discrepancias de letras y recortes de caracteres en tarjetas históricas.
+ */
+function resolveMultipleChoiceSolution(
+  front: string,
+  back: string
+): { letter: string; text: string; explanation: string } {
+  const parsedFront = parseMultipleChoice(front);
+  const parsedBack = parseBackContent(back, 'multiple_choice');
+  const verdictRaw = parsedBack.verdict || back;
+
+  // Extraer letra si existe viñeta formal
+  const letterMatch = verdictRaw.match(/^\s*(?:\*\*)?\(?([a-dA-D])\s*[\)\.\-\]\:]/i);
+  const detectedLetter = letterMatch ? letterMatch[1].toLowerCase() : null;
+
+  // Limpiar texto de la respuesta en el veredicto (eliminando la viñeta si la tuviese y puntuación periférica)
+  const cleanAnswerText = verdictRaw.replace(/^\s*(?:\*\*)?\(?[a-dA-D]\s*[\)\.\-\]\:]\s*/i, '').trim();
+  const cleanAns = cleanAnswerText.toLowerCase().replace(/^[.,;:¿?¡!]+|[.,;:¿?¡!]+$/g, '').trim();
+
+  // Buscar coincidencia en parsedFront.options por contenido de texto
+  const matchedOpt = parsedFront.options.find((opt) => {
+    if (!cleanAns) return false;
+    const cleanOpt = opt.text.toLowerCase().replace(/^[.,;:¿?¡!]+|[.,;:¿?¡!]+$/g, '').trim();
+    if (!cleanOpt) return false;
+
+    // 1. Coincidencia exacta
+    if (cleanOpt === cleanAns) return true;
+
+    // 2. Contención directa (con longitud mínima de seguridad)
+    if (cleanAns.length >= 3 && cleanOpt.includes(cleanAns)) return true;
+    if (cleanOpt.length >= 3 && cleanAns.includes(cleanOpt)) return true;
+
+    // 3. Rescate específico para mutilación de primera letra en tarjetas legacy (ej: 'ctúan' vs 'actúan')
+    if (cleanOpt.length > 3 && cleanAns.includes(cleanOpt.slice(1))) return true;
+    if (cleanAns.length > 3 && cleanOpt.includes(cleanAns.slice(0, Math.min(cleanAns.length, 12)))) return true;
+
+    return false;
+  });
+
+  if (matchedOpt) {
+    // Si encontramos la opción por texto, la letra canónica es la de esa opción en el examen
+    return {
+      letter: matchedOpt.key.toLowerCase(),
+      text: matchedOpt.text,
+      explanation: parsedBack.explanation,
+    };
+  }
+
+  // Fallback si coincide por letra directa en el examen
+  const letterOpt = detectedLetter ? parsedFront.options.find((o) => o.key.toLowerCase() === detectedLetter) : null;
+  if (letterOpt) {
+    return {
+      letter: letterOpt.key.toLowerCase(),
+      text: letterOpt.text,
+      explanation: parsedBack.explanation,
+    };
+  }
+
+  return {
+    letter: detectedLetter || 'a',
+    text: cleanAnswerText || verdictRaw,
+    explanation: parsedBack.explanation,
+  };
+}
+
 export function PrintExamSheet({
   deckTitle = 'Examen de Evaluación',
   deckDescription,
@@ -287,6 +354,8 @@ export function PrintExamSheet({
 
             const parsedBack = parseBackContent(card.back, fmt);
             const clozeTeacher = fmt === 'cloze' ? formatClozeForTeacher(card.front) : null;
+            const mcResolution =
+              fmt === 'multiple_choice' ? resolveMultipleChoiceSolution(card.front, card.back) : null;
 
             return (
               <article
@@ -319,6 +388,15 @@ export function PrintExamSheet({
                           </p>
                         )}
                       </div>
+                    ) : fmt === 'multiple_choice' && mcResolution ? (
+                      <div>
+                        <span className="font-bold text-black">
+                          {t('deck_detail.print_solution_label', isEn ? 'Solution:' : 'Solución:')}{' '}
+                        </span>
+                        <span className="font-semibold text-neutral-900">
+                          {mcResolution.letter.toUpperCase()}) {mcResolution.text}
+                        </span>
+                      </div>
                     ) : (
                       <div>
                         <span className="font-bold text-black">
@@ -331,7 +409,7 @@ export function PrintExamSheet({
                     )}
 
                     {/* Justificación o Rúbrica */}
-                    {parsedBack.explanation && (
+                    {(mcResolution ? mcResolution.explanation : parsedBack.explanation) && (
                       <p className="text-[8.5pt] text-neutral-700 leading-snug">
                         <strong className="text-black font-semibold">
                           {t(
@@ -341,7 +419,7 @@ export function PrintExamSheet({
                               : 'Justificación / Criterios:'
                           )}{' '}
                         </strong>
-                        {parsedBack.explanation}
+                        {mcResolution ? mcResolution.explanation : parsedBack.explanation}
                       </p>
                     )}
 
