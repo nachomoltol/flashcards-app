@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { useProModalStore, ProFeatureName } from '@/stores/useProModalStore';
 import { useAuthStore, useLanguageStore } from '@/stores';
+import { supabase } from '@/lib/supabase';
 import { redeemPromoCodeAction } from '@/app/actions/redeemPromoCode';
 import { claimAdRewardAction } from '@/app/actions/claimAdReward';
 import { usePlatform } from '@/lib/platform';
@@ -206,7 +207,14 @@ export function ProModal({
 
       if (result.completed) {
         setAdLoadingPhase('claiming');
-        const claim = await claimAdRewardAction(user?.id);
+        let accessToken: string | undefined;
+        try {
+          const { data: sessionData } = await supabase.auth.getSession();
+          accessToken = sessionData?.session?.access_token;
+        } catch (sessionErr) {
+          console.warn('[ProModal] No se pudo obtener el token de sesión:', sessionErr);
+        }
+        const claim = await claimAdRewardAction(user?.id, accessToken);
 
         if (claim.success) {
           setAdRewardNotice({
@@ -491,7 +499,7 @@ export function ProModal({
                   {(() => {
                     const isFreeTier = !userLimits || userLimits.tier === 'free';
                     const isZeroBalance = isFreeTier && (userLimits?.bonusCredits ?? 0) <= 0;
-                    const remainingAds = Math.max(0, 50 - (userLimits?.count || 0));
+                    const remainingAds = Math.max(0, 45 - (userLimits?.count || 0));
 
                     return (
                       <div

@@ -140,7 +140,14 @@ export function QuickStudyGuideModal({
     try {
       const adResult = await showAdMobRewardedAd();
       if (adResult.completed) {
-        const claim = await claimAdRewardAction(user?.id);
+        let accessToken: string | undefined;
+        try {
+          const { data: sessionData } = await supabase.auth.getSession();
+          accessToken = sessionData?.session?.access_token;
+        } catch (sessionErr) {
+          console.warn('[QuickStudyGuideModal] No se pudo obtener el token de sesión:', sessionErr);
+        }
+        const claim = await claimAdRewardAction(user?.id, accessToken);
         if (claim.success) {
           setIsAdUnlocked(true);
         } else {

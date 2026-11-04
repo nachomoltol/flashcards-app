@@ -1,5 +1,6 @@
 'use server';
 
+import { createClient } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 
 export interface ClaimRewardResult {
@@ -12,23 +13,46 @@ export interface ClaimRewardResult {
 /**
  * Server Action que acredita +1 crédito bonificado en Supabase al usuario tras
  * completar la visualización exitosa de un anuncio de vídeo bonificado de Google AdMob.
+ * Soporta autenticación dual: cookies web o accessToken JWT de Capacitor.
  */
-export async function claimAdRewardAction(userId?: string): Promise<ClaimRewardResult> {
-  // Blindaje IDOR: Resolver identidad primordialmente de la sesión del servidor
+export async function claimAdRewardAction(
+  userId?: string,
+  accessToken?: string
+): Promise<ClaimRewardResult> {
+  // 1. Resolver usuario autenticado de forma estricta: cookies o token JWT de Capacitor
   let targetUserId: string | undefined;
+
+  // Intento 1: Sesión por cookies en el servidor
   try {
     const {
-      data: { user },
+      data: { user: cookieUser },
     } = await supabase.auth.getUser();
-    targetUserId = user?.id;
-  } catch {
-    // Fallback
+    if (cookieUser?.id) {
+      targetUserId = cookieUser.id;
+    }
+  } catch (err) {
+    console.warn('[claimAdRewardAction] Error al verificar sesión por cookies:', err);
   }
 
-  if (!targetUserId && userId) {
-    targetUserId = userId.trim();
+  // Intento 2: Token JWT enviado por WebView móvil (Capacitor)
+  if (!targetUserId && accessToken && accessToken.trim()) {
+    try {
+      const {
+        data: { user: tokenUser },
+        error: tokenErr,
+      } = await supabase.auth.getUser(accessToken.trim());
+
+      if (!tokenErr && tokenUser?.id) {
+        targetUserId = tokenUser.id;
+      } else if (tokenErr) {
+        console.warn('[claimAdRewardAction] Token de acceso no válido:', tokenErr.message);
+      }
+    } catch (err) {
+      console.warn('[claimAdRewardAction] Error al validar accessToken:', err);
+    }
   }
 
+  // Si no se pudo verificar sesión ni por cookie ni por token, denegar
   if (!targetUserId) {
     return {
       success: false,
@@ -37,8 +61,33 @@ export async function claimAdRewardAction(userId?: string): Promise<ClaimRewardR
     };
   }
 
+  // 2. Instanciar cliente autorizado (service_role o token autenticado de usuario)
+  const supabaseUrl =
+    process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    process.env.SUPABASE_URL ||
+    'https://placeholder.supabase.co';
+  const supabaseAnonKey =
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key';
+  const serviceRoleKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+
+  const rpcClient = serviceRoleKey
+    ? createClient(supabaseUrl, serviceRoleKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      })
+    : accessToken && accessToken.trim()
+    ? createClient(supabaseUrl, supabaseAnonKey, {
+        global: {
+          headers: {
+            Authorization: `Bearer ${accessToken.trim()}`,
+          },
+        },
+        auth: { persistSession: false, autoRefreshToken: false },
+      })
+    : supabase;
+
   try {
-    const { data, error } = await supabase.rpc('add_bonus_credit', {
+    const { data, error } = await rpcClient.rpc('add_bonus_credit', {
       p_user_id: targetUserId,
       p_amount: 1,
     });
@@ -52,11 +101,11 @@ export async function claimAdRewardAction(userId?: string): Promise<ClaimRewardR
       };
     }
 
-    const res = data as { success?: boolean; bonus_credits?: number; error?: string };
+    const res = data as { success?: boolean; bonus_credits?: number; error?: string; message?: string };
     if (!res || !res.success) {
       return {
         success: false,
-        message: 'No se pudo procesar la recompensa.',
+        message: res?.message || 'No se pudo procesar la recompensa.',
         error: res?.error || 'CLAIM_FAILED',
       };
     }
