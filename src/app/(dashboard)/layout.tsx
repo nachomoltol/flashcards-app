@@ -654,7 +654,7 @@ export default function DashboardLayout({
             </div>
           </Link>
 
-          {/* Botón Principal "+ Nuevo" (Visible SOLO en PC/Tablet) */}
+          {/* Botón Principal "Crear" (Visible SOLO en PC/Tablet) */}
           <div className="pt-1 hidden md:flex">
             <Suspense fallback={null}>
               <NewMenuDropdown

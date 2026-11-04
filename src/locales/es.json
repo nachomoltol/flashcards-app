@@ -82,7 +82,7 @@
     "stripe_cancelled_msg": "Proceso de suscripción cancelado en Stripe. No se ha realizado ningún cobro.",
     "folder_title_prefix": "Explorando carpeta actual",
     "up_level": "Subir nivel",
-    "new_button": "+ Nuevo",
+    "new_button": "Crear",
     "new_folder": "Nueva Carpeta",
     "new_folder_desc": "Agrupar asignaturas o temas",
     "new_deck": "Nuevo Mazo de Estudio",

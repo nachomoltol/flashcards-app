@@ -82,7 +82,7 @@
     "stripe_cancelled_msg": "Subscription checkout was cancelled on Stripe. No charge was made.",
     "folder_title_prefix": "Browsing current folder",
     "up_level": "Go Up",
-    "new_button": "+ New",
+    "new_button": "Create",
     "new_folder": "New Folder",
     "new_folder_desc": "Group subjects or topics",
     "new_deck": "New Study Deck",

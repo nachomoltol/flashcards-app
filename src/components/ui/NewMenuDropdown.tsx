@@ -91,7 +91,7 @@ export function NewMenuDropdown({
         }
       >
         <Plus className="w-4 h-4" />
-        <span>{t('dashboard.new_button', '+ Nuevo')}</span>
+        <span>{t('dashboard.new_button', 'Crear')}</span>
         <ChevronDown
           className={`w-3.5 h-3.5 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
         />
