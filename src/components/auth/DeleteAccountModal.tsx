@@ -14,7 +14,7 @@ interface DeleteAccountModalProps {
 
 export function DeleteAccountModal({ isOpen, onClose }: DeleteAccountModalProps) {
   const router = useRouter();
-  const { user, signOut } = useAuthStore();
+  const { signOut } = useAuthStore();
   const [isDeleting, setIsDeleting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -25,7 +25,7 @@ export function DeleteAccountModal({ isOpen, onClose }: DeleteAccountModalProps)
     setErrorMessage(null);
 
     try {
-      const res = await deleteAccountAction(user?.id);
+      const res = await deleteAccountAction();
 
       if (!res.success) {
         setErrorMessage(res.message || 'No se pudo eliminar la cuenta. Inténtalo más tarde.');

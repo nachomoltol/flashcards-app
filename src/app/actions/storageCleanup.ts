@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase';
 
 function getStorageAdminClient() {
   const supabaseUrl =
@@ -36,6 +37,16 @@ export async function deleteDocumentAction(storagePath: string): Promise<{ succe
     let cleanPath = storagePath.trim();
     if (cleanPath.startsWith('user-documents/')) {
       cleanPath = cleanPath.replace(/^user-documents\//, '');
+    }
+
+    // Blindaje IDOR: Verificar que el archivo pertenezca al usuario autenticado
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (user && !cleanPath.startsWith(`${user.id}/`)) {
+      console.warn(`[storageCleanup] Intento no autorizado de eliminar archivo ajeno: ${cleanPath} por usuario: ${user.id}`);
+      return { success: false, error: 'UNAUTHORIZED' };
     }
 
     const admin = getStorageAdminClient();

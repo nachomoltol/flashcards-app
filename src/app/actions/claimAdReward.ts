@@ -14,16 +14,19 @@ export interface ClaimRewardResult {
  * completar la visualización exitosa de un anuncio de vídeo bonificado de Google AdMob.
  */
 export async function claimAdRewardAction(userId?: string): Promise<ClaimRewardResult> {
-  let targetUserId = userId;
-  if (!targetUserId) {
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      targetUserId = user?.id;
-    } catch {
-      // Fallback
-    }
+  // Blindaje IDOR: Resolver identidad primordialmente de la sesión del servidor
+  let targetUserId: string | undefined;
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    targetUserId = user?.id;
+  } catch {
+    // Fallback
+  }
+
+  if (!targetUserId && userId) {
+    targetUserId = userId.trim();
   }
 
   if (!targetUserId) {

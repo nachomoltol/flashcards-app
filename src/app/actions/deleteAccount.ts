@@ -14,25 +14,22 @@ export interface DeleteAccountResult {
  * mediante el cliente administrativo de Supabase (SUPABASE_SERVICE_ROLE_KEY).
  * Cumple con las directivas de seguridad y eliminación de datos de Google Play Store.
  */
-export async function deleteAccountAction(userId?: string): Promise<DeleteAccountResult> {
+export async function deleteAccountAction(): Promise<DeleteAccountResult> {
   try {
-    let targetUserId = userId;
+    // 1. Obtener el ID del usuario activo exclusivamente desde la sesión del servidor (blindaje IDOR)
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-    // 1. Obtener el ID del usuario activo si no fue proporcionado explícitamente
-    if (!targetUserId) {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      targetUserId = user?.id;
-    }
-
-    if (!targetUserId) {
+    if (!user?.id) {
       return {
         success: false,
-        error: 'AUTH_REQUIRED',
+        error: 'UNAUTHORIZED',
         message: 'Debes tener una sesión activa para solicitar la eliminación de tu cuenta.',
       };
     }
+
+    const targetUserId = user.id;
 
     // 2. Instanciar cliente administrativo con SUPABASE_SERVICE_ROLE_KEY
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;

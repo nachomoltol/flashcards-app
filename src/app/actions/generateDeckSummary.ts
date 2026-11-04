@@ -217,7 +217,22 @@ export async function getOrGenerateDeckSummaryAction(
       }
     }
 
-    // 2. Obtener las tarjetas del mazo para alimentar la síntesis de Gemini
+    // 2. Blindaje de Seguridad y Cuota IA: Verificar sesión activa y propiedad del mazo antes de llamar a Gemini
+    const {
+      data: { user: authUser },
+    } = await supabase.auth.getUser();
+
+    if (!authUser?.id) {
+      console.warn(`[generateDeckSummary] Intento de generar guía sin sesión activa para mazo: ${cleanDeckId}`);
+      return { success: false, error: 'AUTH_REQUIRED' };
+    }
+
+    if (deck.user_id !== authUser.id) {
+      console.warn(`[generateDeckSummary] Acceso denegado: el usuario ${authUser.id} no es propietario del mazo ${cleanDeckId}`);
+      return { success: false, error: 'UNAUTHORIZED' };
+    }
+
+    // 3. Obtener las tarjetas del mazo para alimentar la síntesis de Gemini
     const { data: cards, error: cardsErr } = await db
       .from('cards')
       .select('front, back, card_format, notes')

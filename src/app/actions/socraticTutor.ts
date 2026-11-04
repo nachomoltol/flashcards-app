@@ -39,14 +39,17 @@ const GEMINI_MODEL = 'gemini-3.1-flash-lite';
  * Resuelve el ID de usuario autenticado en la sesión o toma el provisto por el cliente
  */
 async function resolveAuthUserId(explicitUserId?: string): Promise<string | null> {
-  if (explicitUserId && explicitUserId.trim()) {
-    return explicitUserId.trim();
-  }
   try {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    return user?.id || null;
+    if (user?.id) {
+      if (explicitUserId && explicitUserId.trim() && explicitUserId.trim() !== user.id) {
+        console.warn('[socraticTutor] Discrepancia de userId detectada. Usando id de sesión autenticada.');
+      }
+      return user.id;
+    }
+    return null;
   } catch (err) {
     console.warn('Error al verificar sesión en resolveAuthUserId:', err);
     return null;
@@ -242,8 +245,26 @@ export async function askSocraticTutorAction(input: SocraticTutorInput): Promise
       };
     }
   } else {
-    // Para la repregunta de la tarjeta activa, no se descuenta cuota adicional
+    // Blindaje de Seguridad en followUpQuestion:
+    // 1. Debe existir una explicación previa válida para evitar omisión directa de la pregunta inicial
+    if (!previousExplanation || !previousExplanation.trim()) {
+      return {
+        success: false,
+        error: 'INVALID_FOLLOWUP',
+      };
+    }
+
+    // 2. Verificar que el usuario tenga acceso válido y no tenga bloqueada la cuota
     const quota = await getTutorQuotaStatusAction(userId);
+    if (!quota.isPro && (quota.requiresAd || (quota.remainingFree <= 0 && quota.bonusCredits <= 0))) {
+      return {
+        success: false,
+        error: 'AD_REQUIRED',
+        remainingFree: 0,
+        isPro: false,
+      };
+    }
+
     isPro = quota.isPro;
     remainingFree = quota.remainingFree;
   }
