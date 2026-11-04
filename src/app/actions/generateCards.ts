@@ -281,56 +281,69 @@ function buildDidacticModeDirective(
   targetAudience: TargetAudience = 'auto'
 ): string {
   const didacticTranslationClause = `
-PRINCIPIO DE FIDELIDAD FACTUAL Y TRADUCCIÓN DIDÁCTICA:
-- FIDELIDAD AL CONTENIDO: Todos los hechos, reglas, conceptos y respuestas deben provenir exclusivamente del texto fuente. Queda prohibido inventar materia o hechos no presentes en el documento.
-- DESCOMPRESIÓN LÉXICA Y ANALOGÍAS: Si el texto original contiene registro universitario, científico o denso, tu labor pedagógica consiste en traducir el concepto a un lenguaje accesible para la edad seleccionada mediante metáforas del entorno cotidiano (deportes, juegos, situaciones familiares o escolares), sin falsear la verdad del concepto.
-- TÉRMINOS CLAVE: Si un término técnico es indispensable, indícalo de forma clara y añade en el reverso una analogía o definición intuitiva para garantizar su comprensión real.`;
+PRINCIPIO UNIVERSAL DE FIDELIDAD FACTUAL Y TRADUCCIÓN DIDÁCTICA:
+- FIDELIDAD AL CONTENIDO: Todos los hechos, reglas, conceptos, relaciones y respuestas deben derivarse estrictamente del texto fuente aportado. Queda terminantemente prohibido inventar información, alterar reglas o introducir hechos ausentes en el documento.
+- DESCOMPRESIÓN LÉXICA Y ANALOGÍAS: Cuando el texto original presente una densidad conceptual, jurídica, técnica o científica superior al nivel de desarrollo cognitivo de la audiencia seleccionada, tu labor pedagógica consiste en traducir el concepto a un lenguaje accesible mediante analogías funcionales del entorno real y relaciones causa-efecto transparentes, sin relajar ni desvirtuar el rigor factual.
+- TÉRMINOS CLAVE: Si un término técnico o formal es indispensable para la disciplina evaluada, introdúcelo con precisión y añade en el reverso su puente explicativo o significado funcional para afianzar su asimilación real.`;
 
   let audienceInstruction = '';
   switch (targetAudience) {
     case '9-11_years':
-      audienceInstruction = `🎯 CALIBRACIÓN POR EDAD - EDUCACIÓN PRIMARIA (9 A 11 AÑOS / 4º A 6º DE PRIMARIA / ELEMENTARY SCHOOL):
-- Adapta la complejidad cognitiva, sintaxis y vocabulario estrictamente a alumnos de 9 a 11 años.
-- Emplea oraciones cortas, dinámicas y claras con un tono estimulante, cercano y motivador.
-- Queda terminantemente PROHIBIDA la subordinación sintáctica innecesaria y los tecnicismos abstractos sin un puente explicativo directo.
-- Enfoque en la comprensión intuitiva de conceptos clave, curiosidad científica y relaciones causa-efecto elementales.
+      audienceInstruction = `🎯 CALIBRACIÓN PEDAGÓGICA UNIVERSAL - EDUCACIÓN PRIMARIA (9 A 11 AÑOS / ELEMENTARY):
+- NIVEL COGNITIVO (TAXONOMÍA DE BLOOM): Comprensión y Aplicación práctica cotidiana.
+- ENFOQUE: Relaciones de causa-efecto directas, identificación de conceptos clave y utilidad o manifestación observable en el mundo real.
+- DIRECTIVA UNIVERSAL DE DISCRIMINACIÓN:
+  * Queda estrictamente PROHIBIDO basar preguntas o distractores en la memorización mecánica de cifras cuantitativas secundarias, constantes, porcentajes aislados o fechas accesorias.
+  * El valor pedagógico debe radicar en entender el "por qué" y el "para qué", no en retener números sin contexto explicativo.
+  * Emplea oraciones cortas, dinámicas y claras con un tono estimulante, cercano y motivador.
+  * Queda terminantemente PROHIBIDA la subordinación sintáctica innecesaria y los tecnicismos abstractos sin un puente explicativo directo.
 ${didacticTranslationClause}`;
       break;
+
     case '12-14_years':
-      audienceInstruction = `🎯 CALIBRACIÓN POR EDAD - ALUMNADO DE 12 A 14 AÑOS (SECUNDARIA INICIAL / MIDDLE SCHOOL / 1º-2º ESO):
-- Adapta la complejidad cognitiva, sintaxis y vocabulario estrictamente a estudiantes de 12-14 años.
-- Emplea oraciones directas, vocabulario accesible y contextualizado sin subordinación innecesaria ni jerga técnica abstracta.
-- Enfoque en la comprensión conceptual fundamental, relaciones causa-efecto claras y ejemplos cercanos y motivadores.
+      audienceInstruction = `🎯 CALIBRACIÓN PEDAGÓGICA UNIVERSAL - SECUNDARIA INICIAL (12 A 14 AÑOS / MIDDLE SCHOOL):
+- NIVEL COGNITIVO (TAXONOMÍA DE BLOOM): Comprensión y Discriminación conceptual.
+- ENFOQUE: Comparación y contraste entre conceptos afines, taxonomías, clasificaciones y resolución de problemas guiados con rigor léxico intermedio.
+- DIRECTIVA UNIVERSAL DE DISCRIMINACIÓN:
+  * Plantea preguntas orientadas a diferenciar matices entre categorías similares, estructurar clasificaciones y aplicar conceptos a situaciones concretas guiadas.
+  * Emplea oraciones directas, vocabulario disciplinar progresivo y preguntas que estimulen el razonamiento estructurado sin ambigüedades ni subordinación excesiva.
 ${didacticTranslationClause}`;
       break;
+
     case '15-17_years':
-      audienceInstruction = `🎯 CALIBRACIÓN POR EDAD - ALUMNADO DE 15 A 17 AÑOS (SECUNDARIA SUPERIOR / HIGH SCHOOL / 3º-4º ESO / BACHILLERATO):
-- Nivel de abstracción formal medio-alto, lenguaje académico y científico adecuado para preparación preuniversitaria.
-- Enfoque en el análisis crítico, interrelación de variables, deducción lógica y aplicación rigurosa de principios.
-- Opciones de examen y distractores plausibles que exijan discernir matices conceptuales finos.
+      audienceInstruction = `🎯 CALIBRACIÓN PEDAGÓGICA UNIVERSAL - BACHILLERATO / SECUNDARIA SUPERIOR (15 A 17 AÑOS / HIGH SCHOOL):
+- NIVEL COGNITIVO (TAXONOMÍA DE BLOOM): Aplicación y Análisis sistemático.
+- ENFOQUE: Relaciones sistémicas, mecanismos, procesos secuenciales, deducción lógica y dominio de la terminología técnica o formal de la disciplina.
+- DIRECTIVA UNIVERSAL DE DISCRIMINACIÓN:
+  * Exige análisis de dependencias multivariables, causas subyacentes, inferencias lógicas, etapas de procesos y justificaciones estructuradas.
+  * Genera distractores plausibles que representen trampas de razonamiento, confusiones conceptuales o errores metodológicos frecuentes en la materia.
 ${didacticTranslationClause}`;
       break;
+
     case 'university_plus':
-      audienceInstruction = `🎯 CALIBRACIÓN POR EDAD - UNIVERSIDAD Y OPOSICIONES (+18 AÑOS / HIGHER EDUCATION / EXÁMENES OFICIALES):
-- Máximo rigor académico, terminología técnica especializada, jurídica, biomédica o científica sin simplificaciones.
-- Enfoque en supuestos complejos, excepciones doctrinales, jurisprudencia, umbrales numéricos exactos y diagnóstico diferencial.
-- Rúbricas exigentes acordes a estándares universitarios y tribunales de oposición.`;
+      audienceInstruction = `🎯 CALIBRACIÓN PEDAGÓGICA UNIVERSAL - UNIVERSIDAD, POSGRADO Y OPOSICIONES (+18 AÑOS / HIGHER EDUCATION):
+- NIVEL COGNITIVO (TAXONOMÍA DE BLOOM): Análisis crítico, Evaluación y Diagnóstico.
+- ENFOQUE: Casos complejos, resolución de escenarios reales, excepciones normativas o doctrinales, y máxima precisión técnica y metodológica.
+- DIRECTIVA UNIVERSAL DE DISCRIMINACIÓN:
+  * Nivel de máxima exigencia analítica: valoración crítica de supuestos, resolución de dilemas técnicos o profesionales, interpretación de excepciones a la regla general y contraste riguroso de alternativas excluyentes.
+  * Terminología especializada y rigor metodológico acorde a estándares universitarios y tribunales de oposición, sin simplificaciones artificiales.`;
       break;
+
     case 'auto':
     default:
-      audienceInstruction = `🎯 CALIBRACIÓN POR EDAD - DETECCIÓN AUTOMÁTICA SEGÚN EL TEXTO:
-- Analiza la densidad léxica, complejidad conceptual y nivel formativo intrínseco del texto fuente para ajustar automáticamente el tono, la sintaxis y el nivel de abstracción de las preguntas (desde educación básica hasta nivel universitario).`;
+      audienceInstruction = `🎯 CALIBRACIÓN PEDAGÓGICA UNIVERSAL - DETECCIÓN AUTOMÁTICA SEGÚN EL TEXTO:
+- Analiza la densidad léxica, complejidad conceptual y nivel formativo intrínseco del texto fuente para ajustar automáticamente el nivel en la Taxonomía de Bloom (desde comprensión fundamental hasta análisis crítico y evaluación), calibrando proporcionalmente la sintaxis, el vocabulario técnico y la profundidad evaluativa.`;
       break;
   }
 
-  // PROTOCOLO DE DISTRIBUCIÓN COGNITIVA (TAXONOMÍA DE BLOOM OBLIGATORIA)
-  const bloomTaxonomyInstruction = `🧠 PROTOCOLO DE DISTRIBUCIÓN COGNITIVA (TAXONOMÍA DE BLOOM OBLIGATORIA):
+  // PROTOCOLO DE DISTRIBUCIÓN COGNITIVA UNIVERSAL (TAXONOMÍA DE BLOOM OBLIGATORIA)
+  const bloomTaxonomyInstruction = `🧠 PROTOCOLO DE DISTRIBUCIÓN COGNITIVA UNIVERSAL (TAXONOMÍA DE BLOOM OBLIGATORIA):
 Debes estructurar la batería de preguntas distribuyendo el nivel cognitivo de los ejercicios bajo la siguiente proporción estricta:
-1. 30% NIVEL BÁSICO (Recordar/Comprender):
+1. 30% NIVEL BÁSICO (Recordar / Comprender):
    - Identificación pura de conceptos, definiciones esenciales, terminología fundamental y reconocimiento de hechos explícitos.
-2. 40% NIVEL INTERMEDIO (Aplicar/Analizar):
-   - Escenarios prácticos aplicados, diferenciación entre conceptos similares, cálculo o uso de fórmulas/reglas en situaciones nuevas y análisis de causas y consecuencias.
-3. 30% NIVEL AVANZADO (Evaluar/Pensamiento Crítico):
+2. 40% NIVEL INTERMEDIO (Aplicar / Analizar):
+   - Escenarios prácticos aplicados, diferenciación entre conceptos similares, uso de reglas o fórmulas en situaciones nuevas y análisis de causas y consecuencias.
+3. 30% NIVEL AVANZADO (Evaluar / Pensamiento Crítico):
    - Supuestos de diagnóstico, resolución de casos límite o atípicos, detección de excepciones a la regla general, juicio fundamentado o razonamiento deductivo complejo.`;
 
   // FORMATO DE EVALUACIÓN DOCENTE
@@ -385,12 +398,12 @@ Debes estructurar la batería de preguntas distribuyendo el nivel cognitivo de l
   }
 
   return `DIRECTIVA EXCLUSIVA PARA MODO DOCENTE / DIDÁCTICO:
-- Este modo está diseñado para profesores que preparan baterías de examen, ejercicios y evaluaciones para sus estudiantes.
-- PROHIBICIÓN ABSOLUTA DE METADATOS DE AULA: Queda terminantemente PROHIBIDO utilizar fórmulas como 'Según el Bloque X', 'En la Unidad Y', 'En el Ejercicio Z', '¿Cuál es la frase de ejemplo del autor?' o hacer referencia a partes físicas de la ficha. La pregunta debe formularse como un examen directo, profesional e independiente.
-- TRANSFORMACIÓN EN CASOS PRÁCTICOS:
-  * Si el material contiene vocabulario o idiomas, formula frases incompletas con huecos ('______') para evaluar el uso en contexto, o preguntas de equivalencia/traducción directa e inversa.
+- Este modo está diseñado para profesores y formadores que preparan baterías de examen, ejercicios y evaluaciones para sus estudiantes en cualquier disciplina.
+- PROHIBICIÓN ABSOLUTA DE METADATOS EDITORIALES O DE AULA: Queda terminantemente PROHIBIDO utilizar fórmulas como 'Según el Bloque X', 'En la Unidad Y', 'En el Ejercicio Z', '¿Cuál es la frase de ejemplo del autor?' o hacer referencia a páginas o partes físicas de la ficha. La pregunta debe formularse como un ítem de examen directo, profesional e independiente.
+- TRANSFORMACIÓN EN CASOS PRÁCTICOS Y COMPETENCIALES:
+  * Transforma las listas teóricas y enumeraciones pasivas en problemas o preguntas de razonamiento competencial y aplicación funcional.
+  * Si el material contiene vocabulario o idiomas, formula oraciones contextualizadas con huecos ('______') para evaluar el uso en contexto, o preguntas de equivalencia/traducción funcional directa e inversa.
   * Queda terminantemente PROHIBIDO generar preguntas sobre símbolos fonéticos o pronunciación figurada escrita (ej. /tiː.tʃər/).
-  * Transforma las listas en problemas o preguntas de razonamiento competencial.
 
 ${audienceInstruction}
 
@@ -973,6 +986,7 @@ function processGeneratedCards(
     const resolvedFormat = (card.cardFormat as CardFormat) || cardFormat;
 
     const isMultipleChoice = resolvedFormat === 'multiple_choice';
+    let cleanedOpts: string[] | undefined = undefined;
 
     // Ensamblado determinista Nivel 2: si viene con options y correct_option_index numérico
     if (
@@ -988,8 +1002,76 @@ function processGeneratedCards(
       const rawOpts = card.options
         .slice(0, 4)
         .map((opt) => String(opt).replace(/^[a-d][\)\.\:\-]\s*/i, '').trim());
-      const correctIdx = Math.min(Math.max(0, Math.floor(card.correct_option_index)), 3);
+      let correctIdx = Math.min(Math.max(0, Math.floor(card.correct_option_index)), 3);
+
+      // Reconciliación de seguridad determinista entre justification y rawOpts
+      const rawJustification = (card.justification || back || '').trim();
+      if (rawJustification && rawOpts.length === 4) {
+        const normalizeForMatch = (s: string) =>
+          s
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^\w\s]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        const justNorm = normalizeForMatch(rawJustification);
+        const currentTargetNorm = normalizeForMatch(rawOpts[correctIdx]);
+
+        // Comprobar si la opción apuntada actualmente por correctIdx está respaldada en la justificación
+        const isCurrentSupported =
+          currentTargetNorm.length > 0 &&
+          (justNorm.includes(currentTargetNorm) ||
+            new RegExp(`(?:^|\\s)${currentTargetNorm}(?:$|\\s)`).test(justNorm));
+
+        if (!isCurrentSupported) {
+          // Si la opción apuntada entra en discrepancia con la justificación, buscar si otra opción sí coincide
+          let bestCandidateIdx = -1;
+          let bestCandidateScore = 0;
+
+          // Seccionar la parte conclusiva de la justificación para priorizar afirmaciones finales
+          const conclusionPart =
+            justNorm
+              .split(
+                /(?:por tanto|en consecuencia|por lo que|por ende|el resultado es|la respuesta correcta es|la opcion correcta es|opcion correcta|concluye que|es decir|correcto es|correcta es)/i
+              )
+              .pop() || justNorm;
+
+          for (let i = 0; i < 4; i++) {
+            if (i === correctIdx) continue;
+            const optNorm = normalizeForMatch(rawOpts[i]);
+            if (!optNorm || optNorm.length < 2) continue;
+
+            let score = 0;
+            const inConclusion =
+              conclusionPart.includes(optNorm) ||
+              new RegExp(`(?:^|\\s)${optNorm}(?:$|\\s)`).test(conclusionPart);
+            const inWholeJust =
+              justNorm.includes(optNorm) ||
+              new RegExp(`(?:^|\\s)${optNorm}(?:$|\\s)`).test(justNorm);
+
+            if (inConclusion) {
+              score += 2;
+            } else if (inWholeJust) {
+              score += 1;
+            }
+
+            if (score > bestCandidateScore) {
+              bestCandidateScore = score;
+              bestCandidateIdx = i;
+            }
+          }
+
+          if (bestCandidateIdx !== -1 && bestCandidateScore > 0) {
+            correctIdx = bestCandidateIdx;
+            card.correct_option_index = correctIdx;
+          }
+        }
+      }
+
       const correctText = rawOpts[correctIdx];
+      cleanedOpts = rawOpts;
 
       // Obtener el enunciado limpio de la pregunta (priorizando question sobre front)
       const qText = (card.question || front)
@@ -1017,9 +1099,12 @@ function processGeneratedCards(
       !/(?:^|\n)\s*[a-d]\)/i.test(front)
     ) {
       const letters = ['a', 'b', 'c', 'd'];
-      const formattedOpts = card.options
+      const rawOpts = card.options
         .slice(0, 4)
-        .map((opt, i) => `${letters[i]}) ${String(opt).replace(/^[a-d][\)\.\:\-]\s*/i, '').trim()}`)
+        .map((opt) => String(opt).replace(/^[a-d][\)\.\:\-]\s*/i, '').trim());
+      cleanedOpts = rawOpts;
+      const formattedOpts = rawOpts
+        .map((opt, i) => `${letters[i]}) ${opt}`)
         .join('\n');
       front = `${front}\n\n${formattedOpts}`;
     }
@@ -1032,8 +1117,8 @@ function processGeneratedCards(
       cardType: resolvedFormat === 'cloze' ? 'cloze' : 'basic',
       // Blindaje de backend: solo multiple_choice puede conservar options; en cualquier otro formato se descarta
       options:
-        isMultipleChoice && card.options && Array.isArray(card.options)
-          ? card.options.map(String)
+        isMultipleChoice && (cleanedOpts || (card.options && Array.isArray(card.options)))
+          ? cleanedOpts || card.options!.map(String)
           : undefined,
       question: card.question,
       justification: card.justification,
