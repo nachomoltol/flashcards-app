@@ -13,8 +13,8 @@ export const ADMOB_CONFIG = {
   // ID de bloque de anuncio bonificado (Rewarded Ad Unit ID) oficial de producción
   REWARDED_AD_UNIT_ID: 'ca-app-pub-8525131609099761/8767167832',
 
-  // Identificador de anuncio bonificado oficial de producción
-  TEST_REWARDED_AD_UNIT_ID: 'ca-app-pub-8525131609099761/8767167832',
+  // Identificador de anuncio bonificado de pruebas de Google para desarrollo
+  TEST_REWARDED_AD_UNIT_ID: 'ca-app-pub-3940256099942544/5224354917',
   TEST_REWARDED_INTERSTITIAL_AD_UNIT_ID: 'ca-app-pub-3940256099942544/5354046379',
   TEST_APP_ID: 'ca-app-pub-8525131609099761~8283952108',
 };
@@ -70,8 +70,27 @@ export function getCapacitorAdMobPlugin(): any {
 let isAdMobInitialized = false;
 
 /**
+ * Solicita y gestiona el consentimiento GDPR (UMP) a través del plugin oficial de AdMob.
+ * Si el estado es REQUIRED y hay formulario disponible, lo muestra al usuario.
+ */
+async function requestConsent(): Promise<boolean> {
+  const AdMob = getCapacitorAdMobPlugin();
+  if (!AdMob) return false;
+  try {
+    const info = await AdMob.requestConsentInfo();
+    if (info.isConsentFormAvailable && info.status === 'REQUIRED') {
+      await AdMob.showConsentForm();
+    }
+    return info.canRequestAds ?? true;
+  } catch (err) {
+    console.warn('Error al verificar consentimiento UMP:', err);
+    return true;
+  }
+}
+
+/**
  * Inicializa el SDK de AdMob si se ejecuta dentro del entorno Capacitor nativo.
- * Utiliza el objeto inyectado en window.Capacitor.Plugins.AdMob.
+ * Solicita primero el consentimiento UMP (GDPR) obligatorio antes de inicializar el SDK.
  */
 export async function initializeAdMob(): Promise<boolean> {
   if (typeof window === 'undefined') return false;
@@ -86,9 +105,14 @@ export async function initializeAdMob(): Promise<boolean> {
   const AdMob = getCapacitorAdMobPlugin();
   if (AdMob) {
     try {
+      // 1. Solicitar y verificar consentimiento UMP (GDPR) antes de inicializar
+      await requestConsent();
+
+      // 2. Inicializar AdMob configurando modo de pruebas según el entorno
+      const isDev = process.env.NODE_ENV !== 'production';
       await AdMob.initialize({
         testingDevices: [],
-        initializeForTesting: false,
+        initializeForTesting: isDev,
       });
       isAdMobInitialized = true;
       return true;
@@ -102,9 +126,17 @@ export async function initializeAdMob(): Promise<boolean> {
 }
 
 /**
- * Determina el ID de bloque bonificado a utilizar en producción.
+ * Determina el ID de bloque bonificado a utilizar según el entorno (desarrollo vs producción).
  */
 function getEffectiveRewardedAdUnitId(requestedId?: string): { adId: string; isTesting: boolean } {
+  const isDev = process.env.NODE_ENV !== 'production';
+  if (isDev) {
+    return {
+      adId: requestedId || ADMOB_CONFIG.TEST_REWARDED_AD_UNIT_ID,
+      isTesting: true,
+    };
+  }
+
   // En producción real y plataforma nativa, usar el ID oficial configurado
   const adId = requestedId || ADMOB_CONFIG.REWARDED_AD_UNIT_ID;
   return { adId, isTesting: false };

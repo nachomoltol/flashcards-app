@@ -33,6 +33,8 @@ declare module '@capacitor-community/admob' {
     initialize(options: AdMobInitializationOptions): Promise<void>;
     prepareRewardVideoAd(options: AdOptions): Promise<void>;
     showRewardVideoAd(): Promise<void>;
+    requestConsentInfo(): Promise<{ status: string; isConsentFormAvailable: boolean; canRequestAds?: boolean }>;
+    showConsentForm(): Promise<{ status: string }>;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     addListener(eventName: string, listenerFunc: (info?: any) => void): Promise<{ remove: () => void }>;
   };
