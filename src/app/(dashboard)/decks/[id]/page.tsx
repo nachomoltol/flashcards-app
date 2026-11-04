@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase';
 import { CardEditor, DocumentUploader, FormattedCardView, UrlCardGenerator } from '@/components/cards';
 import { ShareDeckModal, QuickStudyGuideModal, StudyModesHelpModal, PrintExamSheet } from '@/components/decks';
 import { generateCardsAction } from '@/app/actions/generateCards';
+import { checkUserGenerationQuota } from '@/lib/quotaGuard';
 import { getDeckColorStyles } from '@/lib/colors';
 import type { CardFormat } from '@/types/database';
 
@@ -116,6 +117,15 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
   const handleGenerateCardsByTopic = async (e?: React.FormEvent) => {
     e?.preventDefault?.();
     if (!aiTopic.trim()) return;
+
+    // Zero Latency Guard: comprobar preventivamente saldo en cliente ANTES de activar loader o llamar a Gemini
+    const quota = await checkUserGenerationQuota(user?.id);
+    if (!quota.canGenerate) {
+      openProModal(true, null, () => {
+        handleGenerateCardsByTopic();
+      });
+      return;
+    }
 
     setIsGenerating(true);
     setAiError(null);

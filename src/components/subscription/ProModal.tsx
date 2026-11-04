@@ -88,6 +88,8 @@ export function ProModal({
   const [userLimits, setUserLimits] = useState<{
     tier: 'free' | 'pro' | 'vip';
     count: number;
+    bonusCredits: number;
+    welcomeGenerations: number;
   } | null>(null);
 
   useEffect(() => {
@@ -95,7 +97,7 @@ export function ProModal({
       import('@/lib/supabase').then(({ supabase }) => {
         supabase
           .from('api_limits')
-          .select('tier, generations_count, last_generation_date')
+          .select('tier, generations_count, last_generation_date, bonus_credits, welcome_generations')
           .eq('user_id', user.id)
           .maybeSingle()
           .then(({ data }) => {
@@ -109,6 +111,8 @@ export function ProModal({
               setUserLimits({
                 tier: (data.tier as 'free' | 'pro' | 'vip') || 'free',
                 count: isSameMonth ? (data.generations_count || 0) : 0,
+                bonusCredits: typeof data.bonus_credits === 'number' ? data.bonus_credits : 0,
+                welcomeGenerations: typeof data.welcome_generations === 'number' ? data.welcome_generations : 0,
               });
             }
           });
@@ -214,7 +218,7 @@ export function ProModal({
               ),
           });
 
-          // Auto-reanudación con desacoplamiento visual: persistir feedback visual 800ms antes de cerrar
+          // Auto-reanudación con desacoplamiento visual: persistir feedback visual 500ms antes de cerrar y reanudar
           const resumeAction = store.onRewardSuccess;
           setTimeout(() => {
             handleClose();
@@ -229,7 +233,7 @@ export function ProModal({
                 }
               }, 50);
             }
-          }, 800);
+          }, 500);
         } else {
           setAdRewardNotice({
             type: 'error',
@@ -502,70 +506,93 @@ export function ProModal({
                   </div>
 
                   {/* NIVEL 2 (ALTERNATIVA GRATUITA POR ANUNCIO): BOTÓN GRANDE Y VISTOSO */}
-                  <div className="relative p-3.5 sm:p-4 rounded-2xl bg-gradient-to-b from-amber-50/90 via-white to-amber-50/40 dark:from-neutral-900 dark:via-neutral-900 dark:to-neutral-950 border-2 border-amber-400 dark:border-amber-500/60 shadow-md shadow-amber-500/10 space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-500/25 border border-amber-300 dark:border-amber-400/60 text-amber-950 dark:text-amber-200 text-[10px] font-extrabold uppercase tracking-wider">
-                          <Tv className="w-3 h-3 text-amber-700 dark:text-amber-300" />
-                          OPCIÓN 2 • GRATUITA
-                        </div>
-                        <h3 className="text-sm sm:text-base font-extrabold text-zinc-950 dark:text-white tracking-tight">
-                          Obtén saldo con un vídeo corto
-                        </h3>
-                      </div>
+                  {(() => {
+                    const isFreeTier = !userLimits || userLimits.tier === 'free';
+                    const isZeroBalance = isFreeTier && (userLimits?.bonusCredits ?? 0) <= 0;
+                    const remainingAds = Math.max(0, 50 - (userLimits?.count || 0));
 
-                      <div className="text-right pl-2 shrink-0">
-                        <span className="inline-block px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 border border-emerald-300 dark:border-emerald-500/40 text-emerald-950 dark:text-emerald-300 font-extrabold text-[10px]">
-                          +1 GRATIS
-                        </span>
-                      </div>
-                    </div>
-
-                    <p className="text-xs sm:text-sm font-medium text-zinc-700 dark:text-zinc-200 leading-snug">
-                      Mira un vídeo patrocinado de AdMob y tu generación se reanudará de inmediato.
-                    </p>
-
-                    {/* BOTÓN 2: GRANDE, VISTOSO Y CON ICONO DE REPRODUCCIÓN */}
-                    <button
-                      type="button"
-                      onClick={handleWatchAd}
-                      disabled={isWatchingAd}
-                      className="w-full min-h-[44px] sm:min-h-[46px] inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:via-orange-400 hover:to-amber-500 text-neutral-950 font-bold text-xs sm:text-sm shadow-md shadow-amber-600/20 active:scale-[0.99] transition cursor-pointer disabled:opacity-80 disabled:cursor-not-allowed group"
-                    >
-                      {isWatchingAd ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-neutral-950 border-t-transparent rounded-full animate-spin shrink-0" />
-                          <span>
-                            {adLoadingPhase === 'claiming' || adRewardNotice?.type === 'success'
-                              ? t('pro_modal.admob_resuming', '¡Recompensa añadida! Reanudando...')
-                              : t('pro_modal.admob_preparing', 'Preparando anuncio...')}
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          <PlayCircle className="w-4 h-4 fill-neutral-950 text-amber-300 group-hover:scale-110 transition-transform shrink-0" />
-                          <span>Ver vídeo corto (+1 generación gratis)</span>
-                        </>
-                      )}
-                    </button>
-
-                    {adRewardNotice && (
+                    return (
                       <div
-                        className={`p-2 rounded-xl text-xs flex items-center gap-2 animate-in fade-in ${
-                          adRewardNotice.type === 'success'
-                            ? 'bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/30 text-emerald-800 dark:text-emerald-200'
-                            : 'bg-red-50 dark:bg-red-500/15 border border-red-200 dark:border-red-500/30 text-red-800 dark:text-red-200'
-                        }`}
+                        className={`relative p-3.5 sm:p-4 rounded-2xl bg-gradient-to-b from-amber-50/90 via-white to-amber-50/40 dark:from-neutral-900 dark:via-neutral-900 dark:to-neutral-950 border-2 ${
+                          isZeroBalance
+                            ? 'border-amber-500 ring-2 ring-amber-400/50 shadow-lg shadow-amber-500/20'
+                            : 'border-amber-400 dark:border-amber-500/60 shadow-md shadow-amber-500/10'
+                        } space-y-2.5`}
                       >
-                        {adRewardNotice.type === 'success' ? (
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                        ) : (
-                          <AlertCircle className="w-3.5 h-3.5 text-red-600 dark:text-red-400 shrink-0" />
+                        <div className="flex items-center justify-between">
+                          <div className="space-y-0.5">
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-500/25 border border-amber-300 dark:border-amber-400/60 text-amber-950 dark:text-amber-200 text-[10px] font-extrabold uppercase tracking-wider">
+                              <Tv className="w-3 h-3 text-amber-700 dark:text-amber-300" />
+                              {isZeroBalance ? 'OPCIÓN RECOMENDADA EN MÓVIL • GRATIS' : 'OPCIÓN 2 • GRATUITA'}
+                            </div>
+                            <h3 className="text-sm sm:text-base font-extrabold text-zinc-950 dark:text-white tracking-tight">
+                              Obtén saldo con un vídeo corto
+                            </h3>
+                          </div>
+
+                          <div className="text-right pl-2 shrink-0">
+                            <span className="inline-block px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 border border-emerald-300 dark:border-emerald-500/40 text-emerald-950 dark:text-emerald-300 font-extrabold text-[10px]">
+                              +1 GRATIS
+                            </span>
+                          </div>
+                        </div>
+
+                        <p className="text-xs sm:text-sm font-medium text-zinc-700 dark:text-zinc-200 leading-snug">
+                          Mira un vídeo patrocinado de AdMob y tu generación se reanudará de inmediato.
+                        </p>
+
+                        <div className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-900 dark:text-amber-300 font-mono">
+                          <span>Cupo mensual: hasta 45 anuncios</span>
+                          <strong className="font-bold">
+                            {remainingAds > 0 ? `${remainingAds} disponibles este mes` : 'Cupo mensual completado'}
+                          </strong>
+                        </div>
+
+                        {/* BOTÓN 2: GRANDE, VISTOSO Y CON ICONO DE REPRODUCCIÓN */}
+                        <button
+                          type="button"
+                          onClick={handleWatchAd}
+                          disabled={isWatchingAd || remainingAds <= 0}
+                          className="w-full min-h-[44px] sm:min-h-[46px] inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:via-orange-400 hover:to-amber-500 text-neutral-950 font-bold text-xs sm:text-sm shadow-md shadow-amber-600/20 active:scale-[0.99] transition cursor-pointer disabled:opacity-80 disabled:cursor-not-allowed group"
+                        >
+                          {isWatchingAd ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-neutral-950 border-t-transparent rounded-full animate-spin shrink-0" />
+                              <span>
+                                {adLoadingPhase === 'claiming' || adRewardNotice?.type === 'success'
+                                  ? t('pro_modal.admob_resuming', '¡Recompensa añadida! Reanudando...')
+                                  : t('pro_modal.admob_preparing', 'Preparando anuncio...')}
+                              </span>
+                            </>
+                          ) : remainingAds <= 0 ? (
+                            <span>Cupo mensual de 50 generaciones completado</span>
+                          ) : (
+                            <>
+                              <PlayCircle className="w-4 h-4 fill-neutral-950 text-amber-300 group-hover:scale-110 transition-transform shrink-0" />
+                              <span>Ver vídeo corto (+1 generación gratis)</span>
+                            </>
+                          )}
+                        </button>
+
+                        {adRewardNotice && (
+                          <div
+                            className={`p-2 rounded-xl text-xs flex items-center gap-2 animate-in fade-in ${
+                              adRewardNotice.type === 'success'
+                                ? 'bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/30 text-emerald-800 dark:text-emerald-200'
+                                : 'bg-red-50 dark:bg-red-500/15 border border-red-200 dark:border-red-500/30 text-red-800 dark:text-red-200'
+                            }`}
+                          >
+                            {adRewardNotice.type === 'success' ? (
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                            ) : (
+                              <AlertCircle className="w-3.5 h-3.5 text-red-600 dark:text-red-400 shrink-0" />
+                            )}
+                            <span className="font-medium text-[11px]">{adRewardNotice.message}</span>
+                          </div>
                         )}
-                        <span className="font-medium text-[11px]">{adRewardNotice.message}</span>
                       </div>
-                    )}
-                  </div>
+                    );
+                  })()}
                 </div>
               ) : platform.isIOS ? (
                 /* =======================================================

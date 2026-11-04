@@ -6,6 +6,7 @@ import { parseDocxIntoVirtualPages } from '@/lib/docxPagination';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore, useCardStore, useDeckStore, useProModalStore, useLanguageStore } from '@/stores';
 import { generateCardsFromDocumentAction } from '@/app/actions/generateCards';
+import { checkUserGenerationQuota } from '@/lib/quotaGuard';
 import type { CardFormat, GeneratedCard, DocenteFormat, TargetAudience } from '@/types/cards';
 import { FormattedCardView } from './FormattedCardView';
 import { PrintExamSheet } from '@/components/decks';
@@ -466,6 +467,15 @@ export function DocumentUploader({
 
     if (!user) {
       setErrorMessage('Debes haber iniciado sesión para subir documentos a Supabase Storage.');
+      return;
+    }
+
+    // Zero Latency Guard: comprobar preventivamente saldo en cliente ANTES de procesar o subir
+    const quota = await checkUserGenerationQuota(user.id);
+    if (!quota.canGenerate) {
+      openProModal(true, null, () => {
+        handleProcessDocument(overrideCursor);
+      });
       return;
     }
 

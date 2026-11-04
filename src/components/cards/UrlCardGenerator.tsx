@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuthStore, useCardStore, useDeckStore, useProModalStore, useLanguageStore } from '@/stores';
 import { supabase } from '@/lib/supabase';
 import { generateCardsFromUrlAction } from '@/app/actions/generateCards';
+import { checkUserGenerationQuota } from '@/lib/quotaGuard';
 import type { CardFormat, GeneratedCard } from '@/types/cards';
 import { FormattedCardView } from './FormattedCardView';
 
@@ -116,6 +117,15 @@ export function UrlCardGenerator({
     }
 
     try {
+      // Zero Latency Guard: comprobar preventivamente cuota de generación antes de analizar el enlace
+      const quota = await checkUserGenerationQuota(user?.id);
+      if (!quota.canGenerate) {
+        openProModal(true, null, () => {
+          handleGenerate();
+        });
+        return;
+      }
+
       setErrorMessage(null);
       setStatus('analyzing');
       setStatusStep(language === 'en' ? 'Analyzing web link and extracting content with Gemini...' : 'Analizando enlace web y extrayendo contenido con Gemini...');
