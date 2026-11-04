@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import { HelpCircle, X, Sparkles, CheckCircle2, AlertCircle, Clock, Zap } from 'lucide-react';
+import { HelpCircle, X, Sparkles } from 'lucide-react';
 import { useLanguageStore } from '@/stores';
 
 interface StudyRatingHelpModalProps {

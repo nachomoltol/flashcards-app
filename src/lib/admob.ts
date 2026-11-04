@@ -82,8 +82,8 @@ export function isRewardedAdReady(): boolean {
  * Ejecuta AdMob.prepareRewardVideoAd con límite de tiempo estricto para evitar bloqueos
  * si la red es inestable o la subasta de anuncios se demora.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function prepareRewardVideoWithTimeout(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   AdMob: any,
   options: { adId: string; isTesting: boolean },
   timeoutMs = 12000
@@ -291,7 +291,6 @@ export async function showAdMobRewardedAd(
           });
         };
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const rewardListener = AdMob.addListener(
           RewardAdPluginEvents.Rewarded,
           (rewardItem: { amount: number; type: string }) => {
@@ -312,7 +311,6 @@ export async function showAdMobRewardedAd(
           }
         );
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const dismissListener = AdMob.addListener(
           RewardAdPluginEvents.Dismissed,
           () => {
@@ -334,7 +332,6 @@ export async function showAdMobRewardedAd(
           }
         );
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const failedListener = AdMob.addListener(
           RewardAdPluginEvents.FailedToShow,
           (err: { message?: string }) => {
