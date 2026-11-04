@@ -138,12 +138,17 @@ export const useDeckStore = create<DeckState>((set, get) => ({
   },
 
   fetchDeckById: async (id: string) => {
+    // Comprobación de resiliencia: si el ID no es válido, salir sin disparar consulta ni log
+    if (!id || id === 'undefined' || id === 'null' || !id.trim()) {
+      return null;
+    }
+
     set({ isLoading: true, error: null });
     try {
       const { data, error } = await supabase
         .from('decks')
         .select('*, cards(id, due)')
-        .eq('id', id)
+        .eq('id', id.trim())
         .single();
 
       if (error) throw error;
@@ -168,7 +173,16 @@ export const useDeckStore = create<DeckState>((set, get) => ({
       return deckWithStats;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Error al cargar el mazo';
-      console.error('Error fetching deck by ID:', err);
+
+      // Evitar volcar console.error alarmante si el error es un objeto vacío {} o un estado en tránsito
+      const isTransientOrEmpty =
+        (typeof err === 'object' && err !== null && Object.keys(err).length === 0) ||
+        (typeof err === 'object' && err !== null && 'code' in err && (err as { code: string }).code === 'PGRST116');
+
+      if (!isTransientOrEmpty) {
+        console.warn('[useDeckStore] Aviso transitorio al cargar mazo:', message);
+      }
+
       set({ error: message, isLoading: false });
       return null;
     }

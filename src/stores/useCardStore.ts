@@ -61,12 +61,16 @@ export const useCardStore = create<CardState>((set) => ({
   },
 
   fetchCardsByDeck: async (deckId: string) => {
+    if (!deckId || deckId === 'undefined' || deckId === 'null' || !deckId.trim()) {
+      return [];
+    }
+
     set({ isLoading: true, error: null });
     try {
       const { data, error } = await supabase
         .from('cards')
         .select('*')
-        .eq('deck_id', deckId)
+        .eq('deck_id', deckId.trim())
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -76,7 +80,15 @@ export const useCardStore = create<CardState>((set) => ({
       return loadedCards;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Error al cargar las tarjetas';
-      console.error('Error fetching cards:', err);
+      
+      const isTransientOrEmpty =
+        (typeof err === 'object' && err !== null && Object.keys(err).length === 0) ||
+        (typeof err === 'object' && err !== null && 'code' in err && (err as { code: string }).code === 'PGRST116');
+
+      if (!isTransientOrEmpty) {
+        console.warn('[useCardStore] Aviso al cargar tarjetas:', message);
+      }
+
       set({ error: message, isLoading: false });
       return [];
     }
