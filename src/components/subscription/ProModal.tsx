@@ -20,6 +20,7 @@ import {
   Printer,
   Download,
   Mail,
+  Globe,
 } from 'lucide-react';
 import { useProModalStore, ProFeatureName } from '@/stores/useProModalStore';
 import { useAuthStore, useLanguageStore } from '@/stores';
@@ -477,32 +478,13 @@ export function ProModal({
                       Alta Capacidad: Hasta 120 generaciones de mazos al mes (¡suficiente para todo tu temario!), sin pausas por anuncios y con acceso total.
                     </p>
 
-                    {/* BOTÓN 1: GRANDE Y DESTACADO A STRIPE */}
-                    <button
-                      type="button"
-                      onClick={handleSubscribe}
-                      disabled={isSubscribing}
-                      className="w-full min-h-[44px] sm:min-h-[46px] inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-violet-600 hover:from-purple-500 hover:via-indigo-500 hover:to-violet-500 text-white font-bold text-xs sm:text-sm shadow-md shadow-purple-700/25 active:scale-[0.99] transition cursor-pointer disabled:opacity-70 group"
-                    >
-                      {isSubscribing ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-white/80 border-t-transparent rounded-full animate-spin" />
-                          <span>{t('pro_modal.connecting_gateway', 'Conectando con pasarela segura...')}</span>
-                        </>
-                      ) : (
-                        <>
-                          <CreditCard className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                          <span>Hacerme PRO (3,50 €/mes)</span>
-                          <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-                        </>
-                      )}
-                    </button>
-
-                    {stripeNotice && (
-                      <div className="p-2 rounded-xl bg-purple-100 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-500/30 text-purple-800 dark:text-purple-200 text-xs text-center animate-in fade-in">
-                        <p>{stripeNotice}</p>
-                      </div>
-                    )}
+                    {/* CUMPLIMIENTO GOOGLE PLAY: EN APP NATIVA ANDROID NO SE MUESTRA CHECKOUT DE PAGO DIRECTO */}
+                    <div className="p-3 sm:p-3.5 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-500/30 text-purple-900 dark:text-purple-200 text-xs flex items-start gap-2.5 shadow-sm">
+                      <Globe className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0 mt-0.5" />
+                      <p className="leading-relaxed font-medium">
+                        Gestiona o activa tu suscripción PRO desde nuestra web oficial <strong className="font-bold underline decoration-purple-400 underline-offset-2">flashmente.com</strong> iniciando sesión con esta misma cuenta.
+                      </p>
+                    </div>
                   </div>
 
                   {/* NIVEL 2 (ALTERNATIVA GRATUITA POR ANUNCIO): BOTÓN GRANDE Y VISTOSO */}
@@ -816,37 +798,48 @@ export function ProModal({
                   </div>
                 </div>
 
-                {/* BOTÓN DIRECTO A STRIPE */}
-                <button
-                  type="button"
-                  onClick={handleSubscribe}
-                  disabled={isSubscribing}
-                  className="w-full min-h-[50px] inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-violet-600 hover:from-purple-500 hover:via-indigo-500 hover:to-violet-500 text-white font-bold text-sm shadow-xl shadow-purple-700/30 active:scale-[0.99] transition cursor-pointer disabled:opacity-70 group"
-                >
-                  {isSubscribing ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white/80 border-t-transparent rounded-full animate-spin" />
-                      <span>{t('pro_modal.connecting_gateway', 'Conectando con pasarela segura...')}</span>
-                    </>
-                  ) : (
-                    <>
-                      <CreditCard className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                      <span>{t('pro_modal.cta_subscribe', 'Suscribirse ahora')} — 3,50 €/mes</span>
-                      <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-                    </>
-                  )}
-                </button>
-
-                {stripeNotice && (
-                  <div className="p-2.5 rounded-xl bg-purple-100 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-500/30 text-purple-800 dark:text-purple-200 text-xs text-center animate-in fade-in">
-                    <p>{stripeNotice}</p>
+                {/* BOTÓN DIRECTO A STRIPE EN WEB / MENSAJE INFORMATIVO EN ANDROID NATIVO (GOOGLE PLAY COMPLIANCE) */}
+                {platform.isNativeAndroid ? (
+                  <div className="p-3.5 sm:p-4 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-500/30 text-purple-900 dark:text-purple-200 text-xs sm:text-sm flex items-start gap-2.5 shadow-sm">
+                    <Globe className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600 dark:text-purple-400 shrink-0 mt-0.5" />
+                    <p className="leading-relaxed font-medium">
+                      Gestiona o activa tu suscripción PRO desde nuestra web oficial <strong className="font-bold underline decoration-purple-400 underline-offset-2">flashmente.com</strong> iniciando sesión con esta misma cuenta.
+                    </p>
                   </div>
-                )}
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleSubscribe}
+                      disabled={isSubscribing}
+                      className="w-full min-h-[50px] inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-violet-600 hover:from-purple-500 hover:via-indigo-500 hover:to-violet-500 text-white font-bold text-sm shadow-xl shadow-purple-700/30 active:scale-[0.99] transition cursor-pointer disabled:opacity-70 group"
+                    >
+                      {isSubscribing ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white/80 border-t-transparent rounded-full animate-spin" />
+                          <span>{t('pro_modal.connecting_gateway', 'Conectando con pasarela segura...')}</span>
+                        </>
+                      ) : (
+                        <>
+                          <CreditCard className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                          <span>{t('pro_modal.cta_subscribe', 'Suscribirse ahora')} — 3,50 €/mes</span>
+                          <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+                        </>
+                      )}
+                    </button>
 
-                <div className="flex items-center justify-center gap-2 text-[11px] text-neutral-500 dark:text-neutral-400 pt-1">
-                  <Lock className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                  <span>{t('pro_modal.stripe_notice', 'Transacción 100% segura y encriptada procesada por Stripe')}</span>
-                </div>
+                    {stripeNotice && (
+                      <div className="p-2.5 rounded-xl bg-purple-100 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-500/30 text-purple-800 dark:text-purple-200 text-xs text-center animate-in fade-in">
+                        <p>{stripeNotice}</p>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-center gap-2 text-[11px] text-neutral-500 dark:text-neutral-400 pt-1">
+                      <Lock className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                      <span>{t('pro_modal.stripe_notice', 'Transacción 100% segura y encriptada procesada por Stripe')}</span>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           )}
