@@ -95,6 +95,8 @@ export function ProModal({
     count: number;
     bonusCredits: number;
     welcomeGenerations: number;
+    tutorConsultationsCount?: number;
+    tutorAdsUsed?: number;
     adsUsedInCycle: number;
     remainingAds: number;
   } | null>(null);
@@ -117,6 +119,8 @@ export function ProModal({
           count: res.count,
           bonusCredits: res.bonusCredits,
           welcomeGenerations: res.welcomeGenerations,
+          tutorConsultationsCount: res.tutorConsultationsCount,
+          tutorAdsUsed: res.tutorAdsUsed,
           adsUsedInCycle: res.adsUsedInCycle,
           remainingAds: res.remainingAds,
         });
@@ -235,8 +239,13 @@ export function ProModal({
                 ? claim.bonusCredits
                 : currentBonus + 1;
             const count = typeof claim.generationsCount === 'number' ? claim.generationsCount : (prev?.count ?? 0);
-            const adsUsedInCycle = typeof claim.adsUsedInCycle === 'number' ? claim.adsUsedInCycle : (count + newBonus);
-            const remainingAds = typeof claim.remainingAds === 'number' ? claim.remainingAds : Math.max(0, 45 - adsUsedInCycle);
+            const tutorAdsUsed = prev?.tutorAdsUsed ?? 0;
+            const adsUsedInCycle = typeof claim.adsUsedInCycle === 'number'
+              ? claim.adsUsedInCycle
+              : (count + newBonus + tutorAdsUsed);
+            const remainingAds = typeof claim.remainingAds === 'number'
+              ? claim.remainingAds
+              : Math.max(0, 45 - adsUsedInCycle);
 
             if (!prev) {
               return {
@@ -244,6 +253,7 @@ export function ProModal({
                 count,
                 bonusCredits: newBonus,
                 welcomeGenerations: 5,
+                tutorAdsUsed,
                 adsUsedInCycle,
                 remainingAds,
               };
@@ -547,7 +557,8 @@ export function ProModal({
                   {(() => {
                     const isFreeTier = !userLimits || userLimits.tier === 'free';
                     const isZeroBalance = isFreeTier && (userLimits?.bonusCredits ?? 0) <= 0;
-                    const adsUsedInCycle = userLimits?.adsUsedInCycle ?? ((userLimits?.count || 0) + (userLimits?.bonusCredits || 0));
+                    const tutorAdsUsed = userLimits?.tutorAdsUsed ?? Math.max(0, (userLimits?.tutorConsultationsCount || 0) - 3);
+                    const adsUsedInCycle = userLimits?.adsUsedInCycle ?? ((userLimits?.count || 0) + (userLimits?.bonusCredits || 0) + tutorAdsUsed);
                     const remainingAds = userLimits?.remainingAds !== undefined
                       ? userLimits.remainingAds
                       : Math.max(0, 45 - adsUsedInCycle);

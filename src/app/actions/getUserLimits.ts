@@ -9,6 +9,8 @@ export interface UserLimitsResult {
   count: number;
   bonusCredits: number;
   welcomeGenerations: number;
+  tutorConsultationsCount: number;
+  tutorAdsUsed: number;
   adsUsedInCycle: number;
   remainingAds: number;
   error?: string;
@@ -17,7 +19,8 @@ export interface UserLimitsResult {
 /**
  * Server Action que consulta de forma fidedigna y autorizada (bypass RLS con service_role)
  * los límites de generación del usuario en Supabase (`api_limits`), calculando el cupo
- * mensual real de anuncios disponibles (base 45).
+ * mensual real de anuncios disponibles (base 45) unificando generaciones con IA y
+ * consultas al tutor socrático que exceden la base gratuita (3).
  */
 export async function getUserLimitsAction(
   userId?: string,
@@ -65,6 +68,8 @@ export async function getUserLimitsAction(
       count: 0,
       bonusCredits: 0,
       welcomeGenerations: 0,
+      tutorConsultationsCount: 0,
+      tutorAdsUsed: 0,
       adsUsedInCycle: 0,
       remainingAds: 45,
       error: 'AUTH_REQUIRED',
@@ -99,7 +104,7 @@ export async function getUserLimitsAction(
   try {
     const { data, error } = await client
       .from('api_limits')
-      .select('tier, generations_count, last_generation_date, bonus_credits, welcome_generations')
+      .select('tier, generations_count, last_generation_date, bonus_credits, welcome_generations, tutor_consultations_count, last_tutor_date')
       .eq('user_id', targetUserId)
       .maybeSingle();
 
@@ -111,6 +116,8 @@ export async function getUserLimitsAction(
         count: 0,
         bonusCredits: 0,
         welcomeGenerations: 0,
+        tutorConsultationsCount: 0,
+        tutorAdsUsed: 0,
         adsUsedInCycle: 0,
         remainingAds: 45,
         error: error.message,
@@ -124,6 +131,8 @@ export async function getUserLimitsAction(
         count: 0,
         bonusCredits: 0,
         welcomeGenerations: 0,
+        tutorConsultationsCount: 0,
+        tutorAdsUsed: 0,
         adsUsedInCycle: 0,
         remainingAds: 45,
       };
@@ -140,7 +149,18 @@ export async function getUserLimitsAction(
     const welcomeGenerations = typeof data.welcome_generations === 'number' ? data.welcome_generations : 0;
     const tier = (data.tier as 'free' | 'pro' | 'vip') || 'free';
 
-    const adsUsedInCycle = count + bonusCredits;
+    const lastTutorMonth = data.last_tutor_date
+      ? String(data.last_tutor_date).slice(0, 7)
+      : null;
+    const isSameTutorMonth = lastTutorMonth === currentMonth;
+    const tutorConsultationsCount = isSameTutorMonth ? (data.tutor_consultations_count || 0) : 0;
+
+    // Unificación de consumo publicitario:
+    // 1. Generaciones consumidas con anuncios (generations_count)
+    // 2. Saldo de bonificación activo pendiente de gasto (bonus_credits)
+    // 3. Consultas al tutor socrático que superan la base gratuita de 3 (tutorAdsUsed)
+    const tutorAdsUsed = Math.max(0, tutorConsultationsCount - 3);
+    const adsUsedInCycle = count + bonusCredits + tutorAdsUsed;
     const remainingAds = Math.max(0, 45 - adsUsedInCycle);
 
     return {
@@ -149,6 +169,8 @@ export async function getUserLimitsAction(
       count,
       bonusCredits,
       welcomeGenerations,
+      tutorConsultationsCount,
+      tutorAdsUsed,
       adsUsedInCycle,
       remainingAds,
     };
@@ -160,6 +182,8 @@ export async function getUserLimitsAction(
       count: 0,
       bonusCredits: 0,
       welcomeGenerations: 0,
+      tutorConsultationsCount: 0,
+      tutorAdsUsed: 0,
       adsUsedInCycle: 0,
       remainingAds: 45,
       error: 'SERVER_ERROR',

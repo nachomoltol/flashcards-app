@@ -113,13 +113,14 @@ export async function claimAdRewardAction(
       };
     }
 
-    // Obtener los límites actualizados para cálculo preciso del cupo publicitario
+    // Obtener los límites actualizados para cálculo preciso del cupo publicitario unificado
     let count = 0;
     let bonusCredits = typeof res.bonus_credits === 'number' ? res.bonus_credits : 1;
+    let tutorAdsUsed = 0;
     try {
       const { data: updatedRec } = await rpcClient
         .from('api_limits')
-        .select('generations_count, last_generation_date, bonus_credits')
+        .select('generations_count, last_generation_date, bonus_credits, tutor_consultations_count, last_tutor_date')
         .eq('user_id', targetUserId)
         .maybeSingle();
 
@@ -133,12 +134,19 @@ export async function claimAdRewardAction(
         if (typeof updatedRec.bonus_credits === 'number') {
           bonusCredits = updatedRec.bonus_credits;
         }
+
+        const lastTutorMonth = updatedRec.last_tutor_date
+          ? String(updatedRec.last_tutor_date).slice(0, 7)
+          : null;
+        const isSameTutorMonth = lastTutorMonth === currentMonth;
+        const tutorCount = isSameTutorMonth ? (updatedRec.tutor_consultations_count || 0) : 0;
+        tutorAdsUsed = Math.max(0, tutorCount - 3);
       }
     } catch (fetchErr) {
       console.warn('[claimAdRewardAction] Error al refrescar registro actualizado:', fetchErr);
     }
 
-    const adsUsedInCycle = count + bonusCredits;
+    const adsUsedInCycle = count + bonusCredits + tutorAdsUsed;
     const remainingAds = Math.max(0, 45 - adsUsedInCycle);
 
     return {
