@@ -28,6 +28,7 @@ import { useAuthStore, useLanguageStore } from '@/stores';
 import { supabase } from '@/lib/supabase';
 import { redeemPromoCodeAction } from '@/app/actions/redeemPromoCode';
 import { claimAdRewardAction } from '@/app/actions/claimAdReward';
+import { getUserLimitsAction } from '@/app/actions/getUserLimits';
 import { usePlatform } from '@/lib/platform';
 import { showAdMobRewardedAd, preloadRewardedAd } from '@/lib/admob';
 
@@ -88,39 +89,40 @@ export function ProModal({
     tier?: string;
   } | null>(null);
 
-  // Estado de nivel y consumo para mensajes de límite duros (50 Free / 120 Pro)
+  // Estado de nivel y consumo para mensajes de límite duros (50 Free / 120 Pro) y cupo de anuncios
   const [userLimits, setUserLimits] = useState<{
     tier: 'free' | 'pro' | 'vip';
     count: number;
     bonusCredits: number;
     welcomeGenerations: number;
+    adsUsedInCycle: number;
+    remainingAds: number;
   } | null>(null);
 
   const fetchUserLimits = useCallback(async () => {
     if (!user?.id) return;
     try {
-      const { data, error } = await supabase
-        .from('api_limits')
-        .select('tier, generations_count, last_generation_date, bonus_credits, welcome_generations')
-        .eq('user_id', user.id)
-        .maybeSingle();
+      let accessToken: string | undefined;
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        accessToken = sessionData?.session?.access_token;
+      } catch (sessionErr) {
+        console.warn('[ProModal] No se pudo obtener el token de sesión:', sessionErr);
+      }
 
-      if (data && !error) {
-        const currentMonth = new Date().toISOString().slice(0, 7);
-        const lastMonth = data.last_generation_date
-          ? String(data.last_generation_date).slice(0, 7)
-          : null;
-        const isSameMonth = lastMonth === currentMonth;
-
+      const res = await getUserLimitsAction(user.id, accessToken);
+      if (res.success) {
         setUserLimits({
-          tier: (data.tier as 'free' | 'pro' | 'vip') || 'free',
-          count: isSameMonth ? (data.generations_count || 0) : 0,
-          bonusCredits: typeof data.bonus_credits === 'number' ? data.bonus_credits : 0,
-          welcomeGenerations: typeof data.welcome_generations === 'number' ? data.welcome_generations : 0,
+          tier: res.tier,
+          count: res.count,
+          bonusCredits: res.bonusCredits,
+          welcomeGenerations: res.welcomeGenerations,
+          adsUsedInCycle: res.adsUsedInCycle,
+          remainingAds: res.remainingAds,
         });
       }
     } catch (err) {
-      console.warn('[ProModal] Error al consultar api_limits:', err);
+      console.warn('[ProModal] Error al consultar límites mediante Server Action:', err);
     }
   }, [user?.id]);
 
@@ -232,21 +234,30 @@ export function ProModal({
               typeof claim.bonusCredits === 'number'
                 ? claim.bonusCredits
                 : currentBonus + 1;
+            const count = typeof claim.generationsCount === 'number' ? claim.generationsCount : (prev?.count ?? 0);
+            const adsUsedInCycle = typeof claim.adsUsedInCycle === 'number' ? claim.adsUsedInCycle : (count + newBonus);
+            const remainingAds = typeof claim.remainingAds === 'number' ? claim.remainingAds : Math.max(0, 45 - adsUsedInCycle);
+
             if (!prev) {
               return {
                 tier: 'free',
-                count: 0,
+                count,
                 bonusCredits: newBonus,
                 welcomeGenerations: 5,
+                adsUsedInCycle,
+                remainingAds,
               };
             }
             return {
               ...prev,
+              count,
               bonusCredits: newBonus,
+              adsUsedInCycle,
+              remainingAds,
             };
           });
 
-          // 2. Refrescar datos en segundo plano
+          // 2. Refrescar datos en segundo plano mediante Server Action
           fetchUserLimits();
           try {
             router.refresh();
@@ -536,8 +547,10 @@ export function ProModal({
                   {(() => {
                     const isFreeTier = !userLimits || userLimits.tier === 'free';
                     const isZeroBalance = isFreeTier && (userLimits?.bonusCredits ?? 0) <= 0;
-                    const adsUsedInCycle = (userLimits?.count || 0) + (userLimits?.bonusCredits || 0);
-                    const remainingAds = Math.max(0, 45 - adsUsedInCycle);
+                    const adsUsedInCycle = userLimits?.adsUsedInCycle ?? ((userLimits?.count || 0) + (userLimits?.bonusCredits || 0));
+                    const remainingAds = userLimits?.remainingAds !== undefined
+                      ? userLimits.remainingAds
+                      : Math.max(0, 45 - adsUsedInCycle);
 
                     return (
                       <div

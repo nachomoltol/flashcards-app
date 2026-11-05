@@ -6,6 +6,9 @@ import { supabase } from '@/lib/supabase';
 export interface ClaimRewardResult {
   success: boolean;
   bonusCredits?: number;
+  generationsCount?: number;
+  adsUsedInCycle?: number;
+  remainingAds?: number;
   message?: string;
   error?: string;
 }
@@ -110,9 +113,40 @@ export async function claimAdRewardAction(
       };
     }
 
+    // Obtener los límites actualizados para cálculo preciso del cupo publicitario
+    let count = 0;
+    let bonusCredits = typeof res.bonus_credits === 'number' ? res.bonus_credits : 1;
+    try {
+      const { data: updatedRec } = await rpcClient
+        .from('api_limits')
+        .select('generations_count, last_generation_date, bonus_credits')
+        .eq('user_id', targetUserId)
+        .maybeSingle();
+
+      if (updatedRec) {
+        const currentMonth = new Date().toISOString().slice(0, 7);
+        const lastMonth = updatedRec.last_generation_date
+          ? String(updatedRec.last_generation_date).slice(0, 7)
+          : null;
+        const isSameMonth = lastMonth === currentMonth;
+        count = isSameMonth ? (updatedRec.generations_count || 0) : 0;
+        if (typeof updatedRec.bonus_credits === 'number') {
+          bonusCredits = updatedRec.bonus_credits;
+        }
+      }
+    } catch (fetchErr) {
+      console.warn('[claimAdRewardAction] Error al refrescar registro actualizado:', fetchErr);
+    }
+
+    const adsUsedInCycle = count + bonusCredits;
+    const remainingAds = Math.max(0, 45 - adsUsedInCycle);
+
     return {
       success: true,
-      bonusCredits: typeof res.bonus_credits === 'number' ? res.bonus_credits : 1,
+      bonusCredits,
+      generationsCount: count,
+      adsUsedInCycle,
+      remainingAds,
       message: '¡Recompensa desbloqueada! Se ha añadido +1 crédito de generación con IA.',
     };
   } catch (err: unknown) {
