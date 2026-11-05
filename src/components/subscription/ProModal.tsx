@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Sparkles,
   Zap,
@@ -24,8 +25,10 @@ import {
 } from 'lucide-react';
 import { useProModalStore, ProFeatureName } from '@/stores/useProModalStore';
 import { useAuthStore, useLanguageStore } from '@/stores';
+import { supabase } from '@/lib/supabase';
 import { redeemPromoCodeAction } from '@/app/actions/redeemPromoCode';
 import { claimAdRewardAction } from '@/app/actions/claimAdReward';
+import { getUserLimitsAction } from '@/app/actions/getUserLimits';
 import { usePlatform } from '@/lib/platform';
 import { showAdMobRewardedAd, preloadRewardedAd } from '@/lib/admob';
 
@@ -46,6 +49,7 @@ export function ProModal({
   const { user } = useAuthStore();
   const { language, t } = useLanguageStore();
   const platform = usePlatform();
+  const router = useRouter();
   const isEn = language === 'en';
 
   const isOpen = propIsOpen !== undefined ? propIsOpen : store.isOpen;
@@ -85,41 +89,52 @@ export function ProModal({
     tier?: string;
   } | null>(null);
 
-  // Estado de nivel y consumo para mensajes de límite duros (50 Free / 120 Pro)
+  // Estado de nivel y consumo para mensajes de límite duros (50 Free / 120 Pro) y cupo de anuncios
   const [userLimits, setUserLimits] = useState<{
     tier: 'free' | 'pro' | 'vip';
     count: number;
     bonusCredits: number;
     welcomeGenerations: number;
+    tutorConsultationsCount?: number;
+    tutorAdsUsed?: number;
+    adsUsedInCycle: number;
+    remainingAds: number;
   } | null>(null);
+
+  const fetchUserLimits = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      let accessToken: string | undefined;
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        accessToken = sessionData?.session?.access_token;
+      } catch (sessionErr) {
+        console.warn('[ProModal] No se pudo obtener el token de sesión:', sessionErr);
+      }
+
+      const res = await getUserLimitsAction(user.id, accessToken);
+      if (res.success) {
+        setUserLimits({
+          tier: res.tier,
+          count: res.count,
+          bonusCredits: res.bonusCredits,
+          welcomeGenerations: res.welcomeGenerations,
+          tutorConsultationsCount: res.tutorConsultationsCount,
+          tutorAdsUsed: res.tutorAdsUsed,
+          adsUsedInCycle: res.adsUsedInCycle,
+          remainingAds: res.remainingAds,
+        });
+      }
+    } catch (err) {
+      console.warn('[ProModal] Error al consultar límites mediante Server Action:', err);
+    }
+  }, [user?.id]);
 
   useEffect(() => {
     if (isOpen && user?.id) {
-      import('@/lib/supabase').then(({ supabase }) => {
-        supabase
-          .from('api_limits')
-          .select('tier, generations_count, last_generation_date, bonus_credits, welcome_generations')
-          .eq('user_id', user.id)
-          .maybeSingle()
-          .then(({ data }) => {
-            if (data) {
-              const currentMonth = new Date().toISOString().slice(0, 7);
-              const lastMonth = data.last_generation_date
-                ? String(data.last_generation_date).slice(0, 7)
-                : null;
-              const isSameMonth = lastMonth === currentMonth;
-
-              setUserLimits({
-                tier: (data.tier as 'free' | 'pro' | 'vip') || 'free',
-                count: isSameMonth ? (data.generations_count || 0) : 0,
-                bonusCredits: typeof data.bonus_credits === 'number' ? data.bonus_credits : 0,
-                welcomeGenerations: typeof data.welcome_generations === 'number' ? data.welcome_generations : 0,
-              });
-            }
-          });
-      });
+      fetchUserLimits();
     }
-  }, [isOpen, user?.id]);
+  }, [isOpen, user?.id, fetchUserLimits]);
 
   const handleClose = useCallback(() => {
     if (propOnClose) {
@@ -206,9 +221,60 @@ export function ProModal({
 
       if (result.completed) {
         setAdLoadingPhase('claiming');
-        const claim = await claimAdRewardAction(user?.id);
+        let accessToken: string | undefined;
+        try {
+          const { data: sessionData } = await supabase.auth.getSession();
+          accessToken = sessionData?.session?.access_token;
+        } catch (sessionErr) {
+          console.warn('[ProModal] No se pudo obtener el token de sesión:', sessionErr);
+        }
+        const claim = await claimAdRewardAction(user?.id, accessToken);
 
         if (claim.success) {
+          // 1. Actualización reactiva inmediata en la UI para descontar el contador
+          setUserLimits((prev) => {
+            const currentBonus = prev?.bonusCredits ?? 0;
+            const newBonus =
+              typeof claim.bonusCredits === 'number'
+                ? claim.bonusCredits
+                : currentBonus + 1;
+            const count = typeof claim.generationsCount === 'number' ? claim.generationsCount : (prev?.count ?? 0);
+            const tutorAdsUsed = prev?.tutorAdsUsed ?? 0;
+            const adsUsedInCycle = typeof claim.adsUsedInCycle === 'number'
+              ? claim.adsUsedInCycle
+              : (count + newBonus + tutorAdsUsed);
+            const remainingAds = typeof claim.remainingAds === 'number'
+              ? claim.remainingAds
+              : Math.max(0, 45 - adsUsedInCycle);
+
+            if (!prev) {
+              return {
+                tier: 'free',
+                count,
+                bonusCredits: newBonus,
+                welcomeGenerations: 5,
+                tutorAdsUsed,
+                adsUsedInCycle,
+                remainingAds,
+              };
+            }
+            return {
+              ...prev,
+              count,
+              bonusCredits: newBonus,
+              adsUsedInCycle,
+              remainingAds,
+            };
+          });
+
+          // 2. Refrescar datos en segundo plano mediante Server Action
+          fetchUserLimits();
+          try {
+            router.refresh();
+          } catch {
+            // no-op
+          }
+
           setAdRewardNotice({
             type: 'success',
             message:
@@ -491,7 +557,11 @@ export function ProModal({
                   {(() => {
                     const isFreeTier = !userLimits || userLimits.tier === 'free';
                     const isZeroBalance = isFreeTier && (userLimits?.bonusCredits ?? 0) <= 0;
-                    const remainingAds = Math.max(0, 50 - (userLimits?.count || 0));
+                    const tutorAdsUsed = userLimits?.tutorAdsUsed ?? Math.max(0, (userLimits?.tutorConsultationsCount || 0) - 3);
+                    const adsUsedInCycle = userLimits?.adsUsedInCycle ?? ((userLimits?.count || 0) + (userLimits?.bonusCredits || 0) + tutorAdsUsed);
+                    const remainingAds = userLimits?.remainingAds !== undefined
+                      ? userLimits.remainingAds
+                      : Math.max(0, 45 - adsUsedInCycle);
 
                     return (
                       <div
@@ -547,7 +617,7 @@ export function ProModal({
                               </span>
                             </>
                           ) : remainingAds <= 0 ? (
-                            <span>Cupo mensual de 50 generaciones completado</span>
+                            <span>Cupo mensual de 45 anuncios completado</span>
                           ) : (
                             <>
                               <PlayCircle className="w-4 h-4 fill-neutral-950 text-amber-300 group-hover:scale-110 transition-transform shrink-0" />

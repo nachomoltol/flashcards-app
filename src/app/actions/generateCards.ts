@@ -1469,14 +1469,22 @@ async function enforceApiLimit(
  */
 async function recordApiUsage(userId: string) {
   try {
-    const { error: rpcErr } = await supabase.rpc('increment_api_generation', {
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || 'https://placeholder.supabase.co';
+    const dbClient = serviceRoleKey
+      ? createClient(supabaseUrl, serviceRoleKey, {
+          auth: { persistSession: false, autoRefreshToken: false },
+        })
+      : supabase;
+
+    const { error: rpcErr } = await dbClient.rpc('increment_api_generation', {
       p_user_id: userId,
     });
 
     if (rpcErr) {
       console.error('Advertencia al invocar increment_api_generation RPC:', rpcErr);
       const todayStr = new Date().toISOString().slice(0, 10);
-      const { data: rec } = await supabase
+      const { data: rec } = await dbClient
         .from('api_limits')
         .select('*')
         .eq('user_id', userId)
@@ -1489,21 +1497,21 @@ async function recordApiUsage(userId: string) {
         const tier = (rec.tier as 'free' | 'pro' | 'vip') || 'free';
 
         if (tier === 'pro' || tier === 'vip') {
-          await supabase.from('api_limits').update({
+          await dbClient.from('api_limits').update({
             generations_count: currentCount + 1,
             last_generation_date: todayStr,
             updated_at: new Date().toISOString(),
           }).eq('user_id', userId);
         } else if (welcome < 5) {
           // Fase Bienvenida: suma 1 a welcome_generations y NO altera generations_count
-          await supabase.from('api_limits').update({
+          await dbClient.from('api_limits').update({
             welcome_generations: welcome + 1,
             last_generation_date: todayStr,
             updated_at: new Date().toISOString(),
           }).eq('user_id', userId);
         } else {
           // Fase Ads: resta 1 a bonus_credits y suma 1 a generations_count
-          await supabase.from('api_limits').update({
+          await dbClient.from('api_limits').update({
             bonus_credits: Math.max(0, bonus - 1),
             generations_count: currentCount + 1,
             last_generation_date: todayStr,
@@ -1511,7 +1519,7 @@ async function recordApiUsage(userId: string) {
           }).eq('user_id', userId);
         }
       } else {
-        await supabase.from('api_limits').upsert({
+        await dbClient.from('api_limits').upsert({
           user_id: userId,
           welcome_generations: 1,
           generations_count: 0,
