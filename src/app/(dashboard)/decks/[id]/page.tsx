@@ -31,7 +31,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
 
   // Estado para el modal de Generación con IA (Gemini Flash)
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
-  const [uploaderStep, setUploaderStep] = useState<1 | 2 | 3>(1);
+  const [uploaderStep, setUploaderStep] = useState<1 | 2 | 3 | 4>(1);
   const [aiMode, setAiMode] = useState<'multimodal' | 'url' | 'topic'>('multimodal');
   const [aiTopic, setAiTopic] = useState('');
   const [aiCardFormat, setAiCardFormat] = useState<CardFormat>('multiple_choice');

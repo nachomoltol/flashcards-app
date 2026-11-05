@@ -21,7 +21,7 @@ interface DocumentUploaderProps {
   onSwitchToUrl?: () => void;
   initialMeticulousPhase?: boolean;
   onMeticulousChange?: (val: boolean) => void;
-  onStepChange?: (step: 1 | 2 | 3) => void;
+  onStepChange?: (step: 1 | 2 | 3 | 4) => void;
 }
 
 type FileTypeCategory = 'pdf' | 'docx' | 'audio' | 'video' | 'text';
@@ -262,7 +262,7 @@ export function DocumentUploader({
   const { language, t } = useLanguageStore();
   const isEn = language === 'en';
 
-  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1);
 
   useEffect(() => {
     onStepChange?.(currentStep);
@@ -850,6 +850,113 @@ export function DocumentUploader({
     pageStart.trim() === pageEnd.trim()
   );
 
+  // Helpers para control táctil de páginas en Paso 2
+  const handlePageStep = (target: 'start' | 'end', delta: number) => {
+    const maxPages = effectiveTotalPages || 9999;
+    if (target === 'start') {
+      const current = parseInt(pageStart.trim(), 10) || 1;
+      const next = Math.max(1, Math.min(maxPages, current + delta));
+      setPageStart(String(next));
+      const currentEnd = parseInt(pageEnd.trim(), 10);
+      if (!isNaN(currentEnd) && next > currentEnd) {
+        setPageEnd(String(next));
+      }
+    } else {
+      const currentStart = parseInt(pageStart.trim(), 10) || 1;
+      const current = parseInt(pageEnd.trim(), 10) || (effectiveTotalPages ? Math.min(effectiveTotalPages, currentStart + 4) : currentStart + 4);
+      const next = Math.max(currentStart, Math.min(maxPages, current + delta));
+      setPageEnd(String(next));
+    }
+    setNextCursorPage(null);
+    setLastStartPage(null);
+  };
+
+  const handleApplyRangePreset = (type: 'all' | 'plus5' | 'plus10' | 'resume') => {
+    const maxPages = effectiveTotalPages || 9999;
+    const currentStart = parseInt(pageStart.trim(), 10) || 1;
+    if (type === 'all') {
+      setPageStart('1');
+      if (effectiveTotalPages) setPageEnd(String(effectiveTotalPages));
+      setNextCursorPage(null);
+      setLastStartPage(null);
+    } else if (type === 'plus5') {
+      const nextEnd = Math.min(maxPages, currentStart + 4);
+      setPageEnd(String(nextEnd));
+    } else if (type === 'plus10') {
+      const nextEnd = Math.min(maxPages, currentStart + 9);
+      setPageEnd(String(nextEnd));
+    } else if (type === 'resume' && typeof nextCursorPage === 'number') {
+      setPageStart(String(nextCursorPage));
+      const nextEnd = Math.min(maxPages, nextCursorPage + 9);
+      setPageEnd(String(nextEnd));
+      setNextCursorPage(null);
+      setLastStartPage(null);
+    }
+  };
+
+  const maxAllowedCards = pedagogicalMode === 'didactic' ? 40 : 30;
+
+  // Keypad táctil para el Paso 3
+  const handleKeypadPress = useCallback((key: string) => {
+    if (key === 'C') {
+      setCardCount(0);
+      return;
+    }
+    if (key === 'backspace') {
+      setCardCount((prev) => {
+        const str = String(prev);
+        if (str.length <= 1) return 0;
+        const sliced = parseInt(str.slice(0, -1), 10);
+        return isNaN(sliced) ? 0 : sliced;
+      });
+      return;
+    }
+    const digit = parseInt(key, 10);
+    if (isNaN(digit)) return;
+    setCardCount((prev) => {
+      const currentStr = prev === 0 ? '' : String(prev);
+      const newStr = currentStr + key;
+      let val = parseInt(newStr, 10);
+      if (isNaN(val)) val = 0;
+      if (val > maxAllowedCards) val = maxAllowedCards;
+      return val;
+    });
+  }, [maxAllowedCards]);
+
+  const handleProceedToStep4 = useCallback(() => {
+    setCardCount((prev) => {
+      if (prev < 1) return 10;
+      if (prev > maxAllowedCards) return maxAllowedCards;
+      return prev;
+    });
+    setCurrentStep(4);
+  }, [maxAllowedCards]);
+
+  // Soporte de teclado físico de PC durante el Paso 3
+  useEffect(() => {
+    if (currentStep !== 3) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const targetTag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      if (targetTag === 'input' || targetTag === 'textarea') return;
+
+      if (e.key >= '0' && e.key <= '9') {
+        e.preventDefault();
+        handleKeypadPress(e.key);
+      } else if (e.key === 'Backspace') {
+        e.preventDefault();
+        handleKeypadPress('backspace');
+      } else if (e.key.toLowerCase() === 'c') {
+        e.preventDefault();
+        handleKeypadPress('C');
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        handleProceedToStep4();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentStep, handleKeypadPress, handleProceedToStep4]);
+
   const handleValidateAndProceedToStep3 = () => {
     if (isPageableDoc) {
       const pStart = parseInt(pageStart.trim(), 10);
@@ -1116,13 +1223,14 @@ export function DocumentUploader({
             }}
           />
 
-          {/* Stepper Header (3 Pasos) */}
+          {/* Stepper Header (4 Pasos) */}
           <div className="w-full pb-3 border-b border-neutral-200 dark:border-neutral-800/80">
-            <div className="flex items-center justify-between max-w-sm sm:max-w-md mx-auto px-1">
+            <div className="flex items-center justify-between max-w-sm sm:max-w-lg mx-auto px-1">
               {[
-                { id: 1, label: t('ai_uploader.step1_title', isEn ? 'Document' : 'Documento') },
-                { id: 2, label: t('ai_uploader.step2_title', isEn ? 'Range & Format' : 'Rango y Formato') },
-                { id: 3, label: t('ai_uploader.step3_title', isEn ? 'Mode & Focus' : 'Modo y Enfoque') },
+                { id: 1, label: t('ai_uploader.step1_title', isEn ? 'Document' : 'Archivo') },
+                { id: 2, label: t('ai_uploader.step2_title', isEn ? 'Pages & Format' : 'Páginas y Formato') },
+                { id: 3, label: t('ai_uploader.step3_title', isEn ? 'Quantity' : 'Cantidad') },
+                { id: 4, label: t('ai_uploader.step4_title', isEn ? 'Mode & Focus' : 'Modo y Enfoque') },
               ].map((s, idx) => {
                 const isActive = currentStep === s.id;
                 const isPassed = currentStep > s.id;
@@ -1131,7 +1239,7 @@ export function DocumentUploader({
                   <React.Fragment key={s.id}>
                     {idx > 0 && (
                       <div
-                        className={`flex-1 h-0.5 mx-2 transition-colors duration-200 ${
+                        className={`flex-1 h-0.5 mx-1.5 sm:mx-2 transition-colors duration-200 ${
                           isPassed ? 'bg-violet-600' : 'bg-neutral-200 dark:bg-neutral-800'
                         }`}
                       />
@@ -1143,12 +1251,18 @@ export function DocumentUploader({
                         if (canNavigate) {
                           if (s.id === 3 && currentStep === 2) {
                             handleValidateAndProceedToStep3();
+                          } else if (s.id === 4) {
+                            if (currentStep === 2) {
+                              handleValidateAndProceedToStep3();
+                            } else {
+                              handleProceedToStep4();
+                            }
                           } else {
-                            setCurrentStep(s.id as 1 | 2 | 3);
+                            setCurrentStep(s.id as 1 | 2 | 3 | 4);
                           }
                         }
                       }}
-                      className={`group flex items-center gap-1.5 text-xs font-semibold transition-all ${
+                      className={`group flex items-center gap-1 sm:gap-1.5 text-xs font-semibold transition-all ${
                         isActive
                           ? 'text-violet-600 dark:text-violet-400'
                           : isPassed
@@ -1159,7 +1273,7 @@ export function DocumentUploader({
                       } ${canNavigate ? 'cursor-pointer active:scale-95' : ''}`}
                     >
                       <span
-                        className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold font-mono transition-all ${
+                        className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center text-[10px] sm:text-[11px] font-bold font-mono transition-all ${
                           isActive
                             ? 'bg-violet-600 text-white ring-2 ring-violet-500/30 shadow-sm shadow-violet-600/30'
                             : isPassed
@@ -1428,13 +1542,13 @@ export function DocumentUploader({
           )}
 
           {/* ========================================================
-              PASO 2: Rango y Formato
+              PASO 2: Páginas y Formato
              ======================================================== */}
           {currentStep === 2 && selectedFile && (
-            <div className="space-y-2 sm:space-y-2.5 animate-in fade-in duration-150">
-              {/* Rango de Páginas si es PDF o DOCX */}
+            <div className="space-y-3 sm:space-y-4 animate-in fade-in duration-150">
+              {/* Rango de Páginas si es PDF o DOCX con Controles Táctiles Stepper */}
               {isPageableDoc ? (
-                <div className="p-2.5 sm:p-3 rounded-2xl bg-neutral-50 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 space-y-1.5 sm:space-y-2">
+                <div className="p-3 sm:p-4 rounded-2xl bg-neutral-50 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 space-y-2.5">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-semibold text-neutral-800 dark:text-neutral-200 flex items-center">
                       <span>
@@ -1476,40 +1590,121 @@ export function DocumentUploader({
                       <label className="block text-[11px] font-semibold text-slate-800 dark:text-neutral-300 mb-1">
                         {t('ai_uploader.from_page', isEn ? 'Start page:' : 'Desde página:')}
                       </label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={effectiveTotalPages || undefined}
-                        disabled={isBusy}
-                        value={pageStart}
-                        onChange={(e) => {
-                          setPageStart(e.target.value);
-                          setNextCursorPage(null);
-                          setLastStartPage(null);
-                        }}
-                        placeholder="ej. 1"
-                        className="w-full text-xs font-semibold px-2.5 py-1.5 sm:py-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition disabled:opacity-50"
-                      />
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          disabled={isBusy}
+                          onClick={() => handlePageStep('start', -1)}
+                          className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-neutral-200 dark:bg-neutral-800 hover:bg-neutral-300 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 flex items-center justify-center font-bold text-sm shrink-0 transition active:scale-95 cursor-pointer disabled:opacity-50"
+                          title="Restar una página"
+                        >
+                          -
+                        </button>
+                        <input
+                          type="number"
+                          min={1}
+                          max={effectiveTotalPages || undefined}
+                          disabled={isBusy}
+                          value={pageStart}
+                          onChange={(e) => {
+                            setPageStart(e.target.value);
+                            setNextCursorPage(null);
+                            setLastStartPage(null);
+                          }}
+                          placeholder="1"
+                          className="w-full text-center text-xs font-semibold px-2 py-1.5 sm:py-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition disabled:opacity-50"
+                        />
+                        <button
+                          type="button"
+                          disabled={isBusy}
+                          onClick={() => handlePageStep('start', 1)}
+                          className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-neutral-200 dark:bg-neutral-800 hover:bg-neutral-300 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 flex items-center justify-center font-bold text-sm shrink-0 transition active:scale-95 cursor-pointer disabled:opacity-50"
+                          title="Sumar una página"
+                        >
+                          +
+                        </button>
+                      </div>
                     </div>
                     <div>
                       <label className="block text-[11px] font-semibold text-slate-800 dark:text-neutral-300 mb-1">
                         {t('ai_uploader.to_page', isEn ? 'End page:' : 'Hasta página:')}
                       </label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={effectiveTotalPages || undefined}
-                        disabled={isBusy}
-                        value={pageEnd}
-                        onChange={(e) => {
-                          setPageEnd(e.target.value);
-                          setNextCursorPage(null);
-                          setLastStartPage(null);
-                        }}
-                        placeholder={effectiveTotalPages ? (isEn ? `e.g. ${effectiveTotalPages}` : `ej. ${effectiveTotalPages}`) : (isEn ? 'e.g. 30' : 'ej. 30')}
-                        className="w-full text-xs font-semibold px-2.5 py-1.5 sm:py-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition disabled:opacity-50"
-                      />
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          disabled={isBusy}
+                          onClick={() => handlePageStep('end', -1)}
+                          className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-neutral-200 dark:bg-neutral-800 hover:bg-neutral-300 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 flex items-center justify-center font-bold text-sm shrink-0 transition active:scale-95 cursor-pointer disabled:opacity-50"
+                          title="Restar una página"
+                        >
+                          -
+                        </button>
+                        <input
+                          type="number"
+                          min={1}
+                          max={effectiveTotalPages || undefined}
+                          disabled={isBusy}
+                          value={pageEnd}
+                          onChange={(e) => {
+                            setPageEnd(e.target.value);
+                            setNextCursorPage(null);
+                            setLastStartPage(null);
+                          }}
+                          placeholder={effectiveTotalPages ? String(effectiveTotalPages) : '10'}
+                          className="w-full text-center text-xs font-semibold px-2 py-1.5 sm:py-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition disabled:opacity-50"
+                        />
+                        <button
+                          type="button"
+                          disabled={isBusy}
+                          onClick={() => handlePageStep('end', 1)}
+                          className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-neutral-200 dark:bg-neutral-800 hover:bg-neutral-300 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 flex items-center justify-center font-bold text-sm shrink-0 transition active:scale-95 cursor-pointer disabled:opacity-50"
+                          title="Sumar una página"
+                        >
+                          +
+                        </button>
+                      </div>
                     </div>
+                  </div>
+
+                  {/* Chips de Rango Rápido */}
+                  <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                    <span className="text-[10px] text-neutral-500 dark:text-neutral-400 font-medium">Atajos:</span>
+                    {Boolean(effectiveTotalPages) && (
+                      <button
+                        type="button"
+                        disabled={isBusy}
+                        onClick={() => handleApplyRangePreset('all')}
+                        className="px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-neutral-200/70 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-violet-100 hover:text-violet-600 dark:hover:bg-violet-900/30 transition cursor-pointer"
+                      >
+                        Todo (1-{effectiveTotalPages})
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      disabled={isBusy}
+                      onClick={() => handleApplyRangePreset('plus5')}
+                      className="px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-neutral-200/70 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-violet-100 hover:text-violet-600 dark:hover:bg-violet-900/30 transition cursor-pointer"
+                    >
+                      +5 págs
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isBusy}
+                      onClick={() => handleApplyRangePreset('plus10')}
+                      className="px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-neutral-200/70 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-violet-100 hover:text-violet-600 dark:hover:bg-violet-900/30 transition cursor-pointer"
+                    >
+                      +10 págs
+                    </button>
+                    {typeof nextCursorPage === 'number' && (
+                      <button
+                        type="button"
+                        disabled={isBusy}
+                        onClick={() => handleApplyRangePreset('resume')}
+                        className="px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 transition cursor-pointer"
+                      >
+                        🔖 Retomar pág. {nextCursorPage}
+                      </button>
+                    )}
                   </div>
 
                   {typeof nextCursorPage === 'number' && (
@@ -1535,7 +1730,7 @@ export function DocumentUploader({
                 </div>
               )}
 
-              {/* Formato de Tarjetas (Grid 2x2) */}
+              {/* Formato de Tarjetas (Grid 2x2 Amplio y Cómodo) */}
               <div className="space-y-1.5 sm:space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="block text-xs font-semibold uppercase tracking-wider text-slate-800 dark:text-neutral-300">
@@ -1557,13 +1752,13 @@ export function DocumentUploader({
                     </span>
                   )}
                 </div>
-                <div className="grid grid-cols-2 gap-1.5 sm:gap-2.5">
+                <div className="grid grid-cols-2 gap-2 sm:gap-3">
                   {[
                     {
                       id: 'multiple_choice' as CardFormat,
                       icon: '📝',
                       title: t('card_editor.format_test', isEn ? 'Multiple Choice' : 'Opción Múltiple'),
-                      subtitle: t('ai_uploader.format_mc_sub', isEn ? '4-option test with solution' : 'Test con 4 alternativas y solución'),
+                      subtitle: t('ai_uploader.format_mc_sub', isEn ? '4-option test with solution' : 'Test con 4 alternativas y solución argumentada'),
                     },
                     {
                       id: 'basic' as CardFormat,
@@ -1596,16 +1791,16 @@ export function DocumentUploader({
                             setDocenteFormat(opt.id);
                           }
                         }}
-                        className={`p-2 sm:p-2.5 rounded-xl border text-left transition-all flex items-start gap-2 cursor-pointer active:scale-[0.99] ${
+                        className={`p-3 sm:p-3.5 rounded-xl border text-left transition-all flex items-start gap-2.5 cursor-pointer active:scale-[0.99] ${
                           isSelected
                             ? 'border-violet-500 bg-violet-500/10 ring-1 ring-violet-500 text-slate-900 dark:text-white shadow-sm'
                             : 'border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/60 hover:border-neutral-300 dark:hover:border-neutral-700 text-slate-800 dark:text-neutral-300'
                         }`}
                       >
-                        <span className="text-base sm:text-lg shrink-0 mt-0.5">{opt.icon}</span>
+                        <span className="text-lg sm:text-xl shrink-0 mt-0.5">{opt.icon}</span>
                         <div className="min-w-0 flex-1">
-                          <p className="text-[11px] sm:text-xs font-semibold leading-tight truncate">{opt.title}</p>
-                          <p className="text-[10px] sm:text-[11px] text-slate-600 dark:text-slate-400 leading-tight line-clamp-1 sm:line-clamp-2 mt-0.5">
+                          <p className="text-xs sm:text-sm font-semibold leading-tight truncate">{opt.title}</p>
+                          <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-tight mt-1 line-clamp-2">
                             {opt.subtitle}
                           </p>
                         </div>
@@ -1615,71 +1810,8 @@ export function DocumentUploader({
                 </div>
               </div>
 
-              {/* Cantidad de Tarjetas o Notificación Didáctica */}
-              {pedagogicalMode === 'didactic' ? (
-                <div className="p-2.5 sm:p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-between gap-3 text-xs">
-                  <div className="flex items-center gap-2 text-amber-900 dark:text-amber-200">
-                    <span className="text-base">👨‍🏫</span>
-                    <span className="font-medium">
-                      {t('ai_uploader.docente_step2_notice', { count: cardCount }, isEn ? `Teacher Mode: Question quantity is configured in Step 3 (${cardCount} questions)` : `Modo Docente activo: El número de preguntas se define en el Paso 3 (${cardCount} preguntas)`)}
-                    </span>
-                  </div>
-                  <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-800 dark:text-amber-300 shrink-0">
-                    {cardCount} / 40 MÁX
-                  </span>
-                </div>
-              ) : (
-                <div className="p-2.5 sm:p-3 rounded-xl bg-neutral-50 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <label htmlFor="cardCount" className="text-xs font-semibold uppercase tracking-wider text-slate-800 dark:text-neutral-300">
-                      {t('ai_uploader.card_count_label', isEn ? 'Card Quantity' : 'Cantidad de Tarjetas')}
-                    </label>
-                    <span className="text-[10px] font-mono font-bold text-violet-600 dark:text-violet-400">
-                      {cardCount} / 30 MÁX
-                    </span>
-                  </div>
-                  <input
-                    id="cardCount"
-                    name="cardCount"
-                    type="number"
-                    min={1}
-                    max={30}
-                    disabled={isBusy}
-                    value={cardCount}
-                    onChange={(e) => {
-                      const rawVal = e.target.value;
-                      if (rawVal === '') {
-                        setCardCount(1);
-                        return;
-                      }
-                      const val = parseInt(rawVal, 10);
-                      if (!isNaN(val)) {
-                        setCardCount(Math.min(30, Math.max(1, val)));
-                      }
-                    }}
-                    className="w-full text-xs font-semibold px-3 py-1.5 sm:py-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition disabled:opacity-50"
-                    placeholder={isEn ? "1 to 30 cards" : "1 a 30 tarjetas"}
-                  />
-                </div>
-              )}
-
-              {/* Alerta Preventiva Condicional (1 sola página y > 15 tarjetas) */}
-              {isSinglePage && cardCount > 15 && (
-                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-900 dark:text-amber-200 text-xs leading-relaxed flex items-start gap-2 shadow-sm animate-in fade-in">
-                  <span className="text-sm shrink-0 mt-0.5">⚠️</span>
-                  <p>
-                    {t(
-                      'ai_uploader.density_warning',
-                      isEn
-                        ? 'You selected 1 page for a high card count. Unless it is a dense table, a single page typically yields 8–15 high-fidelity cards without hallucinating content.'
-                        : 'Has seleccionado 1 página para un lote alto. Salvo en tablas muy densas, una sola página suele rendir 8-15 tarjetas de alta fidelidad sin inventar.'
-                    )}
-                  </p>
-                </div>
-              )}
-
               {/* Botones de navegación Paso 2 */}
-              <div className="flex items-center justify-between pt-1 sm:pt-2">
+              <div className="flex items-center justify-between pt-2">
                 <button
                   type="button"
                   onClick={() => setCurrentStep(1)}
@@ -1705,9 +1837,138 @@ export function DocumentUploader({
           )}
 
           {/* ========================================================
-              PASO 3: Modo y Enfoque
+              PASO 3: Cantidad de Tarjetas (Pantalla Dedicada con Keypad)
              ======================================================== */}
           {currentStep === 3 && selectedFile && (
+            <div className="space-y-4 animate-in fade-in duration-150 overflow-x-hidden">
+              <div className="p-4 sm:p-5 rounded-2xl bg-neutral-50 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 text-center space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-slate-800 dark:text-neutral-300">
+                    {t('ai_uploader.card_count_label', isEn ? 'Card Quantity' : 'Cantidad de Tarjetas')}
+                  </label>
+                  <span className="text-[11px] font-mono font-bold text-violet-600 dark:text-violet-400">
+                    {cardCount} / {maxAllowedCards} MÁX
+                  </span>
+                </div>
+
+                {/* Display Central Grande */}
+                <div className="py-2 flex flex-col items-center justify-center">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-4xl sm:text-5xl font-black font-mono tracking-tight text-violet-600 dark:text-violet-400">
+                      {cardCount === 0 ? '0' : cardCount}
+                    </span>
+                    <span className="text-sm sm:text-base font-semibold text-slate-500 dark:text-neutral-500 font-mono">
+                      / {maxAllowedCards}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-1.5 text-xs text-neutral-600 dark:text-neutral-400 font-medium">
+                    <span>⏱️ ~{Math.max(1, Math.round(cardCount * 1.5))} min de estudio activo</span>
+                    <span>•</span>
+                    <span>{pedagogicalMode === 'didactic' ? '👨‍🏫 Modo Docente' : '📚 Repaso FSRS'}</span>
+                  </div>
+                </div>
+
+                {/* Chips de Selección Rápida */}
+                <div className="flex items-center justify-center gap-1.5 sm:gap-2 flex-wrap pt-1">
+                  {(pedagogicalMode === 'didactic' ? [5, 10, 15, 20, 30, 40] : [5, 10, 15, 20, 25, 30]).map((num) => (
+                    <button
+                      key={`preset-card-${num}`}
+                      type="button"
+                      disabled={isBusy}
+                      onClick={() => setCardCount(num)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer active:scale-95 ${
+                        cardCount === num
+                          ? 'bg-violet-600 text-white shadow-md shadow-violet-600/30 ring-2 ring-violet-500/50'
+                          : 'bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-slate-700 dark:text-neutral-300 hover:border-violet-400 dark:hover:border-violet-500/50 hover:bg-violet-50 dark:hover:bg-violet-950/30'
+                      }`}
+                    >
+                      {num}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Alerta Preventiva Condicional (1 sola página y > 15 tarjetas) */}
+                {isSinglePage && cardCount > 15 && (
+                  <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-900 dark:text-amber-200 text-xs leading-relaxed flex items-start gap-2 shadow-sm animate-in fade-in text-left">
+                    <span className="text-sm shrink-0 mt-0.5">⚠️</span>
+                    <p>
+                      {t(
+                        'ai_uploader.density_warning',
+                        isEn
+                          ? 'You selected 1 page for a high card count. Unless it is a dense table, a single page typically yields 8–15 high-fidelity cards without hallucinating content.'
+                          : 'Has seleccionado 1 página para un lote alto. Salvo en tablas muy densas, una sola página suele rendir 8-15 tarjetas de alta fidelidad sin inventar.'
+                      )}
+                    </p>
+                  </div>
+                )}
+
+                {/* Keypad Táctil 3x4 */}
+                <div className="max-w-[260px] sm:max-w-[280px] mx-auto pt-2">
+                  <div className="grid grid-cols-3 gap-2">
+                    {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', 'backspace'].map((key) => {
+                      const isClear = key === 'C';
+                      const isBack = key === 'backspace';
+                      return (
+                        <button
+                          key={`touch-key-${key}`}
+                          type="button"
+                          disabled={isBusy}
+                          onClick={() => handleKeypadPress(key)}
+                          className={`h-11 sm:h-12 rounded-xl text-base sm:text-lg font-bold font-mono transition-all flex items-center justify-center cursor-pointer active:scale-95 select-none ${
+                            isClear
+                              ? 'bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/30 dark:hover:bg-rose-950/50 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/40'
+                              : isBack
+                              ? 'bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/30 dark:hover:bg-amber-950/50 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-900/40'
+                              : 'bg-white hover:bg-slate-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-slate-800 dark:text-neutral-100 border border-neutral-200 dark:border-neutral-800 shadow-xs'
+                          }`}
+                        >
+                          {isBack ? (
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M3 12l6.414-6.414A2 2 0 0110.828 5H20a2 2 0 012 2v10a2 2 0 01-2 2h-9.172a2 2 0 01-1.414-.586L3 12z" />
+                            </svg>
+                          ) : (
+                            key
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[10px] text-neutral-400 dark:text-neutral-500 text-center mt-2 font-medium">
+                    Usa el teclado en pantalla o las teclas numéricas físicas de tu PC
+                  </p>
+                </div>
+              </div>
+
+              {/* Botones de navegación Paso 3 */}
+              <div className="flex items-center justify-between pt-2">
+                <button
+                  type="button"
+                  onClick={() => setCurrentStep(2)}
+                  className="px-4 py-2 text-xs text-slate-700 hover:text-slate-900 dark:text-neutral-400 dark:hover:text-white rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 transition flex items-center gap-1.5 cursor-pointer font-medium"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                  <span>{t('ai_uploader.back_btn', isEn ? 'Back' : 'Atrás')}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleProceedToStep4}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-medium text-xs sm:text-sm transition shadow-lg shadow-violet-600/25 active:scale-95 cursor-pointer"
+                >
+                  <span>{t('ai_uploader.continue_step4', isEn ? 'Continue to Step 4' : 'Continuar al Paso 4')}</span>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================
+              PASO 4: Modo y Enfoque
+             ======================================================== */}
+          {currentStep === 4 && selectedFile && (
             <div className="space-y-3 sm:space-y-3.5 animate-in fade-in duration-150 overflow-x-hidden">
               {/* Selector Enfoque Pedagógico: Académico vs Docente */}
               <div className="p-3.5 sm:p-4 rounded-2xl bg-neutral-50 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 space-y-2.5">
@@ -2193,12 +2454,50 @@ export function DocumentUploader({
               />
             </div>
 
-            {/* Botones de navegación Paso 3 */}
+            {/* Ficha Resumen Pre-Vuelo */}
+            <div className="p-3 sm:p-3.5 rounded-2xl bg-neutral-100/90 dark:bg-neutral-900/90 border border-neutral-200 dark:border-neutral-800 text-xs space-y-2">
+              <div className="flex items-center justify-between text-neutral-500 dark:text-neutral-400 font-mono text-[10px] sm:text-[11px] font-semibold">
+                <span>FICHA RESUMEN PRE-LANZAMIENTO</span>
+                <span className="text-violet-600 dark:text-violet-400">Paso 4 de 4</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-slate-800 dark:text-neutral-200 text-xs">
+                <span className="inline-flex items-center gap-1 font-semibold px-2 py-0.5 rounded-md bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700">
+                  <span>📄</span>
+                  <span className="truncate max-w-[130px] sm:max-w-[200px]" title={selectedFile.name}>{selectedFile.name}</span>
+                </span>
+                {isPageableDoc && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 font-mono text-[11px]">
+                    <span>📖</span>
+                    <span>Págs {pageStart.trim() || 1}–{pageEnd.trim() || (effectiveTotalPages || 'Fin')}</span>
+                  </span>
+                )}
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-violet-500/10 border border-violet-500/20 text-violet-700 dark:text-violet-300 font-semibold text-[11px]">
+                  <span>{cardFormat === 'multiple_choice' ? '📝 Test' : cardFormat === 'basic' ? '🃏 Básica' : cardFormat === 'cloze' ? '🧩 Cloze' : '⚖️ V/F'}</span>
+                </span>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold font-mono text-[11px]">
+                  <span>🎯 {cardCount} tarjetas</span>
+                </span>
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold ${
+                  pedagogicalMode === 'didactic'
+                    ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30'
+                    : 'bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/30'
+                }`}>
+                  <span>{pedagogicalMode === 'didactic' ? '👨‍🏫 Docente' : '📚 Estudio'}</span>
+                </span>
+                {isExhaustiveMode && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30 font-mono text-[11px] font-bold">
+                    <span>⚡ Quirúrgico</span>
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Botones de navegación Paso 4 */}
             <div className="flex items-center justify-between pt-1 sm:pt-2">
               <button
                 type="button"
                 disabled={isBusy}
-                onClick={() => setCurrentStep(2)}
+                onClick={() => setCurrentStep(3)}
                 className="px-4 py-2 text-xs text-slate-700 hover:text-slate-950 dark:text-neutral-400 dark:hover:text-white rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50 font-medium"
               >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
