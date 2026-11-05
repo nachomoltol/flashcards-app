@@ -151,11 +151,13 @@ function validateFile(file: File): string | null {
 interface InfoTooltipProps {
   content: React.ReactNode;
   title?: string;
+  placement?: 'top' | 'bottom';
 }
 
-function InfoTooltip({ content, title }: InfoTooltipProps) {
+function InfoTooltip({ content, title, placement = 'bottom' }: InfoTooltipProps) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLSpanElement>(null);
+  const isBottom = placement === 'bottom';
 
   useEffect(() => {
     if (!isOpen) return;
@@ -195,7 +197,11 @@ function InfoTooltip({ content, title }: InfoTooltipProps) {
       {isOpen && (
         <div
           role="tooltip"
-          className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 sm:w-80 p-3 rounded-xl bg-neutral-900/95 dark:bg-neutral-950/95 text-neutral-200 border border-neutral-700/80 shadow-2xl backdrop-blur-md text-xs leading-relaxed animate-in fade-in zoom-in-95 pointer-events-auto"
+          className={`absolute z-[60] ${
+            isBottom
+              ? 'top-full mt-2 left-0 sm:left-1/2 sm:-translate-x-1/2'
+              : 'bottom-full mb-2 left-0 sm:left-1/2 sm:-translate-x-1/2'
+          } w-[calc(100vw-3rem)] max-w-xs sm:max-w-sm max-h-80 overflow-y-auto p-3.5 rounded-xl bg-neutral-900/98 dark:bg-neutral-950/98 text-neutral-200 border border-neutral-700/80 shadow-2xl backdrop-blur-md text-xs leading-relaxed animate-in fade-in zoom-in-95 pointer-events-auto`}
         >
           {title && (
             <div className="font-semibold text-neutral-100 text-[11px] mb-1.5 pb-1 border-b border-neutral-800 flex items-center gap-1.5">
@@ -206,7 +212,13 @@ function InfoTooltip({ content, title }: InfoTooltipProps) {
           <div className="text-[11px] leading-relaxed text-neutral-300 font-normal">
             {content}
           </div>
-          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-neutral-900 dark:border-t-neutral-950" />
+          <div
+            className={`absolute ${
+              isBottom
+                ? 'bottom-full left-4 sm:left-1/2 sm:-translate-x-1/2 border-4 border-transparent border-b-neutral-900 dark:border-b-neutral-950'
+                : 'top-full left-4 sm:left-1/2 sm:-translate-x-1/2 border-4 border-transparent border-t-neutral-900 dark:border-t-neutral-950'
+            }`}
+          />
         </div>
       )}
     </span>
@@ -1684,6 +1696,7 @@ export function DocumentUploader({
                     <h4 className="text-xs font-semibold text-slate-900 dark:text-white tracking-tight flex items-center">
                       <span>{t('ai_uploader.pedagogical_mode_label', isEn ? 'Pedagogical Focus' : 'Enfoque Pedagógico')}</span>
                       <InfoTooltip
+                        placement="bottom"
                         title={t('ai_uploader.tooltip_pedagogical_title', isEn ? 'Pedagogical Focus Guide' : 'Guía de Enfoque Pedagógico')}
                         content={
                           <div className="space-y-2.5 text-[11px]">
