@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { PDFDocument } from 'pdf-lib';
 import { parseDocxIntoVirtualPages } from '@/lib/docxPagination';
 import { supabase } from '@/lib/supabase';
@@ -154,73 +155,93 @@ interface InfoTooltipProps {
   placement?: 'top' | 'bottom';
 }
 
-function InfoTooltip({ content, title, placement = 'bottom' }: InfoTooltipProps) {
+function InfoTooltip({ content, title }: InfoTooltipProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const containerRef = useRef<HTMLSpanElement>(null);
-  const isBottom = placement === 'bottom';
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!isOpen) return;
-    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
         setIsOpen(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('touchstart', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('touchstart', handleClickOutside);
-    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen]);
 
+  const modalNode = isOpen && mounted && typeof document !== 'undefined' ? (
+    createPortal(
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={title ? 'info-modal-title' : undefined}
+        className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150"
+        onClick={() => setIsOpen(false)}
+      >
+        <div
+          className="w-[90vw] max-w-md mx-auto p-5 rounded-2xl bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Cabecera */}
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-neutral-800">
+            <h3 id="info-modal-title" className="text-sm sm:text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <span>💡</span>
+              <span>{title || 'Información de Ayuda'}</span>
+            </h3>
+            <button
+              type="button"
+              onClick={() => setIsOpen(false)}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:text-neutral-400 dark:hover:text-neutral-200 hover:bg-slate-100 dark:hover:bg-neutral-800 transition cursor-pointer"
+              aria-label="Cerrar diálogo de ayuda"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Cuerpo */}
+          <div className="max-h-[65vh] overflow-y-auto pr-1 text-xs sm:text-sm text-slate-700 dark:text-neutral-300 leading-relaxed space-y-3">
+            {content}
+          </div>
+
+          {/* Pie */}
+          <div className="pt-2 flex justify-end">
+            <button
+              type="button"
+              onClick={() => setIsOpen(false)}
+              className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-semibold text-xs sm:text-sm transition shadow-md shadow-violet-600/20 active:scale-95 cursor-pointer text-center"
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
+      </div>,
+      document.body
+    )
+  ) : null;
+
   return (
-    <span
-      ref={containerRef}
-      className="relative inline-flex items-center align-middle"
-      onMouseEnter={() => setIsOpen(true)}
-      onMouseLeave={() => setIsOpen(false)}
-    >
+    <span className="inline-flex items-center align-middle">
       <button
         type="button"
         aria-label="Más información"
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
-          setIsOpen((prev) => !prev);
+          setIsOpen(true);
         }}
         className="w-4 h-4 rounded-full bg-neutral-200 dark:bg-neutral-800 hover:bg-neutral-300 dark:hover:bg-neutral-700 text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white flex items-center justify-center text-[10px] font-bold font-mono transition-colors cursor-pointer ml-1.5 focus:outline-none focus:ring-1 focus:ring-violet-500"
       >
         ?
       </button>
 
-      {isOpen && (
-        <div
-          role="tooltip"
-          className={`absolute z-[60] ${
-            isBottom
-              ? 'top-full mt-1.5 left-0 sm:left-1/2 sm:-translate-x-1/2'
-              : 'bottom-full mb-1.5 left-0 sm:left-1/2 sm:-translate-x-1/2'
-          } w-[270px] xs:w-[290px] sm:w-80 max-w-[calc(100vw-3.5rem)] max-h-72 overflow-y-auto p-3.5 rounded-xl bg-neutral-900/98 dark:bg-neutral-950/98 text-neutral-200 border border-neutral-700/80 shadow-2xl backdrop-blur-md text-xs leading-relaxed animate-in fade-in zoom-in-95 pointer-events-auto`}
-        >
-          {title && (
-            <div className="font-semibold text-neutral-100 text-[11px] mb-1.5 pb-1 border-b border-neutral-800 flex items-center gap-1.5">
-              <span>💡</span>
-              <span>{title}</span>
-            </div>
-          )}
-          <div className="text-[11px] leading-relaxed text-neutral-300 font-normal">
-            {content}
-          </div>
-          <div
-            className={`absolute ${
-              isBottom
-                ? 'bottom-full left-2 sm:left-1/2 sm:-translate-x-1/2 border-4 border-transparent border-b-neutral-900 dark:border-b-neutral-950'
-                : 'top-full left-2 sm:left-1/2 sm:-translate-x-1/2 border-4 border-transparent border-t-neutral-900 dark:border-t-neutral-950'
-            }`}
-          />
-        </div>
-      )}
+      {modalNode}
     </span>
   );
 }
@@ -1701,7 +1722,7 @@ export function DocumentUploader({
                         content={
                           <div className="space-y-2.5 text-[11px]">
                             <div>
-                              <strong className="text-white block font-semibold flex items-center gap-1.5">
+                              <strong className="text-slate-900 dark:text-white block font-semibold flex items-center gap-1.5">
                                 <span>📚</span>
                                 <span>{t('ai_uploader.pedagogical_academic_title', isEn ? 'Academic / Self-Study Mode:' : 'Modo Estudio / Académico:')}</span>
                               </strong>
@@ -1712,7 +1733,7 @@ export function DocumentUploader({
                               </p>
                             </div>
                             <div>
-                              <strong className="text-amber-300 block font-semibold flex items-center gap-1.5">
+                              <strong className="text-amber-700 dark:text-amber-400 block font-semibold flex items-center gap-1.5">
                                 <span>👨‍🏫</span>
                                 <span>{t('ai_uploader.pedagogical_didactic_title', isEn ? 'Teacher / Didactic Mode:' : 'Modo Docente / Didáctico:')}</span>
                               </strong>
@@ -1788,10 +1809,10 @@ export function DocumentUploader({
                             title={t('ai_uploader.tooltip_exam_questions_title', isEn ? 'Exam Question Limit (Max 40)' : 'Límite de Preguntas del Examen (Máx 40)')}
                             content={
                               <div className="space-y-1.5 text-[11px]">
-                                <p className="text-neutral-200">
+                                <p className="text-slate-700 dark:text-neutral-300">
                                   {t('ai_uploader.tooltip_exam_questions_desc', isEn ? 'Configure how many questions you want for this exam. The chunking engine will distribute them proportionally across all selected pages.' : 'Define cuántas preguntas quieres para este examen. El motor de chunking las distribuirá proporcionalmente por todas las páginas seleccionadas para que ninguna quede sin evaluar.')}
                                 </p>
-                                <div className="p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[10px]">
+                                <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 text-xs">
                                   {isEn ? '💡 Maximum 40 questions per batch for optimal evaluation quality.' : '💡 Máximo 40 preguntas por lote para mantener la máxima calidad de evaluación.'}
                                 </div>
                               </div>
@@ -1854,27 +1875,27 @@ export function DocumentUploader({
                             content={
                               <div className="space-y-2 text-[11px]">
                                 <div>
-                                  <span className="font-semibold text-amber-300 block">🎯 {isEn ? 'Mixed Test (Bloom Distribution):' : 'Test Variado (Bloom):'}</span>
+                                  <span className="font-semibold text-amber-700 dark:text-amber-400 block">🎯 {isEn ? 'Mixed Test (Bloom Distribution):' : 'Test Variado (Bloom):'}</span>
                                   <span className="text-neutral-300">{isEn ? 'Combines formats balancing Bloom taxonomy levels (Remember, Understand, Apply, Analyze).' : 'Combina los 4 formatos distribuyendo las preguntas según los niveles cognitivos de Bloom (Recordar, Comprender, Aplicar y Analizar).'}</span>
                                 </div>
                                 <div>
-                                  <span className="font-semibold text-amber-300 block">📝 {isEn ? 'Multiple Choice Only:' : 'Solo Test:'}</span>
+                                  <span className="font-semibold text-amber-700 dark:text-amber-400 block">📝 {isEn ? 'Multiple Choice Only:' : 'Solo Test:'}</span>
                                   <span className="text-neutral-300">{isEn ? '4 options with single solution and reasoning.' : '4 alternativas con solución única argumentada y distractores plausibles.'}</span>
                                 </div>
                                 <div>
-                                  <span className="font-semibold text-amber-300 block">⚖️ {isEn ? 'True or False Only:' : 'Solo Verdadero o Falso:'}</span>
+                                  <span className="font-semibold text-amber-700 dark:text-amber-400 block">⚖️ {isEn ? 'True or False Only:' : 'Solo Verdadero o Falso:'}</span>
                                   <span className="text-neutral-300">{isEn ? 'Statements with reasoned justification.' : 'Afirmaciones críticas para discriminación conceptual con justificación argumentada.'}</span>
                                 </div>
                                 <div>
-                                  <span className="font-semibold text-amber-300 block">🧩 {isEn ? 'Cloze / Fill-in Only:' : 'Solo Huecos (Cloze):'}</span>
+                                  <span className="font-semibold text-amber-700 dark:text-amber-400 block">🧩 {isEn ? 'Cloze / Fill-in Only:' : 'Solo Huecos (Cloze):'}</span>
                                   <span className="text-neutral-300">{isEn ? 'Complete key concepts in brackets [...].' : 'Completar conceptos clave y fórmulas entre corchetes [...].'}</span>
                                 </div>
                                 <div>
-                                  <span className="font-semibold text-amber-300 block">🃏 {isEn ? 'Short Question Only:' : 'Solo Pregunta Corta:'}</span>
+                                  <span className="font-semibold text-amber-700 dark:text-amber-400 block">🃏 {isEn ? 'Short Question Only:' : 'Solo Pregunta Corta:'}</span>
                                   <span className="text-neutral-300">{isEn ? 'Direct questions and concise key answers.' : 'Preguntas directas y respuestas concisas orientadas a lo esencial.'}</span>
                                 </div>
                                 <div>
-                                  <span className="font-semibold text-amber-300 block">📋 {isEn ? 'Cases with Rubric:' : 'Casos con Rúbrica:'}</span>
+                                  <span className="font-semibold text-amber-700 dark:text-amber-400 block">📋 {isEn ? 'Cases with Rubric:' : 'Casos con Rúbrica:'}</span>
                                   <span className="text-neutral-300">{isEn ? 'Open cases with grading rubric for teachers.' : 'Casos prácticos de desarrollo con rúbrica de corrección y baremo de puntos para el docente.'}</span>
                                 </div>
                               </div>
@@ -1964,23 +1985,23 @@ export function DocumentUploader({
                           content={
                             <div className="space-y-2 text-[11px]">
                               <div>
-                                <span className="font-semibold text-amber-300 block">🤖 {isEn ? 'Auto-detection:' : 'Detección Automática:'}</span>
+                                <span className="font-semibold text-amber-700 dark:text-amber-400 block">🤖 {isEn ? 'Auto-detection:' : 'Detección Automática:'}</span>
                                 <span className="text-neutral-300">{isEn ? 'AI adapts difficulty to document complexity.' : 'La IA analiza la complejidad léxica y sintáctica del material para calibrar la dificultad.'}</span>
                               </div>
                               <div>
-                                <span className="font-semibold text-amber-300 block">🎨 {isEn ? '9-11 years (Elementary / 4º-6º Primaria):' : 'Primaria (9-11 años):'}</span>
+                                <span className="font-semibold text-amber-700 dark:text-amber-400 block">🎨 {isEn ? '9-11 years (Elementary / 4º-6º Primaria):' : 'Primaria (9-11 años):'}</span>
                                 <span className="text-neutral-300">{isEn ? 'Concepts explained with clear examples, simple language, and everyday metaphors.' : 'Conceptos explicados con ejemplos claros, lenguaje sencillo y metáforas cotidianas.'}</span>
                               </div>
                               <div>
-                                <span className="font-semibold text-amber-300 block">🎒 {isEn ? '12-14 years (Middle School / 1º-2º ESO):' : '12-14 años (1º-2º ESO):'}</span>
+                                <span className="font-semibold text-amber-700 dark:text-amber-400 block">🎒 {isEn ? '12-14 years (Middle School / 1º-2º ESO):' : '12-14 años (1º-2º ESO):'}</span>
                                 <span className="text-neutral-300">{isEn ? 'Accessible vocabulary, direct conceptual understanding.' : 'Lenguaje accesible, enunciados directos y foco en conceptos troncales.'}</span>
                               </div>
                               <div>
-                                <span className="font-semibold text-amber-300 block">🏫 {isEn ? '15-17 years (High School / 3º-4º ESO / Bachillerato):' : '15-17 años (3º-4º ESO / Bachillerato):'}</span>
+                                <span className="font-semibold text-amber-700 dark:text-amber-400 block">🏫 {isEn ? '15-17 years (High School / 3º-4º ESO / Bachillerato):' : '15-17 años (3º-4º ESO / Bachillerato):'}</span>
                                 <span className="text-neutral-300">{isEn ? 'Pre-university analytical depth, cause-effect reasoning.' : 'Rigor preuniversitario, pensamiento crítico y análisis de relaciones causa-efecto.'}</span>
                               </div>
                               <div>
-                                <span className="font-semibold text-amber-300 block">🏛️ {isEn ? 'University & Professional (+18 years):' : 'Universidad / Oposiciones (+18 años):'}</span>
+                                <span className="font-semibold text-amber-700 dark:text-amber-400 block">🏛️ {isEn ? 'University & Professional (+18 years):' : 'Universidad / Oposiciones (+18 años):'}</span>
                                 <span className="text-neutral-300">{isEn ? 'Technical rigor, legal precision, advanced evaluation.' : 'Máximo rigor técnico, plazos legales, excepciones y evaluación conceptual avanzada.'}</span>
                               </div>
                             </div>
@@ -2067,7 +2088,7 @@ export function DocumentUploader({
                           content={
                             <div className="space-y-2">
                               <div>
-                                <strong className="text-white block font-semibold">
+                                <strong className="text-slate-900 dark:text-white block font-semibold">
                                   {t('ai_uploader.tooltip_exhaustive_normal_title', isEn ? '💡 Normal Mode:' : '💡 Modo Normal:')}
                                 </strong>
                                 <span className="text-neutral-300">
@@ -2080,7 +2101,7 @@ export function DocumentUploader({
                                 </span>
                               </div>
                               <div>
-                                <strong className="text-violet-300 block font-semibold">
+                                <strong className="text-violet-700 dark:text-violet-400 block font-semibold">
                                   {t('ai_uploader.tooltip_exhaustive_mode_title', isEn ? '⚡ Exhaustive Mode:' : '⚡ Modo Exhaustivo:')}
                                 </strong>
                                 <span className="text-neutral-300">
