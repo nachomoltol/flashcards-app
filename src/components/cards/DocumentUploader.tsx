@@ -199,9 +199,9 @@ function InfoTooltip({ content, title, placement = 'bottom' }: InfoTooltipProps)
           role="tooltip"
           className={`absolute z-[60] ${
             isBottom
-              ? 'top-full mt-2 left-0 sm:left-1/2 sm:-translate-x-1/2'
-              : 'bottom-full mb-2 left-0 sm:left-1/2 sm:-translate-x-1/2'
-          } w-[calc(100vw-3rem)] max-w-xs sm:max-w-sm max-h-80 overflow-y-auto p-3.5 rounded-xl bg-neutral-900/98 dark:bg-neutral-950/98 text-neutral-200 border border-neutral-700/80 shadow-2xl backdrop-blur-md text-xs leading-relaxed animate-in fade-in zoom-in-95 pointer-events-auto`}
+              ? 'top-full mt-1.5 left-0 sm:left-1/2 sm:-translate-x-1/2'
+              : 'bottom-full mb-1.5 left-0 sm:left-1/2 sm:-translate-x-1/2'
+          } w-[270px] xs:w-[290px] sm:w-80 max-w-[calc(100vw-3.5rem)] max-h-72 overflow-y-auto p-3.5 rounded-xl bg-neutral-900/98 dark:bg-neutral-950/98 text-neutral-200 border border-neutral-700/80 shadow-2xl backdrop-blur-md text-xs leading-relaxed animate-in fade-in zoom-in-95 pointer-events-auto`}
         >
           {title && (
             <div className="font-semibold text-neutral-100 text-[11px] mb-1.5 pb-1 border-b border-neutral-800 flex items-center gap-1.5">
@@ -215,8 +215,8 @@ function InfoTooltip({ content, title, placement = 'bottom' }: InfoTooltipProps)
           <div
             className={`absolute ${
               isBottom
-                ? 'bottom-full left-4 sm:left-1/2 sm:-translate-x-1/2 border-4 border-transparent border-b-neutral-900 dark:border-b-neutral-950'
-                : 'top-full left-4 sm:left-1/2 sm:-translate-x-1/2 border-4 border-transparent border-t-neutral-900 dark:border-t-neutral-950'
+                ? 'bottom-full left-2 sm:left-1/2 sm:-translate-x-1/2 border-4 border-transparent border-b-neutral-900 dark:border-b-neutral-950'
+                : 'top-full left-2 sm:left-1/2 sm:-translate-x-1/2 border-4 border-transparent border-t-neutral-900 dark:border-t-neutral-950'
             }`}
           />
         </div>
@@ -866,7 +866,7 @@ export function DocumentUploader({
   };
 
   return (
-    <div className="w-full space-y-5">
+    <div className="w-full space-y-5 overflow-x-hidden">
       {/* Error Banner Amigable con Botón de Reintento Rápido */}
       {errorMessage && (
         <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/30 text-rose-950 dark:text-rose-300 text-xs sm:text-sm flex flex-col sm:flex-row items-start justify-between gap-3 animate-in fade-in">
@@ -1082,7 +1082,7 @@ export function DocumentUploader({
         </div>
       ) : (
         /* Stepper Flow (3 Pasos) */
-        <div className="space-y-2.5 sm:space-y-3.5">
+        <div className="space-y-2.5 sm:space-y-3.5 overflow-x-hidden">
           <input
             ref={fileInputRef}
             type="file"
@@ -1687,7 +1687,7 @@ export function DocumentUploader({
               PASO 3: Modo y Enfoque
              ======================================================== */}
           {currentStep === 3 && selectedFile && (
-            <div className="space-y-3 sm:space-y-3.5 animate-in fade-in duration-150">
+            <div className="space-y-3 sm:space-y-3.5 animate-in fade-in duration-150 overflow-x-hidden">
               {/* Selector Enfoque Pedagógico: Académico vs Docente */}
               <div className="p-3.5 sm:p-4 rounded-2xl bg-neutral-50 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 space-y-2.5">
                 <div className="flex items-center justify-between">
