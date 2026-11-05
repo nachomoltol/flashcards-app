@@ -1,0 +1,63 @@
+name: iOS Build CI
+
+on:
+  push:
+    branches:
+      - 'feature/ios-build'
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    name: Build iOS (Xcode)
+    runs-on: macos-14
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js v20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies (clean install)
+        run: npm ci
+
+      - name: Build web application
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
+
+      - name: Sync Capacitor iOS
+        run: npx cap sync ios
+
+      - name: Verify and build Xcode project (unsigned)
+        run: |
+          if [ ! -d "ios/App/App.xcworkspace" ]; then
+            echo "Inicializando envoltorio App.xcworkspace para App.xcodeproj..."
+            mkdir -p ios/App/App.xcworkspace
+            cat << 'EOF' > ios/App/App.xcworkspace/contents.xcworkspacedata
+<?xml version="1.0" encoding="UTF-8"?>
+<Workspace
+   version = "1.0">
+   <FileRef
+      location = "group:App.xcodeproj">
+   </FileRef>
+</Workspace>
+EOF
+          fi
+          xcodebuild -workspace ios/App/App.xcworkspace -scheme App -configuration Release -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build
+
+      - name: Upload diagnostic logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build-diagnostic-logs
+          path: |
+            ~/Library/Developer/Xcode/DerivedData/**/Logs/Build/*.xcactivitylog
+            ios/App/
+          if-no-files-found: ignore
+          retention-days: 7
