@@ -672,12 +672,18 @@ export function ProModal({
                       Alta Capacidad: Hasta 120 generaciones de mazos al mes (¡suficiente para todo tu temario!), sin pausas por anuncios y con acceso total.
                     </p>
 
-                    {/* CUMPLIMIENTO GOOGLE PLAY: EN APP NATIVA ANDROID NO SE MUESTRA CHECKOUT DE PAGO DIRECTO */}
+                    {/* CUMPLIMIENTO GOOGLE PLAY & APP STORE (GUIDELINE 3.1.3): EN APP NATIVA NO SE MUESTRA CHECKOUT DE PAGO DIRECTO */}
                     <div className="p-3 sm:p-3.5 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-500/30 text-purple-900 dark:text-purple-200 text-xs flex items-start gap-2.5 shadow-sm">
                       <Globe className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0 mt-0.5" />
-                      <p className="leading-relaxed font-medium">
-                        Gestiona o activa tu suscripción PRO desde nuestra web oficial <strong className="font-bold underline decoration-purple-400 underline-offset-2">flashmente.com</strong> iniciando sesión con esta misma cuenta.
-                      </p>
+                      {platform.isNativeIOS ? (
+                        <p className="leading-relaxed font-medium">
+                          Flashmente PRO está disponible para cuentas con suscripción activa. Esta versión móvil permite desbloquear generaciones adicionales mediante vídeos bonificados.
+                        </p>
+                      ) : (
+                        <p className="leading-relaxed font-medium">
+                          Gestiona o activa tu suscripción PRO desde nuestra web oficial <strong className="font-bold underline decoration-purple-400 underline-offset-2">flashmente.com</strong> iniciando sesión con esta misma cuenta.
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -1134,13 +1140,19 @@ export function ProModal({
                   </div>
                 </div>
 
-                {/* BOTÓN DIRECTO A STRIPE EN WEB / MENSAJE INFORMATIVO EN APPS NATIVAS (GOOGLE PLAY & APP STORE 3.1.1) */}
+                {/* BOTÓN DIRECTO A STRIPE EN WEB / MENSAJE INFORMATIVO EN APPS NATIVAS (GOOGLE PLAY & APP STORE 3.1.1 / 3.1.3) */}
                 {platform.isNativeApp ? (
                   <div className="p-3.5 sm:p-4 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-500/30 text-purple-900 dark:text-purple-200 text-xs sm:text-sm flex items-start gap-2.5 shadow-sm">
                     <Globe className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600 dark:text-purple-400 shrink-0 mt-0.5" />
-                    <p className="leading-relaxed font-medium">
-                      Gestiona o activa tu suscripción PRO desde nuestra web oficial <strong className="font-bold underline decoration-purple-400 underline-offset-2">flashmente.com</strong> iniciando sesión con esta misma cuenta.
-                    </p>
+                    {platform.isNativeIOS ? (
+                      <p className="leading-relaxed font-medium">
+                        Flashmente PRO está disponible para cuentas con suscripción activa. Esta versión móvil permite desbloquear generaciones adicionales mediante vídeos bonificados.
+                      </p>
+                    ) : (
+                      <p className="leading-relaxed font-medium">
+                        Gestiona o activa tu suscripción PRO desde nuestra web oficial <strong className="font-bold underline decoration-purple-400 underline-offset-2">flashmente.com</strong> iniciando sesión con esta misma cuenta.
+                      </p>
+                    )}
                   </div>
                 ) : (
                   <>
