@@ -4,8 +4,9 @@ import { detectPlatform } from './platform';
 import { useProModalStore } from '@/stores/useProModalStore';
 
 /**
- * Identificadores de Google AdMob para Flashmente (Android Producción & Pruebas).
+ * Identificadores de Google AdMob para Flashmente (Android e iOS, Producción & Pruebas).
  * @see https://developers.google.com/admob/android/test-ads
+ * @see https://developers.google.com/admob/ios/test-ads
  */
 export const ADMOB_CONFIG = {
   // App ID oficial de Flashmente en Google AdMob (Producción)
@@ -17,6 +18,12 @@ export const ADMOB_CONFIG = {
   TEST_REWARDED_AD_UNIT_ID: 'ca-app-pub-3940256099942544/5224354917',
   TEST_REWARDED_INTERSTITIAL_AD_UNIT_ID: 'ca-app-pub-3940256099942544/5354046379',
   TEST_APP_ID: 'ca-app-pub-8525131609099761~8283952108',
+
+  // iOS: ID de anuncio bonificado de pruebas oficial de Google para iOS
+  IOS_TEST_REWARDED_AD_UNIT_ID: 'ca-app-pub-3940256099942544/1712485313',
+  // iOS: ID de producción (inyectable por variable de entorno; usa el de pruebas hasta crear el bloque real)
+  IOS_REWARDED_AD_UNIT_ID:
+    process.env.NEXT_PUBLIC_ADMOB_IOS_REWARDED_ID || 'ca-app-pub-3940256099942544/1712485313',
 };
 
 export interface AdReward {
@@ -110,7 +117,7 @@ export async function preloadRewardedAd(adUnitId?: string): Promise<void> {
   if (typeof window === 'undefined') return;
 
   const platform = detectPlatform();
-  if (!platform.isNativeAndroid) return;
+  if (!platform.isNativeApp) return;
 
   // Si ya está listo en memoria o actualmente cargándose, omitir llamada redundante
   if (isAdPreloaded || isPreloading) return;
@@ -169,7 +176,7 @@ export async function initializeAdMob(): Promise<boolean> {
   if (isAdMobInitialized) return true;
 
   const platform = detectPlatform();
-  if (!platform.isNativeAndroid) {
+  if (!platform.isNativeApp) {
     isAdMobInitialized = true;
     return true;
   }
@@ -177,6 +184,11 @@ export async function initializeAdMob(): Promise<boolean> {
   const AdMob = getCapacitorAdMobPlugin();
   if (AdMob) {
     try {
+      // 0. iOS: solicitar autorización de App Tracking Transparency (ATT) antes de inicializar
+      if (platform.isNativeIOS) {
+        await requestIOSTrackingAuthorization(AdMob);
+      }
+
       // 1. Solicitar y verificar consentimiento UMP (GDPR) antes de inicializar
       await requestConsent();
 
@@ -204,10 +216,39 @@ export async function initializeAdMob(): Promise<boolean> {
 }
 
 /**
- * Determina el ID de bloque bonificado a utilizar según el entorno (desarrollo vs producción).
+ * iOS: Solicita la autorización de App Tracking Transparency (ATT) si el plugin la expone
+ * y el estado aún no ha sido determinado. Nunca bloquea la inicialización si falla.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function requestIOSTrackingAuthorization(AdMob: any): Promise<void> {
+  try {
+    if (typeof AdMob.trackingAuthorizationStatus === 'function') {
+      const { status } = (await AdMob.trackingAuthorizationStatus()) || {};
+      if (status && status !== 'notDetermined') return;
+    }
+    if (typeof AdMob.requestTrackingAuthorization === 'function') {
+      await AdMob.requestTrackingAuthorization();
+    }
+  } catch (err) {
+    console.warn('[AdMob] No se pudo solicitar la autorización ATT en iOS:', err);
+  }
+}
+
+/**
+ * Determina el ID de bloque bonificado a utilizar según la plataforma (Android / iOS)
+ * y el entorno (desarrollo vs producción).
  */
 function getEffectiveRewardedAdUnitId(requestedId?: string): { adId: string; isTesting: boolean } {
   const isDev = process.env.NODE_ENV !== 'production';
+  const platform = detectPlatform();
+
+  // iOS nativo: los IDs de Android no son válidos en iOS
+  if (platform.isNativeIOS) {
+    const adId = requestedId || (isDev ? ADMOB_CONFIG.IOS_TEST_REWARDED_AD_UNIT_ID : ADMOB_CONFIG.IOS_REWARDED_AD_UNIT_ID);
+    return { adId, isTesting: isDev || adId === ADMOB_CONFIG.IOS_TEST_REWARDED_AD_UNIT_ID };
+  }
+
+  // Android nativo (comportamiento original sin cambios)
   if (isDev) {
     return {
       adId: requestedId || ADMOB_CONFIG.TEST_REWARDED_AD_UNIT_ID,
@@ -229,15 +270,15 @@ export async function showAdMobRewardedAd(
 ): Promise<ShowRewardedAdResult> {
   const platform = detectPlatform();
 
-  // Si la plataforma NO es Android nativo (Capacitor Android), los anuncios bonificados no aplican:
+  // Si la plataforma NO es una App nativa (Capacitor Android o iOS), los anuncios bonificados no aplican:
   // Se bloquea cualquier crédito simulado y se abre directamente el modal PRO.
-  if (!platform.isNativeAndroid) {
+  if (!platform.isNativeApp) {
     if (typeof window !== 'undefined') {
       useProModalStore.getState().openProModal(false);
     }
     return {
       completed: false,
-      error: 'Los anuncios bonificados están disponibles exclusivamente en la aplicación Android. Pasa a PRO para continuar en Web.',
+      error: 'Los anuncios bonificados están disponibles exclusivamente en las aplicaciones móviles. Pasa a PRO para continuar en Web.',
     };
   }
 

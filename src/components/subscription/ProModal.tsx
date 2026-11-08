@@ -73,14 +73,14 @@ export function ProModal({
     message: string;
   } | null>(null);
 
-  // Precarga proactiva en segundo plano del anuncio bonificado al abrir el modal en Android nativo
+  // Precarga proactiva en segundo plano del anuncio bonificado al abrir el modal en App nativa (Android / iOS)
   useEffect(() => {
-    if (isOpen && platform.isNativeAndroid) {
+    if (isOpen && platform.isNativeApp) {
       preloadRewardedAd().catch((err) => {
         console.warn('Fallo en precarga reactiva de ProModal:', err);
       });
     }
-  }, [isOpen, platform.isNativeAndroid]);
+  }, [isOpen, platform.isNativeApp]);
 
   // Estado para el canje secundario de código promocional
   const [promoCode, setPromoCode] = useState('');
@@ -642,9 +642,9 @@ export function ProModal({
           {isLimitReached ? (
             <div className="space-y-2.5 sm:space-y-3 animate-in fade-in">
               {/* =======================================================
-                  ANDORID NATIVO: NIVEL 1 (PRO STRIPE) + NIVEL 2 (ADMOB)
+                  APP NATIVA (ANDROID / iOS): NIVEL 1 (PRO INFO SIN CHECKOUT) + NIVEL 2 (ADMOB)
                  ======================================================= */}
-              {platform.isNativeAndroid ? (
+              {platform.isNativeApp ? (
                 <div className="space-y-2.5 sm:space-y-3">
                   {/* NIVEL 1 (PRIORITARIO / BOTÓN PRINCIPAL): PLAN PRO STRIPE */}
                   <div className="relative p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-neutral-900 border-2 border-purple-600 dark:border-purple-500 shadow-md shadow-purple-500/10 dark:shadow-purple-950/40 space-y-2.5">
@@ -826,7 +826,8 @@ export function ProModal({
                 </div>
               ) : platform.isIOS ? (
                 /* =======================================================
-                   IPHONE / IOS: BOTÓN STRIPE + OPCIÓN GRATUITA (AVISO IOS)
+                   SAFARI MÓVIL EN IPHONE (FUERA DE LA APP NATIVA):
+                   BOTÓN STRIPE + OPCIÓN GRATUITA (AVISO IOS)
                    ======================================================= */
                 <div className="space-y-2.5 sm:space-y-3">
                   {/* Tarjeta Plan Mensual Alta Capacidad (3,50€/mes) */}
@@ -1133,8 +1134,8 @@ export function ProModal({
                   </div>
                 </div>
 
-                {/* BOTÓN DIRECTO A STRIPE EN WEB / MENSAJE INFORMATIVO EN ANDROID NATIVO (GOOGLE PLAY COMPLIANCE) */}
-                {platform.isNativeAndroid ? (
+                {/* BOTÓN DIRECTO A STRIPE EN WEB / MENSAJE INFORMATIVO EN APPS NATIVAS (GOOGLE PLAY & APP STORE 3.1.1) */}
+                {platform.isNativeApp ? (
                   <div className="p-3.5 sm:p-4 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-500/30 text-purple-900 dark:text-purple-200 text-xs sm:text-sm flex items-start gap-2.5 shadow-sm">
                     <Globe className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600 dark:text-purple-400 shrink-0 mt-0.5" />
                     <p className="leading-relaxed font-medium">
