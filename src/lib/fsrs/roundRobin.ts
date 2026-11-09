@@ -34,9 +34,14 @@ export interface CardQueueItem {
   created_at?: string;
 }
 
+export interface QueueOptions {
+  includeFuture?: boolean;
+}
+
 export function buildInterleavedCombinedQueue<T extends CardQueueItem>(
   cards: T[],
-  deckOrder?: string[]
+  deckOrder?: string[],
+  options: QueueOptions = { includeFuture: false }
 ): T[] {
   if (!cards || cards.length === 0) return [];
 
@@ -49,8 +54,7 @@ export function buildInterleavedCombinedQueue<T extends CardQueueItem>(
   for (const card of cards) {
     const isNew =
       (card.state === 0 || card.state === undefined) &&
-      (!card.reps || card.reps === 0) &&
-      !card.last_review;
+      (!card.reps || card.reps === 0);
 
     if (isNew) {
       newCards.push(card);
@@ -116,10 +120,15 @@ export function buildInterleavedCombinedQueue<T extends CardQueueItem>(
   }
 
   // 4. Composición de la Cola Final:
-  // [Repasos FSRS Vencidos] -> [Nuevas Intercaladas Round-Robin] -> [Repasos Futuros]
+  // [Repasos FSRS Vencidos] -> [Nuevas Intercaladas Round-Robin]
+  // Salvo que se solicite includeFuture: true explícitamente, se descartan futureReviews
   const dueReviews = reviewCards.filter((c) => new Date(c.due).getTime() <= nowTime);
   const futureReviews = reviewCards.filter((c) => new Date(c.due).getTime() > nowTime);
 
-  return [...dueReviews, ...interleavedNewCards, ...futureReviews];
+  if (options.includeFuture) {
+    return [...dueReviews, ...interleavedNewCards, ...futureReviews];
+  }
+
+  return [...dueReviews, ...interleavedNewCards];
 }
 
