@@ -7,6 +7,7 @@ import { checkUserGenerationQuota } from '@/lib/quotaGuard';
 import { createInitialCardValues } from '@/lib/fsrs';
 import { deduplicateCandidateCards } from '@/lib/cardDeduplication';
 import { randomizeMultipleChoiceCard } from '@/lib/cardUtils';
+import { GEMINI_DEFAULT_MODEL } from '@/lib/aiConfig';
 import type {
   CardFormat,
   GeneratedCard,
@@ -14,7 +15,7 @@ import type {
   HandwrittenNotesInput,
 } from '@/types/cards';
 
-const GEMINI_MODEL = 'gemini-2.5-flash';
+const GEMINI_MODEL = GEMINI_DEFAULT_MODEL;
 
 const flashcardSchema = {
   type: Type.OBJECT,
@@ -221,7 +222,7 @@ function processGeneratedCards(
  * Server Action: Genera tarjetas a partir de fotos de apuntes manuscritos.
  * Procesamiento 100% efímero en memoria RAM:
  * - Recibe imágenes en base64.
- * - Transmite inlineData a Gemini 2.5 Flash.
+ * - Transmite inlineData a Gemini 3.1 Flash-Lite.
  * - Inserta tarjetas en la tabla `cards` de Supabase.
  * - 0 bytes guardados en Supabase Storage o File API.
  */
@@ -316,7 +317,7 @@ IDIOMA DE SALIDA: ${language === 'en' ? 'Inglés' : 'Español'}.`;
       { text: systemPromptText },
     ];
 
-    // 4. Inferencia con Gemini 2.5 Flash
+    // 4. Inferencia con Gemini 3.1 Flash-Lite
     const response = await ai.models.generateContent({
       model: GEMINI_MODEL,
       contents,

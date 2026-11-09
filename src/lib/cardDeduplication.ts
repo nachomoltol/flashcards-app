@@ -1,4 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
+import { GEMINI_EMBEDDING_MODEL } from '@/lib/aiConfig';
 import type { GeneratedCard } from '@/types/cards';
 
 export interface CardHistoryItem {
@@ -194,7 +195,7 @@ async function batchEmbedTexts(
   if (!texts || texts.length === 0) return [];
 
   const ai = new GoogleGenAI({ apiKey });
-  const EMBED_MODEL = 'gemini-embedding-001';
+  const EMBED_MODEL = GEMINI_EMBEDDING_MODEL;
   const BATCH_SIZE = 30;
   const allEmbeddings: number[][] = [];
 
