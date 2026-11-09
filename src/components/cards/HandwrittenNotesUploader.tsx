@@ -14,10 +14,12 @@ import {
   AlertCircle,
   CheckCircle2,
 } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { compressImage } from '@/lib/imageCompression';
 import { generateCardsFromNotesAction } from '@/app/actions/generateCardsFromNotes';
 import { useAuthStore, useCardStore, useDeckStore, useProModalStore, useLanguageStore } from '@/stores';
+import { InfoTooltip } from './InfoTooltip';
 import type { CardFormat } from '@/types/cards';
 
 interface NotePageItem {
@@ -42,10 +44,12 @@ export function HandwrittenNotesUploader({
   const { fetchDeckById } = useDeckStore();
   const { openProModal } = useProModalStore();
   const { language, t } = useLanguageStore();
+  const isEn = language === 'en';
 
   const [pages, setPages] = useState<NotePageItem[]>([]);
   const [cardFormat, setCardFormat] = useState<CardFormat>('multiple_choice');
   const [cardCount, setCardCount] = useState<number>(10);
+  const [isPracticalMode, setIsPracticalMode] = useState<boolean>(false);
   const [customPrompt, setCustomPrompt] = useState('');
 
   const [status, setStatus] = useState<'idle' | 'compressing' | 'generating' | 'success'>('idle');
@@ -53,10 +57,8 @@ export function HandwrittenNotesUploader({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [generatedCount, setGeneratedCount] = useState<number | null>(null);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
-
-  const isNative = typeof window !== 'undefined' && Boolean((window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.());
 
   // Agregar archivos nuevos a la lista respetando el límite de 10
   const addFilesToPages = useCallback((newFiles: File[]) => {
@@ -77,64 +79,86 @@ export function HandwrittenNotesUploader({
 
   // Manejador del input de archivos web
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      addFilesToPages(Array.from(e.target.files));
+    try {
+      if (e.target.files && e.target.files.length > 0) {
+        addFilesToPages(Array.from(e.target.files));
+      }
+    } catch (err: unknown) {
+      console.error('[HandwrittenNotesUploader] Error al leer archivos:', err);
+    } finally {
+      // Reiniciar value para permitir seleccionar los mismos archivos en reintentos
       e.target.value = '';
     }
   };
 
-  // Disparar cámara nativa con Capacitor (iOS / Android) o input web
-  const handleCaptureCamera = async () => {
-    if (isNative) {
+  // Convertir path nativo de foto a File y agregar a la cola
+  const handleAddNativePhoto = async (webPath: string) => {
+    try {
+      const response = await fetch(webPath);
+      const blob = await response.blob();
+      const file = new File([blob], `apunte_cam_${Date.now()}.jpg`, { type: 'image/jpeg' });
+      addFilesToPages([file]);
+    } catch (err) {
+      console.error('[HandwrittenNotesUploader] Error al convertir foto nativa:', err);
+    }
+  };
+
+  // Disparar captura de foto con cámara (Nativo Capacitor o fallback a input HTML5)
+  const handleTakePhoto = async (e?: React.MouseEvent) => {
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+
+    if (Capacitor.isNativePlatform()) {
       try {
+        const check = await Camera.checkPermissions();
+        if (check.camera !== 'granted') {
+          const req = await Camera.requestPermissions({ permissions: ['camera'] });
+          if (req.camera !== 'granted') {
+            cameraInputRef.current?.click();
+            return;
+          }
+        }
         const photo = await Camera.getPhoto({
           resultType: CameraResultType.Uri,
           source: CameraSource.Camera,
-          quality: 90,
+          quality: 85,
           allowEditing: false,
         });
-
         if (photo.webPath) {
-          const response = await fetch(photo.webPath);
-          const blob = await response.blob();
-          const file = new File([blob], `apunte_cam_${Date.now()}.jpg`, { type: 'image/jpeg' });
-          addFilesToPages([file]);
+          await handleAddNativePhoto(photo.webPath);
         }
-      } catch (err: unknown) {
-        // El usuario canceló la captura o denegó permisos
-        console.warn('Captura de cámara cancelada o no disponible:', err);
+      } catch (err) {
+        console.warn('Native camera error or cancelled, falling back to input:', err);
+        cameraInputRef.current?.click();
       }
     } else {
       cameraInputRef.current?.click();
     }
   };
 
-  // Disparar selector de galería nativa con Capacitor o input web
-  const handlePickGallery = async () => {
-    if (isNative) {
-      try {
-        const remaining = 10 - pages.length;
-        const result = await Camera.pickImages({
-          quality: 90,
-          limit: Math.max(1, remaining),
-        });
+  // Disparar selector de galería (Nativo Capacitor o fallback a input HTML5)
+  const handlePickGallery = async (e?: React.MouseEvent) => {
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
 
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const remaining = Math.max(1, 10 - pages.length);
+        const result = await Camera.pickImages({
+          quality: 85,
+          limit: remaining,
+        });
         if (result.photos && result.photos.length > 0) {
-          const files: File[] = [];
-          for (const [index, p] of result.photos.entries()) {
-            if (p.webPath) {
-              const res = await fetch(p.webPath);
-              const blob = await res.blob();
-              files.push(new File([blob], `apunte_gal_${Date.now()}_${index}.jpg`, { type: 'image/jpeg' }));
-            }
+          for (const p of result.photos) {
+            if (p.webPath) await handleAddNativePhoto(p.webPath);
           }
-          addFilesToPages(files);
         }
-      } catch (err: unknown) {
-        console.warn('Selección de galería cancelada o no disponible:', err);
+      } catch (err) {
+        console.warn('Native gallery error or cancelled, falling back to input:', err);
+        galleryInputRef.current?.click();
       }
     } else {
-      fileInputRef.current?.click();
+      galleryInputRef.current?.click();
     }
   };
 
@@ -233,6 +257,7 @@ export function HandwrittenNotesUploader({
         cardCount,
         customPrompt: customPrompt.trim() || undefined,
         language,
+        isPracticalMode: Boolean(isPracticalMode),
       });
 
       if (!result.success || !result.cards || result.cards.length === 0) {
@@ -271,7 +296,7 @@ export function HandwrittenNotesUploader({
     <div className="space-y-5 animate-in fade-in duration-200">
       {/* Inputs ocultos para web */}
       <input
-        ref={fileInputRef}
+        ref={galleryInputRef}
         type="file"
         accept="image/jpeg,image/png,image/webp"
         multiple
@@ -281,25 +306,11 @@ export function HandwrittenNotesUploader({
       <input
         ref={cameraInputRef}
         type="file"
-        accept="image/jpeg,image/png,image/webp"
+        accept="image/*"
         capture="environment"
         className="hidden"
         onChange={handleFileInputChange}
       />
-
-      {/* Banner de Garantía Efímera y Privacidad */}
-      <div className="p-3 rounded-xl bg-violet-500/10 border border-violet-500/20 text-violet-800 dark:text-violet-200 text-xs flex items-start gap-2.5">
-        <span className="text-base shrink-0">🛡️</span>
-        <div className="leading-relaxed">
-          <strong className="font-semibold text-violet-700 dark:text-violet-300">
-            {t('notes_ocr.privacy_title', 'Procesamiento 100% Efímero en Memoria:')}
-          </strong>{' '}
-          {t(
-            'notes_ocr.privacy_desc',
-            'Tus fotos de cuadernos o pizarras se analizan exclusivamente en memoria RAM para extraer las flashcards y se descartan de inmediato sin guardarse en almacenamiento permanente.'
-          )}
-        </div>
-      </div>
 
       {/* Estados de Notificación */}
       {errorMessage && (
@@ -329,8 +340,8 @@ export function HandwrittenNotesUploader({
             <button
               type="button"
               disabled={status !== 'idle' || pages.length >= 10}
-              onClick={handleCaptureCamera}
-              className="w-full sm:flex-1 py-2.5 px-3.5 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700/80 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-800 dark:text-neutral-200 font-semibold text-xs transition flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 cursor-pointer"
+              onClick={handleTakePhoto}
+              className="w-full sm:flex-1 py-2.5 px-3.5 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700/80 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-800 dark:text-neutral-200 font-semibold text-xs transition flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer min-h-[44px]"
             >
               <CameraIcon className="w-4 h-4 text-violet-500" />
               <span>{t('notes_ocr.btn_camera', 'Hacer Foto con Cámara')}</span>
@@ -340,7 +351,7 @@ export function HandwrittenNotesUploader({
               type="button"
               disabled={status !== 'idle' || pages.length >= 10}
               onClick={handlePickGallery}
-              className="w-full sm:flex-1 py-2.5 px-3.5 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700/80 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-800 dark:text-neutral-200 font-semibold text-xs transition flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 cursor-pointer"
+              className="w-full sm:flex-1 py-2.5 px-3.5 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700/80 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-800 dark:text-neutral-200 font-semibold text-xs transition flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer min-h-[44px]"
             >
               <ImageIcon className="w-4 h-4 text-indigo-500" />
               <span>{t('notes_ocr.btn_gallery', 'Seleccionar de Galería')}</span>
@@ -350,7 +361,18 @@ export function HandwrittenNotesUploader({
           {/* Área de Drag & Drop para Escritorio */}
           {pages.length === 0 && (
             <div
-              onClick={handlePickGallery}
+              onClick={(e) => {
+                e.preventDefault();
+                handlePickGallery();
+              }}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (status !== 'idle') return;
+                if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                  addFilesToPages(Array.from(e.dataTransfer.files));
+                }
+              }}
               className="p-8 sm:p-10 rounded-2xl border-2 border-dashed border-neutral-300 dark:border-neutral-800 hover:border-violet-500 dark:hover:border-violet-500 bg-neutral-50/60 dark:bg-neutral-900/40 text-center flex flex-col items-center justify-center space-y-2 cursor-pointer transition"
             >
               <div className="w-12 h-12 rounded-2xl bg-violet-500/10 text-violet-500 flex items-center justify-center">
@@ -439,7 +461,10 @@ export function HandwrittenNotesUploader({
                   <button
                     type="button"
                     disabled={status !== 'idle'}
-                    onClick={handlePickGallery}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handlePickGallery();
+                    }}
                     className="aspect-[4/3] rounded-xl border-2 border-dashed border-neutral-300 dark:border-neutral-800 hover:border-violet-500 flex flex-col items-center justify-center gap-1 text-neutral-400 hover:text-violet-500 transition cursor-pointer"
                   >
                     <Plus className="w-5 h-5" />
@@ -487,6 +512,74 @@ export function HandwrittenNotesUploader({
                 }}
                 className="w-full text-xs font-semibold px-3.5 py-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:border-violet-500 transition disabled:opacity-50"
               />
+            </div>
+          </div>
+
+          {/* Selector Enfoque de las Preguntas: Teórico vs Práctico */}
+          <div className="space-y-1.5 pt-1">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 flex items-center">
+                <span>{t('ai_uploader.approach_label', isEn ? 'Question approach' : 'Enfoque de las preguntas')}</span>
+                <InfoTooltip
+                  placement="bottom"
+                  title={t('ai_uploader.tooltip_approach_title', isEn ? 'Theoretical vs. Practical Approach' : 'Enfoque Teórico vs. Práctico')}
+                  content={
+                    <div className="space-y-2 text-[11px] leading-relaxed">
+                      <p>
+                        <strong className="text-slate-900 dark:text-white block font-semibold mb-0.5">
+                          📖 {t('ai_uploader.approach_theoretical', isEn ? 'Theoretical' : 'Teórico')}:
+                        </strong>
+                        {isEn
+                          ? 'Direct concepts, definitions, legal deadlines, and factual recall. Ideal for initial study and memorizing essential data.'
+                          : 'Conceptos directos, definiciones, plazos legales y datos concretos. Ideal para primera vuelta y fijar contenidos esenciales.'}
+                      </p>
+                      <p>
+                        <strong className="text-violet-600 dark:text-violet-400 block font-semibold mb-0.5">
+                          🎯 {t('ai_uploader.approach_practical', isEn ? 'Practical' : 'Práctico')}:
+                        </strong>
+                        {isEn
+                          ? 'Problem-based learning, clinical patient vignettes, legal cases, and professional decision-making scenarios.'
+                          : 'Supuestos prácticos, casos clínicos de pacientes, problemas de derecho y situaciones reales de toma de decisiones.'}
+                      </p>
+                    </div>
+                  }
+                />
+              </label>
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md font-mono text-neutral-500 dark:text-neutral-400">
+                {isPracticalMode
+                  ? `🎯 ${t('ai_uploader.approach_practical', isEn ? 'Practical' : 'Práctico')}`
+                  : `📖 ${t('ai_uploader.approach_theoretical', isEn ? 'Theoretical' : 'Teórico')}`}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                disabled={status !== 'idle'}
+                onClick={() => setIsPracticalMode(false)}
+                className={`min-h-[44px] py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                  !isPracticalMode
+                    ? 'bg-violet-500/10 border-violet-500 text-violet-700 dark:text-violet-300 ring-1 ring-violet-500 font-bold'
+                    : 'bg-neutral-50 dark:bg-neutral-950 border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:border-neutral-300'
+                } disabled:opacity-50`}
+              >
+                <span>📖</span>
+                <span>{t('ai_uploader.approach_theoretical', isEn ? 'Theoretical' : 'Teórico')}</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={status !== 'idle'}
+                onClick={() => setIsPracticalMode(true)}
+                className={`min-h-[44px] py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                  isPracticalMode
+                    ? 'bg-violet-500/10 border-violet-500 text-violet-700 dark:text-violet-300 ring-1 ring-violet-500 font-bold'
+                    : 'bg-neutral-50 dark:bg-neutral-950 border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:border-neutral-300'
+                } disabled:opacity-50`}
+              >
+                <span>🎯</span>
+                <span>{t('ai_uploader.approach_practical', isEn ? 'Practical' : 'Práctico')}</span>
+              </button>
             </div>
           </div>
 

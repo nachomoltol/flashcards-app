@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { PDFDocument } from 'pdf-lib';
 import { parseDocxIntoVirtualPages } from '@/lib/docxPagination';
 import { supabase } from '@/lib/supabase';
@@ -13,6 +12,7 @@ import { FormattedCardView } from './FormattedCardView';
 import { PrintExamSheet } from '@/components/decks';
 import { cleanupUploadedDocument } from '@/lib/storageCleanup';
 import { purgeExpiredDocumentsAction } from '@/app/actions/storageCleanup';
+import { InfoTooltip } from './InfoTooltip';
 
 interface DocumentUploaderProps {
   deckId: string;
@@ -149,103 +149,6 @@ function validateFile(file: File): string | null {
   return null;
 }
 
-interface InfoTooltipProps {
-  content: React.ReactNode;
-  title?: string;
-  placement?: 'top' | 'bottom';
-}
-
-function InfoTooltip({ content, title }: InfoTooltipProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setIsOpen(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen]);
-
-  const modalNode = isOpen && mounted && typeof document !== 'undefined' ? (
-    createPortal(
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={title ? 'info-modal-title' : undefined}
-        className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150"
-        onClick={() => setIsOpen(false)}
-      >
-        <div
-          className="w-[90vw] max-w-md mx-auto p-5 rounded-2xl bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Cabecera */}
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-neutral-800">
-            <h3 id="info-modal-title" className="text-sm sm:text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <span>💡</span>
-              <span>{title || 'Información de Ayuda'}</span>
-            </h3>
-            <button
-              type="button"
-              onClick={() => setIsOpen(false)}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:text-neutral-400 dark:hover:text-neutral-200 hover:bg-slate-100 dark:hover:bg-neutral-800 transition cursor-pointer"
-              aria-label="Cerrar diálogo de ayuda"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-
-          {/* Cuerpo */}
-          <div className="max-h-[65vh] overflow-y-auto pr-1 text-xs sm:text-sm text-slate-700 dark:text-neutral-300 leading-relaxed space-y-3">
-            {content}
-          </div>
-
-          {/* Pie */}
-          <div className="pt-2 flex justify-end">
-            <button
-              type="button"
-              onClick={() => setIsOpen(false)}
-              className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-semibold text-xs sm:text-sm transition shadow-md shadow-violet-600/20 active:scale-95 cursor-pointer text-center"
-            >
-              Entendido
-            </button>
-          </div>
-        </div>
-      </div>,
-      document.body
-    )
-  ) : null;
-
-  return (
-    <span className="inline-flex items-center align-middle">
-      <button
-        type="button"
-        aria-label="Más información"
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          setIsOpen(true);
-        }}
-        className="w-4 h-4 rounded-full bg-neutral-200 dark:bg-neutral-800 hover:bg-neutral-300 dark:hover:bg-neutral-700 text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white flex items-center justify-center text-[10px] font-bold font-mono transition-colors cursor-pointer ml-1.5 focus:outline-none focus:ring-1 focus:ring-violet-500"
-      >
-        ?
-      </button>
-
-      {modalNode}
-    </span>
-  );
-}
-
 export function DocumentUploader({
   deckId,
   onSuccess,
@@ -271,6 +174,7 @@ export function DocumentUploader({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [cardFormat, setCardFormat] = useState<CardFormat>('multiple_choice');
   const [cardCount, setCardCount] = useState<number>(10);
+  const [isPracticalMode, setIsPracticalMode] = useState<boolean>(false);
   const [customPrompt, setCustomPrompt] = useState('');
   const [pageStart, setPageStart] = useState<string>('');
   const [pageEnd, setPageEnd] = useState<string>('');
@@ -730,6 +634,7 @@ export function DocumentUploader({
           pedagogicalMode: effectivePedagogicalMode,
           docenteFormat,
           targetAudience,
+          isPracticalMode: Boolean(isPracticalMode),
         });
       } catch (actionErr: unknown) {
         const actionErrMsg =
@@ -829,6 +734,7 @@ export function DocumentUploader({
     setGeneratedCardsPreview([]);
     setNextCursorPage(null);
     setLastStartPage(null);
+    setIsPracticalMode(false);
     if (uploadedStorage?.storagePath) {
       cleanupUploadedDocument(uploadedStorage.storagePath);
     }
@@ -1779,6 +1685,92 @@ export function DocumentUploader({
                 </div>
               </div>
 
+              {/* Selector Enfoque de las Preguntas: Teórico vs Práctico */}
+              <div className="p-3 sm:p-3.5 rounded-2xl bg-neutral-50 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm">🎯</span>
+                    <label className="text-xs font-semibold uppercase tracking-wider text-slate-800 dark:text-neutral-300 flex items-center">
+                      <span>{t('ai_uploader.approach_label', isEn ? 'Question approach' : 'Enfoque de las preguntas')}</span>
+                      <InfoTooltip
+                        placement="bottom"
+                        title={t('ai_uploader.tooltip_approach_title', isEn ? 'Theoretical vs. Practical Approach' : 'Enfoque Teórico vs. Práctico')}
+                        content={
+                          <div className="space-y-2 text-[11px] leading-relaxed">
+                            <p>
+                              <strong className="text-slate-900 dark:text-white block font-semibold mb-0.5">
+                                📖 {t('ai_uploader.approach_theoretical', isEn ? 'Theoretical' : 'Teórico')}:
+                              </strong>
+                              {isEn
+                                ? 'Direct concepts, definitions, legal deadlines, and factual recall. Ideal for initial study and memorizing essential data.'
+                                : 'Conceptos directos, definiciones, plazos legales y datos concretos. Ideal para primera vuelta y fijar contenidos esenciales.'}
+                            </p>
+                            <p>
+                              <strong className="text-violet-600 dark:text-violet-400 block font-semibold mb-0.5">
+                                🎯 {t('ai_uploader.approach_practical', isEn ? 'Practical' : 'Práctico')}:
+                              </strong>
+                              {isEn
+                                ? 'Problem-based learning, clinical patient vignettes, legal cases, and professional decision-making scenarios.'
+                                : 'Supuestos prácticos, casos clínicos de pacientes, problemas de derecho y situaciones reales de toma de decisiones.'}
+                            </p>
+                          </div>
+                        }
+                      />
+                    </label>
+                  </div>
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md font-mono text-neutral-500 dark:text-neutral-400">
+                    {isPracticalMode
+                      ? `🎯 ${t('ai_uploader.approach_practical', isEn ? 'Practical' : 'Práctico')}`
+                      : `📖 ${t('ai_uploader.approach_theoretical', isEn ? 'Theoretical' : 'Teórico')}`}
+                  </span>
+                </div>
+
+                {/* Segmented Control de 2 botones (>= 44px de alto para tap targets mobile-first) */}
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    disabled={isBusy}
+                    onClick={() => setIsPracticalMode(false)}
+                    className={`min-h-[44px] p-2.5 sm:p-3 rounded-xl border text-left transition-all flex items-start gap-2 cursor-pointer active:scale-[0.99] ${
+                      !isPracticalMode
+                        ? 'border-violet-500 bg-violet-500/10 ring-1 ring-violet-500 text-slate-900 dark:text-white shadow-sm'
+                        : 'border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/60 hover:border-neutral-300 dark:hover:border-neutral-700 text-slate-800 dark:text-neutral-300'
+                    }`}
+                  >
+                    <span className="text-base sm:text-lg shrink-0 mt-0.5">📖</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs sm:text-sm font-semibold leading-tight">
+                        {t('ai_uploader.approach_theoretical', isEn ? 'Theoretical' : 'Teórico')}
+                      </p>
+                      <p className="text-[10px] text-slate-600 dark:text-slate-400 leading-tight mt-0.5 font-normal">
+                        {t('ai_uploader.approach_theoretical_desc', isEn ? 'Direct concepts & facts' : 'Conceptos y datos directos')}
+                      </p>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={isBusy}
+                    onClick={() => setIsPracticalMode(true)}
+                    className={`min-h-[44px] p-2.5 sm:p-3 rounded-xl border text-left transition-all flex items-start gap-2 cursor-pointer active:scale-[0.99] ${
+                      isPracticalMode
+                        ? 'border-violet-500 bg-violet-500/10 ring-1 ring-violet-500 text-slate-900 dark:text-white shadow-sm'
+                        : 'border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/60 hover:border-neutral-300 dark:hover:border-neutral-700 text-slate-800 dark:text-neutral-300'
+                    }`}
+                  >
+                    <span className="text-base sm:text-lg shrink-0 mt-0.5">🎯</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs sm:text-sm font-semibold leading-tight">
+                        {t('ai_uploader.approach_practical', isEn ? 'Practical' : 'Práctico')}
+                      </p>
+                      <p className="text-[10px] text-slate-600 dark:text-slate-400 leading-tight mt-0.5 font-normal">
+                        {t('ai_uploader.approach_practical_desc', isEn ? 'Real-world cases & scenarios' : 'Casos y situaciones reales')}
+                      </p>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
               {/* Botones de navegación Paso 2 */}
               <div className="flex items-center justify-between pt-1.5 sm:pt-2">
                 <button
@@ -1936,6 +1928,69 @@ export function DocumentUploader({
              ======================================================== */}
           {currentStep === 4 && selectedFile && (
             <div className="space-y-2 sm:space-y-2.5 animate-in fade-in duration-150 overflow-x-hidden">
+              {/* Selector de Enfoque Cognitivo: Teórico vs Práctico */}
+              <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white/50 dark:bg-neutral-900/50 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">🎯</span>
+                    <label className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+                      {t('ai_uploader.approach_label', 'Enfoque de las preguntas')}
+                    </label>
+                  </div>
+                  <InfoTooltip
+                    title={t('ai_uploader.tooltip_approach_title', 'Enfoque Teórico vs. Práctico')}
+                    content={
+                      <div className="space-y-2 text-xs leading-relaxed">
+                        <div>
+                          <strong className="text-slate-900 dark:text-white block font-semibold">
+                            📖 Modo Teórico:
+                          </strong>
+                          <span className="text-neutral-400">
+                            Fija conceptos directos, definiciones de manual, artículos legales exactos, fechas o vocabulario puro.
+                          </span>
+                        </div>
+                        <div>
+                          <strong className="text-emerald-500 dark:text-emerald-400 block font-semibold">
+                            🎯 Modo Práctico:
+                          </strong>
+                          <span className="text-neutral-400">
+                            Plantea mini-casos clínicos, supuestos de hecho jurídicos, problemas aplicados o situaciones reales donde debes tomar una decisión.
+                          </span>
+                        </div>
+                      </div>
+                    }
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsPracticalMode(false)}
+                    className={`min-h-[44px] flex items-center justify-center gap-2 rounded-xl text-xs font-medium border transition-all cursor-pointer ${
+                      !isPracticalMode
+                        ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 border-transparent shadow-sm'
+                        : 'bg-neutral-100 dark:bg-neutral-800/60 text-neutral-600 dark:text-neutral-400 border-neutral-200 dark:border-neutral-700/60'
+                    }`}
+                  >
+                    <span>📖</span>
+                    <span>{t('ai_uploader.approach_theoretical', 'Teórico')}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsPracticalMode(true)}
+                    className={`min-h-[44px] flex items-center justify-center gap-2 rounded-xl text-xs font-medium border transition-all cursor-pointer ${
+                      isPracticalMode
+                        ? 'bg-emerald-600 text-white border-transparent shadow-sm'
+                        : 'bg-neutral-100 dark:bg-neutral-800/60 text-neutral-600 dark:text-neutral-400 border-neutral-200 dark:border-neutral-700/60'
+                    }`}
+                  >
+                    <span>🎯</span>
+                    <span>{t('ai_uploader.approach_practical', 'Práctico')}</span>
+                  </button>
+                </div>
+              </div>
+
               {/* Selector Enfoque Pedagógico: Académico vs Docente */}
               <div className="p-3 sm:p-3.5 rounded-2xl bg-neutral-50 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 space-y-2">
                 <div className="flex items-center justify-between">
@@ -2455,6 +2510,13 @@ export function DocumentUploader({
                     <span>⚡ Quirúrgico</span>
                   </span>
                 )}
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium border ${
+                  isPracticalMode 
+                    ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800' 
+                    : 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800'
+                }`}>
+                  <span>{isPracticalMode ? '🎯 Práctico' : '📖 Teórico'}</span>
+                </span>
               </div>
             </div>
 

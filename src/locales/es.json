@@ -305,6 +305,13 @@
     "error_save_failed": "No se pudo guardar la tarjeta en Supabase. Verifica tu conexión."
   },
   "ai_uploader": {
+    "approach_label": "Enfoque de las preguntas",
+    "approach_theoretical": "Teórico",
+    "approach_theoretical_desc": "Conceptos y datos directos",
+    "approach_practical": "Práctico",
+    "approach_practical_desc": "Casos y situaciones reales",
+    "tooltip_approach_title": "Enfoque Teórico vs. Práctico",
+    "tooltip_approach_body": "Elige Teórico para memorizar definiciones, conceptos clave, plazos legales y datos concretos (ideal para primera vuelta y fijar contenidos esenciales). Elige Práctico para plantear problemas aplicados, viñetas clínicas de pacientes, supuestos de derecho, toma de decisiones profesionales y contextos reales.",
     "card_format_label": "Formato de Tarjetas",
     "card_count_label": "Cantidad de Tarjetas",
     "pdf_page_warning": "⚠️ Atención a la numeración: Introduce el número de página que indica el contador superior de tu visor PDF (ej. 96 de 569), NO el número impreso en la esquina de la hoja. Las portadas y prólogos hacen que estos números no coincidan.",

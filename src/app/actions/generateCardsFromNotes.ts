@@ -8,6 +8,7 @@ import { createInitialCardValues } from '@/lib/fsrs';
 import { deduplicateCandidateCards } from '@/lib/cardDeduplication';
 import { randomizeMultipleChoiceCard } from '@/lib/cardUtils';
 import { GEMINI_DEFAULT_MODEL } from '@/lib/aiConfig';
+import { buildDidacticModeDirective, PRACTICAL_MODE_DIRECTIVE } from '@/lib/aiDirectives';
 import type {
   CardFormat,
   GeneratedCard,
@@ -238,6 +239,10 @@ export async function generateCardsFromNotesAction(
     customPrompt,
     focusInstruction,
     language = 'es',
+    isPracticalMode = false,
+    pedagogicalMode = 'academic',
+    docenteFormat = 'mixed_test',
+    targetAudience = 'auto',
   } = input;
 
   if (!deckId) {
@@ -289,6 +294,10 @@ export async function generateCardsFromNotesAction(
 
     const effectiveInstruction = (customPrompt || focusInstruction || '').trim();
 
+    const isDocenteMode = pedagogicalMode === 'didactic' || (pedagogicalMode as unknown as string) === 'docente';
+    const didacticDirective = isDocenteMode ? `\n\n${buildDidacticModeDirective(docenteFormat, targetAudience)}\n` : '';
+    const practicalDirective = isPracticalMode ? `\n\n${PRACTICAL_MODE_DIRECTIVE}\n` : '';
+
     // 3. Prompt pedagógico especializado para OCR de caligrafía
     const systemPromptText = `ERES UN PROFESOR UNIVERSITARIO Y ANALISTA CALIGRÁFICO MULTIMODAL ESPECIALIZADO EN EXTRACCIÓN DIDÁCTICA DE APUNTES MANUSCRITOS.
 Has recibido ${sortedImages.length} foto(s) consecutiva(s) de apuntes manuscritos (cuadernos, esquemas conceptuales, pizarras o fichas de estudio).
@@ -306,7 +315,7 @@ TUS REGLAS DE ORO:
    - Cada tarjeta debe ser autocontenida y evaluar un concepto concreto.
 
 3. REGLAS DE FORMATO SOLICITADO ("${cardFormat}"):
-${getFormatInstructions(cardFormat)}
+${getFormatInstructions(cardFormat)}${didacticDirective}${practicalDirective}
 
 ${effectiveInstruction ? `INSTRUCCIÓN ESPECÍFICA DEL ESTUDIANTE:\n"${effectiveInstruction}"\n` : ''}
 

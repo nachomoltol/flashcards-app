@@ -53,6 +53,7 @@ export interface MultimodalDocumentInput {
   language?: string;
   coreExhaustedPrevious?: boolean;
   isExhaustiveMode?: boolean;
+  isPracticalMode?: boolean;
   pedagogicalMode?: 'academic' | 'didactic';
   docenteFormat?: DocenteFormat;
   targetAudience?: TargetAudience;
@@ -69,6 +70,7 @@ export interface UrlCardInput {
   existingQuestions?: string[];
   language?: string;
   coreExhaustedPrevious?: boolean;
+  isPracticalMode?: boolean;
   pedagogicalMode?: 'academic' | 'didactic';
   docenteFormat?: DocenteFormat;
   targetAudience?: TargetAudience;
@@ -89,6 +91,7 @@ export interface HandwrittenNotesInput {
   customPrompt?: string;
   focusInstruction?: string;
   language?: string;
+  isPracticalMode?: boolean;
   pedagogicalMode?: 'academic' | 'didactic';
   docenteFormat?: DocenteFormat;
   targetAudience?: TargetAudience;
