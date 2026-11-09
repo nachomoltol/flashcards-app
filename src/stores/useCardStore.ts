@@ -22,7 +22,7 @@ interface CardState {
   isLoading: boolean;
   error: string | null;
   fetchCardsByDeck: (deckId: string) => Promise<CardRow[]>;
-  fetchCardsByDecks: (deckIds: string[]) => Promise<CardRow[]>;
+  fetchCardsByDecks: (deckIds: string[], onlyDue?: boolean) => Promise<CardRow[]>;
   createCard: (
     deckId: string,
     front: string,
@@ -94,7 +94,7 @@ export const useCardStore = create<CardState>((set) => ({
     }
   },
 
-  fetchCardsByDecks: async (deckIds: string[]) => {
+  fetchCardsByDecks: async (deckIds: string[], onlyDue: boolean = true) => {
     if (!deckIds || deckIds.length === 0) {
       set({ cards: [], isLoading: false, error: null });
       return [];
@@ -102,10 +102,17 @@ export const useCardStore = create<CardState>((set) => ({
 
     set({ isLoading: true, error: null });
     try {
-      const { data, error } = await supabase
+      const nowIso = new Date().toISOString();
+      let query = supabase
         .from('cards')
         .select('*, decks(id, title, color)')
         .in('deck_id', deckIds);
+
+      if (onlyDue) {
+        query = query.lte('due', nowIso);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -114,7 +121,10 @@ export const useCardStore = create<CardState>((set) => ({
       // Algoritmo Round-Robin para Mazos Combinados (Práctica Intercalada + FSRS):
       // - Tarjetas con historial FSRS (repaso/aprendizaje): gobernadas estrictamente por FSRS.
       // - Tarjetas nuevas sin historial: agrupadas por mazo y entrelazadas cíclicamente en Round-Robin.
-      const interleavedCards = buildInterleavedCombinedQueue(loadedCards, deckIds);
+      // - Salvo que se indique includeFuture: true, no se incluyen repasos futuros
+      const interleavedCards = buildInterleavedCombinedQueue(loadedCards, deckIds, {
+        includeFuture: !onlyDue,
+      });
 
       set({ cards: interleavedCards, isLoading: false });
       return interleavedCards;
