@@ -74,4 +74,24 @@ export interface UrlCardInput {
   targetAudience?: TargetAudience;
 }
 
+export interface NoteImageInput {
+  order: number;
+  mimeType: 'image/jpeg' | 'image/webp' | 'image/png';
+  base64Data: string;
+}
+
+export interface HandwrittenNotesInput {
+  deckId: string;
+  userId?: string;
+  images: NoteImageInput[];
+  cardFormat?: CardFormat;
+  cardCount?: number;
+  customPrompt?: string;
+  focusInstruction?: string;
+  language?: string;
+  pedagogicalMode?: 'academic' | 'didactic';
+  docenteFormat?: DocenteFormat;
+  targetAudience?: TargetAudience;
+}
+
 

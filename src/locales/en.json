@@ -239,6 +239,7 @@
     "modal_ai_sub": "Gemini Flash • Multimodal & Multiple Formats",
     "modal_ai_existing_hint": "To add more cards, re-upload your document. AI will review the {count} existing cards in this deck to generate fresh content without duplicates.",
     "tab_upload": "Upload Document",
+    "tab_notes": "Handwritten Notes",
     "tab_url": "Web Link / YouTube",
     "tab_topic": "By Topic or Prompt",
     "topic_desc": "Enter the topic or concept and select your desired format and quantity. Gemini will generate UP TO {count} high-precision study cards covering key concepts evenly and save them to this deck with FSRS.",

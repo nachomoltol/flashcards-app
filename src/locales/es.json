@@ -239,6 +239,7 @@
     "modal_ai_sub": "Gemini Flash • Multimodal & Múltiples Formatos",
     "modal_ai_existing_hint": "Para añadir más tarjetas al mazo, vuelve a subir el documento que usaste para crear las preguntas. La IA revisará las {count} tarjetas existentes en este mazo para generar contenido nuevo sin repetir.",
     "tab_upload": "Subir Documento",
+    "tab_notes": "Fotos de Apuntes",
     "tab_url": "Enlace Web / YouTube",
     "tab_topic": "Por Tema o Prompt",
     "topic_desc": "Introduce el tema o concepto y selecciona el formato y cantidad deseada. Gemini generará HASTA {count} tarjetas de estudio de alta precisión cubriendo los conceptos clave de forma equitativa y las guardará automáticamente en este mazo con FSRS.",
