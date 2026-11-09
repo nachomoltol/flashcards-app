@@ -11,6 +11,7 @@ import { createClient } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { randomizeMultipleChoiceCard } from '@/lib/cardUtils';
 import { deduplicateCandidateCards } from '@/lib/cardDeduplication';
+import { GEMINI_DEFAULT_MODEL } from '@/lib/aiConfig';
 import type {
   CardFormat,
   GeneratedCard,
@@ -1204,7 +1205,7 @@ function parseGeminiBatchResponse(rawText: string | undefined): ParsedGeminiBatc
 /**
  * Modelo global de Google Gemini unificado para rentabilidad y generaciones ilimitadas sostenibles.
  */
-const GEMINI_MODEL = 'gemini-3.1-flash-lite';
+const GEMINI_MODEL = GEMINI_DEFAULT_MODEL;
 
 /**
  * Configuración estricta de Gemini generada dinámicamente según el formato de tarjeta:

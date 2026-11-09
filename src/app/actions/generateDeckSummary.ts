@@ -3,6 +3,7 @@
 import { GoogleGenAI, Type } from '@google/genai';
 import { createClient } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import { GEMINI_DEFAULT_MODEL } from '@/lib/aiConfig';
 import type { Database, Json } from '@/types/database';
 
 export interface KeyConceptItem {
@@ -48,7 +49,7 @@ export interface GenerateDeckSummaryResult {
   error?: string;
 }
 
-const GEMINI_MODEL = 'gemini-3.1-flash-lite';
+const GEMINI_MODEL = GEMINI_DEFAULT_MODEL;
 
 /**
  * Obtiene un cliente de Supabase administrativo con SERVICE_ROLE_KEY para acciones de servidor,

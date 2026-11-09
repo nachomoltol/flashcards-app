@@ -2,6 +2,7 @@
 
 import { GoogleGenAI } from '@google/genai';
 import { supabase } from '@/lib/supabase';
+import { GEMINI_DEFAULT_MODEL } from '@/lib/aiConfig';
 
 export interface SocraticTutorInput {
   deckTitle: string;
@@ -34,7 +35,7 @@ export interface TutorQuotaStatus {
   requiresAd: boolean;
 }
 
-const GEMINI_MODEL = 'gemini-3.1-flash-lite';
+const GEMINI_MODEL = GEMINI_DEFAULT_MODEL;
 
 /**
  * Resuelve el ID de usuario autenticado en la sesión (cookie de servidor o JWT enviado por cliente Capacitor)
