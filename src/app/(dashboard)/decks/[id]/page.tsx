@@ -2,10 +2,10 @@
 
 import { use, useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
-import { Search, X, Award, Zap, FileText, HelpCircle, Plus, Sparkles, Share2, Printer } from 'lucide-react';
+import { Search, X, Award, Zap, FileText, HelpCircle, Plus, Sparkles, Share2, Printer, Camera } from 'lucide-react';
 import { useDeckStore, useCardStore, useProModalStore, useAuthStore, useLanguageStore } from '@/stores';
 import { supabase } from '@/lib/supabase';
-import { CardEditor, DocumentUploader, FormattedCardView, UrlCardGenerator } from '@/components/cards';
+import { CardEditor, DocumentUploader, FormattedCardView, UrlCardGenerator, HandwrittenNotesUploader } from '@/components/cards';
 import { ShareDeckModal, QuickStudyGuideModal, StudyModesHelpModal, PrintExamSheet } from '@/components/decks';
 import { generateCardsAction } from '@/app/actions/generateCards';
 import { checkUserGenerationQuota } from '@/lib/quotaGuard';
@@ -32,7 +32,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
   // Estado para el modal de Generación con IA (Gemini Flash)
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [uploaderStep, setUploaderStep] = useState<1 | 2 | 3 | 4>(1);
-  const [aiMode, setAiMode] = useState<'multimodal' | 'url' | 'topic'>('multimodal');
+  const [aiMode, setAiMode] = useState<'multimodal' | 'notes' | 'url' | 'topic'>('multimodal');
   const [aiTopic, setAiTopic] = useState('');
   const [aiCardFormat, setAiCardFormat] = useState<CardFormat>('multiple_choice');
   const [aiCardCount, setAiCardCount] = useState<number>(10);
@@ -734,7 +734,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
 
             {/* Mode Tabs - Ocultas en los pasos 2 y 3 para liberar espacio vertical en pantallas móviles */}
             {(aiMode !== 'multimodal' || uploaderStep === 1) && (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 p-1 rounded-xl bg-neutral-100 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 text-xs">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 p-1 rounded-xl bg-neutral-100 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 text-xs">
                 <button
                   type="button"
                   onClick={() => {
@@ -743,16 +743,33 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                     setAiError(null);
                     setAiSuccessMessage(null);
                   }}
-                  className={`py-2 px-3 rounded-lg font-medium transition flex items-center justify-center gap-2 cursor-pointer ${
+                  className={`py-2 px-2.5 rounded-lg font-medium transition flex items-center justify-center gap-1.5 cursor-pointer ${
                     aiMode === 'multimodal'
                       ? 'bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-sm'
                       : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
                   }`}
                 >
-                  <svg className="w-4 h-4 text-violet-500 dark:text-violet-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-3.5 h-3.5 text-violet-500 dark:text-violet-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                   </svg>
-                  <span>{t('deck_detail.tab_upload')}</span>
+                  <span className="truncate">{t('deck_detail.tab_upload', 'Archivos')}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAiMode('notes');
+                    setUploaderStep(1);
+                    setAiError(null);
+                    setAiSuccessMessage(null);
+                  }}
+                  className={`py-2 px-2.5 rounded-lg font-medium transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                    aiMode === 'notes'
+                      ? 'bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-sm'
+                      : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
+                  }`}
+                >
+                  <Camera className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400 shrink-0" />
+                  <span className="truncate">{t('deck_detail.tab_notes', 'Fotos Apuntes')}</span>
                 </button>
                 <button
                   type="button"
@@ -762,16 +779,16 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                     setAiError(null);
                     setAiSuccessMessage(null);
                   }}
-                  className={`py-2 px-3 rounded-lg font-medium transition flex items-center justify-center gap-2 cursor-pointer ${
+                  className={`py-2 px-2.5 rounded-lg font-medium transition flex items-center justify-center gap-1.5 cursor-pointer ${
                     aiMode === 'url'
                       ? 'bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-sm'
                       : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
                   }`}
                 >
-                  <svg className="w-4 h-4 text-rose-500 dark:text-rose-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-3.5 h-3.5 text-rose-500 dark:text-rose-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                   </svg>
-                  <span>{t('deck_detail.tab_url')}</span>
+                  <span className="truncate">{t('deck_detail.tab_url', 'Enlace')}</span>
                 </button>
                 <button
                   type="button"
@@ -781,16 +798,16 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                     setAiError(null);
                     setAiSuccessMessage(null);
                   }}
-                  className={`py-2 px-3 rounded-lg font-medium transition flex items-center justify-center gap-2 cursor-pointer ${
+                  className={`py-2 px-2.5 rounded-lg font-medium transition flex items-center justify-center gap-1.5 cursor-pointer ${
                     aiMode === 'topic'
                       ? 'bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-sm'
                       : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
                   }`}
                 >
-                  <svg className="w-4 h-4 text-indigo-500 dark:text-indigo-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                   </svg>
-                  <span>{t('deck_detail.tab_topic')}</span>
+                  <span className="truncate">{t('deck_detail.tab_topic', 'Por Tema')}</span>
                 </button>
               </div>
             )}
@@ -813,6 +830,16 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                   setUploaderStep(1);
                 }}
                 onStepChange={setUploaderStep}
+              />
+            ) : aiMode === 'notes' ? (
+              <HandwrittenNotesUploader
+                deckId={id}
+                onSuccess={() => {
+                  fetchDeckById(id);
+                  fetchCardsByDeck(id);
+                  setIsAiModalOpen(false);
+                }}
+                onCancel={() => setIsAiModalOpen(false)}
               />
             ) : aiMode === 'url' ? (
               <UrlCardGenerator
