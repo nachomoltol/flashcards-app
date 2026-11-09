@@ -22,6 +22,9 @@ import {
   Download,
   Mail,
   Globe,
+  RefreshCw,
+  Laptop,
+  Smartphone,
 } from 'lucide-react';
 import { useProModalStore, ProFeatureName } from '@/stores/useProModalStore';
 import { useAuthStore, useLanguageStore } from '@/stores';
@@ -70,14 +73,14 @@ export function ProModal({
     message: string;
   } | null>(null);
 
-  // Precarga proactiva en segundo plano del anuncio bonificado al abrir el modal en Android nativo
+  // Precarga proactiva en segundo plano del anuncio bonificado al abrir el modal en App nativa (Android / iOS)
   useEffect(() => {
-    if (isOpen && platform.isNativeAndroid) {
+    if (isOpen && platform.isNativeApp) {
       preloadRewardedAd().catch((err) => {
         console.warn('Fallo en precarga reactiva de ProModal:', err);
       });
     }
-  }, [isOpen, platform.isNativeAndroid]);
+  }, [isOpen, platform.isNativeApp]);
 
   // Estado para el canje secundario de código promocional
   const [promoCode, setPromoCode] = useState('');
@@ -90,6 +93,20 @@ export function ProModal({
   } | null>(null);
 
   // Estado de nivel y consumo para mensajes de límite duros (50 Free / 120 Pro) y cupo de anuncios
+  // Estado para la comprobación manual interactiva de saldo en PC / Web
+  const [isCheckingBalance, setIsCheckingBalance] = useState(false);
+  const [balanceFeedback, setBalanceFeedback] = useState<{
+    type: 'success' | 'info';
+    message: string;
+  } | null>(null);
+
+  // Estado para la pantalla de elección post-recompensa en Android nativo (Continuar en PC vs Generar en móvil)
+  const [rewardChoicePrompt, setRewardChoicePrompt] = useState<{
+    show: boolean;
+    bonusCredits: number;
+  } | null>(null);
+  const [mobileNoticeToast, setMobileNoticeToast] = useState<string | null>(null);
+
   const [userLimits, setUserLimits] = useState<{
     tier: 'free' | 'pro' | 'vip';
     count: number;
@@ -137,6 +154,10 @@ export function ProModal({
   }, [isOpen, user?.id, fetchUserLimits]);
 
   const handleClose = useCallback(() => {
+    setRewardChoicePrompt(null);
+    setMobileNoticeToast(null);
+    setBalanceFeedback(null);
+    setIsCheckingBalance(false);
     if (propOnClose) {
       propOnClose();
     }
@@ -206,6 +227,120 @@ export function ProModal({
         )
       );
       setIsSubscribing(false);
+    }
+  };
+
+  // Flujo Híbrido Web (PC): Comprobar saldo en la nube tras ver vídeo en móvil Android
+  const handleCheckBalance = async () => {
+    if (!user?.id || isCheckingBalance) return;
+    setIsCheckingBalance(true);
+    setBalanceFeedback(null);
+
+    try {
+      let accessToken: string | undefined;
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        accessToken = sessionData?.session?.access_token;
+      } catch (sessionErr) {
+        console.warn('[ProModal] No se pudo obtener el token de sesión:', sessionErr);
+      }
+
+      const res = await getUserLimitsAction(user.id, accessToken);
+      if (res.success) {
+        setUserLimits({
+          tier: res.tier,
+          count: res.count,
+          bonusCredits: res.bonusCredits,
+          welcomeGenerations: res.welcomeGenerations,
+          tutorConsultationsCount: res.tutorConsultationsCount,
+          tutorAdsUsed: res.tutorAdsUsed,
+          adsUsedInCycle: res.adsUsedInCycle,
+          remainingAds: res.remainingAds,
+        });
+
+        try {
+          router.refresh();
+        } catch {
+          // no-op
+        }
+
+        const hasBonus = (res.bonusCredits || 0) > 0;
+        const canGenerate = (res.bonusCredits || 0) > 0 || res.tier === 'pro' || res.tier === 'vip' || (res.welcomeGenerations < 5);
+
+        if (hasBonus || canGenerate) {
+          const creditsFound = res.bonusCredits || 1;
+          setBalanceFeedback({
+            type: 'success',
+            message: isEn
+              ? `Balance detected! You have ${creditsFound} bonus credit(s) available. Resuming...`
+              : `¡Saldo detectado! Tienes ${creditsFound} crédito(s) bonificado(s) disponible(s). Desbloqueando...`,
+          });
+
+          const resumeAction = store.onRewardSuccess;
+          setTimeout(() => {
+            handleClose();
+            if (typeof resumeAction === 'function') {
+              setTimeout(() => {
+                try {
+                  resumeAction();
+                } catch (resumeErr) {
+                  console.error('Error al auto-reanudar acción tras comprobar saldo:', resumeErr);
+                }
+              }, 50);
+            }
+          }, 1200);
+        } else {
+          setBalanceFeedback({
+            type: 'info',
+            message: isEn
+              ? 'We have not detected bonus credits yet. Complete the ad on your mobile and try again.'
+              : 'Aún no detectamos créditos en tu cuenta. Completa el anuncio en tu móvil y pulsa nuevamente.',
+          });
+        }
+      } else {
+        setBalanceFeedback({
+          type: 'info',
+          message: res.error || (isEn ? 'Could not verify balance. Try again.' : 'No se pudo verificar el saldo. Inténtalo de nuevo.'),
+        });
+      }
+    } catch (err) {
+      console.error('Error al comprobar saldo en PC:', err);
+      setBalanceFeedback({
+        type: 'info',
+        message: isEn ? 'Connection error checking balance.' : 'Error de conexión al comprobar el saldo.',
+      });
+    } finally {
+      setIsCheckingBalance(false);
+    }
+  };
+
+  // Elección post-recompensa en móvil: Continuar en PC
+  const handleContinueOnPC = () => {
+    setRewardChoicePrompt(null);
+    setMobileNoticeToast(
+      isEn
+        ? 'Your credit is now available on the web. Return to your PC and tap "Check balance".'
+        : 'Tu crédito ya está disponible en la web. Vuelve a tu ordenador y pulsa "Comprobar saldo".'
+    );
+    setTimeout(() => {
+      handleClose();
+      setMobileNoticeToast(null);
+    }, 1800);
+  };
+
+  // Elección post-recompensa en móvil: Generar en este móvil
+  const handleGenerateOnMobile = () => {
+    setRewardChoicePrompt(null);
+    const resumeAction = store.onRewardSuccess;
+    handleClose();
+    if (typeof resumeAction === 'function') {
+      setTimeout(() => {
+        try {
+          resumeAction();
+        } catch (resumeErr) {
+          console.error('Error al auto-reanudar acción en móvil:', resumeErr);
+        }
+      }, 50);
     }
   };
 
@@ -281,27 +416,20 @@ export function ProModal({
               claim.message ||
               t(
                 'pro_modal.admob_reward_success',
-                '¡+1 Generación añadida con éxito! Reanudando generación...'
+                '¡+1 Generación añadida con éxito!'
               ),
           });
 
-          // Auto-reanudación con desacoplamiento visual: persistir feedback visual 500ms antes de cerrar y reanudar
-          const resumeAction = store.onRewardSuccess;
-          setTimeout(() => {
-            handleClose();
-            setIsWatchingAd(false);
-            setAdLoadingPhase('idle');
-            if (typeof resumeAction === 'function') {
-              setTimeout(() => {
-                try {
-                  resumeAction();
-                } catch (resumeErr) {
-                  console.error('Error al auto-reanudar la acción pendiente:', resumeErr);
-                }
-              }, 50);
-            }
-          }, 500);
-        } else {
+          setIsWatchingAd(false);
+          setAdLoadingPhase('idle');
+          setRewardChoicePrompt({
+            show: true,
+            bonusCredits:
+              typeof claim.bonusCredits === 'number'
+                ? claim.bonusCredits
+                : ((userLimits?.bonusCredits ?? 0) + 1),
+          });
+          } else {
           setAdRewardNotice({
             type: 'error',
             message: claim.message || 'Error al acreditar la bonificación en tu cuenta.',
@@ -514,9 +642,9 @@ export function ProModal({
           {isLimitReached ? (
             <div className="space-y-2.5 sm:space-y-3 animate-in fade-in">
               {/* =======================================================
-                  ANDORID NATIVO: NIVEL 1 (PRO STRIPE) + NIVEL 2 (ADMOB)
+                  APP NATIVA (ANDROID / iOS): NIVEL 1 (PRO INFO SIN CHECKOUT) + NIVEL 2 (ADMOB)
                  ======================================================= */}
-              {platform.isNativeAndroid ? (
+              {platform.isNativeApp ? (
                 <div className="space-y-2.5 sm:space-y-3">
                   {/* NIVEL 1 (PRIORITARIO / BOTÓN PRINCIPAL): PLAN PRO STRIPE */}
                   <div className="relative p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-neutral-900 border-2 border-purple-600 dark:border-purple-500 shadow-md shadow-purple-500/10 dark:shadow-purple-950/40 space-y-2.5">
@@ -544,12 +672,18 @@ export function ProModal({
                       Alta Capacidad: Hasta 120 generaciones de mazos al mes (¡suficiente para todo tu temario!), sin pausas por anuncios y con acceso total.
                     </p>
 
-                    {/* CUMPLIMIENTO GOOGLE PLAY: EN APP NATIVA ANDROID NO SE MUESTRA CHECKOUT DE PAGO DIRECTO */}
+                    {/* CUMPLIMIENTO GOOGLE PLAY & APP STORE (GUIDELINE 3.1.3): EN APP NATIVA NO SE MUESTRA CHECKOUT DE PAGO DIRECTO */}
                     <div className="p-3 sm:p-3.5 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-500/30 text-purple-900 dark:text-purple-200 text-xs flex items-start gap-2.5 shadow-sm">
                       <Globe className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0 mt-0.5" />
-                      <p className="leading-relaxed font-medium">
-                        Gestiona o activa tu suscripción PRO desde nuestra web oficial <strong className="font-bold underline decoration-purple-400 underline-offset-2">flashmente.com</strong> iniciando sesión con esta misma cuenta.
-                      </p>
+                      {platform.isNativeIOS ? (
+                        <p className="leading-relaxed font-medium">
+                          Flashmente PRO está disponible para cuentas con suscripción activa. Esta versión móvil permite desbloquear generaciones adicionales mediante vídeos bonificados.
+                        </p>
+                      ) : (
+                        <p className="leading-relaxed font-medium">
+                          Gestiona o activa tu suscripción PRO desde nuestra web oficial <strong className="font-bold underline decoration-purple-400 underline-offset-2">flashmente.com</strong> iniciando sesión con esta misma cuenta.
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -600,33 +734,83 @@ export function ProModal({
                           </strong>
                         </div>
 
-                        {/* BOTÓN 2: GRANDE, VISTOSO Y CON ICONO DE REPRODUCCIÓN */}
-                        <button
-                          type="button"
-                          onClick={handleWatchAd}
-                          disabled={isWatchingAd || remainingAds <= 0}
-                          className="w-full min-h-[44px] sm:min-h-[46px] inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:via-orange-400 hover:to-amber-500 text-neutral-950 font-bold text-xs sm:text-sm shadow-md shadow-amber-600/20 active:scale-[0.99] transition cursor-pointer disabled:opacity-80 disabled:cursor-not-allowed group"
-                        >
-                          {isWatchingAd ? (
-                            <>
-                              <div className="w-4 h-4 border-2 border-neutral-950 border-t-transparent rounded-full animate-spin shrink-0" />
-                              <span>
-                                {adLoadingPhase === 'claiming' || adRewardNotice?.type === 'success'
-                                  ? t('pro_modal.admob_resuming', '¡Recompensa añadida! Reanudando...')
-                                  : t('pro_modal.admob_preparing', 'Preparando anuncio...')}
-                              </span>
-                            </>
-                          ) : remainingAds <= 0 ? (
-                            <span>Cupo mensual de 45 anuncios completado</span>
-                          ) : (
-                            <>
-                              <PlayCircle className="w-4 h-4 fill-neutral-950 text-amber-300 group-hover:scale-110 transition-transform shrink-0" />
-                              <span>Ver vídeo corto (+1 generación gratis)</span>
-                            </>
-                          )}
-                        </button>
+                        {/* PANTALLA DE ELECCIÓN POST-RECOMPENSA O BOTÓN DE REPRODUCCIÓN */}
+                        {rewardChoicePrompt?.show ? (
+                          <div className="p-3.5 sm:p-4 rounded-xl bg-gradient-to-b from-emerald-50 via-white to-emerald-50/60 dark:from-emerald-950/40 dark:via-neutral-900 dark:to-neutral-950 border-2 border-emerald-500 shadow-md shadow-emerald-500/10 space-y-3 animate-in fade-in zoom-in-95">
+                            <div className="space-y-1 text-center">
+                              <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 mb-0.5">
+                                <CheckCircle2 className="w-6 h-6" />
+                              </div>
+                              <h4 className="text-sm sm:text-base font-extrabold text-neutral-950 dark:text-white">
+                                {isEn ? '🎉 Credit Credited Successfully! (+1 Generation)' : '🎉 ¡Crédito Acreditado con Éxito! (+1 Generación)'}
+                              </h4>
+                              <p className="text-xs text-neutral-600 dark:text-neutral-300">
+                                {isEn
+                                  ? `Your balance is now synced in the cloud for ${user?.email || 'your account'}. Where would you like to continue?`
+                                  : `Tu saldo ya está sincronizado en la nube para tu cuenta (${user?.email || 'registrada'}). ¿Dónde prefieres continuar?`}
+                              </p>
+                            </div>
 
-                        {adRewardNotice && (
+                            <div className="space-y-2 pt-1">
+                              {/* Botón 1: Continuar en el PC */}
+                              <button
+                                type="button"
+                                onClick={handleContinueOnPC}
+                                className="w-full min-h-[44px] inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-900 font-bold text-xs sm:text-sm shadow-md transition cursor-pointer group"
+                              >
+                                <Laptop className="w-4 h-4 text-emerald-400 dark:text-emerald-600 group-hover:scale-110 transition-transform" />
+                                <span>{isEn ? 'Continue on PC' : 'Continuar en el PC'}</span>
+                              </button>
+
+                              {/* Botón 2: Generar en este móvil */}
+                              <button
+                                type="button"
+                                onClick={handleGenerateOnMobile}
+                                className="w-full min-h-[40px] inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold text-xs shadow-sm transition cursor-pointer group"
+                              >
+                                <Smartphone className="w-3.5 h-3.5 text-neutral-950 group-hover:scale-110 transition-transform" />
+                                <span>{isEn ? 'Generate on this mobile' : 'Generar en este móvil'}</span>
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            {/* BOTÓN 2: GRANDE, VISTOSO Y CON ICONO DE REPRODUCCIÓN */}
+                            <button
+                              type="button"
+                              onClick={handleWatchAd}
+                              disabled={isWatchingAd || remainingAds <= 0}
+                              className="w-full min-h-[44px] sm:min-h-[46px] inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:via-orange-400 hover:to-amber-500 text-neutral-950 font-bold text-xs sm:text-sm shadow-md shadow-amber-600/20 active:scale-[0.99] transition cursor-pointer disabled:opacity-80 disabled:cursor-not-allowed group"
+                            >
+                              {isWatchingAd ? (
+                                <>
+                                  <div className="w-4 h-4 border-2 border-neutral-950 border-t-transparent rounded-full animate-spin shrink-0" />
+                                  <span>
+                                    {adLoadingPhase === 'claiming' || adRewardNotice?.type === 'success'
+                                      ? t('pro_modal.admob_resuming', '¡Recompensa añadida! Procesando...')
+                                      : t('pro_modal.admob_preparing', 'Preparando anuncio...')}
+                                  </span>
+                                </>
+                              ) : remainingAds <= 0 ? (
+                                <span>Cupo mensual de 45 anuncios completado</span>
+                              ) : (
+                                <>
+                                  <PlayCircle className="w-4 h-4 fill-neutral-950 text-amber-300 group-hover:scale-110 transition-transform shrink-0" />
+                                  <span>Ver vídeo corto (+1 generación gratis)</span>
+                                </>
+                              )}
+                            </button>
+                          </>
+                        )}
+
+                        {mobileNoticeToast && (
+                          <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-500/40 text-emerald-900 dark:text-emerald-200 text-xs text-center animate-in fade-in flex items-center justify-center gap-2">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                            <span className="font-semibold">{mobileNoticeToast}</span>
+                          </div>
+                        )}
+
+                        {adRewardNotice && !rewardChoicePrompt?.show && (
                           <div
                             className={`p-2 rounded-xl text-xs flex items-center gap-2 animate-in fade-in ${
                               adRewardNotice.type === 'success'
@@ -648,7 +832,8 @@ export function ProModal({
                 </div>
               ) : platform.isIOS ? (
                 /* =======================================================
-                   IPHONE / IOS: BOTÓN STRIPE + OPCIÓN GRATUITA (AVISO IOS)
+                   SAFARI MÓVIL EN IPHONE (FUERA DE LA APP NATIVA):
+                   BOTÓN STRIPE + OPCIÓN GRATUITA (AVISO IOS)
                    ======================================================= */
                 <div className="space-y-2.5 sm:space-y-3">
                   {/* Tarjeta Plan Mensual Alta Capacidad (3,50€/mes) */}
@@ -796,43 +981,130 @@ export function ProModal({
                     )}
                   </div>
 
-                  {/* NIVEL 2: OPCIÓN GRATUITA (DISPONIBLE EN APP ANDROID) */}
-                  <div className="relative p-3.5 sm:p-4 rounded-2xl bg-gradient-to-b from-amber-50/90 via-white to-amber-50/40 dark:from-neutral-900 dark:via-neutral-900 dark:to-neutral-950 border-2 border-amber-400 dark:border-amber-500/60 shadow-md shadow-amber-500/10 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-500/25 border border-amber-300 dark:border-amber-400/60 text-amber-950 dark:text-amber-200 text-[10px] font-extrabold uppercase tracking-wider">
-                          <PlayCircle className="w-3 h-3 text-amber-700 dark:text-amber-300" />
-                          Opción Gratuita
+                  {/* NIVEL 2: OPCIÓN GRATUITA (DISPONIBLE EN APP ANDROID / FLUJO HÍBRIDO GUIADO) */}
+                  {(() => {
+                    const tutorAdsUsed = userLimits?.tutorAdsUsed ?? Math.max(0, (userLimits?.tutorConsultationsCount || 0) - 3);
+                    const adsUsedInCycle = userLimits?.adsUsedInCycle ?? ((userLimits?.count || 0) + (userLimits?.bonusCredits || 0) + tutorAdsUsed);
+                    const remainingAdsWeb = userLimits?.remainingAds !== undefined
+                      ? userLimits.remainingAds
+                      : Math.max(0, 45 - adsUsedInCycle);
+
+                    return (
+                      <div className="relative p-3.5 sm:p-4 rounded-2xl bg-gradient-to-b from-amber-50/90 via-white to-amber-50/40 dark:from-neutral-900 dark:via-neutral-900 dark:to-neutral-950 border-2 border-amber-400 dark:border-amber-500/60 shadow-md shadow-amber-500/10 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="space-y-0.5">
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-500/25 border border-amber-300 dark:border-amber-400/60 text-amber-950 dark:text-amber-200 text-[10px] font-extrabold uppercase tracking-wider">
+                              <PlayCircle className="w-3 h-3 text-amber-700 dark:text-amber-300" />
+                              {isEn ? 'Free Option • Via Android App' : 'Opción Gratuita • Vía App Android'}
+                            </div>
+                            <h3 className="text-sm sm:text-base font-extrabold text-zinc-950 dark:text-white tracking-tight">
+                              {isEn ? 'Recharge balance from your mobile' : 'Recarga saldo desde tu móvil'}
+                            </h3>
+                          </div>
+
+                          <div className="text-right pl-2 shrink-0">
+                            <span className="inline-block px-2.5 py-0.5 rounded-full bg-amber-200/90 dark:bg-amber-500/30 border border-amber-400 dark:border-amber-400/70 text-amber-950 dark:text-amber-100 font-extrabold text-[10px] uppercase tracking-wider shadow-sm">
+                              {remainingAdsWeb > 0
+                                ? (isEn ? `${remainingAdsWeb} available this month` : `${remainingAdsWeb} disponibles este mes`)
+                                : (isEn ? 'Monthly quota reached' : 'Cupo mensual completado')}
+                            </span>
+                          </div>
                         </div>
-                        <h3 className="text-sm sm:text-base font-extrabold text-zinc-950 dark:text-white tracking-tight">
-                          Disponible en la App de Android
-                        </h3>
+
+                        {/* Pasos estructurados */}
+                        <div className="p-3 rounded-xl bg-amber-500/10 dark:bg-amber-500/5 border border-amber-500/20 space-y-2">
+                          <p className="text-[11px] font-bold text-amber-950 dark:text-amber-200 uppercase tracking-wider">
+                            {isEn ? 'How to generate for free on this computer:' : 'Cómo generar gratis en este ordenador:'}
+                          </p>
+                          <ol className="space-y-1.5 text-xs text-zinc-800 dark:text-zinc-200 leading-snug">
+                            <li className="flex items-start gap-2">
+                              <span className="w-4 h-4 rounded-full bg-amber-200 dark:bg-amber-500/30 text-amber-950 dark:text-amber-100 font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">
+                                1
+                              </span>
+                              <span>
+                                {isEn ? 'Open Flashmente on your Android mobile with this account: ' : 'Abre Flashmente en tu móvil Android con esta cuenta: '}
+                                <strong className="font-bold underline text-amber-900 dark:text-amber-300">
+                                  {user?.email || (isEn ? 'your registered email' : 'tu email registrado')}
+                                </strong>.
+                              </span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <span className="w-4 h-4 rounded-full bg-amber-200 dark:bg-amber-500/30 text-amber-950 dark:text-amber-100 font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">
+                                2
+                              </span>
+                              <span>
+                                {isEn
+                                  ? 'In this deck, tap "Generate questions with AI" to watch a short video.'
+                                  : 'En este mazo, pulsa "Generar preguntas con IA" para ver un vídeo corto.'}
+                              </span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <span className="w-4 h-4 rounded-full bg-amber-200 dark:bg-amber-500/30 text-amber-950 dark:text-amber-100 font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">
+                                3
+                              </span>
+                              <span>
+                                {isEn
+                                  ? 'After watching the ad, tap the button below to unlock your generation here.'
+                                  : 'Tras ver el anuncio, pulsa el botón inferior para desbloquear tu generación aquí.'}
+                              </span>
+                            </li>
+                          </ol>
+                        </div>
+
+                        {/* Botón interactivo de comprobación de saldo */}
+                        <button
+                          type="button"
+                          onClick={handleCheckBalance}
+                          disabled={isCheckingBalance}
+                          className="w-full min-h-[44px] sm:min-h-[46px] inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:via-orange-400 hover:to-amber-500 text-neutral-950 font-bold text-xs sm:text-sm shadow-md shadow-amber-600/20 active:scale-[0.99] transition cursor-pointer disabled:opacity-80 group"
+                        >
+                          {isCheckingBalance ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-neutral-950 border-t-transparent rounded-full animate-spin shrink-0" />
+                              <span>{isEn ? 'Checking balance in cloud...' : 'Comprobando saldo en la nube...'}</span>
+                            </>
+                          ) : (
+                            <>
+                              <RefreshCw className="w-4 h-4 text-neutral-950 group-hover:rotate-180 transition-transform duration-500 shrink-0" />
+                              <span>{isEn ? 'Check balance / I watched the video' : 'Comprobar saldo / Ya vi el vídeo'}</span>
+                              <ChevronRight className="w-3.5 h-3.5 text-neutral-900 group-hover:translate-x-0.5 transition-transform shrink-0" />
+                            </>
+                          )}
+                        </button>
+
+                        {balanceFeedback && (
+                          <div
+                            className={`p-2.5 rounded-xl text-xs flex items-center gap-2 animate-in fade-in ${
+                              balanceFeedback.type === 'success'
+                                ? 'bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/30 text-emerald-800 dark:text-emerald-200'
+                                : 'bg-amber-50 dark:bg-amber-500/15 border border-amber-200 dark:border-amber-500/30 text-amber-900 dark:text-amber-200'
+                            }`}
+                          >
+                            {balanceFeedback.type === 'success' ? (
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                            ) : (
+                              <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                            )}
+                            <span className="font-medium text-[11px] leading-snug">{balanceFeedback.message}</span>
+                          </div>
+                        )}
+
+                        {/* Enlace secundario Google Play */}
+                        <div className="pt-0.5 text-center">
+                          <a
+                            href="https://play.google.com/store/apps/details?id=com.flashmente.app"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-zinc-600 dark:text-zinc-400 hover:text-amber-700 dark:hover:text-amber-300 underline underline-offset-2 transition group"
+                          >
+                            <Download className="w-3.5 h-3.5 text-zinc-500 group-hover:text-amber-600 transition-colors" />
+                            <span>{isEn ? 'Don’t have the app yet? Download on Google Play' : '¿Aún no tienes la app? Descargar en Google Play'}</span>
+                            <ChevronRight className="w-3 h-3 text-zinc-400 group-hover:translate-x-0.5 transition-transform" />
+                          </a>
+                        </div>
                       </div>
-
-                      <div className="text-right pl-2 shrink-0">
-                        <span className="inline-block px-2.5 py-0.5 rounded-full bg-amber-200/90 dark:bg-amber-500/30 border border-amber-400 dark:border-amber-400/70 text-amber-950 dark:text-amber-100 font-extrabold text-[10px] uppercase tracking-wider shadow-sm">
-                          Exclusivo en Android App
-                        </span>
-                      </div>
-                    </div>
-
-                    <p className="text-xs sm:text-sm font-medium text-zinc-700 dark:text-zinc-200 leading-relaxed">
-                      {isEn
-                        ? 'Open Flashmente on your Android mobile device, and inside your deck menu tap “Generate questions with AI” to watch a short video and return here to create your deck for free'
-                        : 'Abre Flashmente en tu móvil Android, y dentro del menú de tu mazo, pulsa “Generar preguntas con IA” para ver un vídeo corto y vuelve aquí para crear tu mazo gratis'}
-                    </p>
-
-                    <a
-                      href="https://play.google.com/store/apps/details?id=com.flashmente.app"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-full min-h-[46px] inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-900 font-bold text-xs sm:text-sm shadow-md active:scale-[0.99] transition cursor-pointer group"
-                    >
-                      <Download className="w-4 h-4 text-emerald-400 dark:text-emerald-600 group-hover:translate-y-0.5 transition-transform" />
-                      <span>Descargar en Google Play</span>
-                      <ChevronRight className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 group-hover:translate-x-0.5 transition-transform" />
-                    </a>
-                  </div>
+                    );
+                  })()}
                 </div>
               )}
             </div>
@@ -868,13 +1140,19 @@ export function ProModal({
                   </div>
                 </div>
 
-                {/* BOTÓN DIRECTO A STRIPE EN WEB / MENSAJE INFORMATIVO EN ANDROID NATIVO (GOOGLE PLAY COMPLIANCE) */}
-                {platform.isNativeAndroid ? (
+                {/* BOTÓN DIRECTO A STRIPE EN WEB / MENSAJE INFORMATIVO EN APPS NATIVAS (GOOGLE PLAY & APP STORE 3.1.1 / 3.1.3) */}
+                {platform.isNativeApp ? (
                   <div className="p-3.5 sm:p-4 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-500/30 text-purple-900 dark:text-purple-200 text-xs sm:text-sm flex items-start gap-2.5 shadow-sm">
                     <Globe className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600 dark:text-purple-400 shrink-0 mt-0.5" />
-                    <p className="leading-relaxed font-medium">
-                      Gestiona o activa tu suscripción PRO desde nuestra web oficial <strong className="font-bold underline decoration-purple-400 underline-offset-2">flashmente.com</strong> iniciando sesión con esta misma cuenta.
-                    </p>
+                    {platform.isNativeIOS ? (
+                      <p className="leading-relaxed font-medium">
+                        Flashmente PRO está disponible para cuentas con suscripción activa. Esta versión móvil permite desbloquear generaciones adicionales mediante vídeos bonificados.
+                      </p>
+                    ) : (
+                      <p className="leading-relaxed font-medium">
+                        Gestiona o activa tu suscripción PRO desde nuestra web oficial <strong className="font-bold underline decoration-purple-400 underline-offset-2">flashmente.com</strong> iniciando sesión con esta misma cuenta.
+                      </p>
+                    )}
                   </div>
                 ) : (
                   <>

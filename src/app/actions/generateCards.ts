@@ -461,10 +461,21 @@ REGLA DE INTEGRIDAD: Devuelve un objeto JSON estructurado con "conceptos_identif
 }
 
 /**
- * PROTOCOLO OBLIGATORIO DE EXTRACCIÓN DE TABLAS, ESQUEMAS E IMÁGENES:
+ * TRATAMIENTO DE TABLAS EN MODO NORMAL (JERARQUÍA CONCEPTUAL TRONCAL):
+ * Evalúa las tablas desde su significado global, reglas generales y umbrales críticos sin fragmentar fila a fila.
+ */
+const NORMAL_TABLES_DIRECTIVE = `TRATAMIENTO DE TABLAS, MATRICES Y ESQUEMAS (MODO NORMAL - JERARQUÍA CONCEPTUAL TRONCAL):
+Las tablas, matrices y diagramas contienen información estructurada de alto valor. En este modo debes evaluarlas desde su significado global y conclusiones rectoras:
+a) Evalúa la regla o principio general que resume o clasifica la tabla.
+b) Plantea comparaciones conceptuales de alto nivel entre las categorías o columnas principales.
+c) Evalúa únicamente umbrales de corte, excepciones determinantes o valores críticos que condicionen una decisión o cambio de estado.
+Queda PROHIBIDO desglosar mecánicamente cada fila o celda secundaria en preguntas independientes aisladas. La cantidad de preguntas dependerá de la densidad sustancial de la tabla, priorizando siempre la comprensión del patrón sobre la memorización atomizada de listas de datos. Reserva el desglose quirúrgico celda a celda para el Modo Exhaustivo.`;
+
+/**
+ * PROTOCOLO OBLIGATORIO DE EXTRACCIÓN DE TABLAS EN MODO EXHAUSTIVO (QUIRÚRGICO CELDA A CELDA):
  * Obliga a desglosar sistemáticamente las tablas, diagramas, matrices e infografías.
  */
-const TABLES_AND_FIGURES_DIRECTIVE = `TRATAMIENTO RIGUROSO DE TABLAS, MATRICES Y FIGURAS:
+const EXHAUSTIVE_TABLES_DIRECTIVE = `TRATAMIENTO RIGUROSO DE TABLAS, MATRICES Y FIGURAS:
 Las tablas, diagramas e imágenes contienen la mayor densidad evaluable del documento. Tienes terminantemente PROHIBIDO despachar una tabla con 1 o 2 preguntas genéricas de resumen.
 Debes desglosarla sistemáticamente:
 a) Preguntar por cruces de variables (fila vs. columna, parámetro A frente a parámetro B).
@@ -472,6 +483,9 @@ b) Evaluar valores numéricos críticos, unidades de medida, umbrales de corte o
 c) Evaluar criterios de inclusión/exclusión, diagnósticos diferenciales o excepciones a la norma presentes en notas al pie de la tabla.
 Si una tabla es densa, estás OBLIGADO a generar múltiples preguntas independientes sobre sus diferentes celdas y relaciones.
 En modo exhaustivo, cuando encuentres una tabla, esquema de absorción o clasificación con múltiples elementos, debes generar preguntas independientes para cada elemento sustancial (por ejemplo, cada nutriente, enzima, plazo legal o parámetro relevante). No las agrupes ni omitas elementos individuales.`;
+
+// Alias de retrocompatibilidad
+const TABLES_AND_FIGURES_DIRECTIVE = EXHAUSTIVE_TABLES_DIRECTIVE;
 
 /**
  * REFORMULACIÓN DEL OBJETIVO: EXPRIMIDO TOTAL SIN ALUCINACIÓN:
@@ -505,8 +519,11 @@ const buildSystemPrompt = (
   existingTopicsList: string = '',
   pedagogicalMode?: 'academic' | 'didactic',
   docenteFormat: DocenteFormat = 'mixed_test',
-  targetAudience: TargetAudience = 'auto'
+  targetAudience: TargetAudience = 'auto',
+  isExhaustiveMode: boolean = false
 ) => {
+  const tablesDirective = isExhaustiveMode ? EXHAUSTIVE_TABLES_DIRECTIVE : NORMAL_TABLES_DIRECTIVE;
+
   // 1. EL NÚCLEO DEL COMPORTAMIENTO (Universal y Exhaustivo)
   let prompt = `Eres Flashmente, un motor de extracción de conocimiento de alto rendimiento. Tu objetivo es diseccionar el texto proporcionado y generar tarjetas de estudio (flashcards) rigurosas. No resumas el texto. Actúa como un interrogador minucioso.
 
@@ -524,7 +541,7 @@ El texto puede ser de cualquier temática (ciencias, derecho, historia, tecnolog
 - Conceptos técnicos, definiciones y normativas.
 No asumas conocimientos externos. Extrae la información estrictamente del texto provisto.
 
-${TABLES_AND_FIGURES_DIRECTIVE}
+${tablesDirective}
 
 ${STRICT_GROUNDING_DIRECTIVE}
 \n`;
@@ -566,8 +583,10 @@ function getGlobalRules(
   existingCardsCount: number = 0,
   pedagogicalMode?: 'academic' | 'didactic',
   docenteFormat: DocenteFormat = 'mixed_test',
-  targetAudience: TargetAudience = 'auto'
+  targetAudience: TargetAudience = 'auto',
+  isExhaustiveMode: boolean = false
 ): string {
+  const tablesDirective = isExhaustiveMode ? EXHAUSTIVE_TABLES_DIRECTIVE : NORMAL_TABLES_DIRECTIVE;
   let formatRule = '';
   if (pedagogicalMode === 'didactic') {
     switch (docenteFormat) {
@@ -627,7 +646,7 @@ ${directiveRule}
 8. ${COMPREHENSIVE_SWEEP_DIRECTIVE}
 9. ${SINGLE_CORE_CONCEPT_DIRECTIVE}
 10. ${CONTENT_HIERARCHY_DIRECTIVE}
-11. ${TABLES_AND_FIGURES_DIRECTIVE}
+11. ${tablesDirective}
 12. ${EDITORIAL_ARTIFACTS_DIRECTIVE}${didacticRule}`;
 }
 
@@ -1213,7 +1232,8 @@ function getGeminiConfig(
       existingTopicsList,
       pedagogicalMode,
       docenteFormat,
-      targetAudience
+      targetAudience,
+      isExhaustiveMode
     ),
     temperature: isExhaustiveMode ? 0.1 : 0.15,
     responseMimeType: 'application/json',
@@ -2152,6 +2172,8 @@ export async function generateCardsFromDocumentAction(
       const existingCards = await fetchExistingCardsHistory(deckId, existingQuestions);
 
       // 3. Directiva de Extracción: 'Modo Exhaustivo Forzado' vs 'Libertad Universal Estándar'
+      const tablesDirective = isExhaustiveMode ? EXHAUSTIVE_TABLES_DIRECTIVE : NORMAL_TABLES_DIRECTIVE;
+
       const universalDirective = `Tu objetivo es extraer TODOS los conceptos clave, datos precisos, normativas o hechos únicos de esta página, sin importar la temática del documento. No tienes un límite máximo por página. Si encuentras tablas, cronologías, gráficos o listas, extrae absolutamente todos los datos relevantes posibles. SIN EMBARGO, tienes ESTRICTAMENTE PROHIBIDO inventar información o hacer preguntas triviales de relleno. Si la página está casi vacía (ej. una portada, un índice o fotos decorativas), devuelve únicamente las preguntas válidas que encuentres, o un array vacío []. Sé implacable y exhaustivo donde haya conocimiento real, y conservador donde no lo haya.
 
 ${COMPREHENSIVE_SWEEP_DIRECTIVE}
@@ -2160,7 +2182,7 @@ ${SINGLE_CORE_CONCEPT_DIRECTIVE}
 
 ${CONTENT_HIERARCHY_DIRECTIVE}
 
-${TABLES_AND_FIGURES_DIRECTIVE}
+${tablesDirective}
 
 ${STRICT_GROUNDING_DIRECTIVE}
 
@@ -2174,7 +2196,7 @@ ${SINGLE_CORE_CONCEPT_DIRECTIVE}
 
 ${CONTENT_HIERARCHY_DIRECTIVE}
 
-${TABLES_AND_FIGURES_DIRECTIVE}
+${EXHAUSTIVE_TABLES_DIRECTIVE}
 
 ${STRICT_GROUNDING_DIRECTIVE}
 
@@ -2561,6 +2583,8 @@ DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de esta pági
       const existingCards = await fetchExistingCardsHistory(deckId, existingQuestions);
 
       // 3. Directiva de Extracción: 'Modo Exhaustivo Forzado' vs 'Libertad Universal Estándar'
+      const tablesDirective = isExhaustiveMode ? EXHAUSTIVE_TABLES_DIRECTIVE : NORMAL_TABLES_DIRECTIVE;
+
       const universalDirective = `Tu objetivo es extraer TODOS los conceptos clave, datos precisos, normativas o hechos únicos de esta página virtual, sin importar la temática del documento. No tienes un límite máximo por página. Si encuentras tablas, cronologías o listas, extrae absolutamente todos los datos relevantes posibles. SIN EMBARGO, tienes ESTRICTAMENTE PROHIBIDO inventar información o hacer preguntas triviales de relleno. Si la página virtual contiene poco contenido relevante, devuelve únicamente las preguntas válidas que encuentres, o un array vacío []. Sé implacable y exhaustivo donde haya conocimiento real, y conservador donde no lo haya.
 
 ${COMPREHENSIVE_SWEEP_DIRECTIVE}
@@ -2569,7 +2593,7 @@ ${SINGLE_CORE_CONCEPT_DIRECTIVE}
 
 ${CONTENT_HIERARCHY_DIRECTIVE}
 
-${TABLES_AND_FIGURES_DIRECTIVE}
+${tablesDirective}
 
 ${STRICT_GROUNDING_DIRECTIVE}
 
@@ -2583,7 +2607,7 @@ ${SINGLE_CORE_CONCEPT_DIRECTIVE}
 
 ${CONTENT_HIERARCHY_DIRECTIVE}
 
-${TABLES_AND_FIGURES_DIRECTIVE}
+${EXHAUSTIVE_TABLES_DIRECTIVE}
 
 ${STRICT_GROUNDING_DIRECTIVE}
 
@@ -3184,7 +3208,7 @@ ${coverageText}${fileName ? ` Documento de referencia: "${fileName}".` : ''}
 
 ${RIGOR_WARNING_DIRECTIVE}
 
-${focusRuleSection ? `${focusRuleSection}\n\n` : ''}${getGlobalRules(cardFormat, requestCount, existingCards.length, pedagogicalMode, docenteFormat, targetAudience)}
+${focusRuleSection ? `${focusRuleSection}\n\n` : ''}${getGlobalRules(cardFormat, requestCount, existingCards.length, pedagogicalMode, docenteFormat, targetAudience, isExhaustiveMode)}
 
 ${getFormatInstructions(cardFormat)}
 

@@ -2,6 +2,23 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ['pdf-lib'],
+  async redirects() {
+    return [
+      {
+        // Redirigir de apex (flashmente.com) a www EXCEPTO /.well-known/assetlinks.json
+        // para que Google Play Console reciba HTTP 200 directo sin redirección (301/308).
+        source: '/:path((?!\\.well-known/assetlinks\\.json$).*)',
+        has: [
+          {
+            type: 'host',
+            value: 'flashmente.com',
+          },
+        ],
+        destination: 'https://www.flashmente.com/:path',
+        permanent: true,
+      },
+    ];
+  },
   async rewrites() {
     return [
       {
@@ -60,10 +77,6 @@ const nextConfig: NextConfig = {
           {
             key: 'Access-Control-Allow-Origin',
             value: '*',
-          },
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=86400',
           },
         ],
       },

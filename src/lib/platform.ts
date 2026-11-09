@@ -18,6 +18,10 @@ export interface PlatformInfo {
   isMobileBrowser: boolean;
   /** Indica si el dispositivo es iOS (iPhone, iPad o iPod) */
   isIOS: boolean;
+  /** Indica si se ejecuta bajo el runtime nativo de Capacitor en iOS (App Store / TestFlight) */
+  isNativeIOS: boolean;
+  /** Indica si se ejecuta dentro de cualquier contenedor nativo Capacitor (Android o iOS) */
+  isNativeApp: boolean;
 }
 
 /**
@@ -33,6 +37,8 @@ export function detectPlatform(): PlatformInfo {
       isWebDesktop: true,
       isMobileBrowser: false,
       isIOS: false,
+      isNativeIOS: false,
+      isNativeApp: false,
     };
   }
 
@@ -73,9 +79,16 @@ export function detectPlatform(): PlatformInfo {
   // isNativeAndroid depende EXCLUSIVAMENTE de Capacitor en entorno nativo Android
   // Los usuarios en Chrome móvil sobre Android son tratados como navegación web móvil estándar
   const isNativeAndroid = isCapacitorAndroid;
+
+  // isNativeIOS depende EXCLUSIVAMENTE de Capacitor en entorno nativo iOS
+  // Los usuarios en Safari móvil sobre iPhone son tratados como navegación web móvil estándar
+  const isNativeIOS = Boolean(
+    Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios'
+  );
+  const isNativeApp = isNativeAndroid || isNativeIOS;
   const isMobileDevice = isAndroidOS || isIOS;
-  const isWebDesktop = !isNativeAndroid && !isMobileDevice;
-  const isMobileBrowser = isMobileDevice && !isNativeAndroid;
+  const isWebDesktop = !isNativeApp && !isMobileDevice;
+  const isMobileBrowser = isMobileDevice && !isNativeApp;
 
   // Persistir en sessionStorage si se detectó TWA para mantener contexto durante la sesión
   if (isTWA && typeof window !== 'undefined' && window.sessionStorage) {
@@ -94,6 +107,8 @@ export function detectPlatform(): PlatformInfo {
     isWebDesktop,
     isMobileBrowser,
     isIOS,
+    isNativeIOS,
+    isNativeApp,
   };
 }
 
@@ -110,6 +125,8 @@ export function usePlatform(): PlatformInfo {
     isWebDesktop: true,
     isMobileBrowser: false,
     isIOS: false,
+    isNativeIOS: false,
+    isNativeApp: false,
   });
 
   useEffect(() => {
