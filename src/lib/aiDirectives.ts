@@ -45,6 +45,28 @@ Antes de emitir cada tarjeta en el JSON final, realiza obligatoriamente una veri
    - En tarjetas 'cloze', la palabra o fórmula revelada en el reverso DEBE encajar gramatical y conceptualmente con exactitud en el espacio marcado con [...] en el anverso.`;
 
 /**
+ * LEY DE PROPORCIÓN COGNITIVA UNIVERSAL (TAXONOMÍA DE BLOOM 30/50/20):
+ * Distribuye rigurosamente cualquier batería de preguntas tipo test en tres niveles de profundidad cognitiva:
+ * - 30% Asimilación conceptual / declarativa (Bloom 1-2: Recordar / Comprender).
+ * - 50% Supuestos prácticos y resolución situacional (Bloom 3-4: Aplicar / Analizar).
+ * - 20% Juicio crítico, diagnóstico diferencial y excepciones (Bloom 5-6: Evaluar / Sintetizar).
+ */
+export const UNIVERSAL_BLOOM_PROPORTION_DIRECTIVE = `🧠 LEY DE PROPORCIÓN COGNITIVA UNIVERSAL (DISTRIBUCIÓN TAXONOMÍA DE BLOOM 30/50/20):
+Toda batería de preguntas tipo test debe estructurarse obligatoriamente bajo las siguientes cuotas cognitivas exactas según el número de tarjetas del lote (N):
+
+1. EXACTAMENTE EL 30% DEL LOTE: ASIMILACIÓN CONCEPTUAL TRONCAL (Bloom 1 y 2 - Recordar / Comprender):
+   - Enfoque: Definiciones canónicas, terminología disciplinar clave, principios rectores y valores cuantitativos de referencia indispensables.
+   - Prohibido formular preguntas sobre datos anecdóticos de formato o curiosidades secundarias.
+
+2. EXACTAMENTE EL 50% DEL LOTE: SUPUESTOS PRÁCTICOS Y RESOLUCIÓN SITUACIONAL (Bloom 3 y 4 - Aplicar / Analizar):
+   - Enfoque: Problemas reales aplicados con la estructura obligatoria:
+     [Contexto o caso operativo] + [Conflicto, necesidad o hallazgo técnico] + [Pregunta de toma de decisiones o intervención].
+   - El alumno debe aplicar los conceptos teóricos para diagnosticar, calcular, elegir la técnica o resolver el problema.
+
+3. EXACTAMENTE EL 20% DEL LOTE: ANÁLISIS CRÍTICO, DIAGNÓSTICO Y EXCEPCIONES (Bloom 5 y 6 - Evaluar / Discernir):
+   - Enfoque: Escenarios de alta discriminación donde se evalúan excepciones a la regla general, criterios de exclusión, dilemas profesionales o distinción sutil entre opciones casi idénticas con distractores altamente verosímiles.`;
+
+/**
  * CALIBRACIÓN UNIVERSAL: MODO NORMAL VS. MODO MINUCIOSO:
  */
 export function buildUniversalCalibrationDirective(isExhaustiveMode: boolean = false): string {
@@ -153,14 +175,14 @@ ${didacticTranslationClause}`;
   }
 
   // PROTOCOLO DE DISTRIBUCIÓN COGNITIVA UNIVERSAL (TAXONOMÍA DE BLOOM OBLIGATORIA)
-  const bloomTaxonomyInstruction = `🧠 PROTOCOLO DE DISTRIBUCIÓN COGNITIVA UNIVERSAL (TAXONOMÍA DE BLOOM OBLIGATORIA):
+  const bloomTaxonomyInstruction = `🧠 PROTOCOLO DE DISTRIBUCIÓN COGNITIVA UNIVERSAL (TAXONOMÍA DE BLOOM OBLIGATORIA 30/50/20):
 Debes estructurar la batería de preguntas distribuyendo el nivel cognitivo de los ejercicios bajo la siguiente proporción estricta:
-1. 30% NIVEL BÁSICO (Recordar / Comprender):
+1. 30% NIVEL BÁSICO / CONCEPTUAL (Recordar / Comprender):
    - Identificación pura de conceptos, definiciones esenciales, terminología fundamental y reconocimiento de hechos explícitos.
-2. 40% NIVEL INTERMEDIO (Aplicar / Analizar):
-   - Escenarios prácticos aplicados, diferenciación entre conceptos similares, uso de reglas o fórmulas en situaciones nuevas y análisis de causas y consecuencias.
-3. 30% NIVEL AVANZADO (Evaluar / Pensamiento Crítico):
-   - Supuestos de diagnóstico, resolución de casos límite o atípicos, detección de excepciones a la regla general, juicio fundamentado o razonamiento deductivo complejo.`;
+2. 50% NIVEL INTERMEDIO / APLICADO (Aplicar / Analizar):
+   - Escenarios prácticos aplicados, resolución de problemas situacionales, diferenciación entre conceptos similares, uso de reglas en situaciones nuevas y análisis de causas y consecuencias.
+3. 20% NIVEL AVANZADO / CRÍTICO (Evaluar / Pensamiento Crítico):
+   - Supuestos de diagnóstico diferencial, resolución de casos límite o atípicos, detección de excepciones a la regla general, juicio fundamentado o razonamiento deductivo complejo.`;
 
   // FORMATO DE EVALUACIÓN DOCENTE
   let formatInstruction = '';
@@ -174,7 +196,9 @@ Debes estructurar la batería de preguntas distribuyendo el nivel cognitivo de l
   2º "question": Enunciado limpio de la pregunta sin opciones.
   3º "options": Exactamente 4 alternativas plausibles en el array options [0, 1, 2, 3].
   4º "correct_option_index": Número entero (0 a 3) de la opción verdadera justificada.
-- En "front" coloca la pregunta con sus 4 opciones a-d y en "back" la opción verdadera ("VEREDICTO_EXACTO: [texto]") seguida de su justificación. Queda terminantemente PROHIBIDO devolver tarjetas en otro formato.`;
+- En "front" coloca la pregunta con sus 4 opciones a-d y en "back" la opción verdadera ("VEREDICTO_EXACTO: [texto]") seguida de su justificación. Queda terminantemente PROHIBIDO devolver tarjetas en otro formato.
+
+${UNIVERSAL_BLOOM_PROPORTION_DIRECTIVE}`;
       break;
     case 'true_false':
       formatInstruction = `📋 FORMATO DE EVALUACIÓN EXCLUSIVO: SOLO VERDADERO O FALSO (FORMATO "true_false"):

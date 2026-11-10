@@ -12,6 +12,7 @@ import {
   PRACTICAL_MODE_DIRECTIVE,
   ZERO_MISMATCH_DIRECTIVE,
   buildUniversalTablesDirective,
+  UNIVERSAL_BLOOM_PROPORTION_DIRECTIVE,
 } from '@/lib/aiDirectives';
 import type {
   CardFormat,
@@ -411,7 +412,7 @@ ${buildUniversalTablesDirective(false)}
 5. AUTO-AUDITORÍA LÓGICA (ZERO-MISMATCH):
 ${ZERO_MISMATCH_DIRECTIVE}
 
-${effectiveInstruction ? `INSTRUCCIÓN ESPECÍFICA DEL ESTUDIANTE:\n"${effectiveInstruction}"\n` : ''}
+${cardFormat === 'multiple_choice' ? `6. DISTRIBUCIÓN COGNITIVA TAXONOMÍA DE BLOOM (30/50/20):\n${UNIVERSAL_BLOOM_PROPORTION_DIRECTIVE}\n\n` : ''}${effectiveInstruction ? `INSTRUCCIÓN ESPECÍFICA DEL ESTUDIANTE:\n"${effectiveInstruction}"\n` : ''}
 
 IDIOMA DE SALIDA: ${language === 'en' ? 'Inglés' : 'Español'}.`;
 

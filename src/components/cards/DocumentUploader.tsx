@@ -212,6 +212,7 @@ export function DocumentUploader({
   const [docenteFormat, setDocenteFormat] = useState<DocenteFormat>('mixed_test');
   const [targetAudience, setTargetAudience] = useState<TargetAudience>('auto');
   const [generatedCardsPreview, setGeneratedCardsPreview] = useState<GeneratedCard[]>([]);
+  const [showPreview, setShowPreview] = useState<boolean>(false);
   const [materialExhaustedNotice, setMaterialExhaustedNotice] = useState<{ generated: number; requested: number } | null>(null);
 
   // Estatus de suscripción PRO / VIP del usuario
@@ -740,6 +741,7 @@ export function DocumentUploader({
     }
     setUploadedStorage(null);
     setMaterialExhaustedNotice(null);
+    setShowPreview(false);
     setPedagogicalMode('academic');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -986,107 +988,107 @@ export function DocumentUploader({
 
       {/* Success View */}
       {status === 'success' ? (
-        <div className="p-6 rounded-2xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-950/20 text-center space-y-4 animate-in fade-in duration-300">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/40 flex items-center justify-center mx-auto shadow-md">
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-
-          <div>
-            <h3 className="text-base font-extrabold text-slate-900 dark:text-white tracking-tight">
+        <div className="p-4 sm:p-5 rounded-2xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50/60 dark:bg-emerald-950/20 text-center space-y-3 animate-in fade-in duration-300">
+          <div className="flex items-center justify-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/40 flex items-center justify-center shrink-0 shadow-xs">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h3 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white tracking-tight">
               {t('ai_uploader.success_title', '¡{count} Tarjetas Generadas y Guardadas!').replace('{count}', String(successCount))}
             </h3>
+          </div>
 
-            {/* FASE 2: Notificación si el texto no contenía más conceptos únicos */}
-            {materialExhaustedNotice && (
-              <div className="mt-3 p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-950 dark:text-amber-200 text-xs text-left flex items-start gap-2.5 max-w-md mx-auto shadow-sm animate-in fade-in">
-                <span className="text-base shrink-0">⚠️</span>
-                <p className="leading-relaxed font-medium">
-                  {t(
-                    'deck_detail.material_exhausted',
-                    'Material agotado: Se han generado {count} tarjetas. El texto no contenía más conceptos únicos para alcanzar las {requested} solicitadas.'
-                  )
-                    .replace('{count}', String(materialExhaustedNotice.generated))
-                    .replace('{requested}', String(materialExhaustedNotice.requested))}
-                </p>
-              </div>
-            )}
+          {/* FASE 2: Notificación si el texto no contenía más conceptos únicos */}
+          {materialExhaustedNotice && (
+            <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-950 dark:text-amber-200 text-xs text-left flex items-start gap-2 max-w-md mx-auto shadow-xs">
+              <span className="text-sm shrink-0">⚠️</span>
+              <p className="leading-snug font-medium">
+                {t(
+                  'deck_detail.material_exhausted',
+                  'Material agotado: Se han generado {count} tarjetas. El texto no contenía más conceptos únicos para alcanzar las {requested} solicitadas.'
+                )
+                  .replace('{count}', String(materialExhaustedNotice.generated))
+                  .replace('{requested}', String(materialExhaustedNotice.requested))}
+              </p>
+            </div>
+          )}
 
-            {/* Si es documento por páginas / tramos, mostramos ÚNICAMENTE la caja de progreso limpia */}
-            {isPageableDoc && typeof nextCursorPage === 'number' ? (
-              <div className="mt-3 p-3.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 text-blue-950 dark:text-blue-200 text-xs text-center max-w-md mx-auto shadow-sm">
-                <div className="flex items-center justify-center gap-2 flex-wrap">
-                  <span className="text-sm">📖</span>
-                  <span className="font-medium text-blue-950 dark:text-blue-200">
-                    Páginas consumidas por el motor:{' '}
-                    <strong className="text-blue-950 dark:text-white font-semibold">
-                      {lastStartPage && lastStartPage !== nextCursorPage
-                        ? `de la ${lastStartPage} a la ${nextCursorPage}`
-                        : `página ${nextCursorPage}`}
-                    </strong>
-                    {effectiveTotalPages && (
-                      <span className="text-blue-900/80 dark:text-blue-300"> (de {effectiveTotalPages} págs {isPdf ? 'totales' : 'virtuales'})</span>
-                    )}
-                  </span>
-                </div>
-                <span className="block text-[11px] text-blue-900/80 dark:text-blue-300 mt-1 font-medium">
-                  Marcapáginas guardado en pág. {nextCursorPage} • El motor retomará desde aquí en el siguiente clic
+          {/* Si es documento por páginas / tramos, mostramos ÚNICAMENTE la caja de progreso limpia */}
+          {isPageableDoc && typeof nextCursorPage === 'number' ? (
+            <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 text-blue-950 dark:text-blue-200 text-xs text-center max-w-md mx-auto shadow-xs">
+              <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                <span className="text-xs">📖</span>
+                <span className="font-medium text-blue-950 dark:text-blue-200">
+                  Páginas:{' '}
+                  <strong className="text-blue-950 dark:text-white font-semibold">
+                    {lastStartPage && lastStartPage !== nextCursorPage
+                      ? `de la ${lastStartPage} a la ${nextCursorPage}`
+                      : `página ${nextCursorPage}`}
+                  </strong>
+                  {effectiveTotalPages && (
+                    <span className="text-blue-900/80 dark:text-blue-300"> (de {effectiveTotalPages} págs)</span>
+                  )}
+                </span>
+                <span className="mx-1 text-blue-400">•</span>
+                <span className="text-[11px] text-blue-900/80 dark:text-blue-300 font-medium">
+                  Marcapáginas en pág. {nextCursorPage}
                 </span>
               </div>
+            </div>
+          ) : (
+            <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-950 dark:text-emerald-200 text-xs text-center max-w-md mx-auto shadow-xs">
+              <p className="font-medium">
+                ✅ <strong className="font-semibold text-emerald-950 dark:text-emerald-300">{t('deck_detail.cards_added_title', 'Tarjetas añadidas con éxito.')}</strong>
+              </p>
+            </div>
+          )}
+
+          <p className="text-[11px] text-slate-500 dark:text-neutral-400 max-w-sm mx-auto font-medium">
+            {t('ai_uploader.document_label', 'Documento:')} &ldquo;{selectedFile?.name}&rdquo; ({cardFormat})
+          </p>
+
+          {/* Actions-First Header Buttons (Always immediately visible without scrolling) */}
+          <div className="bg-slate-900/95 backdrop-blur-sm border border-slate-800 p-2.5 rounded-xl flex flex-wrap items-center justify-center gap-2 shadow-md print:hidden">
+            {isPageableDoc && typeof nextCursorPage === 'number' ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setStatus('idle');
+                  handleProcessDocument(nextCursorPage);
+                }}
+                className="px-4 py-2 text-xs rounded-xl bg-gradient-to-r from-violet-600 via-indigo-600 to-purple-600 hover:from-violet-500 hover:to-indigo-500 text-white font-semibold shadow-md shadow-indigo-600/30 transition flex items-center gap-1.5 active:scale-95 cursor-pointer"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                </svg>
+                <span>Continuar extrayendo (Retomar desde pág. {nextCursorPage})</span>
+              </button>
             ) : (
-              /* Para documentos generales sin páginas */
-              <div className="mt-3 p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-950 dark:text-emerald-200 text-xs text-left flex items-start gap-2.5 max-w-md mx-auto shadow-sm">
-                <span className="text-base shrink-0">✅</span>
-                <p className="leading-relaxed">
-                  <strong className="font-semibold text-emerald-950 dark:text-emerald-300">{t('deck_detail.cards_added_title', 'Tarjetas añadidas con éxito.')}</strong>
-                </p>
-              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setStatus('idle');
+                  handleProcessDocument();
+                }}
+                className={`px-4 py-2 text-xs rounded-xl ${
+                  isMeticulousPhase
+                    ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-indigo-600 hover:from-amber-500 hover:to-indigo-500 shadow-amber-600/30'
+                    : 'bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 shadow-violet-600/30'
+                } text-white font-medium shadow-md transition flex items-center gap-1.5 active:scale-95 cursor-pointer`}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                <span>
+                  {isMeticulousPhase
+                    ? t('ai_uploader.next_block_meticulous_btn', 'Generar tarjetas detalladas ({count})').replace('{count}', String(cardCount))
+                    : t('ai_uploader.next_block_btn', 'Generar siguiente bloque ({count} tarjetas)').replace('{count}', String(cardCount))}
+                </span>
+              </button>
             )}
 
-            <p className="text-[11px] text-slate-600 dark:text-neutral-400 mt-2 max-w-sm mx-auto font-medium">
-              {t('ai_uploader.document_label', 'Documento:')} &ldquo;{selectedFile?.name}&rdquo; ({cardFormat})
-            </p>
-          </div>
-
-          {/* Cards Preview with FormattedCardView (Pantalla: visible | Impresión: oculta) */}
-          <div className="space-y-3 print:hidden">
-            <div className="overflow-y-auto max-h-[55vh] sm:max-h-[60vh] pr-2 space-y-3 text-left">
-              {generatedCardsPreview.map((card, i) => (
-                <div
-                  key={card.id || `card-batch-${Date.now()}-${(card.front || '').slice(0, 15)}-${i}`}
-                  className="p-3.5 rounded-xl bg-neutral-900/90 border border-neutral-800 text-xs shadow-sm"
-                >
-                  <FormattedCardView
-                    cardId={card.id || `preview-${(card.front || '').slice(0, 15)}-${i}`}
-                    front={card.front}
-                    back={card.back}
-                    cardFormat={card.cardFormat}
-                    isRevealed={true}
-                    interactive={false}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Documento de Impresión Ultra-Compacto para Vista Previa */}
-          <PrintExamSheet
-            deckTitle={
-              selectedFile?.name
-                ? `${selectedFile.name.replace(/\.[^/.]+$/, '')} — ${
-                    pedagogicalMode === 'didactic'
-                      ? (docenteFormat === 'mixed_test' ? 'Examen de Evaluación (Test Mixto)' : 'Casos Prácticos y Preguntas Abiertas')
-                      : 'Ficha de Estudio y Repaso'
-                  }`
-                : 'Examen de Evaluación'
-            }
-            deckDescription={pedagogicalMode === 'didactic' ? `Modo Docente • ${docenteFormat}` : undefined}
-            cards={generatedCardsPreview}
-          />
-
-          {/* Sticky Actions Footer */}
-          <div className="sticky bottom-0 z-10 bg-slate-900/95 backdrop-blur-sm border-t border-slate-800 p-3 mt-2 rounded-xl flex flex-wrap items-center justify-center gap-2.5 shadow-lg print:hidden">
             {/* Exportar a PDF / Imprimir */}
             <button
               type="button"
@@ -1097,7 +1099,7 @@ export function DocumentUploader({
                 }
                 window.print();
               }}
-              className="px-3.5 py-2.5 text-xs rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 font-semibold transition flex items-center gap-1.5 active:scale-95 cursor-pointer shadow-sm"
+              className="px-3 py-2 text-xs rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 font-semibold transition flex items-center gap-1.5 active:scale-95 cursor-pointer shadow-xs"
               title={
                 !isPro
                   ? isEn
@@ -1116,58 +1118,74 @@ export function DocumentUploader({
                 </span>
               )}
             </button>
-            {isPageableDoc && typeof nextCursorPage === 'number' ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setStatus('idle');
-                  handleProcessDocument(nextCursorPage);
-                }}
-                className="px-5 py-2.5 text-xs rounded-xl bg-gradient-to-r from-violet-600 via-indigo-600 to-purple-600 hover:from-violet-500 hover:to-indigo-500 text-white font-semibold shadow-lg shadow-indigo-600/30 transition flex items-center gap-2 active:scale-95 cursor-pointer"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-                </svg>
-                <span>Continuar extrayendo (Retomar desde pág. {nextCursorPage})</span>
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => {
-                  setStatus('idle');
-                  handleProcessDocument();
-                }}
-                className={`px-4 py-2.5 text-xs rounded-xl ${
-                  isMeticulousPhase
-                    ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-indigo-600 hover:from-amber-500 hover:to-indigo-500 shadow-amber-600/30'
-                    : 'bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 shadow-violet-600/30'
-                } text-white font-medium shadow-md transition flex items-center gap-1.5 active:scale-95 cursor-pointer`}
-              >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-                <span>
-                  {isMeticulousPhase
-                    ? t('ai_uploader.next_block_meticulous_btn', 'Generar tarjetas detalladas ({count})').replace('{count}', String(cardCount))
-                    : t('ai_uploader.next_block_btn', 'Generar siguiente bloque ({count} tarjetas)').replace('{count}', String(cardCount))}
-                </span>
-              </button>
-            )}
+
             <button
               onClick={handleReset}
-              className="px-3.5 py-2.5 text-xs rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-800 dark:bg-neutral-800 dark:hover:bg-neutral-700 dark:text-neutral-300 dark:hover:text-white font-medium transition cursor-pointer"
+              className="px-3 py-2 text-xs rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-800 dark:bg-neutral-800 dark:hover:bg-neutral-700 dark:text-neutral-300 dark:hover:text-white font-medium transition cursor-pointer"
             >
               {t('ai_uploader.process_another_btn', 'Procesar otro documento')}
             </button>
+
             {onCancel && (
               <button
                 onClick={handleSafeCancel}
-                className="px-3.5 py-2.5 text-xs rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900/80 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white font-medium transition cursor-pointer"
+                className="px-3 py-2 text-xs rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900/80 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white font-medium transition cursor-pointer"
               >
                 {t('ai_uploader.close_btn', 'Cerrar ventana')}
               </button>
             )}
           </div>
+
+          {/* Collapsible Accordion Preview (Zero screen takeover) */}
+          <div className="pt-1 print:hidden">
+            <button
+              type="button"
+              onClick={() => setShowPreview((prev) => !prev)}
+              className="w-full py-2 px-3 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white/80 dark:bg-neutral-800/80 hover:bg-white dark:hover:bg-neutral-700 text-xs font-semibold text-neutral-700 dark:text-neutral-300 transition flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+            >
+              <span>{showPreview ? '▲' : '▼'}</span>
+              <span>
+                {showPreview
+                  ? t('ai_uploader.hide_preview', 'Ocultar tarjetas generadas')
+                  : t('ai_uploader.show_preview', 'Ver tarjetas generadas ({count})').replace('{count}', String(generatedCardsPreview.length))}
+              </span>
+            </button>
+
+            {showPreview && (
+              <div className="mt-2.5 overflow-y-auto max-h-[35vh] pr-1.5 space-y-2.5 text-left animate-in fade-in duration-200">
+                {generatedCardsPreview.map((card, i) => (
+                  <div
+                    key={card.id || `card-batch-${Date.now()}-${(card.front || '').slice(0, 15)}-${i}`}
+                    className="p-3 rounded-xl bg-neutral-900/95 border border-neutral-800 text-xs shadow-sm"
+                  >
+                    <FormattedCardView
+                      cardId={card.id || `preview-${(card.front || '').slice(0, 15)}-${i}`}
+                      front={card.front}
+                      back={card.back}
+                      cardFormat={card.cardFormat}
+                      isRevealed={true}
+                      interactive={false}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Documento de Impresión Ultra-Compacto para Vista Previa */}
+          <PrintExamSheet
+            deckTitle={
+              selectedFile?.name
+                ? `${selectedFile.name.replace(/\.[^/.]+$/, '')} — ${
+                    pedagogicalMode === 'didactic'
+                      ? (docenteFormat === 'mixed_test' ? 'Examen de Evaluación (Test Mixto)' : 'Casos Prácticos y Preguntas Abiertas')
+                      : 'Ficha de Estudio y Repaso'
+                  }`
+                : 'Examen de Evaluación'
+            }
+            deckDescription={pedagogicalMode === 'didactic' ? `Modo Docente • ${docenteFormat}` : undefined}
+            cards={generatedCardsPreview}
+          />
         </div>
       ) : (
         /* Stepper Flow (3 Pasos) */
