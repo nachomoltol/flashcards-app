@@ -151,9 +151,9 @@ export function SplashIntro({ onFinish, duration = 3000 }: SplashIntroProps) {
 
             {/* Icono oficial de la app Flashmente */}
             <img
-              src="/icon.png"
+              src="/icons/android-chrome-512x512.png"
               alt="Flashmente Logo"
-              className="w-24 h-24 sm:w-28 sm:h-28 object-contain drop-shadow-[0_0_20px_rgba(99,102,241,0.65)] select-none pointer-events-none z-10"
+              className="w-full h-full p-2 object-contain rounded-2xl drop-shadow-[0_0_20px_rgba(99,102,241,0.65)] select-none pointer-events-none z-10"
             />
           </div>
         </div>

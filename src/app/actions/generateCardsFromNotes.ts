@@ -3,7 +3,6 @@
 import { GoogleGenAI, Type } from '@google/genai';
 import { createClient } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
-import { checkUserGenerationQuota } from '@/lib/quotaGuard';
 import { createInitialCardValues } from '@/lib/fsrs';
 import { deduplicateCandidateCards } from '@/lib/cardDeduplication';
 import { randomizeMultipleChoiceCard } from '@/lib/cardUtils';
@@ -220,6 +219,70 @@ function processGeneratedCards(
 }
 
 /**
+ * Valida la cuota de generación del usuario en api_limits exclusivamente desde el servidor
+ * mediante el RPC 'check_api_limit' de Supabase (sin importar módulos de cliente).
+ */
+async function checkServerQuota(
+  userId: string
+): Promise<{ allowed: boolean; reason?: 'LIMIT_REACHED' | 'AD_REQUIRED' }> {
+  try {
+    const { data: rpcData, error: rpcError } = await supabase.rpc('check_api_limit', {
+      p_user_id: userId,
+    });
+
+    if (!rpcError && rpcData) {
+      const res = rpcData as {
+        allowed?: boolean;
+        error?: 'LIMIT_REACHED' | 'AD_REQUIRED';
+        tier?: 'free' | 'pro' | 'vip';
+        bonus_credits?: number;
+      };
+
+      if (res.allowed === false) {
+        return {
+          allowed: false,
+          reason: res.error || 'LIMIT_REACHED',
+        };
+      }
+
+      return { allowed: true };
+    }
+
+    if (rpcError) {
+      console.warn('[generateCardsFromNotes] RPC check_api_limit error, fallback to table:', rpcError);
+    }
+
+    // Fallback a consulta directa sobre la tabla api_limits
+    const { data: directData } = await supabase
+      .from('api_limits')
+      .select('tier, generations_count, bonus_credits')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (directData) {
+      const tier = (directData.tier as 'free' | 'pro' | 'vip') || 'free';
+      const count = typeof directData.generations_count === 'number' ? directData.generations_count : 0;
+      const bonus = typeof directData.bonus_credits === 'number' ? directData.bonus_credits : 0;
+
+      if (tier === 'pro' || tier === 'vip') {
+        if (count >= 120) return { allowed: false, reason: 'LIMIT_REACHED' };
+        return { allowed: true };
+      }
+
+      if (count >= 50) return { allowed: false, reason: 'LIMIT_REACHED' };
+      if (bonus <= 0) return { allowed: false, reason: 'AD_REQUIRED' };
+
+      return { allowed: true };
+    }
+
+    return { allowed: true };
+  } catch (err) {
+    console.error('[generateCardsFromNotes] Error en checkServerQuota:', err);
+    return { allowed: true };
+  }
+}
+
+/**
  * Server Action: Genera tarjetas a partir de fotos de apuntes manuscritos.
  * Procesamiento 100% efímero en memoria RAM:
  * - Recibe imágenes en base64.
@@ -272,14 +335,27 @@ export async function generateCardsFromNotesAction(
       };
     }
 
-    // 1. Control de cuota de generación
+    // Inicializar cliente de base de datos en servidor
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+    const supabaseUrl =
+      process.env.NEXT_PUBLIC_SUPABASE_URL ||
+      process.env.SUPABASE_URL ||
+      'https://placeholder.supabase.co';
+
+    const dbClient = serviceRoleKey
+      ? createClient(supabaseUrl, serviceRoleKey, {
+          auth: { persistSession: false, autoRefreshToken: false },
+        })
+      : supabase;
+
+    // 1. Control de cuota de generación 100% Server-Side
     const resolvedUserId = await resolveUserId(deckId, explicitUserId);
     if (!resolvedUserId) {
       return { success: false, error: 'LIMIT_REACHED', cards: [] };
     }
 
-    const quotaCheck = await checkUserGenerationQuota(resolvedUserId);
-    if (!quotaCheck.canGenerate) {
+    const quotaCheck = await checkServerQuota(resolvedUserId);
+    if (!quotaCheck.allowed) {
       return {
         success: false,
         error: quotaCheck.reason === 'AD_REQUIRED' ? 'AD_REQUIRED' : 'LIMIT_REACHED',
@@ -365,18 +441,6 @@ IDIOMA DE SALIDA: ${language === 'en' ? 'Inglés' : 'Español'}.`;
     }
 
     // 5. Deduplicación con tarjetas existentes en el mazo
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    const supabaseUrl =
-      process.env.NEXT_PUBLIC_SUPABASE_URL ||
-      process.env.SUPABASE_URL ||
-      'https://placeholder.supabase.co';
-
-    const dbClient = serviceRoleKey
-      ? createClient(supabaseUrl, serviceRoleKey, {
-          auth: { persistSession: false, autoRefreshToken: false },
-        })
-      : supabase;
-
     const { data: existingRows } = await dbClient
       .from('cards')
       .select('front, back')
