@@ -1146,30 +1146,17 @@ export function DocumentUploader({
             <button
               type="button"
               onClick={() => {
-                if (!isPro) {
-                  openProModal(false, 'print');
-                  return;
+                if (typeof window !== 'undefined') {
+                  window.print();
                 }
-                window.print();
               }}
               className="px-3 py-2 text-xs rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 font-semibold transition flex items-center gap-1.5 active:scale-95 cursor-pointer shadow-xs"
-              title={
-                !isPro
-                  ? isEn
-                    ? 'Export to PDF / Print is exclusive to PRO'
-                    : 'Exportar a PDF / Imprimir es exclusivo para PRO'
-                  : 'Guardar como PDF o Imprimir tarjetas'
-              }
+              title={isEn ? 'Export to PDF / Print' : 'Guardar como PDF o Imprimir tarjetas'}
             >
               <svg className="w-3.5 h-3.5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
               </svg>
               <span>{t('ai_uploader.export_pdf_btn', isEn ? 'Export to PDF / Print' : 'Exportar a PDF / Imprimir')}</span>
-              {!isPro && (
-                <span className="px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white leading-none shadow-xs">
-                  PRO
-                </span>
-              )}
             </button>
 
             <button

@@ -54,30 +54,6 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
   // Estado para el acordeón del Editor Manual de Tarjetas (cerrado por defecto para evitar saturar la pantalla)
   const [isManualEditorOpen, setIsManualEditorOpen] = useState(false);
 
-  // Estatus de suscripción PRO / VIP del usuario
-  const [isPro, setIsPro] = useState(false);
-
-  useEffect(() => {
-    if (!user?.id) return;
-    const uid: string = user.id;
-    async function checkTier() {
-      try {
-        const { data } = await supabase
-          .from('api_limits')
-          .select('tier')
-          .eq('user_id', uid)
-          .maybeSingle();
-
-        if (data && (data.tier === 'pro' || data.tier === 'vip')) {
-          setIsPro(true);
-        }
-      } catch (err) {
-        console.warn('Error al verificar estatus PRO:', err);
-      }
-    }
-    checkTier();
-  }, [user?.id]);
-
   useEffect(() => {
     fetchDeckById(id);
     fetchCardsByDeck(id);
@@ -106,10 +82,6 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
   };
 
   const handlePrintExam = () => {
-    if (!isPro) {
-      openProModal(false, 'print');
-      return;
-    }
     if (typeof window !== 'undefined') {
       window.print();
     }
@@ -354,18 +326,11 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                 title={
                   cards.length === 0
                     ? t('deck_detail.empty_print_tooltip', 'El mazo no contiene preguntas para imprimir')
-                    : !isPro
-                      ? t('deck_detail.print_pro_only', 'Exportar a PDF / Imprimir es exclusivo para PRO')
-                      : t('deck_detail.export_pdf_btn', 'Exportar a PDF / Imprimir')
+                    : t('deck_detail.export_pdf_btn', 'Exportar a PDF / Imprimir')
                 }
               >
                 <Printer className="w-4 h-4 text-[var(--deck-accent)] shrink-0" />
                 <span className="truncate">{t('deck_detail.export_pdf_short', 'Imprimir / PDF')}</span>
-                {!isPro && (
-                  <span className="px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white leading-none shadow-xs">
-                    PRO
-                  </span>
-                )}
               </button>
             </div>
           </div>
