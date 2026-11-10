@@ -425,17 +425,23 @@ DEBES explorar conceptos, relaciones, celdas de tablas o párrafos que aún NO h
 
   if (pedagogicalMode === 'didactic') {
     prompt += `\n${buildDidacticModeDirective(docenteFormat, targetAudience)}\n`;
+    if (isPracticalMode) {
+      prompt += `\n${PRACTICAL_MODE_DIRECTIVE}\n`;
+    }
+    if (isExhaustiveMode) {
+      prompt += `\n${buildUniversalCalibrationDirective(true)}\n`;
+    }
+    prompt += `\n${DISTRACTOR_VEROSIMILITUDE_DIRECTIVE}\n`;
+    prompt += `\n${ZERO_MISMATCH_DIRECTIVE}\n`;
   } else {
     prompt += `\n${TEXT_DENSITY_ADAPTIVE_DISTRACTOR_DIRECTIVE}\n`;
+    if (isPracticalMode) {
+      prompt += `\n${PRACTICAL_MODE_DIRECTIVE}\n`;
+    }
+    prompt += `\n${buildUniversalCalibrationDirective(isExhaustiveMode)}\n`;
+    prompt += `\n${DISTRACTOR_VEROSIMILITUDE_DIRECTIVE}\n`;
+    prompt += `\n${ZERO_MISMATCH_DIRECTIVE}\n`;
   }
-
-  if (isPracticalMode) {
-    prompt += `\n${PRACTICAL_MODE_DIRECTIVE}\n`;
-  }
-
-  prompt += `\n${buildUniversalCalibrationDirective(isExhaustiveMode)}\n`;
-  prompt += `\n${DISTRACTOR_VEROSIMILITUDE_DIRECTIVE}\n`;
-  prompt += `\n${ZERO_MISMATCH_DIRECTIVE}\n`;
 
   prompt += `\n${EDITORIAL_ARTIFACTS_DIRECTIVE}\n`;
 
@@ -500,13 +506,17 @@ function getGlobalRules(
     : `2. ${STRICT_GROUNDING_DIRECTIVE} Objetivo de extracción: hasta ${countStr} tarjetas reales respaldadas por la fuente.
 3. ÍNDICE DE SEGUIMIENTO OBLIGATORIO: Para cada tarjeta, asigna un \`generation_index\` estrictamente secuencial (1, 2, 3...). Detén la generación al alcanzar las ${countStr} tarjetas o si el material académico real se ha agotado por completo sin inventar datos externos.`;
 
-  const didacticRule =
-    pedagogicalMode === 'didactic'
-      ? `\n\n13. ${buildDidacticModeDirective(docenteFormat, targetAudience)}`
-      : `\n\n13. ${TEXT_DENSITY_ADAPTIVE_DISTRACTOR_DIRECTIVE}`;
+  const isDocenteMode =
+    pedagogicalMode === 'didactic' || (pedagogicalMode as unknown as string) === 'docente';
+
+  const didacticRule = isDocenteMode
+    ? `\n\n13. ${buildDidacticModeDirective(docenteFormat, targetAudience)}`
+    : `\n\n13. ${TEXT_DENSITY_ADAPTIVE_DISTRACTOR_DIRECTIVE}`;
 
   const practicalRule = isPracticalMode ? `\n\n14. ${PRACTICAL_MODE_DIRECTIVE}` : '';
-  const calibrationRule = `\n\n15. ${buildUniversalCalibrationDirective(isExhaustiveMode)}`;
+  const calibrationRule = isDocenteMode
+    ? (isExhaustiveMode ? `\n\n15. ${buildUniversalCalibrationDirective(true)}` : '')
+    : `\n\n15. ${buildUniversalCalibrationDirective(isExhaustiveMode)}`;
   const distractorRule = `\n\n16. ${DISTRACTOR_VEROSIMILITUDE_DIRECTIVE}`;
   const zeroMismatchRule = `\n\n17. ${ZERO_MISMATCH_DIRECTIVE}`;
 
@@ -2146,29 +2156,30 @@ Esta instrucción tiene PRIORIDAD ABSOLUTA y actúa como un filtro estricto sobr
 
       if (isDocenteMode) {
         singlePageSystemPrompt += `${buildDidacticModeDirective(docenteFormat, targetAudience)}\n\n`;
-      } else {
-        singlePageSystemPrompt += `${TEXT_DENSITY_ADAPTIVE_DISTRACTOR_DIRECTIVE}\n\n`;
-      }
-
-      if (isPracticalMode) {
-        singlePageSystemPrompt += `${PRACTICAL_MODE_DIRECTIVE}\n\n`;
-      }
-
-      singlePageSystemPrompt += `${buildUniversalCalibrationDirective(isExhaustiveMode)}\n\n`;
-      singlePageSystemPrompt += `${DISTRACTOR_VEROSIMILITUDE_DIRECTIVE}\n\n`;
-      singlePageSystemPrompt += `${ZERO_MISMATCH_DIRECTIVE}\n\n`;
-
-      // Si el modo exhaustivo está activo, REEMPLAZA la directiva estándar para anular cualquier síntesis pedagógica o brevedad
-      if (isExhaustiveMode) {
-        singlePageSystemPrompt += `${exhaustiveDirective}\n\n`;
-      } else {
-        singlePageSystemPrompt += `${universalDirective}\n\n`;
-      }
-
-      if (isDocenteMode) {
+        if (isPracticalMode) {
+          singlePageSystemPrompt += `${PRACTICAL_MODE_DIRECTIVE}\n\n`;
+        }
+        if (isExhaustiveMode) {
+          singlePageSystemPrompt += `${buildUniversalCalibrationDirective(true)}\n\n`;
+          singlePageSystemPrompt += `${exhaustiveDirective}\n\n`;
+        }
+        singlePageSystemPrompt += `${DISTRACTOR_VEROSIMILITUDE_DIRECTIVE}\n\n`;
+        singlePageSystemPrompt += `${ZERO_MISMATCH_DIRECTIVE}\n\n`;
         singlePageSystemPrompt += `${getDidacticFormatSection(docenteFormat)}\n`;
         singlePageSystemPrompt += `\nRECORDATORIO MODO DOCENTE / DIDÁCTICO: Realiza un barrido homogéneo por todo el texto, transformando el contenido en ejercicios y problemas prácticos de examen para alumnos, omitiendo metadatos de aula (ejercicios, bloques, unidades) y omitiendo preguntas sobre transcripciones fonéticas.`;
       } else {
+        singlePageSystemPrompt += `${TEXT_DENSITY_ADAPTIVE_DISTRACTOR_DIRECTIVE}\n\n`;
+        if (isPracticalMode) {
+          singlePageSystemPrompt += `${PRACTICAL_MODE_DIRECTIVE}\n\n`;
+        }
+        singlePageSystemPrompt += `${buildUniversalCalibrationDirective(isExhaustiveMode)}\n\n`;
+        singlePageSystemPrompt += `${DISTRACTOR_VEROSIMILITUDE_DIRECTIVE}\n\n`;
+        singlePageSystemPrompt += `${ZERO_MISMATCH_DIRECTIVE}\n\n`;
+        if (isExhaustiveMode) {
+          singlePageSystemPrompt += `${exhaustiveDirective}\n\n`;
+        } else {
+          singlePageSystemPrompt += `${universalDirective}\n\n`;
+        }
         singlePageSystemPrompt += `${getFormatRule(cardFormat)}`;
         singlePageSystemPrompt += `\n${getFormatInstructions(cardFormat)}`;
         singlePageSystemPrompt += `\n\nREGLA DE INTEGRIDAD: Devuelve un objeto JSON estructurado con "conceptos_identificados" (array de strings con los conceptos encontrados en esta página), "core_exhausted" (booleano) y "cards" (array dinámico con todas las tarjetas extraídas sin límite máximo ni mínimo artificial, formuladas según el formato "${cardFormat}").`;
@@ -2229,8 +2240,8 @@ DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de este bloqu
               : `Páginas ${chunk.startPage} a ${chunk.endPage}`;
 
           const chunkUserPrompt = isExhaustiveMode
-            ? `Analiza el bloque (${pageLabel}) del documento aplicando la DIRECTIVA DE COBERTURA Y CALIDAD (cuota asignada: ${currentChunkQuota} tarjetas). Aplica la DIRECTIVA DE MODO DOCENTE / DIDÁCTICO para crear ejercicios prácticos de evaluación sin metadatos de aula. Si hay tablas o matrices, extrae preguntas independientes por celda o cruce. Formato: "${cardFormat}".`
-            : `Analiza el bloque (${pageLabel}) del documento adjunto y extrae exactamente ${currentChunkQuota} preguntas en formato "${cardFormat}". Aplica el Modo Docente / Didáctico: preguntas prácticas de examen sin metadatos de aula. Asegúrate de cubrir equilibradamente el contenido de todas las páginas del bloque.`;
+            ? `Analiza el bloque (${pageLabel}) del documento aplicando la DIRECTIVA DE COBERTURA Y CALIDAD (cuota asignada: ${currentChunkQuota} tarjetas). Aplica la DIRECTIVA DE MODO DOCENTE / DIDÁCTICO para crear ejercicios prácticos de evaluación sin metadatos de aula. Si hay tablas o matrices, extrae preguntas independientes por celda o cruce. Formato: "${docenteFormat}".`
+            : `Analiza el bloque (${pageLabel}) del documento adjunto y extrae exactamente ${currentChunkQuota} preguntas en formato de evaluación docente "${docenteFormat}". Aplica el Modo Docente / Didáctico: preguntas prácticas de examen sin metadatos de aula. Asegúrate de cubrir equilibradamente el contenido de todas las páginas del bloque.`;
 
           let chunkCandidateCards: GeneratedCard[] = [];
 
@@ -2567,29 +2578,30 @@ Esta instrucción tiene PRIORIDAD ABSOLUTA y actúa como un filtro estricto sobr
 
       if (isDocenteMode) {
         singlePageSystemPrompt += `${buildDidacticModeDirective(docenteFormat, targetAudience)}\n\n`;
-      } else {
-        singlePageSystemPrompt += `${TEXT_DENSITY_ADAPTIVE_DISTRACTOR_DIRECTIVE}\n\n`;
-      }
-
-      if (isPracticalMode) {
-        singlePageSystemPrompt += `${PRACTICAL_MODE_DIRECTIVE}\n\n`;
-      }
-
-      singlePageSystemPrompt += `${buildUniversalCalibrationDirective(isExhaustiveMode)}\n\n`;
-      singlePageSystemPrompt += `${DISTRACTOR_VEROSIMILITUDE_DIRECTIVE}\n\n`;
-      singlePageSystemPrompt += `${ZERO_MISMATCH_DIRECTIVE}\n\n`;
-
-      // Si el modo exhaustivo está activo, REEMPLAZA la directiva estándar para anular cualquier síntesis pedagógica o brevedad
-      if (isExhaustiveMode) {
-        singlePageSystemPrompt += `${exhaustiveDirective}\n\n`;
-      } else {
-        singlePageSystemPrompt += `${universalDirective}\n\n`;
-      }
-
-      if (isDocenteMode) {
+        if (isPracticalMode) {
+          singlePageSystemPrompt += `${PRACTICAL_MODE_DIRECTIVE}\n\n`;
+        }
+        if (isExhaustiveMode) {
+          singlePageSystemPrompt += `${buildUniversalCalibrationDirective(true)}\n\n`;
+          singlePageSystemPrompt += `${exhaustiveDirective}\n\n`;
+        }
+        singlePageSystemPrompt += `${DISTRACTOR_VEROSIMILITUDE_DIRECTIVE}\n\n`;
+        singlePageSystemPrompt += `${ZERO_MISMATCH_DIRECTIVE}\n\n`;
         singlePageSystemPrompt += `${getDidacticFormatSection(docenteFormat)}\n`;
         singlePageSystemPrompt += `\nRECORDATORIO MODO DOCENTE / DIDÁCTICO: Realiza un barrido homogéneo por todo el texto, transformando el contenido en ejercicios y problemas prácticos de examen para alumnos, omitiendo metadatos de aula (ejercicios, bloques, unidades) y omitiendo preguntas sobre transcripciones fonéticas.`;
       } else {
+        singlePageSystemPrompt += `${TEXT_DENSITY_ADAPTIVE_DISTRACTOR_DIRECTIVE}\n\n`;
+        if (isPracticalMode) {
+          singlePageSystemPrompt += `${PRACTICAL_MODE_DIRECTIVE}\n\n`;
+        }
+        singlePageSystemPrompt += `${buildUniversalCalibrationDirective(isExhaustiveMode)}\n\n`;
+        singlePageSystemPrompt += `${DISTRACTOR_VEROSIMILITUDE_DIRECTIVE}\n\n`;
+        singlePageSystemPrompt += `${ZERO_MISMATCH_DIRECTIVE}\n\n`;
+        if (isExhaustiveMode) {
+          singlePageSystemPrompt += `${exhaustiveDirective}\n\n`;
+        } else {
+          singlePageSystemPrompt += `${universalDirective}\n\n`;
+        }
         singlePageSystemPrompt += `${getFormatRule(cardFormat)}`;
         singlePageSystemPrompt += `\n${getFormatInstructions(cardFormat)}`;
         singlePageSystemPrompt += `\n\nREGLA DE INTEGRIDAD: Devuelve un objeto JSON estructurado con "conceptos_identificados" (array de strings con los conceptos encontrados en esta página virtual), "core_exhausted" (booleano) y "cards" (array dinámico con todas las tarjetas extraídas sin límite máximo ni mínimo artificial, formuladas según el formato "${cardFormat}").`;
@@ -2657,11 +2669,11 @@ DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de este bloqu
               : '';
 
           const chunkUserPrompt = isExhaustiveMode
-            ? `Analiza el bloque (${pageLabel}) del documento Word aplicando la DIRECTIVA DE COBERTURA Y CALIDAD (cuota asignada: ${currentChunkQuota} tarjetas). Aplica la DIRECTIVA DE MODO DOCENTE / DIDÁCTICO para crear ejercicios prácticos de evaluación sin metadatos de aula. ${imageNotice}Si hay tablas, diagramas o clasificaciones, extrae preguntas independientes por celda o cruce. Formato: "${cardFormat}".
+            ? `Analiza el bloque (${pageLabel}) del documento Word aplicando la DIRECTIVA DE COBERTURA Y CALIDAD (cuota asignada: ${currentChunkQuota} tarjetas). Aplica la DIRECTIVA DE MODO DOCENTE / DIDÁCTICO para crear ejercicios prácticos de evaluación sin metadatos de aula. ${imageNotice}Si hay tablas, diagramas o clasificaciones, extrae preguntas independientes por celda o cruce. Formato de evaluación: "${docenteFormat}".
 
 --- TEXTO DEL BLOQUE (${pageLabel}) ---
 ${chunkText}`
-            : `Analiza el bloque (${pageLabel}) del documento Word adjunto y extrae exactamente ${currentChunkQuota} preguntas en formato "${cardFormat}". Aplica el Modo Docente / Didáctico: preguntas prácticas de examen sin metadatos de aula.${imageNotice} Asegúrate de cubrir equilibradamente el contenido de todas las páginas virtuales del bloque.
+            : `Analiza el bloque (${pageLabel}) del documento Word adjunto y extrae exactamente ${currentChunkQuota} preguntas en formato de evaluación docente "${docenteFormat}". Aplica el Modo Docente / Didáctico: preguntas prácticas de examen sin metadatos de aula.${imageNotice} Asegúrate de cubrir equilibradamente el contenido de todas las páginas virtuales del bloque.
 
 --- TEXTO DEL BLOQUE (${pageLabel}) ---
 ${chunkText}`;

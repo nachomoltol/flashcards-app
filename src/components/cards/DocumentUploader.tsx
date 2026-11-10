@@ -160,7 +160,7 @@ export function DocumentUploader({
 }: DocumentUploaderProps) {
   const { user } = useAuthStore();
   const { cards, createCardsBatch, fetchCardsByDeck } = useCardStore();
-  const { fetchDeckById } = useDeckStore();
+  const { fetchDeckById, currentDeck } = useDeckStore();
   const { openProModal } = useProModalStore();
   const { language, t } = useLanguageStore();
   const isEn = language === 'en';
@@ -687,6 +687,25 @@ export function DocumentUploader({
         cardFormat: card.cardFormat,
       }));
       await createCardsBatch(deckId, cardsPayload);
+
+      // Persistir metadatos del Modo Docente en la descripción del mazo si corresponde
+      if (effectivePedagogicalMode === 'didactic') {
+        try {
+          const currentDesc = currentDeck?.description || '';
+          const alreadyMarked =
+            currentDesc.toLowerCase().includes('docente') ||
+            currentDesc.toLowerCase().includes('didactic');
+
+          if (!alreadyMarked) {
+            const updatedDesc = currentDesc
+              ? `${currentDesc} [Modo Docente • ${docenteFormat} • ${targetAudience}]`
+              : `[Modo Docente] Formato: ${docenteFormat} • Audiencia: ${targetAudience}`;
+            await supabase.from('decks').update({ description: updatedDesc }).eq('id', deckId);
+          }
+        } catch (updateDeckErr) {
+          console.warn('No se pudo actualizar metadatos docentes en el mazo:', updateDeckErr);
+        }
+      }
 
       // Sincronizar datos del mazo en local
       await fetchCardsByDeck(deckId);

@@ -688,7 +688,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
 
       {/* Modal: Generar con IA (Gemini Flash Multimodal) */}
       {isAiModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/75 backdrop-blur-sm animate-in fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/75 backdrop-blur-sm animate-in fade-in print:hidden">
           <div className="w-full max-w-xl rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 sm:p-6 shadow-2xl relative space-y-3 sm:space-y-4 max-h-[92vh] overflow-y-auto">
             {/* Header */}
             <div className="flex items-center justify-between">
@@ -1132,6 +1132,14 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
       deckTitle={currentDeck?.title || t('deck_detail.untitled_deck', 'Mazo de Estudio')}
       deckDescription={currentDeck?.description}
       cards={cards}
+      pedagogicalMode={
+        Boolean(
+          currentDeck?.description?.toLowerCase().includes('docente') ||
+          currentDeck?.description?.toLowerCase().includes('didactic')
+        )
+          ? 'didactic'
+          : 'academic'
+      }
       isDocenteMode={
         Boolean(
           currentDeck?.description?.toLowerCase().includes('docente') ||
