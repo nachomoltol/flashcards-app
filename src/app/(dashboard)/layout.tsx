@@ -43,7 +43,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   {
     name: 'Mazos',
-    href: '/',
+    href: '/decks',
     icon: ({ className }) => <Layers className={className} />,
   },
   {
@@ -60,7 +60,7 @@ const navItems: NavItem[] = [
 
 function MobileBrandFallback() {
   return (
-    <Link href="/" className="flex items-center gap-2 sm:gap-2.5 shrink-0" aria-label="Ir a Inicio">
+    <Link href="/decks" className="flex items-center gap-2 sm:gap-2.5 shrink-0" aria-label="Ir a Inicio">
       <img
         src="/icons/android-chrome-192x192.png"
         alt="Flashmente"
@@ -74,12 +74,12 @@ function MobileBrandFallback() {
 function MobileHeaderBrand() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const isOutOfRoot = pathname !== '/' || Boolean(searchParams?.get('folder'));
+  const isOutOfRoot = (pathname !== '/' && pathname !== '/decks') || Boolean(searchParams?.get('folder'));
 
   if (isOutOfRoot) {
     return (
       <Link
-        href="/"
+        href="/decks"
         className="flex items-center gap-2 sm:gap-2.5 shrink-0 group"
         aria-label="Volver a Inicio"
         title="Volver a Inicio"

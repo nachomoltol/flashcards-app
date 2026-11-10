@@ -16,7 +16,6 @@ import {
 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
-import { compressImage } from '@/lib/imageCompression';
 import { generateCardsFromNotesAction } from '@/app/actions/generateCardsFromNotes';
 import { useAuthStore, useCardStore, useDeckStore, useProModalStore, useLanguageStore } from '@/stores';
 import { InfoTooltip } from './InfoTooltip';
@@ -32,6 +31,84 @@ interface HandwrittenNotesUploaderProps {
   deckId: string;
   onSuccess?: (count: number) => void;
   onCancel?: () => void;
+}
+
+/**
+ * Comprime y reescala obligatoriamente una imagen en el cliente:
+ * - Escala a un máximo de 1600px en anchura o altura preservando el aspect ratio original.
+ * - Codifica a formato image/jpeg con calidad 0.75.
+ * - Reduce imágenes nativas (5-10 MB) a ~300-400 KB antes de cualquier envío o almacenamiento en estado.
+ */
+async function compressNoteImage(fileOrBlob: Blob, filename = 'apunte.jpg'): Promise<File> {
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    return new File([fileOrBlob], filename, { type: 'image/jpeg' });
+  }
+
+  return new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(fileOrBlob);
+    const img = new Image();
+
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      try {
+        let width = img.naturalWidth || img.width;
+        let height = img.naturalHeight || img.height;
+        const maxDim = 1600;
+
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          throw new Error('No se pudo inicializar contexto Canvas 2D');
+        }
+
+        // Pintar fondo blanco para evitar artefactos o fondos negros al codificar JPEG
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, width, height);
+
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              const compressedFile = new File([blob], filename, {
+                type: 'image/jpeg',
+                lastModified: Date.now(),
+              });
+              resolve(compressedFile);
+            } else {
+              reject(new Error('Canvas toBlob retornó un resultado nulo'));
+            }
+          },
+          'image/jpeg',
+          0.75
+        );
+      } catch (err) {
+        reject(err);
+      }
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('No se pudo cargar la imagen para compresión'));
+    };
+
+    img.src = objectUrl;
+  });
 }
 
 export function HandwrittenNotesUploader({
@@ -53,6 +130,7 @@ export function HandwrittenNotesUploader({
   const [customPrompt, setCustomPrompt] = useState('');
 
   const [status, setStatus] = useState<'idle' | 'compressing' | 'generating' | 'success'>('idle');
+  const [isOptimizing, setIsOptimizing] = useState<boolean>(false);
   const [compressionProgress, setCompressionProgress] = useState<{ current: number; total: number } | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [generatedCount, setGeneratedCount] = useState<number | null>(null);
@@ -60,46 +138,68 @@ export function HandwrittenNotesUploader({
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
-  // Agregar archivos nuevos a la lista respetando el límite de 10
-  const addFilesToPages = useCallback((newFiles: File[]) => {
-    setPages((prev) => {
-      const remainingSlots = 10 - prev.length;
-      if (remainingSlots <= 0) return prev;
+  // Ingesta unificada con compresión obligatoria client-side previa a entrar al estado
+  const processAndAddFiles = useCallback(
+    async (rawBlobs: Array<{ blob: Blob; name: string }>) => {
+      if (rawBlobs.length === 0) return;
+      setIsOptimizing(true);
+      setErrorMessage(null);
 
-      const validFiles = newFiles.filter((f) => f.type.startsWith('image/')).slice(0, remainingSlots);
-      const newItems: NotePageItem[] = validFiles.map((file) => ({
-        id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-        file,
-        previewUrl: URL.createObjectURL(file),
-      }));
+      try {
+        const remainingSlots = 10 - pages.length;
+        if (remainingSlots <= 0) return;
 
-      return [...prev, ...newItems];
-    });
-  }, []);
+        const toProcess = rawBlobs.slice(0, remainingSlots);
+        const newItems: NotePageItem[] = [];
+
+        for (let i = 0; i < toProcess.length; i++) {
+          const item = toProcess[i];
+          const compressedFile = await compressNoteImage(item.blob, item.name);
+          newItems.push({
+            id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}-${i}`,
+            file: compressedFile,
+            previewUrl: URL.createObjectURL(compressedFile),
+          });
+        }
+
+        setPages((prev) => [...prev, ...newItems].slice(0, 10));
+      } catch (err) {
+        console.error('[HandwrittenNotesUploader] Error al optimizar imágenes:', err);
+        setErrorMessage('Error al optimizar una o más fotos. Inténtalo de nuevo.');
+      } finally {
+        setIsOptimizing(false);
+      }
+    },
+    [pages.length]
+  );
 
   // Manejador del input de archivos web
-  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     try {
       if (e.target.files && e.target.files.length > 0) {
-        addFilesToPages(Array.from(e.target.files));
+        const valid = Array.from(e.target.files)
+          .filter((f) => f.type.startsWith('image/'))
+          .map((f) => ({ blob: f, name: f.name.replace(/\.[^/.]+$/, '') + '.jpg' }));
+        await processAndAddFiles(valid);
       }
     } catch (err: unknown) {
       console.error('[HandwrittenNotesUploader] Error al leer archivos:', err);
+      setErrorMessage('Error al leer las fotos seleccionadas.');
     } finally {
       // Reiniciar value para permitir seleccionar los mismos archivos en reintentos
       e.target.value = '';
     }
   };
 
-  // Convertir path nativo de foto a File y agregar a la cola
+  // Convertir path nativo de foto a File, comprimir en cliente y agregar a la cola
   const handleAddNativePhoto = async (webPath: string) => {
     try {
       const response = await fetch(webPath);
       const blob = await response.blob();
-      const file = new File([blob], `apunte_cam_${Date.now()}.jpg`, { type: 'image/jpeg' });
-      addFilesToPages([file]);
+      await processAndAddFiles([{ blob, name: `apunte_cam_${Date.now()}.jpg` }]);
     } catch (err) {
       console.error('[HandwrittenNotesUploader] Error al convertir foto nativa:', err);
+      setErrorMessage('Error al leer la foto de la cámara.');
     }
   };
 
@@ -149,8 +249,21 @@ export function HandwrittenNotesUploader({
           limit: remaining,
         });
         if (result.photos && result.photos.length > 0) {
-          for (const p of result.photos) {
-            if (p.webPath) await handleAddNativePhoto(p.webPath);
+          const list: Array<{ blob: Blob; name: string }> = [];
+          for (let i = 0; i < result.photos.length; i++) {
+            const p = result.photos[i];
+            if (p.webPath) {
+              try {
+                const res = await fetch(p.webPath);
+                const blob = await res.blob();
+                list.push({ blob, name: `apunte_gal_${Date.now()}_${i}.jpg` });
+              } catch (fetchErr) {
+                console.error('[HandwrittenNotesUploader] Error al leer imagen de galería:', fetchErr);
+              }
+            }
+          }
+          if (list.length > 0) {
+            await processAndAddFiles(list);
           }
         }
       } catch (err) {
@@ -223,22 +336,13 @@ export function HandwrittenNotesUploader({
     setCompressionProgress({ current: 0, total: pages.length });
 
     try {
-      // 1. Compresión client-side en Canvas: 1920px max, JPEG, quality 0.78, ~400KB
+      // 1. Preparar imágenes ya comprimidas a JPEG < 400KB
       const processedImages: Array<{ order: number; mimeType: 'image/jpeg'; base64Data: string }> = [];
 
       for (let i = 0; i < pages.length; i++) {
         setCompressionProgress({ current: i + 1, total: pages.length });
         const { file } = pages[i];
-
-        const compressed = await compressImage(file, {
-          maxWidth: 1920,
-          maxHeight: 1920,
-          format: 'image/jpeg',
-          quality: 0.78,
-          maxFileSizeKB: 450,
-        });
-
-        const base64 = await blobToBase64(compressed.blob);
+        const base64 = await blobToBase64(file);
         processedImages.push({
           order: i + 1,
           mimeType: 'image/jpeg',
@@ -283,10 +387,13 @@ export function HandwrittenNotesUploader({
       setStatus('success');
       onSuccess?.(result.cards.length);
     } catch (err: unknown) {
-      console.error('[HandwrittenNotesUploader] Error:', err);
-      const msg = err instanceof Error ? err.message : 'Error al procesar las fotos de apuntes.';
-      setErrorMessage(msg);
+      console.error('[HandwrittenNotesUploader] Error al procesar apuntes:', err);
       setStatus('idle');
+      setErrorMessage(
+        err instanceof Error
+          ? err.message
+          : 'Ocurrió un error inesperado al procesar las fotos. Por favor inténtalo de nuevo.'
+      );
     } finally {
       setCompressionProgress(null);
     }
@@ -313,6 +420,13 @@ export function HandwrittenNotesUploader({
       />
 
       {/* Estados de Notificación */}
+      {isOptimizing && (
+        <div className="p-3 rounded-xl bg-violet-500/10 border border-violet-500/20 text-violet-700 dark:text-violet-300 text-xs flex items-center gap-2">
+          <div className="w-4 h-4 border-2 border-violet-500 border-t-transparent rounded-full animate-spin shrink-0" />
+          <span>Optimizando y comprimiendo fotos a 1600px para carga ultrarrápida...</span>
+        </div>
+      )}
+
       {errorMessage && (
         <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-500 dark:text-rose-300 text-xs flex items-center gap-2">
           <AlertCircle className="w-4 h-4 shrink-0" />
@@ -339,7 +453,7 @@ export function HandwrittenNotesUploader({
           <div className="flex flex-col sm:flex-row items-center gap-2.5">
             <button
               type="button"
-              disabled={status !== 'idle' || pages.length >= 10}
+              disabled={status !== 'idle' || isOptimizing || pages.length >= 10}
               onClick={handleTakePhoto}
               className="w-full sm:flex-1 py-2.5 px-3.5 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700/80 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-800 dark:text-neutral-200 font-semibold text-xs transition flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer min-h-[44px]"
             >
@@ -349,7 +463,7 @@ export function HandwrittenNotesUploader({
 
             <button
               type="button"
-              disabled={status !== 'idle' || pages.length >= 10}
+              disabled={status !== 'idle' || isOptimizing || pages.length >= 10}
               onClick={handlePickGallery}
               className="w-full sm:flex-1 py-2.5 px-3.5 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700/80 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-800 dark:text-neutral-200 font-semibold text-xs transition flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer min-h-[44px]"
             >
@@ -366,11 +480,14 @@ export function HandwrittenNotesUploader({
                 handlePickGallery();
               }}
               onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => {
+              onDrop={async (e) => {
                 e.preventDefault();
-                if (status !== 'idle') return;
+                if (status !== 'idle' || isOptimizing) return;
                 if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-                  addFilesToPages(Array.from(e.dataTransfer.files));
+                  const valid = Array.from(e.dataTransfer.files)
+                    .filter((f) => f.type.startsWith('image/'))
+                    .map((f) => ({ blob: f, name: f.name.replace(/\.[^/.]+$/, '') + '.jpg' }));
+                  await processAndAddFiles(valid);
                 }
               }}
               className="p-8 sm:p-10 rounded-2xl border-2 border-dashed border-neutral-300 dark:border-neutral-800 hover:border-violet-500 dark:hover:border-violet-500 bg-neutral-50/60 dark:bg-neutral-900/40 text-center flex flex-col items-center justify-center space-y-2 cursor-pointer transition"
@@ -613,7 +730,7 @@ export function HandwrittenNotesUploader({
 
             <button
               type="button"
-              disabled={status !== 'idle' || pages.length === 0}
+              disabled={status !== 'idle' || isOptimizing || pages.length === 0}
               onClick={handleProcessNotes}
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 via-indigo-600 to-indigo-700 hover:from-violet-500 hover:to-indigo-500 text-white font-medium text-xs sm:text-sm transition-all duration-150 shadow-lg shadow-violet-600/25 active:scale-95 disabled:opacity-50 cursor-pointer"
             >

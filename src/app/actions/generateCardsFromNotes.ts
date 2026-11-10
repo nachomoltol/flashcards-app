@@ -230,57 +230,63 @@ function processGeneratedCards(
 export async function generateCardsFromNotesAction(
   input: HandwrittenNotesInput
 ): Promise<GenerateCardsResult> {
-  const {
-    deckId,
-    userId: explicitUserId,
-    images,
-    cardFormat = 'multiple_choice',
-    cardCount = 10,
-    customPrompt,
-    focusInstruction,
-    language = 'es',
-    isPracticalMode = false,
-    pedagogicalMode = 'academic',
-    docenteFormat = 'mixed_test',
-    targetAudience = 'auto',
-  } = input;
-
-  if (!deckId) {
-    return { success: false, error: 'Identificador del mazo (deckId) no proporcionado.' };
-  }
-
-  if (!images || !Array.isArray(images) || images.length === 0) {
-    return { success: false, error: 'Debes seleccionar al menos una foto de apuntes.' };
-  }
-
-  if (images.length > 10) {
-    return { success: false, error: 'Se permite un máximo de 10 fotos por lote para asegurar calidad.' };
-  }
-
-  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENAI_API_KEY;
-  if (!apiKey) {
-    return {
-      success: false,
-      error:
-        'Clave GEMINI_API_KEY no configurada. Por favor define GEMINI_API_KEY en tu entorno.',
-    };
-  }
-
-  // 1. Control de cuota de generación
-  const resolvedUserId = await resolveUserId(deckId, explicitUserId);
-  if (!resolvedUserId) {
-    return { success: false, error: 'LIMIT_REACHED' };
-  }
-
-  const quotaCheck = await checkUserGenerationQuota(resolvedUserId);
-  if (!quotaCheck.canGenerate) {
-    return {
-      success: false,
-      error: quotaCheck.reason === 'AD_REQUIRED' ? 'AD_REQUIRED' : 'LIMIT_REACHED',
-    };
-  }
-
   try {
+    if (!input || typeof input !== 'object') {
+      return { success: false, error: 'Parámetros de entrada inválidos.', cards: [] };
+    }
+
+    const {
+      deckId,
+      userId: explicitUserId,
+      images = [],
+      cardFormat = 'multiple_choice',
+      cardCount = 10,
+      customPrompt,
+      focusInstruction,
+      language = 'es',
+      isPracticalMode = false,
+      pedagogicalMode = 'academic',
+      docenteFormat = 'mixed_test',
+      targetAudience = 'auto',
+    } = input;
+
+    if (!deckId) {
+      return { success: false, error: 'Identificador del mazo (deckId) no proporcionado.', cards: [] };
+    }
+
+    if (!images || !Array.isArray(images) || images.length === 0) {
+      return { success: false, error: 'Debes seleccionar al menos una foto de apuntes.', cards: [] };
+    }
+
+    if (images.length > 10) {
+      return { success: false, error: 'Se permite un máximo de 10 fotos por lote para asegurar calidad.', cards: [] };
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENAI_API_KEY;
+    if (!apiKey) {
+      return {
+        success: false,
+        error:
+          'Clave GEMINI_API_KEY no configurada. Por favor define GEMINI_API_KEY en tu entorno.',
+        cards: [],
+      };
+    }
+
+    // 1. Control de cuota de generación
+    const resolvedUserId = await resolveUserId(deckId, explicitUserId);
+    if (!resolvedUserId) {
+      return { success: false, error: 'LIMIT_REACHED', cards: [] };
+    }
+
+    const quotaCheck = await checkUserGenerationQuota(resolvedUserId);
+    if (!quotaCheck.canGenerate) {
+      return {
+        success: false,
+        error: quotaCheck.reason === 'AD_REQUIRED' ? 'AD_REQUIRED' : 'LIMIT_REACHED',
+        cards: [],
+      };
+    }
+
     const ai = new GoogleGenAI({ apiKey });
 
     // 2. Ordenar secuencialmente las imágenes y construir inlineData
@@ -434,11 +440,12 @@ IDIOMA DE SALIDA: ${language === 'en' ? 'Inglés' : 'Español'}.`;
       core_exhausted: isExhausted,
     };
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Error al procesar las fotos de apuntes';
+    const message = err instanceof Error ? err.message : 'Error al procesar notas';
     console.error('[generateCardsFromNotesAction] Error:', err);
     return {
       success: false,
-      error: `Error al procesar los apuntes con Gemini: ${message}`,
+      error: message,
+      cards: [],
     };
   }
 }
