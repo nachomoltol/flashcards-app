@@ -615,6 +615,7 @@ export function DocumentUploader({
           : cardFormat;
 
       console.log('[FRONTEND PAYLOAD -> BACKEND]', {
+        isPracticalMode: Boolean(isPracticalMode),
         pedagogicalMode: effectivePedagogicalMode,
         isExhaustiveMode: Boolean(isExhaustiveMode),
         startPage: startPageForRun,

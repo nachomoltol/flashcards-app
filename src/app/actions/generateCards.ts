@@ -2185,6 +2185,9 @@ Esta instrucción tiene PRIORIDAD ABSOLUTA y actúa como un filtro estricto sobr
         singlePageSystemPrompt += `${ZERO_MISMATCH_DIRECTIVE}\n\n`;
         if (isExhaustiveMode) {
           singlePageSystemPrompt += `${exhaustiveDirective}\n\n`;
+        } else if (isPracticalMode) {
+          singlePageSystemPrompt += `🎯 DIRECTIVA DE BARRIDO PRÁCTICO Y SITUACIONAL:
+En lugar de extraer definiciones o conceptos teóricos literales, identifica cada dato clave, principio funcional o regla técnica de esta página y formula OBLIGATORIAMENTE un caso práctico, supuesto operativo o escenario de toma de decisiones donde dicho dato sea indispensable para resolver el conflicto planteado.\n\n`;
         } else {
           singlePageSystemPrompt += `${universalDirective}\n\n`;
         }
@@ -2367,9 +2370,15 @@ DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de esta pági
 
           const currentPageSystemPrompt = `${singlePageSystemPrompt}${historyDirective}${exhaustiveQuotaMandate}`;
 
+          const practicalInstruction = isPracticalMode
+            ? `ENFOQUE OBLIGATORIO: MODO PRÁCTICO Y SITUACIONAL (PROBLEM-BASED LEARNING).
+Queda terminantemente PROHIBIDO formular preguntas teóricas directas o definiciones de manual.
+Formula supuestos del mundo real, escenarios de toma de decisiones o problemas aplicados basados en los datos de esta página. La pregunta debe ser imposible de responder sin los datos específicos del supuesto.`
+            : `Extrae todos los conceptos clave, datos precisos, normativas o hechos únicos posibles.`;
+
           const pageUserPrompt = isExhaustiveMode
-            ? `Analiza la Página ${currentPage} del documento adjunto aplicando la DIRECTIVA DE COBERTURA Y CALIDAD (cuota restante: ${remainingToTarget} tarjetas). Si hay tablas o matrices de datos, extrae preguntas independientes por cada fila o cruce numérico. Si es texto continuo, extrae hechos y definiciones sustanciales sin duplicar ni inventar preguntas sobre términos al margen, concluyendo cuando los datos sustanciales se agoten para que el servidor avance de página. Formato: "${cardFormat}".`
-            : `Analiza la Página ${currentPage} del documento adjunto y extrae todos los conceptos clave, datos precisos, normativas o hechos únicos posibles en formato "${cardFormat}".`;
+            ? `Analiza la Página ${currentPage} del documento adjunto aplicando la DIRECTIVA DE COBERTURA Y CALIDAD. ${practicalInstruction} Formato: "${cardFormat}".`
+            : `Analiza la Página ${currentPage} del documento adjunto. ${practicalInstruction} Formato: "${cardFormat}".`;
 
           let pageCandidateCards: GeneratedCard[] = [];
 
@@ -2607,6 +2616,9 @@ Esta instrucción tiene PRIORIDAD ABSOLUTA y actúa como un filtro estricto sobr
         singlePageSystemPrompt += `${ZERO_MISMATCH_DIRECTIVE}\n\n`;
         if (isExhaustiveMode) {
           singlePageSystemPrompt += `${exhaustiveDirective}\n\n`;
+        } else if (isPracticalMode) {
+          singlePageSystemPrompt += `🎯 DIRECTIVA DE BARRIDO PRÁCTICO Y SITUACIONAL:
+En lugar de extraer definiciones o conceptos teóricos literales, identifica cada dato clave, principio funcional o regla técnica de esta página y formula OBLIGATORIAMENTE un caso práctico, supuesto operativo o escenario de toma de decisiones donde dicho dato sea indispensable para resolver el conflicto planteado.\n\n`;
         } else {
           singlePageSystemPrompt += `${universalDirective}\n\n`;
         }
@@ -2816,12 +2828,18 @@ DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de esta pági
             ? ` Se adjuntan ${currentPageImages.length} imagen(es) o diagrama(s) incrustados en esta sección del documento Word. Analízalos visualmente con precisión para extraer datos, esquemas, clasificaciones o conceptos presentes en ellos.`
             : '';
 
+          const practicalInstructionWord = isPracticalMode
+            ? `ENFOQUE OBLIGATORIO: MODO PRÁCTICO Y SITUACIONAL (PROBLEM-BASED LEARNING).
+Queda terminantemente PROHIBIDO formular preguntas teóricas directas o definiciones de manual.
+Formula supuestos del mundo real, escenarios de toma de decisiones o problemas aplicados basados en los datos de este bloque. La pregunta debe ser imposible de responder sin los datos específicos del supuesto.`
+            : `Extrae todos los conceptos clave, datos precisos, normativas o hechos únicos posibles.`;
+
           const pageUserPrompt = isExhaustiveMode
-            ? `Analiza el contenido de la Página Virtual ${currentPage} del documento Word adjunto aplicando la DIRECTIVA DE COBERTURA Y CALIDAD (cuota restante: ${remainingToTarget} tarjetas). ${imageNotice}Si hay tablas, diagramas o datos estructurados, extrae preguntas independientes por cada dato relevante. Si es texto continuo, extrae hechos y definiciones sustanciales sin duplicar ni inventar preguntas sobre términos al margen, concluyendo cuando los datos sustanciales se agoten para que el servidor avance de página. Formato: "${cardFormat}".
+            ? `Analiza el contenido de la Página Virtual ${currentPage} del documento Word adjunto aplicando la DIRECTIVA DE COBERTURA Y CALIDAD. ${imageNotice}${practicalInstructionWord} Formato: "${cardFormat}".
 
 --- TEXTO DE LA PÁGINA VIRTUAL ${currentPage} (${fileName || 'documento.docx'}) ---
 ${currentPageText}`
-            : `Analiza el contenido de la Página Virtual ${currentPage} del documento Word adjunto y extrae todos los conceptos clave, datos precisos, normativas o hechos únicos posibles en formato "${cardFormat}".${imageNotice}
+            : `Analiza el contenido de la Página Virtual ${currentPage} del documento Word adjunto. ${practicalInstructionWord} Formato: "${cardFormat}".${imageNotice}
 
 --- TEXTO DE LA PÁGINA VIRTUAL ${currentPage} (${fileName || 'documento.docx'}) ---
 ${currentPageText}`;
