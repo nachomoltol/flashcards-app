@@ -1181,10 +1181,12 @@ export function DocumentUploader({
                       ? (docenteFormat === 'mixed_test' ? 'Examen de Evaluación (Test Mixto)' : 'Casos Prácticos y Preguntas Abiertas')
                       : 'Ficha de Estudio y Repaso'
                   }`
-                : 'Examen de Evaluación'
+                : (pedagogicalMode === 'didactic' ? 'Examen de Evaluación' : 'Cuaderno de Repaso y Autoevaluación')
             }
             deckDescription={pedagogicalMode === 'didactic' ? `Modo Docente • ${docenteFormat}` : undefined}
             cards={generatedCardsPreview}
+            pedagogicalMode={pedagogicalMode}
+            isDocenteMode={pedagogicalMode === 'didactic'}
           />
         </div>
       ) : (

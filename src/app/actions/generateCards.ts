@@ -18,7 +18,6 @@ import {
   buildUniversalCalibrationDirective,
   buildUniversalTablesDirective,
   ZERO_MISMATCH_DIRECTIVE,
-  UNIVERSAL_BLOOM_PROPORTION_DIRECTIVE,
 } from '@/lib/aiDirectives';
 import type {
   CardFormat,
@@ -243,9 +242,7 @@ ESTRUCTURA DE COMPATIBILIDAD EN "front" Y "back":
 
   Explicación: [Justificación técnica extraída del campo justification]
 - "cardFormat": "multiple_choice"
-- ${EDITORIAL_ARTIFACTS_DIRECTIVE}
-
-${UNIVERSAL_BLOOM_PROPORTION_DIRECTIVE}`;
+- ${EDITORIAL_ARTIFACTS_DIRECTIVE}`;
 
     case 'cloze':
       return `FORMATO OBLIGATORIO: cloze (Texto para rellenar / Cloze):
@@ -434,7 +431,6 @@ DEBES explorar conceptos, relaciones, celdas de tablas o párrafos que aún NO h
 
   prompt += `\n${buildUniversalCalibrationDirective(isExhaustiveMode)}\n`;
   prompt += `\n${ZERO_MISMATCH_DIRECTIVE}\n`;
-  prompt += `\n${UNIVERSAL_BLOOM_PROPORTION_DIRECTIVE}\n`;
 
   prompt += `\n${EDITORIAL_ARTIFACTS_DIRECTIVE}\n`;
 
@@ -507,7 +503,6 @@ function getGlobalRules(
   const practicalRule = isPracticalMode ? `\n\n14. ${PRACTICAL_MODE_DIRECTIVE}` : '';
   const calibrationRule = `\n\n15. ${buildUniversalCalibrationDirective(isExhaustiveMode)}`;
   const zeroMismatchRule = `\n\n16. ${ZERO_MISMATCH_DIRECTIVE}`;
-  const bloomRule = `\n\n17. ${UNIVERSAL_BLOOM_PROPORTION_DIRECTIVE}`;
 
   return `REGLAS GLOBALES INQUEBRANTABLES DE BLINDAJE (ESTILO NOTEBOOKLM):
 1. REGLA DE ORO (Estilo NotebookLM): NO inventes información. Tu única fuente de verdad es el texto. Si un concepto, dato o respuesta no se puede deducir directa y explícitamente del texto proporcionado, DEBES omitirlo. No uses conocimiento previo externo.
@@ -520,7 +515,7 @@ ${directiveRule}
 9. ${SINGLE_CORE_CONCEPT_DIRECTIVE}
 10. ${CONTENT_HIERARCHY_DIRECTIVE}
 11. ${tablesDirective}
-12. ${EDITORIAL_ARTIFACTS_DIRECTIVE}${didacticRule}${practicalRule}${calibrationRule}${zeroMismatchRule}${bloomRule}`;
+12. ${EDITORIAL_ARTIFACTS_DIRECTIVE}${didacticRule}${practicalRule}${calibrationRule}${zeroMismatchRule}`;
 }
 
 interface ParsedPageRange {
@@ -2153,7 +2148,6 @@ Esta instrucción tiene PRIORIDAD ABSOLUTA y actúa como un filtro estricto sobr
 
       singlePageSystemPrompt += `${buildUniversalCalibrationDirective(isExhaustiveMode)}\n\n`;
       singlePageSystemPrompt += `${ZERO_MISMATCH_DIRECTIVE}\n\n`;
-      singlePageSystemPrompt += `${UNIVERSAL_BLOOM_PROPORTION_DIRECTIVE}\n\n`;
 
       // Si el modo exhaustivo está activo, REEMPLAZA la directiva estándar para anular cualquier síntesis pedagógica o brevedad
       if (isExhaustiveMode) {
@@ -2572,7 +2566,6 @@ Esta instrucción tiene PRIORIDAD ABSOLUTA y actúa como un filtro estricto sobr
 
       singlePageSystemPrompt += `${buildUniversalCalibrationDirective(isExhaustiveMode)}\n\n`;
       singlePageSystemPrompt += `${ZERO_MISMATCH_DIRECTIVE}\n\n`;
-      singlePageSystemPrompt += `${UNIVERSAL_BLOOM_PROPORTION_DIRECTIVE}\n\n`;
 
       // Si el modo exhaustivo está activo, REEMPLAZA la directiva estándar para anular cualquier síntesis pedagógica o brevedad
       if (isExhaustiveMode) {

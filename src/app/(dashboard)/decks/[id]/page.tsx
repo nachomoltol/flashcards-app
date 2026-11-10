@@ -1127,11 +1127,17 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
       />
     </div>
 
-    {/* Documento de Impresión Ultra-Compacto (Examen Alumnos + Solucionario Docente) */}
+    {/* Documento de Impresión Ultra-Compacto (Cuaderno de Repaso / Examen Docente) */}
     <PrintExamSheet
-      deckTitle={currentDeck?.title || t('deck_detail.untitled_deck', 'Examen de Evaluación')}
+      deckTitle={currentDeck?.title || t('deck_detail.untitled_deck', 'Mazo de Estudio')}
       deckDescription={currentDeck?.description}
       cards={cards}
+      isDocenteMode={
+        Boolean(
+          currentDeck?.description?.toLowerCase().includes('docente') ||
+          currentDeck?.description?.toLowerCase().includes('didactic')
+        )
+      }
     />
   </>
 );

@@ -20,6 +20,8 @@ export interface PrintExamSheetProps {
   deckTitle?: string;
   deckDescription?: string | null;
   cards: PrintCardItem[];
+  pedagogicalMode?: 'academic' | 'didactic' | string;
+  isDocenteMode?: boolean;
 }
 
 /**
@@ -141,12 +143,26 @@ function resolveMultipleChoiceSolution(
 }
 
 export function PrintExamSheet({
-  deckTitle = 'Examen de Evaluación',
+  deckTitle = 'Cuaderno de Repaso',
   deckDescription,
   cards,
+  pedagogicalMode,
+  isDocenteMode,
 }: PrintExamSheetProps) {
   const { language, t } = useLanguageStore();
   const isEn = language === 'en';
+
+  // Detección estricta: Modo Docente vs Modo Estudio
+  const isDocente =
+    isDocenteMode !== undefined
+      ? Boolean(isDocenteMode)
+      : pedagogicalMode !== undefined
+      ? pedagogicalMode === 'didactic'
+      : Boolean(
+          deckDescription?.toLowerCase().includes('docente') ||
+          deckDescription?.toLowerCase().includes('didactic') ||
+          deckTitle?.toLowerCase().includes('modo docente')
+        );
 
   if (!cards || cards.length === 0) {
     return null;
@@ -155,22 +171,25 @@ export function PrintExamSheet({
   return (
     <div className="hidden print:block print-exam-root w-full bg-white text-black font-sans leading-tight pt-1">
       {/* =========================================================================
-          SECCIÓN 1: CUESTIONARIO DE EVALUACIÓN (PARA EL ALUMNADO)
+          SECCIÓN 1: CUESTIONARIO / HOJA DE ESTUDIO
           Diseño continuo, sin respuestas ni pistas, con cortes limpios de página.
          ========================================================================= */}
       <section className="print-student-section space-y-3">
-        {/* Cabecera Formal de Examen */}
+        {/* Cabecera Formal: Bifurcada según Modo Docente vs Modo Estudio */}
         <header className="border-b-2 border-black pb-2.5 space-y-2 mb-3">
           <div className="flex items-start justify-between gap-4">
             <div>
               <h1 className="text-lg font-black uppercase tracking-tight leading-tight">
-                {deckTitle}
+                {isDocente
+                  ? deckTitle
+                  : (isEn ? 'STUDY & SELF-ASSESSMENT WORKBOOK' : 'CUADERNO DE REPASO Y AUTOEVALUACIÓN')}
               </h1>
-              {deckDescription && (
-                <p className="text-[9pt] text-neutral-700 italic mt-0.5 leading-snug">
-                  {deckDescription}
-                </p>
-              )}
+              <p className="text-[9.5pt] text-neutral-800 font-semibold mt-0.5 leading-snug">
+                {isDocente ? deckDescription : deckTitle}
+                {!isDocente && deckDescription && (
+                  <span className="font-normal italic text-neutral-600"> • {deckDescription}</span>
+                )}
+              </p>
             </div>
             <div className="text-right shrink-0">
               <span className="inline-block border border-black px-2 py-0.5 text-[9pt] font-mono font-bold uppercase">
@@ -179,27 +198,33 @@ export function PrintExamSheet({
             </div>
           </div>
 
-          {/* Fila de Metadatos del Alumno */}
-          <div className="grid grid-cols-12 gap-2 text-[9.5pt] pt-1">
-            <div className="col-span-6 border-b border-black pb-0.5">
-              <span className="font-bold">{t('deck_detail.print_student_label', isEn ? 'Student:' : 'Alumno/a:')} </span>
+          {/* Fila de Metadatos del Alumno (ÚNICAMENTE EN MODO DOCENTE) */}
+          {isDocente && (
+            <div className="grid grid-cols-12 gap-2 text-[9.5pt] pt-1">
+              <div className="col-span-6 border-b border-black pb-0.5">
+                <span className="font-bold">{t('deck_detail.print_student_label', isEn ? 'Student:' : 'Alumno/a:')} </span>
+              </div>
+              <div className="col-span-3 border-b border-black pb-0.5">
+                <span className="font-bold">{t('deck_detail.print_date_label', isEn ? 'Date:' : 'Fecha:')} </span>
+              </div>
+              <div className="col-span-3 border-b border-black pb-0.5">
+                <span className="font-bold">{t('deck_detail.print_score_label', isEn ? 'Score:' : 'Nota / Calificación:')} </span>
+              </div>
             </div>
-            <div className="col-span-3 border-b border-black pb-0.5">
-              <span className="font-bold">{t('deck_detail.print_date_label', isEn ? 'Date:' : 'Fecha:')} </span>
-            </div>
-            <div className="col-span-3 border-b border-black pb-0.5">
-              <span className="font-bold">{t('deck_detail.print_score_label', isEn ? 'Score:' : 'Nota / Calificación:')} </span>
-            </div>
-          </div>
+          )}
 
-          {/* Instrucciones Breves */}
-          <p className="text-[8.5pt] text-neutral-600 italic leading-snug">
-            {t(
-              'deck_detail.print_instructions',
-              isEn
-                ? 'Instructions: Read each question carefully. Mark the correct answer with an X or complete your answer in the designated space.'
-                : 'Instrucciones: Lea atentamente cada enunciado. Marque con una X la opción correcta o desarrolle su respuesta en el espacio asignado.'
-            )}
+          {/* Instrucciones al usuario: bifurcadas */}
+          <p className="text-[8.5pt] text-neutral-600 italic leading-snug pt-0.5">
+            {isDocente
+              ? t(
+                  'deck_detail.print_instructions',
+                  isEn
+                    ? 'Instructions: Read each question carefully. Mark the correct answer with an X or complete your answer in the designated space.'
+                    : 'Instrucciones: Lea atentamente cada enunciado. Marque con una X la opción correcta o desarrolle su respuesta en el espacio asignado.'
+                )
+              : (isEn
+                  ? 'Instructions: Read each question carefully to test your conceptual understanding. Check the reasoned solutions at the end of the document.'
+                  : 'Instrucciones: Lea cada cuestión y compruebe su nivel de asimilación conceptual. Consulte las soluciones razonadas al final del documento.')}
           </p>
         </header>
 
@@ -332,32 +357,37 @@ export function PrintExamSheet({
         className="print-teacher-section break-before-page pt-4 space-y-3"
         style={{ breakBefore: 'page', pageBreakBefore: 'always' }}
       >
-        {/* Cabecera del Solucionario */}
+        {/* Cabecera del Solucionario: Modo Docente vs Modo Estudio */}
         <header className="border-b-2 border-black pb-2 space-y-1">
           <div className="flex items-center justify-between gap-4">
             <h2 className="text-base font-black uppercase tracking-tight">
-              {t(
-                'deck_detail.print_answer_key_title',
-                isEn
-                  ? 'Answer Key & Grading Criteria'
-                  : 'Hoja de Respuestas y Criterios de Corrección'
-              )}
+              {isDocente
+                ? t(
+                    'deck_detail.print_answer_key_title',
+                    isEn
+                      ? 'Answer Key & Grading Criteria'
+                      : 'Hoja de Respuestas y Criterios de Corrección'
+                  )
+                : (isEn ? 'ANSWER KEYS & SELF-ASSESSMENT' : 'CLAVES DE RESPUESTA Y AUTOEVALUACIÓN')}
             </h2>
-            <span className="bg-black text-white px-2 py-0.5 text-[8pt] font-mono font-bold uppercase tracking-wider shrink-0">
-              {t(
-                'deck_detail.print_answer_key_sub',
-                isEn
-                  ? 'Official Solution Sheet • Teacher Use Only'
-                  : 'Solucionario Oficial • Uso Exclusivo del Docente'
-              )}
+            <span className={`${isDocente ? 'bg-black text-white' : 'bg-neutral-800 text-white'} px-2 py-0.5 text-[8pt] font-mono font-bold uppercase tracking-wider shrink-0`}>
+              {isDocente
+                ? t(
+                    'deck_detail.print_answer_key_sub',
+                    isEn
+                      ? 'Official Solution Sheet • Teacher Use Only'
+                      : 'Solucionario Oficial • Uso Exclusivo del Docente'
+                  )
+                : (isEn ? 'STUDY SOLUTION SHEET' : 'SOLUCIONARIO DE REPASO')}
             </span>
           </div>
           <div className="flex items-center justify-between text-[9pt] text-neutral-700">
             <span>
-              Materia / Examen: <strong className="text-black">{deckTitle}</strong>
+              {isDocente ? 'Materia / Examen:' : 'Mazo / Temario:'}{' '}
+              <strong className="text-black">{deckTitle}</strong>
             </span>
             <span>
-              Total: <strong>{cards.length} preguntas</strong>
+              Total: <strong>{cards.length} {isEn ? 'questions' : 'preguntas'}</strong>
             </span>
           </div>
         </header>
@@ -444,12 +474,16 @@ export function PrintExamSheet({
                       <div className="mt-2 text-[8.5pt] text-neutral-700 leading-relaxed bg-neutral-50 rounded-md p-2 border-l-2 border-emerald-400">
                         <p>
                           <strong className="text-black font-semibold mr-1">
-                            {t(
-                              'deck_detail.print_justification_label',
-                              isEn
-                                ? 'Justification / Evaluation Criteria:'
-                                : 'Justificación / Criterios de Evaluación:'
-                            )}
+                            {isDocente
+                              ? t(
+                                  'deck_detail.print_justification_label',
+                                  isEn
+                                    ? 'Justification / Evaluation Criteria:'
+                                    : 'Justificación / Criterios de Evaluación:'
+                                )
+                              : (isEn
+                                  ? 'Reasoned Explanation:'
+                                  : 'Justificación Razonada:')}
                           </strong>
                           {mcResolution ? mcResolution.explanation : parsedBack.explanation}
                         </p>
