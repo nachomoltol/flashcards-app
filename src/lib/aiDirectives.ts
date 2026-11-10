@@ -25,6 +25,45 @@ DISTRACTORES EN MODO PRÁCTICO:
 En preguntas tipo test o verdadero/falso, los distractores deben representar decisiones o interpretaciones plausibles dentro del contexto del caso (trampas operativas comunes o diagnósticos alternativos verosímiles), nunca errores absurdos o datos inventados ajenos al temario.`;
 
 /**
+ * DIRECTIVA UNIVERSAL DE CALIBRACIÓN PSICOMÉTRICA DE DISTRACTORES (ZERO-OBVIOUS / ANTI-HEURÍSTICAS):
+ * Erradica el descarte por sentido común, la heurística de longitud ("la más larga es la correcta")
+ * y obliga a utilizar el conocimiento real de la materia para discriminar opciones.
+ */
+export const DISTRACTOR_VEROSIMILITUDE_DIRECTIVE = `🎯 DIRECTIVA UNIVERSAL DE CALIBRACIÓN PSICOMÉTRICA DE DISTRACTORES (ANTI-DESCARTE TRIVIAL Y SIMETRÍA):
+La validez y calidad técnica de una prueba depende primordialmente de la plausibilidad intrínseca de sus alternativas incorrectas. Todo distractor debe obligar al estudiante a recurrir al conocimiento específico de la materia para discriminarlo.
+
+1. PRINCIPIO DE VEROSIMILITUD TOTAL (CERO DISTRACTORES ABSURDOS):
+   - Queda TERMINANTEMENTE PROHIBIDO generar opciones disparatadas, cómicas, extremas o que cualquier persona pueda descartar por simple lógica, intuición o sentido común general sin haber estudiado el texto.
+   - Cada una de las opciones incorrectas debe parecer científica, jurídica o técnicamente correcta ante una lectura rápida o desatenta.
+
+2. TAXONOMÍA OBLIGATORIA DE FUENTES PARA DISTRACTORES:
+   Los distractores deben originarse EXCLUSIVAMENTE a partir de estas 4 categorías de error conceptual:
+   a) Confusión de Mecanismos Cruzados o Entidades Análogas: Asignar la función, característica o efecto de un concepto cercano de la misma familia temática (ej. intercambiar las funciones de dos enzimas afines, dos artículos de leyes correlativas o dos protocolos de red).
+   b) Umbrales Cuantitativos Limítrofes y Rangos Intercambiados: En preguntas numéricas o de dosis/plazos, utilizar valores cuantitativos que figuren en otras partes del mismo tema (ej. usar el límite máximo en vez del mínimo, o un rango perteneciente a otra categoría del texto), NUNCA cifras inventadas o disparatadas (evita '9999 días' o '0%').
+   c) Afirmaciones Ciertas pero No Pertinentes: Opciones que expresan un hecho rigurosamente verídico según el texto, pero que NO responden a la pregunta formulada o a las condiciones específicas del caso.
+   d) Inversión Causa-Efecto y Falsos Amigos: Intercambiar el orden temporal de una secuencia, invertir una relación de causa/consecuencia o utilizar términos con etimología o apariencia similar pero significado conceptual opuesto.
+
+3. SIMETRÍA ESTRUCTURAL Y LINGÜÍSTICA (ANTI-PISTAS DE EXAMEN):
+   - Homogeneidad de Longitud: Las 4 opciones deben compartir una extensión visual y número de palabras similar (ninguna opción debe ser notablemente más larga o tener el triple de explicaciones que las demás, erradicando la heurística de 'la más larga es la correcta').
+   - Paralelismo Sintáctico: Todas las opciones de una pregunta deben compartir la misma estructura gramatical (mismo tiempo verbal, misma categoría gramatical de inicio, misma formulación afirmativa/negativa).
+   - Prohibición de Absolutos Reveladores: No emplees calificadores absolutos ('siempre', 'nunca', 'en ningún caso') en los distractores para delatarlos artificialmente mientras la opción correcta usa un lenguaje moderado.
+
+4. CALIBRACIÓN ESPECÍFICA EN FORMATOS ALTERNATIVOS:
+   - En 'true_false': La premisa falsa debe construirse alterando sutilmente un matiz crítico, un condicional o un factor limitante de un concepto verídico. PROHIBIDO crear afirmaciones ridículas o invertir una verdad mediante negaciones gramaticales forzadas o burdas.
+   - En 'cloze': El espacio [...] debe ocultar EXCLUSIVAMENTE el núcleo conceptual sustantivo, término técnico indispensable o valor determinante, NUNCA palabras funcionales, artículos o conectores triviales.`;
+
+/**
+ * DIRECTIVA DE RESONANCIA LÉXICA Y DENSIDAD ADAPTATIVA DE DISTRACTORES (MODO ESTUDIO):
+ * Auto-nivela la sofisticación y sutilidad de las opciones incorrectas a la densidad académica del documento.
+ */
+export const TEXT_DENSITY_ADAPTIVE_DISTRACTOR_DIRECTIVE = `🔬 RESONANCIA LÉXICA Y DENSIDAD ADAPTATIVA DE DISTRACTORES (MODO ESTUDIO):
+- Evalúa la complejidad conceptual, densidad técnica y registro académico del documento fuente analizado.
+- Calibra la sofisticación y sutilidad de las opciones incorrectas para que reflejen EXACTAMENTE el mismo nivel terminológico y rigor intelectual que el texto fuente:
+  * Si el documento es un texto científico o médico especializado, los distractores deben emplear nomenclatura fisiopatológica exacta, biomarcadores reales o cuadros clínicos diferenciales.
+  * Si el documento es normativo o legal, los distractores deben utilizar el lenguaje procesal riguroso, plazos o excepciones formales pertinentes.
+  * Si el documento es divulgativo o escolar, los distractores deben mantener la claridad y sencillez léxica correspondiente sin forzar una artificialidad inapropiada.`;
+
+/**
  * PROTOCOLO DE AUTO-AUDITORÍA LÓGICA (ZERO-MISMATCH / COHERENCIA INQUEBRANTABLE):
  * Exige una verificación interna estricta de consistencia entre la justificación, las opciones y la clave marcada.
  */
@@ -135,6 +174,9 @@ PRINCIPIO UNIVERSAL DE FIDELIDAD FACTUAL Y TRADUCCIÓN DIDÁCTICA:
   * El valor pedagógico debe radicar en entender el "por qué" y el "para qué", no en retener números sin contexto explicativo.
   * Emplea oraciones cortas, dinámicas y claras con un tono estimulante, cercano y motivador.
   * Queda terminantemente PROHIBIDA la subordinación sintáctica innecesaria y los tecnicismos abstractos sin un puente explicativo directo.
+- DIRECTIVA DE DISTRACTORES PARA 9-11 AÑOS:
+  * Los distractores deben basarse en errores conceptuales comunes de la vida cotidiana o confusión entre elementos de la misma familia concreta que el alumno suele mezclar (ej. confundir carnívoro con herbívoro, o rotación con traslación).
+  * Quedan terminantemente prohibidos distractores con vocabulario abstracto incomprensible o basados en memorizar cifras secundarias sin sentido.
 ${didacticTranslationClause}`;
       break;
 
@@ -145,6 +187,8 @@ ${didacticTranslationClause}`;
 - DIRECTIVA UNIVERSAL DE DISCRIMINACIÓN:
   * Plantea preguntas orientadas a diferenciar matices entre categorías similares, estructurar clasificaciones y aplicar conceptos a situaciones concretas guiadas.
   * Emplea oraciones directas, vocabulario disciplinar progresivo y preguntas que estimulen el razonamiento estructurado sin ambigüedades ni subordinación excesiva.
+- DIRECTIVA DE DISTRACTORES PARA 12-14 AÑOS:
+  * Los distractores deben enfocarse en la discriminación entre categorías taxonómicas vecinas, pasos contiguos de un proceso secuencial o propiedades opuestas de dos elementos comparados en el texto.
 ${didacticTranslationClause}`;
       break;
 
@@ -155,6 +199,8 @@ ${didacticTranslationClause}`;
 - DIRECTIVA UNIVERSAL DE DISCRIMINACIÓN:
   * Exige análisis de dependencias multivariables, causas subyacentes, inferencias lógicas, etapas de procesos y justificaciones estructuradas.
   * Genera distractores plausibles que representen trampas de razonamiento, confusiones conceptuales o errores metodológicos frecuentes en la materia.
+- DIRECTIVA DE DISTRACTORES PARA 15-17 AÑOS:
+  * Los distractores deben incorporar trampas de razonamiento deductivo, correlaciones espurias, inversión de dependencias causa-efecto y condiciones restrictivas ('salvo que...', 'a excepción de...').
 ${didacticTranslationClause}`;
       break;
 
@@ -164,7 +210,9 @@ ${didacticTranslationClause}`;
 - ENFOQUE: Casos complejos, resolución de escenarios reales, excepciones normativas o doctrinales, y máxima precisión técnica y metodológica.
 - DIRECTIVA UNIVERSAL DE DISCRIMINACIÓN:
   * Nivel de máxima exigencia analítica: valoración crítica de supuestos, resolución de dilemas técnicos o profesionales, interpretación de excepciones a la regla general y contraste riguroso de alternativas excluyentes.
-  * Terminología especializada y rigor metodológico acorde a estándares universitarios y tribunales de oposición, sin simplificaciones artificiales.`;
+  * Terminología especializada y rigor metodológico acorde a estándares universitarios y tribunales de oposición, sin simplificaciones artificiales.
+- DIRECTIVA DE DISTRACTORES PARA UNIVERSIDAD / OPOSICIONES (+18):
+  * Máximo estándar psicométrico. Los distractores deben formularse como opciones de alta plausibilidad profesional: diagnósticos diferenciales estrechos, contraindicaciones farmacológicas directas, excepciones jurisprudenciales cruzadas o interpretaciones doctrinales alternativas defendibles si no se domina el detalle normativo estricto.`;
       break;
 
     case 'auto':
@@ -251,6 +299,8 @@ ${audienceInstruction}
 ${bloomTaxonomyInstruction}
 
 ${formatInstruction}
+
+${DISTRACTOR_VEROSIMILITUDE_DIRECTIVE}
 
 REGLA DE COBERTURA HOMOGÉNEA Y BARRIDO INTEGRAL (DE PRINCIPIO A FIN):
 - Es OBLIGATORIO realizar un barrido homogéneo y equilibrado por la TOTALIDAD del texto fuente aportado (desde la primera página o párrafo inicial hasta la última sección).

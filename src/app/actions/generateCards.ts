@@ -18,6 +18,8 @@ import {
   buildUniversalCalibrationDirective,
   buildUniversalTablesDirective,
   ZERO_MISMATCH_DIRECTIVE,
+  DISTRACTOR_VEROSIMILITUDE_DIRECTIVE,
+  TEXT_DENSITY_ADAPTIVE_DISTRACTOR_DIRECTIVE,
 } from '@/lib/aiDirectives';
 import type {
   CardFormat,
@@ -227,7 +229,7 @@ Cada tarjeta tipo test DEBE seguir rigurosamente este flujo cognitivo de 4 pasos
 1º "justification": Redacta PRIMERO el razonamiento factual, cálculo u operación matemática exacta citando el documento ANTES de elegir o marcar la opción correcta (Chain of Thought), concluyendo OBLIGATORIAMENTE en su última línea con la etiqueta:
    VEREDICTO_EXACTO: [texto exacto de la opción ganadora]
 2º "question": Escribe el enunciado limpio y directo de la pregunta de examen, sin incluir opciones ni letras a, b, c, d.
-3º "options": Proporciona un array con exactamente 4 alternativas plausibles [opción 0, opción 1, opción 2, opción 3] extraídas del texto.
+3º "options": Proporciona un array con exactamente 4 alternativas [opción 0, opción 1, opción 2, opción 3] derivadas del texto. Deben cumplir SIMETRÍA ESTRUCTURAL (longitud visual similar y redacción paralela, erradicando la heurística de que 'la más larga es la correcta') y originarse de las 4 fuentes taxonómicas permitidas (mecanismos cruzados afines, umbrales cuantitativos limítrofes, afirmaciones verídicas no pertinentes o inversión causa-efecto/falsos amigos). Queda terminantemente PROHIBIDO incluir opciones absurdas o descartables por sentido común.
 4º "correct_option_index": Asigna el número entero estricto (0, 1, 2 o 3) correspondiente a la opción verdadera justificada en "options".
 
 ESTRUCTURA DE COMPATIBILIDAD EN "front" Y "back":
@@ -423,6 +425,8 @@ DEBES explorar conceptos, relaciones, celdas de tablas o párrafos que aún NO h
 
   if (pedagogicalMode === 'didactic') {
     prompt += `\n${buildDidacticModeDirective(docenteFormat, targetAudience)}\n`;
+  } else {
+    prompt += `\n${TEXT_DENSITY_ADAPTIVE_DISTRACTOR_DIRECTIVE}\n`;
   }
 
   if (isPracticalMode) {
@@ -430,6 +434,7 @@ DEBES explorar conceptos, relaciones, celdas de tablas o párrafos que aún NO h
   }
 
   prompt += `\n${buildUniversalCalibrationDirective(isExhaustiveMode)}\n`;
+  prompt += `\n${DISTRACTOR_VEROSIMILITUDE_DIRECTIVE}\n`;
   prompt += `\n${ZERO_MISMATCH_DIRECTIVE}\n`;
 
   prompt += `\n${EDITORIAL_ARTIFACTS_DIRECTIVE}\n`;
@@ -498,11 +503,12 @@ function getGlobalRules(
   const didacticRule =
     pedagogicalMode === 'didactic'
       ? `\n\n13. ${buildDidacticModeDirective(docenteFormat, targetAudience)}`
-      : '';
+      : `\n\n13. ${TEXT_DENSITY_ADAPTIVE_DISTRACTOR_DIRECTIVE}`;
 
   const practicalRule = isPracticalMode ? `\n\n14. ${PRACTICAL_MODE_DIRECTIVE}` : '';
   const calibrationRule = `\n\n15. ${buildUniversalCalibrationDirective(isExhaustiveMode)}`;
-  const zeroMismatchRule = `\n\n16. ${ZERO_MISMATCH_DIRECTIVE}`;
+  const distractorRule = `\n\n16. ${DISTRACTOR_VEROSIMILITUDE_DIRECTIVE}`;
+  const zeroMismatchRule = `\n\n17. ${ZERO_MISMATCH_DIRECTIVE}`;
 
   return `REGLAS GLOBALES INQUEBRANTABLES DE BLINDAJE (ESTILO NOTEBOOKLM):
 1. REGLA DE ORO (Estilo NotebookLM): NO inventes información. Tu única fuente de verdad es el texto. Si un concepto, dato o respuesta no se puede deducir directa y explícitamente del texto proporcionado, DEBES omitirlo. No uses conocimiento previo externo.
@@ -515,7 +521,7 @@ ${directiveRule}
 9. ${SINGLE_CORE_CONCEPT_DIRECTIVE}
 10. ${CONTENT_HIERARCHY_DIRECTIVE}
 11. ${tablesDirective}
-12. ${EDITORIAL_ARTIFACTS_DIRECTIVE}${didacticRule}${practicalRule}${calibrationRule}${zeroMismatchRule}`;
+12. ${EDITORIAL_ARTIFACTS_DIRECTIVE}${didacticRule}${practicalRule}${calibrationRule}${distractorRule}${zeroMismatchRule}`;
 }
 
 interface ParsedPageRange {
@@ -2140,6 +2146,8 @@ Esta instrucción tiene PRIORIDAD ABSOLUTA y actúa como un filtro estricto sobr
 
       if (isDocenteMode) {
         singlePageSystemPrompt += `${buildDidacticModeDirective(docenteFormat, targetAudience)}\n\n`;
+      } else {
+        singlePageSystemPrompt += `${TEXT_DENSITY_ADAPTIVE_DISTRACTOR_DIRECTIVE}\n\n`;
       }
 
       if (isPracticalMode) {
@@ -2147,6 +2155,7 @@ Esta instrucción tiene PRIORIDAD ABSOLUTA y actúa como un filtro estricto sobr
       }
 
       singlePageSystemPrompt += `${buildUniversalCalibrationDirective(isExhaustiveMode)}\n\n`;
+      singlePageSystemPrompt += `${DISTRACTOR_VEROSIMILITUDE_DIRECTIVE}\n\n`;
       singlePageSystemPrompt += `${ZERO_MISMATCH_DIRECTIVE}\n\n`;
 
       // Si el modo exhaustivo está activo, REEMPLAZA la directiva estándar para anular cualquier síntesis pedagógica o brevedad
@@ -2558,6 +2567,8 @@ Esta instrucción tiene PRIORIDAD ABSOLUTA y actúa como un filtro estricto sobr
 
       if (isDocenteMode) {
         singlePageSystemPrompt += `${buildDidacticModeDirective(docenteFormat, targetAudience)}\n\n`;
+      } else {
+        singlePageSystemPrompt += `${TEXT_DENSITY_ADAPTIVE_DISTRACTOR_DIRECTIVE}\n\n`;
       }
 
       if (isPracticalMode) {
@@ -2565,6 +2576,7 @@ Esta instrucción tiene PRIORIDAD ABSOLUTA y actúa como un filtro estricto sobr
       }
 
       singlePageSystemPrompt += `${buildUniversalCalibrationDirective(isExhaustiveMode)}\n\n`;
+      singlePageSystemPrompt += `${DISTRACTOR_VEROSIMILITUDE_DIRECTIVE}\n\n`;
       singlePageSystemPrompt += `${ZERO_MISMATCH_DIRECTIVE}\n\n`;
 
       // Si el modo exhaustivo está activo, REEMPLAZA la directiva estándar para anular cualquier síntesis pedagógica o brevedad
