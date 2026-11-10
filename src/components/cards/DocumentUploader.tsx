@@ -13,6 +13,7 @@ import { PrintExamSheet } from '@/components/decks';
 import { cleanupUploadedDocument } from '@/lib/storageCleanup';
 import { purgeExpiredDocumentsAction } from '@/app/actions/storageCleanup';
 import { InfoTooltip } from './InfoTooltip';
+import { detectPlatform } from '@/lib/platform';
 
 interface DocumentUploaderProps {
   deckId: string;
@@ -1146,7 +1147,21 @@ export function DocumentUploader({
             <button
               type="button"
               onClick={() => {
-                if (typeof window !== 'undefined') {
+                if (typeof window === 'undefined') return;
+                const platform = detectPlatform();
+                const isAndroidNative =
+                  platform.isNativeAndroid ||
+                  Boolean(
+                    (window as unknown as { Capacitor?: { isNativePlatform: () => boolean; getPlatform: () => string } })
+                      .Capacitor?.isNativePlatform() &&
+                    (window as unknown as { Capacitor?: { isNativePlatform: () => boolean; getPlatform: () => string } })
+                      .Capacitor?.getPlatform() === 'android'
+                  );
+
+                if (isAndroidNative) {
+                  const printUrl = `https://www.flashmente.com/decks/${deckId}/print`;
+                  window.open(printUrl, '_system');
+                } else {
                   window.print();
                 }
               }}

@@ -22,6 +22,7 @@ export interface PrintExamSheetProps {
   cards: PrintCardItem[];
   pedagogicalMode?: 'academic' | 'didactic' | string;
   isDocenteMode?: boolean;
+  forceVisible?: boolean;
 }
 
 /**
@@ -148,6 +149,7 @@ export function PrintExamSheet({
   cards,
   pedagogicalMode,
   isDocenteMode,
+  forceVisible = false,
 }: PrintExamSheetProps) {
   const { language, t } = useLanguageStore();
   const isEn = language === 'en';
@@ -169,7 +171,11 @@ export function PrintExamSheet({
   }
 
   return (
-    <div className="hidden print:block print-exam-root w-full bg-white text-black font-sans leading-tight pt-1">
+    <div
+      className={`print-exam-root w-full bg-white text-black font-sans leading-tight pt-1 ${
+        forceVisible ? 'block' : 'hidden print:block'
+      }`}
+    >
       {/* =========================================================================
           SECCIÓN 1: CUESTIONARIO / HOJA DE ESTUDIO
           Diseño continuo, sin respuestas ni pistas, con cortes limpios de página.

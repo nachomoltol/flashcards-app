@@ -157,12 +157,12 @@ export default function DashboardLayout({
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, [user?.id, fetchStreak]);
 
-  // Si finalizó de verificar la autenticación y no hay sesión activa, redirigir a /login
+  // Si finalizó de verificar la autenticación y no hay sesión activa, redirigir a /login (excepto en páginas de impresión dedicadas)
   useEffect(() => {
-    if (isMounted && !isLoading && !user) {
+    if (isMounted && !isLoading && !user && !pathname?.endsWith('/print')) {
       router.push('/login');
     }
-  }, [isMounted, isLoading, user, router]);
+  }, [isMounted, isLoading, user, router, pathname]);
 
   // Cerrar menús al hacer clic fuera o presionar Escape
   useEffect(() => {
@@ -247,7 +247,12 @@ export default function DashboardLayout({
   const hasAvatar = Boolean(isMounted && profile.avatar_url && !avatarError);
   const isStudyPage = Boolean(pathname?.startsWith('/study'));
   const isExamPage = Boolean(pathname?.startsWith('/exam'));
+  const isPrintPage = Boolean(pathname?.endsWith('/print'));
   const isFullscreen = isStudyPage || isExamPage;
+
+  if (isPrintPage) {
+    return <>{children}</>;
+  }
 
   return (
     <div

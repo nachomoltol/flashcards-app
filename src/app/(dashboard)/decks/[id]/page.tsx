@@ -4,12 +4,12 @@ import { use, useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Search, X, Award, Zap, FileText, HelpCircle, Plus, Sparkles, Share2, Printer, Camera } from 'lucide-react';
 import { useDeckStore, useCardStore, useProModalStore, useAuthStore, useLanguageStore } from '@/stores';
-import { supabase } from '@/lib/supabase';
 import { CardEditor, DocumentUploader, FormattedCardView, UrlCardGenerator, HandwrittenNotesUploader, InfoTooltip } from '@/components/cards';
 import { ShareDeckModal, QuickStudyGuideModal, StudyModesHelpModal, PrintExamSheet } from '@/components/decks';
 import { generateCardsAction } from '@/app/actions/generateCards';
 import { checkUserGenerationQuota } from '@/lib/quotaGuard';
 import { getDeckColorStyles } from '@/lib/colors';
+import { detectPlatform } from '@/lib/platform';
 import type { CardFormat } from '@/types/database';
 
 interface DeckPageProps {
@@ -82,7 +82,21 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
   };
 
   const handlePrintExam = () => {
-    if (typeof window !== 'undefined') {
+    if (typeof window === 'undefined') return;
+    const platform = detectPlatform();
+    const isAndroidNative =
+      platform.isNativeAndroid ||
+      Boolean(
+        (window as unknown as { Capacitor?: { isNativePlatform: () => boolean; getPlatform: () => string } })
+          .Capacitor?.isNativePlatform() &&
+        (window as unknown as { Capacitor?: { isNativePlatform: () => boolean; getPlatform: () => string } })
+          .Capacitor?.getPlatform() === 'android'
+      );
+
+    if (isAndroidNative) {
+      const printUrl = `https://www.flashmente.com/decks/${id}/print`;
+      window.open(printUrl, '_system');
+    } else {
       window.print();
     }
   };
