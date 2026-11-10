@@ -7,7 +7,12 @@ import { createInitialCardValues } from '@/lib/fsrs';
 import { deduplicateCandidateCards } from '@/lib/cardDeduplication';
 import { randomizeMultipleChoiceCard } from '@/lib/cardUtils';
 import { GEMINI_DEFAULT_MODEL } from '@/lib/aiConfig';
-import { buildDidacticModeDirective, PRACTICAL_MODE_DIRECTIVE } from '@/lib/aiDirectives';
+import {
+  buildDidacticModeDirective,
+  PRACTICAL_MODE_DIRECTIVE,
+  ZERO_MISMATCH_DIRECTIVE,
+  buildUniversalTablesDirective,
+} from '@/lib/aiDirectives';
 import type {
   CardFormat,
   GeneratedCard,
@@ -398,6 +403,12 @@ TUS REGLAS DE ORO:
 
 3. REGLAS DE FORMATO SOLICITADO ("${cardFormat}"):
 ${getFormatInstructions(cardFormat)}${didacticDirective}${practicalDirective}
+
+4. TRATAMIENTO DE TABLAS Y ESQUEMAS:
+${buildUniversalTablesDirective(false)}
+
+5. AUTO-AUDITORÍA LÓGICA (ZERO-MISMATCH):
+${ZERO_MISMATCH_DIRECTIVE}
 
 ${effectiveInstruction ? `INSTRUCCIÓN ESPECÍFICA DEL ESTUDIANTE:\n"${effectiveInstruction}"\n` : ''}
 

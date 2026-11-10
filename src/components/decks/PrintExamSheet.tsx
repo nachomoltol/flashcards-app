@@ -125,14 +125,14 @@ export function PrintExamSheet({
   }
 
   return (
-    <div className="hidden print:block print-exam-root w-full bg-white text-black font-sans leading-tight">
+    <div className="hidden print:block print-exam-root w-full bg-white text-black font-sans leading-tight pt-1">
       {/* =========================================================================
           SECCIÓN 1: CUESTIONARIO DE EVALUACIÓN (PARA EL ALUMNADO)
-          Diseño continuo, ultra-compacto, sin respuestas ni pistas.
+          Diseño continuo, sin respuestas ni pistas, con cortes limpios de página.
          ========================================================================= */}
       <section className="print-student-section space-y-3">
         {/* Cabecera Formal de Examen */}
-        <header className="border-b-2 border-black pb-2.5 space-y-2">
+        <header className="border-b-2 border-black pb-2.5 space-y-2 mb-3">
           <div className="flex items-start justify-between gap-4">
             <div>
               <h1 className="text-lg font-black uppercase tracking-tight leading-tight">
@@ -187,7 +187,7 @@ export function PrintExamSheet({
             return (
               <article
                 key={card.id || `print-q-${index}`}
-                className="print-question-item break-inside-avoid text-[10pt] leading-snug"
+                className="print-question-item break-inside-avoid text-[10pt] leading-snug py-1.5"
                 style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}
               >
                 {/* 1. Opción Múltiple (Test) */}
@@ -360,72 +360,77 @@ export function PrintExamSheet({
             return (
               <article
                 key={`print-sol-${card.id || index}`}
-                className="print-solution-item break-inside-avoid text-[9.5pt] border-b border-neutral-200 pb-1.5"
+                className="print-solution-item break-inside-avoid text-[9.5pt] border-b border-neutral-200 py-2.5"
                 style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}
               >
-                <div className="flex items-baseline gap-2">
-                  <span className="font-bold text-black shrink-0">
-                    {index + 1}.
-                  </span>
-                  <span className="text-[8pt] font-mono font-bold uppercase px-1 py-0.2 bg-neutral-200 text-neutral-800 rounded-xs shrink-0">
-                    {formatLabel}
-                  </span>
-                  <div className="flex-1 space-y-0.5">
-                    {/* Veredicto / Solución Principal */}
+                <div className="flex items-start gap-2.5">
+                  <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
+                    <span className="font-bold text-black text-[10.5pt]">
+                      {index + 1}.
+                    </span>
+                    <span className="text-[7.5pt] font-mono font-bold uppercase px-1.5 py-0.5 bg-neutral-100 border border-neutral-300 text-neutral-700 rounded-sm shrink-0">
+                      {formatLabel}
+                    </span>
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    {/* Veredicto / Solución Principal Destacada con Píldora Visual */}
                     {fmt === 'cloze' ? (
                       <div>
-                        <span className="font-bold text-black">
-                          {t('deck_detail.print_solution_label', isEn ? 'Solution:' : 'Solución:')}{' '}
-                        </span>
-                        <span className="font-mono font-bold text-neutral-900">
+                        <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-md px-2.5 py-1 font-semibold text-sm inline-block">
+                          <span className="text-emerald-700 font-bold mr-1">
+                            {t('deck_detail.print_solution_label', isEn ? 'Solution:' : 'Solución:')}
+                          </span>
                           {clozeTeacher?.hiddenWords.length
                             ? clozeTeacher.hiddenWords.join(', ')
                             : parsedBack.verdict || card.back}
                         </span>
                         {clozeTeacher?.highlighted && (
-                          <p className="text-[8.5pt] text-neutral-600 mt-0.5 italic">
+                          <p className="text-[8.5pt] text-neutral-600 mt-1 italic leading-snug">
                             &ldquo;{clozeTeacher.highlighted}&rdquo;
                           </p>
                         )}
                       </div>
                     ) : fmt === 'multiple_choice' && mcResolution ? (
                       <div>
-                        <span className="font-bold text-black">
-                          {t('deck_detail.print_solution_label', isEn ? 'Solution:' : 'Solución:')}{' '}
-                        </span>
-                        <span className="font-semibold text-neutral-900">
-                          {mcResolution.letter.toUpperCase()}) {mcResolution.text}
+                        <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-md px-2.5 py-1 font-semibold text-sm inline-block">
+                          <strong className="font-bold uppercase mr-1">
+                            {mcResolution.letter.toUpperCase()})
+                          </strong>{' '}
+                          {mcResolution.text}
                         </span>
                       </div>
                     ) : (
                       <div>
-                        <span className="font-bold text-black">
-                          {t('deck_detail.print_solution_label', isEn ? 'Solution:' : 'Solución:')}{' '}
-                        </span>
-                        <span className="font-semibold text-neutral-900">
+                        <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-md px-2.5 py-1 font-semibold text-sm inline-block">
+                          <span className="text-emerald-700 font-bold mr-1">
+                            {t('deck_detail.print_solution_label', isEn ? 'Solution:' : 'Solución:')}
+                          </span>
                           {parsedBack.verdict || card.back}
                         </span>
                       </div>
                     )}
 
-                    {/* Justificación o Rúbrica */}
+                    {/* Bloque de Justificación / Criterios de Evaluación con Espaciado Nítido */}
                     {(mcResolution ? mcResolution.explanation : parsedBack.explanation) && (
-                      <p className="text-[8.5pt] text-neutral-700 leading-snug">
-                        <strong className="text-black font-semibold">
-                          {t(
-                            'deck_detail.print_justification_label',
-                            isEn
-                              ? 'Justification / Rubric:'
-                              : 'Justificación / Criterios:'
-                          )}{' '}
-                        </strong>
-                        {mcResolution ? mcResolution.explanation : parsedBack.explanation}
-                      </p>
+                      <div className="mt-2 text-[8.5pt] text-neutral-700 leading-relaxed bg-neutral-50 rounded-md p-2 border-l-2 border-emerald-400">
+                        <p>
+                          <strong className="text-black font-semibold mr-1">
+                            {t(
+                              'deck_detail.print_justification_label',
+                              isEn
+                                ? 'Justification / Evaluation Criteria:'
+                                : 'Justificación / Criterios de Evaluación:'
+                            )}
+                          </strong>
+                          {mcResolution ? mcResolution.explanation : parsedBack.explanation}
+                        </p>
+                      </div>
                     )}
 
                     {/* Notas adicionales del docente */}
                     {card.notes && (
-                      <p className="text-[8pt] text-neutral-500 italic">
+                      <p className="text-[8pt] text-neutral-500 italic mt-1.5">
                         Nota: {card.notes}
                       </p>
                     )}

@@ -12,7 +12,13 @@ import { supabase } from '@/lib/supabase';
 import { randomizeMultipleChoiceCard } from '@/lib/cardUtils';
 import { deduplicateCandidateCards } from '@/lib/cardDeduplication';
 import { GEMINI_DEFAULT_MODEL } from '@/lib/aiConfig';
-import { PRACTICAL_MODE_DIRECTIVE, buildDidacticModeDirective } from '@/lib/aiDirectives';
+import {
+  PRACTICAL_MODE_DIRECTIVE,
+  buildDidacticModeDirective,
+  buildUniversalCalibrationDirective,
+  buildUniversalTablesDirective,
+  ZERO_MISMATCH_DIRECTIVE,
+} from '@/lib/aiDirectives';
 import type {
   CardFormat,
   GeneratedCard,
@@ -318,27 +324,16 @@ REGLA DE INTEGRIDAD: Devuelve un objeto JSON estructurado con "conceptos_identif
 
 /**
  * TRATAMIENTO DE TABLAS EN MODO NORMAL (JERARQUÍA CONCEPTUAL TRONCAL):
- * Evalúa las tablas desde su significado global, reglas generales y umbrales críticos sin fragmentar fila a fila.
+ * Directiva universal que evalúa matrices, tablas y catálogos desde su significado global,
+ * umbrales críticos y tendencias sin caer en memorismo monótono repetitivo.
  */
-const NORMAL_TABLES_DIRECTIVE = `TRATAMIENTO DE TABLAS, MATRICES Y ESQUEMAS (MODO NORMAL - JERARQUÍA CONCEPTUAL TRONCAL):
-Las tablas, matrices y diagramas contienen información estructurada de alto valor. En este modo debes evaluarlas desde su significado global y conclusiones rectoras:
-a) Evalúa la regla o principio general que resume o clasifica la tabla.
-b) Plantea comparaciones conceptuales de alto nivel entre las categorías o columnas principales.
-c) Evalúa únicamente umbrales de corte, excepciones determinantes o valores críticos que condicionen una decisión o cambio de estado.
-Queda PROHIBIDO desglosar mecánicamente cada fila o celda secundaria en preguntas independientes aisladas. La cantidad de preguntas dependerá de la densidad sustancial de la tabla, priorizando siempre la comprensión del patrón sobre la memorización atomizada de listas de datos. Reserva el desglose quirúrgico celda a celda para el Modo Exhaustivo.`;
+const NORMAL_TABLES_DIRECTIVE = buildUniversalTablesDirective(false);
 
 /**
  * PROTOCOLO OBLIGATORIO DE EXTRACCIÓN DE TABLAS EN MODO EXHAUSTIVO (QUIRÚRGICO CELDA A CELDA):
- * Obliga a desglosar sistemáticamente las tablas, diagramas, matrices e infografías.
+ * Desglosa sistemáticamente cruces de variables, umbrales y excepciones evitando preguntas mecánicas idénticas.
  */
-const EXHAUSTIVE_TABLES_DIRECTIVE = `TRATAMIENTO RIGUROSO DE TABLAS, MATRICES Y FIGURAS:
-Las tablas, diagramas e imágenes contienen la mayor densidad evaluable del documento. Tienes terminantemente PROHIBIDO despachar una tabla con 1 o 2 preguntas genéricas de resumen.
-Debes desglosarla sistemáticamente:
-a) Preguntar por cruces de variables (fila vs. columna, parámetro A frente a parámetro B).
-b) Evaluar valores numéricos críticos, unidades de medida, umbrales de corte o rangos de referencia.
-c) Evaluar criterios de inclusión/exclusión, diagnósticos diferenciales o excepciones a la norma presentes en notas al pie de la tabla.
-Si una tabla es densa, estás OBLIGADO a generar múltiples preguntas independientes sobre sus diferentes celdas y relaciones.
-En modo exhaustivo, cuando encuentres una tabla, esquema de absorción o clasificación con múltiples elementos, debes generar preguntas independientes para cada elemento sustancial (por ejemplo, cada nutriente, enzima, plazo legal o parámetro relevante). No las agrupes ni omitas elementos individuales.`;
+const EXHAUSTIVE_TABLES_DIRECTIVE = buildUniversalTablesDirective(true);
 
 // Alias de retrocompatibilidad
 const TABLES_AND_FIGURES_DIRECTIVE = EXHAUSTIVE_TABLES_DIRECTIVE;
@@ -430,6 +425,9 @@ DEBES explorar conceptos, relaciones, celdas de tablas o párrafos que aún NO h
     prompt += `\n${PRACTICAL_MODE_DIRECTIVE}\n`;
   }
 
+  prompt += `\n${buildUniversalCalibrationDirective(isExhaustiveMode)}\n`;
+  prompt += `\n${ZERO_MISMATCH_DIRECTIVE}\n`;
+
   prompt += `\n${EDITORIAL_ARTIFACTS_DIRECTIVE}\n`;
 
   return prompt;
@@ -499,6 +497,8 @@ function getGlobalRules(
       : '';
 
   const practicalRule = isPracticalMode ? `\n\n14. ${PRACTICAL_MODE_DIRECTIVE}` : '';
+  const calibrationRule = `\n\n15. ${buildUniversalCalibrationDirective(isExhaustiveMode)}`;
+  const zeroMismatchRule = `\n\n16. ${ZERO_MISMATCH_DIRECTIVE}`;
 
   return `REGLAS GLOBALES INQUEBRANTABLES DE BLINDAJE (ESTILO NOTEBOOKLM):
 1. REGLA DE ORO (Estilo NotebookLM): NO inventes información. Tu única fuente de verdad es el texto. Si un concepto, dato o respuesta no se puede deducir directa y explícitamente del texto proporcionado, DEBES omitirlo. No uses conocimiento previo externo.
@@ -511,7 +511,7 @@ ${directiveRule}
 9. ${SINGLE_CORE_CONCEPT_DIRECTIVE}
 10. ${CONTENT_HIERARCHY_DIRECTIVE}
 11. ${tablesDirective}
-12. ${EDITORIAL_ARTIFACTS_DIRECTIVE}${didacticRule}${practicalRule}`;
+12. ${EDITORIAL_ARTIFACTS_DIRECTIVE}${didacticRule}${practicalRule}${calibrationRule}${zeroMismatchRule}`;
 }
 
 interface ParsedPageRange {
@@ -2100,6 +2100,9 @@ Esta instrucción tiene PRIORIDAD ABSOLUTA y actúa como un filtro estricto sobr
         singlePageSystemPrompt += `${PRACTICAL_MODE_DIRECTIVE}\n\n`;
       }
 
+      singlePageSystemPrompt += `${buildUniversalCalibrationDirective(isExhaustiveMode)}\n\n`;
+      singlePageSystemPrompt += `${ZERO_MISMATCH_DIRECTIVE}\n\n`;
+
       // Si el modo exhaustivo está activo, REEMPLAZA la directiva estándar para anular cualquier síntesis pedagógica o brevedad
       if (isExhaustiveMode) {
         singlePageSystemPrompt += `${exhaustiveDirective}\n\n`;
@@ -2514,6 +2517,9 @@ Esta instrucción tiene PRIORIDAD ABSOLUTA y actúa como un filtro estricto sobr
       if (isPracticalMode) {
         singlePageSystemPrompt += `${PRACTICAL_MODE_DIRECTIVE}\n\n`;
       }
+
+      singlePageSystemPrompt += `${buildUniversalCalibrationDirective(isExhaustiveMode)}\n\n`;
+      singlePageSystemPrompt += `${ZERO_MISMATCH_DIRECTIVE}\n\n`;
 
       // Si el modo exhaustivo está activo, REEMPLAZA la directiva estándar para anular cualquier síntesis pedagógica o brevedad
       if (isExhaustiveMode) {

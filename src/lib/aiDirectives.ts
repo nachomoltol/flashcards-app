@@ -3,15 +3,83 @@ import type { DocenteFormat, TargetAudience } from '@/types/cards';
 /**
  * DIRECTIVA DE ENFOQUE PRÁCTICO Y SITUACIONAL (APRENDIZAJE BASADO EN PROBLEMAS):
  * Transforma conceptos teóricos en supuestos de aplicación del mundo real sin distorsionar el rigor factual.
+ * Estructura obligatoria: [Contexto o caso operativo] + [Conflicto, necesidad o restricción técnica] + [Pregunta de toma de decisiones o intervención].
  */
-export const PRACTICAL_MODE_DIRECTIVE = `DIRECTIVA DE ENFOQUE PRÁCTICO Y SITUACIONAL (APRENDIZAJE BASADO EN PROBLEMAS):
-Queda prohibido formular preguntas memorísticas pasivas o pedir definiciones teóricas aisladas (evita '¿Qué es X?', 'Define Y', 'Enumera las características de Z').
-PRINCIPIO UNIVERSAL: Transforma cada concepto, norma, regla, fórmula o principio del texto en una situación aplicada o supuesto del mundo real.
-- Ciencias y Salud: Plantéalo como un caso clínico, observación de laboratorio o dilema biológico donde se requiera diagnosticar, predecir o pautar.
-- Leyes y Empresa: Plantéalo como un supuesto de hecho, consulta profesional o escenario operativo donde se deba dictaminar o resolver conforme a la normativa.
-- Idiomas y Letras: Plantéalo como una situación de comunicación real, contexto cultural o análisis causal de un acontecimiento histórico/filosófico.
-- Fórmulas y Técnica: Plantea un problema aplicado o decisión de diseño donde deba identificarse qué principio aplicar ante unas condiciones dadas.
-En preguntas tipo test o verdadero/falso, los distractores deben representar decisiones o interpretaciones plausibles dentro del contexto del caso, no errores absurdos.`;
+export const PRACTICAL_MODE_DIRECTIVE = `🎯 DIRECTIVA UNIVERSAL DE ENFOQUE PRÁCTICO Y SITUACIONAL (APRENDIZAJE BASADO EN PROBLEMAS):
+Queda terminantemente prohibido formular preguntas teóricas pasivas o de memorización descontextualizada (evita '¿Qué es X?', 'Define Y', 'Enumera las características de Z').
+Tampoco se considera práctico añadir un prefijo cosmético superficial (como 'En el hospital...' o 'Un abogado observa...') a una pregunta puramente memorística.
+
+ESTRUCTURA OBLIGATORIA DEL ENUNCIADO PRÁCTICO:
+Toda tarjeta en modo práctico debe formularse mediante un supuesto o escenario aplicado realista estructurado en tres partes:
+[Contexto o caso operativo] + [Conflicto, necesidad o restricción técnica] + [Pregunta de toma de decisiones o intervención].
+El alumno debe verse obligado a utilizar el criterio técnico y el conocimiento de la materia para resolver la situación.
+
+APLICACIÓN UNIVERSAL SEGÚN LA DISCIPLINA:
+- Ciencias de la Salud y Biología: Caso clínico, paciente o muestra experimental que presenta signos o hallazgos específicos; conflicto terapéutico, farmacológico o fisiológico; decisión fundamentada sobre la intervención, pauta, diagnóstico diferencial o mecanismo subyacente.
+- Leyes, Normativa y Administración: Supuesto de hecho o consulta profesional con plazos, partes implicadas o conflicto de intereses; determinación fundada de la acción jurídica, derecho aplicable o consecuencia legal correspondiente.
+- Ingeniería, Tecnología y Exactas: Problema de diseño, fallo en un sistema o condiciones operativas límite; selección fundada del método de cálculo, algoritmo, arquitectura o solución técnica óptima.
+- Humanidades, Historia y Filosofía: Análisis de una fuente histórica, dilema ético o coyuntura sociopolítica concreta; juicio crítico sobre causas, consecuencias o contraste de posturas doctrinales conforme al texto.
+- Idiomas y Comunicación: Situación comunicativa real o profesional con matiz pragmático o de registro; selección de la expresión idiomática, término o estructura adecuada para resolver el intercambio.
+
+DISTRACTORES EN MODO PRÁCTICO:
+En preguntas tipo test o verdadero/falso, los distractores deben representar decisiones o interpretaciones plausibles dentro del contexto del caso (trampas operativas comunes o diagnósticos alternativos verosímiles), nunca errores absurdos o datos inventados ajenos al temario.`;
+
+/**
+ * PROTOCOLO DE AUTO-AUDITORÍA LÓGICA (ZERO-MISMATCH / COHERENCIA INQUEBRANTABLE):
+ * Exige una verificación interna estricta de consistencia entre la justificación, las opciones y la clave marcada.
+ */
+export const ZERO_MISMATCH_DIRECTIVE = `⚖️ PROTOCOLO DE AUTO-AUDITORÍA LÓGICA (ZERO-MISMATCH / COHERENCIA INQUEBRANTABLE):
+Antes de emitir cada tarjeta en el JSON final, realiza obligatoriamente una verificación interna de consistencia lógica entre todos sus campos:
+1. COHERENCIA UNÍVOCA ENTRE JUSTIFICACIÓN Y RESPUESTA MARCADA:
+   - En preguntas tipo test, la alternativa defendida en "justification" y en "back" DEBE coincidir con precisión milimétrica con la opción señalada por "correct_option_index".
+   - Queda ESTRICTAMENTE PROHIBIDO cualquier desajuste lógico o numérico (ejemplo: si la justificación concluye que la respuesta válida son "4 calorías" o "el plazo es de 10 días", el índice 'correct_option_index' bajo ninguna circunstancia puede apuntar a la opción de '7 calorías' o '15 días').
+2. DISTRACTORES PLAUSIBLES PERO INEQUÍVOCAMENTE FALSOS:
+   - Las alternativas incorrectas deben pertenecer al dominio temático del texto para exigir discriminación real, pero deben ser indiscutiblemente falsas, incompletas o no aplicables frente al caso planteado.
+3. CONCORDANCIA EN VERDADERO/FALSO Y CLOZE:
+   - En tarjetas 'true_false', si el texto de la justificación demuestra que la premisa es errónea, la respuesta en 'back' DEBE comenzar categóricamente con '**Falso**', y viceversa.
+   - En tarjetas 'cloze', la palabra o fórmula revelada en el reverso DEBE encajar gramatical y conceptualmente con exactitud en el espacio marcado con [...] en el anverso.`;
+
+/**
+ * CALIBRACIÓN UNIVERSAL: MODO NORMAL VS. MODO MINUCIOSO:
+ */
+export function buildUniversalCalibrationDirective(isExhaustiveMode: boolean = false): string {
+  if (isExhaustiveMode) {
+    return `🔬 CALIBRACIÓN PEDAGÓGICA UNIVERSAL: MODO MINUCIOSO (ALTA EXIGENCIA / ENFOQUE 100%):
+- PROFUNDIDAD INTEGRAL: Evalúa todo el espectro sustancial del documento sin omitir subdivisiones teóricas, excepciones a la regla general, clasificaciones secundarias, etimología, umbrales numéricos críticos, valores de referencia y contrastes sutiles.
+- REGLA DE CALIDAD PEDAGÓGICA: "Exprimir el texto" significa elevar al máximo la discriminación conceptual y el análisis crítico. Está TERMINANTEMENTE PROHIBIDO convertir la generación en una copia mecánica o inventario memorístico pasivo de listas. Cada detalle evaluado debe tener relevancia funcional o metodológica dentro de la disciplina.`;
+  }
+
+  return `🎯 CALIBRACIÓN PEDAGÓGICA UNIVERSAL: MODO NORMAL (ENFOQUE 80/20):
+- NÚCLEO SUSTANCIAL: Concéntrate en el 20% de los conceptos que explican el 80% de la materia: definiciones fundamentales, mecanismos centrales, principios rectores y relaciones de alto nivel.
+- FILTRO ANTI-SATURACIÓN: Excluye deliberadamente notas al pie accesorias, cifras secundarias sin relevancia clínica/jurídica/técnica, excepciones ultra-raras y detalles enciclopédicos que sobrecarguen la sesión de estudio básica.`;
+}
+
+/**
+ * TRATAMIENTO UNIVERSAL DE TABLAS, CUADROS Y MATRICES DE DATOS:
+ * Diferencia entre tablas de catálogo/inventario y matrices conceptuales relacionales.
+ */
+export function buildUniversalTablesDirective(isExhaustiveMode: boolean = false): string {
+  if (isExhaustiveMode) {
+    return `📊 TRATAMIENTO UNIVERSAL DE TABLAS, CUADROS Y MATRICES (MODO MINUCIOSO / EXHAUSTIVO):
+Las tablas y diagramas concentran el conocimiento de mayor densidad y exigencia evaluativa del material. Debes procesarlas diferenciando con rigor su naturaleza pedagógica:
+
+a) Tablas de Inventario, Catálogo o Valores de Referencia (listas de componentes, constantes numéricas, posologías, composiciones):
+   - PROHIBICIÓN DE MEMORIA CIEGA: Queda prohibido formular preguntas aisladas y mecánicas sobre celdas individuales descontextualizadas (ej. '¿Qué valor exacto aparece en la fila 14?').
+   - EVALUACIÓN DE ALTO NIVEL: Evalúa valores extremos significativos (máximos y mínimos determinantes), umbrales críticos de corte que condicionan un cambio de estado, casos atípicos que rompen la tendencia general y correlaciones directas o inversas entre columnas.
+   - REGLA ANTI-MONOTONÍA: Prohibido generar más de 2 preguntas con la misma sintaxis o plantilla interrogativa procedentes de la misma matriz.
+
+b) Matrices Conceptuales y Relacionales (cruces de causas, mecanismos, efectos, órganos diana, clasificaciones normativas o taxonomías):
+   - Evalúa el cruce conceptual entre filas y columnas, la relación de causalidad y la diferenciación sistemática entre categorías adyacentes.
+   - Exige discriminar por qué un elemento pertenece a una categoría y no a otra según los criterios de la tabla.`;
+  }
+
+  return `📊 TRATAMIENTO UNIVERSAL DE TABLAS, CUADROS Y MATRICES (MODO NORMAL / ESTÁNDAR):
+En modo estándar, las tablas deben evaluarse desde su jerarquía conceptual troncal y conclusiones de alto nivel:
+a) Evalúa la regla, patrón o principio general que sintetiza la matriz.
+b) Compara a gran escala las columnas o categorías principales, enfocando tendencias globales y relaciones causa-efecto determinantes.
+c) Evalúa únicamente umbrales de decisión críticos o excepciones notorias señaladas en la tabla.
+d) Queda TERMINANTEMENTE PROHIBIDO desglosar mecánicamente celdas individuales o hacer preguntas memorísticas sobre filas secundarias aisladas.`;
+}
 
 /**
  * DIRECTIVA EXCLUSIVA PARA MODO DOCENTE / DIDÁCTICO:
