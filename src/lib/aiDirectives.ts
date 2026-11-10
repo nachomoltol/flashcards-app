@@ -30,8 +30,13 @@ En preguntas tipo test o verdadero/falso, los distractores deben representar dec
  */
 export const ZERO_MISMATCH_DIRECTIVE = `⚖️ PROTOCOLO DE AUTO-AUDITORÍA LÓGICA (ZERO-MISMATCH / COHERENCIA INQUEBRANTABLE):
 Antes de emitir cada tarjeta en el JSON final, realiza obligatoriamente una verificación interna de consistencia lógica entre todos sus campos:
-1. COHERENCIA UNÍVOCA ENTRE JUSTIFICACIÓN Y RESPUESTA MARCADA:
-   - En preguntas tipo test, la alternativa defendida en "justification" y en "back" DEBE coincidir con precisión milimétrica con la opción señalada por "correct_option_index".
+1. COHERENCIA UNÍVOCA Y ETIQUETA DE VEREDICTO EXPLÍCITO:
+   - En preguntas tipo test ("multiple_choice"), la propiedad "justification" DEBE concluir OBLIGATORIAMENTE en su última línea con la etiqueta estricta:
+     VEREDICTO_EXACTO: [texto exacto de la opción ganadora]
+   - El inicio del campo "back" DEBE comenzar obligatoriamente con la misma opción ganadora y su letra:
+     [letra]) [texto exacto de la opción ganadora]
+     VEREDICTO_EXACTO: [texto exacto de la opción ganadora]
+   - El número entero "correct_option_index" (0 a 3) DEBE coincidir con precisión milimétrica con la posición de dicha opción ganadora en el array "options".
    - Queda ESTRICTAMENTE PROHIBIDO cualquier desajuste lógico o numérico (ejemplo: si la justificación concluye que la respuesta válida son "4 calorías" o "el plazo es de 10 días", el índice 'correct_option_index' bajo ninguna circunstancia puede apuntar a la opción de '7 calorías' o '15 días').
 2. DISTRACTORES PLAUSIBLES PERO INEQUÍVOCAMENTE FALSOS:
    - Las alternativas incorrectas deben pertenecer al dominio temático del texto para exigir discriminación real, pero deben ser indiscutiblemente falsas, incompletas o no aplicables frente al caso planteado.
@@ -164,11 +169,12 @@ Debes estructurar la batería de preguntas distribuyendo el nivel cognitivo de l
       formatInstruction = `📋 FORMATO DE EVALUACIÓN EXCLUSIVO: SOLO TEST / OPCIÓN MÚLTIPLE DETERMINISTA (FORMATO "multiple_choice"):
 - TODAS las tarjetas DEBEN ser formuladas estrictamente en formato "multiple_choice".
 - En cada tarjeta debes generar obligatoriamente:
-  1º "justification": Razonamiento técnico del texto antes de elegir la respuesta (Chain of Thought).
+  1º "justification": Razonamiento técnico del texto antes de elegir la respuesta (Chain of Thought), concluyendo obligatoriamente con la etiqueta:
+     VEREDICTO_EXACTO: [texto exacto de la opción ganadora]
   2º "question": Enunciado limpio de la pregunta sin opciones.
   3º "options": Exactamente 4 alternativas plausibles en el array options [0, 1, 2, 3].
   4º "correct_option_index": Número entero (0 a 3) de la opción verdadera justificada.
-- En "front" coloca la pregunta con sus 4 opciones a-d y en "back" la opción verdadera con su justificación. Queda terminantemente PROHIBIDO devolver tarjetas en otro formato.`;
+- En "front" coloca la pregunta con sus 4 opciones a-d y en "back" la opción verdadera ("VEREDICTO_EXACTO: [texto]") seguida de su justificación. Queda terminantemente PROHIBIDO devolver tarjetas en otro formato.`;
       break;
     case 'true_false':
       formatInstruction = `📋 FORMATO DE EVALUACIÓN EXCLUSIVO: SOLO VERDADERO O FALSO (FORMATO "true_false"):

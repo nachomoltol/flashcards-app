@@ -56,59 +56,87 @@ function resolveMultipleChoiceSolution(
 ): { letter: string; text: string; explanation: string } {
   const parsedFront = parseMultipleChoice(front);
   const parsedBack = parseBackContent(back, 'multiple_choice');
-  const verdictRaw = parsedBack.verdict || back;
 
-  // Extraer letra si existe viñeta formal
-  const letterMatch = verdictRaw.match(/^\s*(?:\*\*)?\(?([a-dA-D])\s*[\)\.\-\]\:]/i);
+  // Limpiar explanation eliminando etiquetas internas de veredicto
+  const cleanExplanation = (parsedBack.explanation || '')
+    .replace(/VEREDICTO_EXACTO\s*[:=]\s*[^\r\n]+/gi, '')
+    .trim();
+
+  // 1. Aislar estrictamente la primera línea del veredicto descartando cualquier bloque explicativo
+  const rawVerdictLine = (parsedBack.verdict || back || '')
+    .split(/(?:\r?\n+|Explicación:|Justificación:|Fundamento:|Razón:)/i)[0]
+    .replace(/VEREDICTO_EXACTO\s*[:=]\s*[^\r\n]+/gi, '')
+    .trim();
+
+  // 2. Extraer letra si existe viñeta formal (ej: 'a)', 'b.', '(c)')
+  const letterMatch = rawVerdictLine.match(/^\s*(?:\*\*)?\(?([a-dA-D])\s*[\)\.\-\]\:]/i);
   const detectedLetter = letterMatch ? letterMatch[1].toLowerCase() : null;
 
-  // Limpiar texto de la respuesta en el veredicto (eliminando la viñeta si la tuviese y puntuación periférica)
-  const cleanAnswerText = verdictRaw.replace(/^\s*(?:\*\*)?\(?[a-dA-D]\s*[\)\.\-\]\:]\s*/i, '').trim();
-  const cleanAns = cleanAnswerText.toLowerCase().replace(/^[.,;:¿?¡!]+|[.,;:¿?¡!]+$/g, '').trim();
+  // INVERSIÓN DE JERARQUÍA (BLINDAJE DETERMINISTA):
+  // Si existe una letra formal detectada en el reverso, resolver DIRECTAMENTE la opción del examen
+  if (detectedLetter) {
+    const letterOpt = parsedFront.options.find(
+      (o) => o.key.toLowerCase() === detectedLetter
+    );
+    if (letterOpt) {
+      return {
+        letter: letterOpt.key.toLowerCase(),
+        text: letterOpt.text,
+        explanation: cleanExplanation,
+      };
+    }
+  }
 
-  // Buscar coincidencia en parsedFront.options por contenido de texto
+  // 3. Si no hay letra formal, buscar por veredicto explícito o texto aislado de la opción
+  const explicitMatch = back.match(
+    /(?:VEREDICTO_EXACTO|VEREDICTO|RESPUESTA_CANONICA|RESPUESTA_CANÓNICA|RESPUESTA_CORRECTA)\s*[:=]\s*([^\r\n]+)/i
+  );
+  const candidateText = (
+    explicitMatch
+      ? explicitMatch[1]
+      : rawVerdictLine.replace(/^\s*(?:\*\*)?\(?[a-dA-D]\s*[\)\.\-\]\:]\s*/i, '')
+  ).trim();
+
+  const cleanAns = candidateText
+    .toLowerCase()
+    .replace(/^[.,;:¿?¡!]+|[.,;:¿?¡!]+$/g, '')
+    .trim();
+
+  // Buscar coincidencia rigurosa en parsedFront.options (ELIMINADO: cleanAns.includes(cleanOpt))
   const matchedOpt = parsedFront.options.find((opt) => {
     if (!cleanAns) return false;
-    const cleanOpt = opt.text.toLowerCase().replace(/^[.,;:¿?¡!]+|[.,;:¿?¡!]+$/g, '').trim();
+    const cleanOpt = opt.text
+      .toLowerCase()
+      .replace(/^[.,;:¿?¡!]+|[.,;:¿?¡!]+$/g, '')
+      .trim();
     if (!cleanOpt) return false;
 
     // 1. Coincidencia exacta
     if (cleanOpt === cleanAns) return true;
 
-    // 2. Contención directa (con longitud mínima de seguridad)
+    // 2. Contención unidireccional: la opción completa del examen contiene el veredicto aislado
     if (cleanAns.length >= 3 && cleanOpt.includes(cleanAns)) return true;
-    if (cleanOpt.length >= 3 && cleanAns.includes(cleanOpt)) return true;
 
-    // 3. Rescate específico para mutilación de primera letra en tarjetas legacy (ej: 'ctúan' vs 'actúan')
-    if (cleanOpt.length > 3 && cleanAns.includes(cleanOpt.slice(1))) return true;
-    if (cleanAns.length > 3 && cleanOpt.includes(cleanAns.slice(0, Math.min(cleanAns.length, 12)))) return true;
+    // 3. Prefijo común idéntico
+    if (cleanOpt.length >= 4 && cleanAns.length >= 4) {
+      if (cleanOpt.startsWith(cleanAns) || cleanAns.startsWith(cleanOpt)) return true;
+    }
 
     return false;
   });
 
   if (matchedOpt) {
-    // Si encontramos la opción por texto, la letra canónica es la de esa opción en el examen
     return {
       letter: matchedOpt.key.toLowerCase(),
       text: matchedOpt.text,
-      explanation: parsedBack.explanation,
-    };
-  }
-
-  // Fallback si coincide por letra directa en el examen
-  const letterOpt = detectedLetter ? parsedFront.options.find((o) => o.key.toLowerCase() === detectedLetter) : null;
-  if (letterOpt) {
-    return {
-      letter: letterOpt.key.toLowerCase(),
-      text: letterOpt.text,
-      explanation: parsedBack.explanation,
+      explanation: cleanExplanation,
     };
   }
 
   return {
-    letter: detectedLetter || 'a',
-    text: cleanAnswerText || verdictRaw,
-    explanation: parsedBack.explanation,
+    letter: detectedLetter || (parsedFront.options[0]?.key.toLowerCase() ?? 'a'),
+    text: candidateText || rawVerdictLine,
+    explanation: cleanExplanation,
   };
 }
 

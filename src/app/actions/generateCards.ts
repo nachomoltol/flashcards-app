@@ -96,7 +96,7 @@ const flashcardSchema = {
             description: 'Formato de la tarjeta: "multiple_choice", "basic", "cloze" o "true_false"',
           },
         },
-        required: ['generation_index', 'front', 'back', 'cardFormat'],
+        required: ['generation_index', 'front', 'back', 'cardFormat', 'options', 'correct_option_index'],
       },
     },
   },
@@ -173,7 +173,7 @@ const singlePageExtractionSchema = {
             description: 'Formato de la tarjeta: "multiple_choice", "basic", "cloze" o "true_false"',
           },
         },
-        required: ['generation_index', 'front', 'back', 'cardFormat'],
+        required: ['generation_index', 'front', 'back', 'cardFormat', 'options', 'correct_option_index'],
       },
     },
   },
@@ -224,7 +224,8 @@ function getFormatInstructions(format: CardFormat = 'multiple_choice'): string {
       return `FORMATO INNEGOCIABLE: multiple_choice (Opción Múltiple / Test Determinista con Chain of Thought):
 Cada tarjeta tipo test DEBE seguir rigurosamente este flujo cognitivo de 4 pasos obligatorios:
 
-1º "justification": Redacta PRIMERO el razonamiento factual, cálculo u operación matemática exacta citando el documento ANTES de elegir o marcar la opción correcta (Chain of Thought).
+1º "justification": Redacta PRIMERO el razonamiento factual, cálculo u operación matemática exacta citando el documento ANTES de elegir o marcar la opción correcta (Chain of Thought), concluyendo OBLIGATORIAMENTE en su última línea con la etiqueta:
+   VEREDICTO_EXACTO: [texto exacto de la opción ganadora]
 2º "question": Escribe el enunciado limpio y directo de la pregunta de examen, sin incluir opciones ni letras a, b, c, d.
 3º "options": Proporciona un array con exactamente 4 alternativas plausibles [opción 0, opción 1, opción 2, opción 3] extraídas del texto.
 4º "correct_option_index": Asigna el número entero estricto (0, 1, 2 o 3) correspondiente a la opción verdadera justificada en "options".
@@ -235,8 +236,11 @@ ESTRUCTURA DE COMPATIBILIDAD EN "front" Y "back":
   b) [Texto opción 1]
   c) [Texto opción 2]
   d) [Texto opción 3]
-- "back": Debe contener la opción verdadera con su letra formal y su texto, seguida de:
-  '\\n\\nExplicación: [Justificación técnica extraída del campo justification]'.
+- "back": Debe comenzar obligatoriamente con la opción verdadera con su letra formal y su texto, seguida de la etiqueta de veredicto y la explicación técnica:
+  [letra]) [Texto opción 0]
+  VEREDICTO_EXACTO: [Texto opción ganadora]
+
+  Explicación: [Justificación técnica extraída del campo justification]
 - "cardFormat": "multiple_choice"
 - ${EDITORIAL_ARTIFACTS_DIRECTIVE}`;
 
@@ -887,7 +891,7 @@ function processGeneratedCards(
         .map((opt) => String(opt).replace(/^[a-d][\)\.\:\-]\s*/i, '').trim());
       let correctIdx = Math.min(Math.max(0, Math.floor(card.correct_option_index)), 3);
 
-      // Reconciliación de seguridad determinista entre justification y rawOpts
+      // Reconciliación de seguridad determinista entre justification, veredicto explícito y rawOpts
       const rawJustification = (card.justification || back || '').trim();
       if (rawJustification && rawOpts.length === 4) {
         const normalizeForMatch = (s: string) =>
@@ -899,34 +903,52 @@ function processGeneratedCards(
             .replace(/\s+/g, ' ')
             .trim();
 
-        const justNorm = normalizeForMatch(rawJustification);
-        const currentTargetNorm = normalizeForMatch(rawOpts[correctIdx]);
+        // 1. Extraer veredicto explícito si existe la etiqueta VEREDICTO_EXACTO
+        const fullSource = `${rawJustification}\n${back}`;
+        const explicitMatch = fullSource.match(
+          /(?:VEREDICTO_EXACTO|VEREDICTO|RESPUESTA_CANONICA|RESPUESTA_CANÓNICA|RESPUESTA_CORRECTA)\s*[:=]\s*([^\r\n]+)/i
+        );
+        const explicitVerdictNorm = explicitMatch ? normalizeForMatch(explicitMatch[1]) : '';
 
-        // Comprobar si la opción apuntada actualmente por correctIdx está respaldada en la justificación
-        const isCurrentSupported =
-          currentTargetNorm.length > 0 &&
-          (justNorm.includes(currentTargetNorm) ||
-            new RegExp(`(?:^|\\s)${currentTargetNorm}(?:$|\\s)`).test(justNorm));
+        // 2. Comprobar si alguna opción coincide directamente con el veredicto explícito
+        let explicitFoundIdx = -1;
+        if (explicitVerdictNorm) {
+          for (let i = 0; i < 4; i++) {
+            const optNorm = normalizeForMatch(rawOpts[i]);
+            if (!optNorm) continue;
+            if (
+              optNorm === explicitVerdictNorm ||
+              explicitVerdictNorm === optNorm ||
+              explicitVerdictNorm.startsWith(optNorm) ||
+              optNorm.startsWith(explicitVerdictNorm)
+            ) {
+              explicitFoundIdx = i;
+              break;
+            }
+          }
+        }
 
-        if (!isCurrentSupported) {
-          // Si la opción apuntada entra en discrepancia con la justificación, buscar si otra opción sí coincide
-          let bestCandidateIdx = -1;
-          let bestCandidateScore = 0;
+        if (explicitFoundIdx !== -1) {
+          correctIdx = explicitFoundIdx;
+          card.correct_option_index = correctIdx;
+        } else {
+          // 3. Evaluador comparativo simultáneo de las 4 opciones
+          // Aislar la parte conclusiva y detectar expresiones de exclusión/negación
+          const justNorm = normalizeForMatch(rawJustification);
+          const conclusionRegex =
+            /(?:por tanto|en consecuencia|por lo que|por ende|el resultado es|la respuesta correcta es|la opcion correcta es|opcion correcta|concluye que|es decir|correcto es|correcta es|aporta[n]?|corresponde[n]? a|se define como|equivale[n]? a|consiste en)/i;
+          const conclusionPart = justNorm.split(conclusionRegex).pop() || justNorm;
 
-          // Seccionar la parte conclusiva de la justificación para priorizar afirmaciones finales
-          const conclusionPart =
-            justNorm
-              .split(
-                /(?:por tanto|en consecuencia|por lo que|por ende|el resultado es|la respuesta correcta es|la opcion correcta es|opcion correcta|concluye que|es decir|correcto es|correcta es)/i
-              )
-              .pop() || justNorm;
+          const exclusionRegex =
+            /(?:a diferencia de|en cambio|mientras que|no es|no son|no corresponde|no aplica|a excepcion de|frente a|contrariamente a|a pesar de|distinto de|lejos de)/i;
+
+          // Puntuación comparativa simultánea para cada opción [0..3]
+          const scores = [0, 0, 0, 0];
 
           for (let i = 0; i < 4; i++) {
-            if (i === correctIdx) continue;
             const optNorm = normalizeForMatch(rawOpts[i]);
             if (!optNorm || optNorm.length < 2) continue;
 
-            let score = 0;
             const inConclusion =
               conclusionPart.includes(optNorm) ||
               new RegExp(`(?:^|\\s)${optNorm}(?:$|\\s)`).test(conclusionPart);
@@ -935,19 +957,42 @@ function processGeneratedCards(
               new RegExp(`(?:^|\\s)${optNorm}(?:$|\\s)`).test(justNorm);
 
             if (inConclusion) {
-              score += 2;
+              scores[i] += 15;
             } else if (inWholeJust) {
-              score += 1;
+              scores[i] += 5;
             }
 
-            if (score > bestCandidateScore) {
-              bestCandidateScore = score;
-              bestCandidateIdx = i;
+            // Penalización estricta si aparece precedida por expresiones de exclusión o negación
+            const optIndexInJust = justNorm.indexOf(optNorm);
+            if (optIndexInJust > 0) {
+              const precedingWindow = justNorm.substring(
+                Math.max(0, optIndexInJust - 45),
+                optIndexInJust
+              );
+              if (exclusionRegex.test(precedingWindow)) {
+                scores[i] -= 25; // Fuertemente descartada como distractor mencionado
+              }
             }
           }
 
-          if (bestCandidateIdx !== -1 && bestCandidateScore > 0) {
-            correctIdx = bestCandidateIdx;
+          // Bonificación leve por fidelidad al índice original emitido si tiene soporte positivo
+          if (scores[correctIdx] > 0) {
+            scores[correctIdx] += 2;
+          }
+
+          // Determinar el mejor candidato
+          let bestIdx = correctIdx;
+          let maxScore = scores[correctIdx];
+
+          for (let i = 0; i < 4; i++) {
+            if (scores[i] > maxScore) {
+              maxScore = scores[i];
+              bestIdx = i;
+            }
+          }
+
+          if (bestIdx !== correctIdx && maxScore > 0) {
+            correctIdx = bestIdx;
             card.correct_option_index = correctIdx;
           }
         }
@@ -964,9 +1009,10 @@ function processGeneratedCards(
       const formattedOpts = rawOpts.map((opt, i) => `${letters[i]}) ${opt}`).join('\n');
       front = `${qText}\n\n${formattedOpts}`;
 
-      // Obtener la justificación (priorizando justification sobre el reverso existente)
+      // Obtener la justificación eliminando etiquetas internas de veredicto
       const rawExplanation = (card.justification || back)
         .replace(/^[a-d][\)\.\:\-]\s*/i, '')
+        .replace(/VEREDICTO_EXACTO\s*[:=]\s*[^\r\n]+/gi, '')
         .replace(/^(?:Explicación|Justificación):\s*/i, '')
         .trim();
 

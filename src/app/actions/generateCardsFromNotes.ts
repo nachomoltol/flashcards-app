@@ -199,6 +199,7 @@ function processGeneratedCards(
 
       const rawExplanation = (card.justification || back)
         .replace(/^[a-d][\)\.\:\-]\s*/i, '')
+        .replace(/VEREDICTO_EXACTO\s*[:=]\s*[^\r\n]+/gi, '')
         .replace(/^(?:Explicación|Justificación):\s*/i, '')
         .trim();
 
