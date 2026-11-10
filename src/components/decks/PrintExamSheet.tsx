@@ -283,7 +283,7 @@ export function PrintExamSheet({
                                 <strong className="font-bold uppercase">
                                   {opt.key})
                                 </strong>{' '}
-                                {opt.text}
+                                {opt.text.replace(/^\s*(?:\*{1,2}|_{1,2})?\(?([a-dA-D]|\d+)[\)\.\:\-\]](?:\*{1,2}|_{1,2})?\s*/, '').trim()}
                               </span>
                             </div>
                           ))}
@@ -432,9 +432,11 @@ export function PrintExamSheet({
                     <span className="font-bold text-black text-[10.5pt]">
                       {index + 1}.
                     </span>
-                    <span className="text-[7.5pt] font-mono font-bold uppercase px-1.5 py-0.5 bg-neutral-100 border border-neutral-300 text-neutral-700 rounded-sm shrink-0">
-                      {formatLabel}
-                    </span>
+                    {formatLabel && formatLabel.toLowerCase() !== "test" && (
+                      <span className="text-[7.5pt] font-mono font-medium text-neutral-500 shrink-0">
+                        [{formatLabel}]
+                      </span>
+                    )}
                   </div>
 
                   <div className="flex-1 min-w-0">

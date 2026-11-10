@@ -153,3 +153,36 @@ input::-ms-clear {
   }
 }
 
+/* ==========================================================================
+   BLINDAJE DE IMPRESIÓN Y SALTO DE PÁGINA (FLASHMENTE A4)
+   ========================================================================== */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm 10mm;
+  }
+  
+  .print-question-item {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    display: block !important;
+    position: relative !important;
+    float: none !important;
+    margin-bottom: 0.65rem !important;
+  }
+
+  /* Evitar que flex/grid internos rompan la fragmentación de Chromium */
+  .print-question-item > div {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  
+  .print-solution-item {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    display: block !important;
+    margin-bottom: 0.75rem !important;
+  }
+}
+
+

@@ -875,6 +875,15 @@ function buildProgressMemorySection(existingCards?: ExistingCardHistoryItem[]): 
   return '';
 }
 
+// Función universal de saneamiento de prefijos de opciones (elimina 'a)', '**b)**', '(c)', etc.)
+function stripOptionPrefix(text: string): string {
+  if (!text) return '';
+  return text
+    .replace(/^\s*(?:\*{1,2}|_{1,2})?\(?([a-dA-D]|\d+)[\)\.\:\-\]](?:\*{1,2}|_{1,2})?\s*/, '')
+    .replace(/^\s*(?:\*{1,2}|_{1,2})?\(?([a-dA-D]|\d+)[\)\.\:\-\]](?:\*{1,2}|_{1,2})?\s*/, '')
+    .trim();
+}
+
 /**
  * Normaliza y procesa las tarjetas generadas garantizando la estructura de 4 opciones para preguntas tipo test.
  */
@@ -904,7 +913,7 @@ function processGeneratedCards(
       const letters = ['a', 'b', 'c', 'd'];
       const rawOpts = card.options
         .slice(0, 4)
-        .map((opt) => String(opt).replace(/^[a-d][\)\.\:\-]\s*/i, '').trim());
+        .map((opt) => stripOptionPrefix(String(opt)));
       let correctIdx = Math.min(Math.max(0, Math.floor(card.correct_option_index)), 3);
 
       // Reconciliación de seguridad determinista entre justification, veredicto explícito y rawOpts
@@ -1026,8 +1035,7 @@ function processGeneratedCards(
       front = `${qText}\n\n${formattedOpts}`;
 
       // Obtener la justificación eliminando etiquetas internas de veredicto
-      const rawExplanation = (card.justification || back)
-        .replace(/^[a-d][\)\.\:\-]\s*/i, '')
+      const rawExplanation = stripOptionPrefix(card.justification || back)
         .replace(/VEREDICTO_EXACTO\s*[:=]\s*[^\r\n]+/gi, '')
         .replace(/^(?:Explicación|Justificación):\s*/i, '')
         .trim();
@@ -1046,7 +1054,7 @@ function processGeneratedCards(
       const letters = ['a', 'b', 'c', 'd'];
       const rawOpts = card.options
         .slice(0, 4)
-        .map((opt) => String(opt).replace(/^[a-d][\)\.\:\-]\s*/i, '').trim());
+        .map((opt) => stripOptionPrefix(String(opt)));
       cleanedOpts = rawOpts;
       const formattedOpts = rawOpts
         .map((opt, i) => `${letters[i]}) ${opt}`)
@@ -2121,7 +2129,7 @@ ${STRICT_GROUNDING_DIRECTIVE}
 
 ${EDITORIAL_ARTIFACTS_DIRECTIVE}`;
 
-      const exhaustiveDirective = `🚨 MODO EXHAUSTIVO FORZADO: Anula cualquier instrucción de resumen, brevedad o selección pedagógica. Extrae una tarjeta por cada dato, celda de tabla, gráfica o cruce de información sin omitir nada. Prioriza la exhaustividad sobre la síntesis. Analiza profundamente todo el texto de la página extrayendo cualquier concepto, normativa o dato clave. Si encuentras tablas, gráficos o listas, actúa como un extractor implacable: extrae tarjetas individuales cruzando absolutamente TODOS los datos posibles de celdas, filas y columnas, sin resumir ni agrupar. No dejes ningún dato estructurado ni textual relevante sin extraer. Tienes terminantemente prohibido omitir datos o resumir información por considerarla secundaria.
+      const exhaustiveDirective = `🚨 MODO EXHAUSTIVO FORZADO: Anula cualquier instrucción de resumen, brevedad o selección pedagógica. Realiza una cobertura exhaustiva del 100% de conceptos y tablas mediante cruce relacional y análisis comparativo, sin repetir datos ya preguntados. Prioriza la exhaustividad sobre la síntesis. Analiza profundamente todo el texto de la página extrayendo cualquier concepto, normativa o dato clave. Si encuentras tablas, gráficos o listas, actúa como un extractor implacable: extrae tarjetas individuales cruzando absolutamente TODOS los datos posibles de celdas, filas y columnas, sin resumir ni agrupar. No dejes ningún dato estructurado ni textual relevante sin extraer. Tienes terminantemente prohibido omitir datos o resumir información por considerarla secundaria.
 
 ${COMPREHENSIVE_SWEEP_DIRECTIVE}
 
@@ -2543,7 +2551,7 @@ ${STRICT_GROUNDING_DIRECTIVE}
 
 ${EDITORIAL_ARTIFACTS_DIRECTIVE}`;
 
-      const exhaustiveDirective = `🚨 MODO EXHAUSTIVO FORZADO: Anula cualquier instrucción de resumen, brevedad o selección pedagógica. Extrae una tarjeta por cada dato, celda de tabla, gráfica o cruce de información sin omitir nada. Prioriza la exhaustividad sobre la síntesis. Analiza profundamente todo el texto de la página virtual extrayendo cualquier concepto, normativa o dato clave. Si encuentras tablas, gráficos o listas, actúa como un extractor implacable: extrae tarjetas individuales cruzando absolutamente TODOS los datos posibles de celdas, filas y columnas, sin resumir ni agrupar. No dejes ningún dato estructurado ni textual relevante sin extraer. Tienes terminantemente prohibido omitir datos o resumir información por considerarla secundaria.
+      const exhaustiveDirective = `🚨 MODO EXHAUSTIVO FORZADO: Anula cualquier instrucción de resumen, brevedad o selección pedagógica. Realiza una cobertura exhaustiva del 100% de conceptos y tablas mediante cruce relacional y análisis comparativo, sin repetir datos ya preguntados. Prioriza la exhaustividad sobre la síntesis. Analiza profundamente todo el texto de la página virtual extrayendo cualquier concepto, normativa o dato clave. Si encuentras tablas, gráficos o listas, actúa como un extractor implacable: extrae tarjetas individuales cruzando absolutamente TODOS los datos posibles de celdas, filas y columnas, sin resumir ni agrupar. No dejes ningún dato estructurado ni textual relevante sin extraer. Tienes terminantemente prohibido omitir datos o resumir información por considerarla secundaria.
 
 ${COMPREHENSIVE_SWEEP_DIRECTIVE}
 

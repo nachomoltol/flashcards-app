@@ -5,24 +5,15 @@ import type { DocenteFormat, TargetAudience } from '@/types/cards';
  * Transforma conceptos teóricos en supuestos de aplicación del mundo real sin distorsionar el rigor factual.
  * Estructura obligatoria: [Contexto o caso operativo] + [Conflicto, necesidad o restricción técnica] + [Pregunta de toma de decisiones o intervención].
  */
-export const PRACTICAL_MODE_DIRECTIVE = `🎯 DIRECTIVA UNIVERSAL DE ENFOQUE PRÁCTICO Y SITUACIONAL (APRENDIZAJE BASADO EN PROBLEMAS):
-Queda terminantemente prohibido formular preguntas teóricas pasivas o de memorización descontextualizada (evita '¿Qué es X?', 'Define Y', 'Enumera las características de Z').
-Tampoco se considera práctico añadir un prefijo cosmético superficial (como 'En el hospital...' o 'Un abogado observa...') a una pregunta puramente memorística.
+export const PRACTICAL_MODE_DIRECTIVE = `🎯 DIRECTIVA UNIVERSAL DE ENFOQUE PRÁCTICO Y SITUACIONAL (PROBLEM-BASED LEARNING):
+Toda tarjeta en modo práctico debe formularse mediante un supuesto o escenario aplicado del mundo real.
+ESTRUCTURA OBLIGATORIA DEL ENUNCIADO:
+[Contexto operativo específico] + [Conflicto de variables, síntoma o restricción técnica] + [Pregunta de toma de decisiones o intervención concreta].
 
-ESTRUCTURA OBLIGATORIA DEL ENUNCIADO PRÁCTICO:
-Toda tarjeta en modo práctico debe formularse mediante un supuesto o escenario aplicado realista estructurado en tres partes:
-[Contexto o caso operativo] + [Conflicto, necesidad o restricción técnica] + [Pregunta de toma de decisiones o intervención].
-El alumno debe verse obligado a utilizar el criterio técnico y el conocimiento de la materia para resolver la situación.
-
-APLICACIÓN UNIVERSAL SEGÚN LA DISCIPLINA:
-- Ciencias de la Salud y Biología: Caso clínico, paciente o muestra experimental que presenta signos o hallazgos específicos; conflicto terapéutico, farmacológico o fisiológico; decisión fundamentada sobre la intervención, pauta, diagnóstico diferencial o mecanismo subyacente.
-- Leyes, Normativa y Administración: Supuesto de hecho o consulta profesional con plazos, partes implicadas o conflicto de intereses; determinación fundada de la acción jurídica, derecho aplicable o consecuencia legal correspondiente.
-- Ingeniería, Tecnología y Exactas: Problema de diseño, fallo en un sistema o condiciones operativas límite; selección fundada del método de cálculo, algoritmo, arquitectura o solución técnica óptima.
-- Humanidades, Historia y Filosofía: Análisis de una fuente histórica, dilema ético o coyuntura sociopolítica concreta; juicio crítico sobre causas, consecuencias o contraste de posturas doctrinales conforme al texto.
-- Idiomas y Comunicación: Situación comunicativa real o profesional con matiz pragmático o de registro; selección de la expresión idiomática, término o estructura adecuada para resolver el intercambio.
-
-DISTRACTORES EN MODO PRÁCTICO:
-En preguntas tipo test o verdadero/falso, los distractores deben representar decisiones o interpretaciones plausibles dentro del contexto del caso (trampas operativas comunes o diagnósticos alternativos verosímiles), nunca errores absurdos o datos inventados ajenos al temario.`;
+🚨 REGLA DE DEPENDENCIA CONTEXTUAL ESTRICTA (ANTI-CASO COSMÉTICO):
+1. CRITERIO DE VALIDEZ PRÁCTICA: La pregunta DEBE ser IMPOSIBLE de responder sin los datos y condiciones del supuesto. Queda terminantemente PROHIBIDO anteponer un escenario decorativo a una pregunta teórica de manual (ej. es INVÁLIDO escribir 'Un bombero acude a un incendio, ¿a qué temperatura hierve el agua?').
+2. INTERACCIÓN DE VARIABLES: El caso debe obligar a relacionar al menos dos datos del texto (ej. valores de análisis, antecedentes, condiciones de contorno, plazos legales, especificaciones técnicas concurrentes).
+3. DISTRACTORES PRÁCTICOS: Las opciones incorrectas deben representar fallos de juicio plausibles, errores procedimentales frecuentes o vías de intervención alternativas pero contraindicadas en ese supuesto concreto.`;
 
 /**
  * DIRECTIVA UNIVERSAL DE CALIBRACIÓN PSICOMÉTRICA DE DISTRACTORES (ZERO-OBVIOUS / ANTI-HEURÍSTICAS):
@@ -121,22 +112,25 @@ export function buildUniversalCalibrationDirective(isExhaustiveMode: boolean = f
 }
 
 /**
+ * DIRECTIVA DE COBERTURA INTEGRAL Y CRUCE RELACIONAL DE TABLAS:
+ * Prohíbe el barrido mecánico celda a celda y exige cruces relacionales de orden superior.
+ */
+export const EXHAUSTIVE_TABLES_DIRECTIVE = `📊 DIRECTIVA DE COBERTURA INTEGRAL Y CRUCE RELACIONAL DE TABLAS:
+Cuando el texto contenga tablas, cuadros sinópticos o matrices de datos:
+1. PROHIBICIÓN DE BARRIDO MECÁNICO AISLADO: Queda terminantemente PROHIBIDO formular preguntas de memoria ciega sobre celdas individuales inconexas (ej. '¿Qué dato exacto figura en la fila 3?').
+2. CRUCE RELACIONAL DE DATOS: Genera preguntas de orden superior que comparen y relacionen la información de la tabla:
+   - Comparación entre filas o categorías (mayor que, menor que, diferencias clave).
+   - Identificación de casos extremos (valores máximos, mínimos, excepciones señaladas).
+   - Correlación bidireccional (ej. dadas unas condiciones o propiedades, identificar a qué entidad o categoría de la tabla corresponden).
+3. COBERTURA TOTAL SIN DUPLICIDAD: Asegura que todas las entidades principales de la tabla queden evaluadas, pero NUNCA formules dos preguntas distintas sobre el mismo cruce o valor idéntico.`;
+
+/**
  * TRATAMIENTO UNIVERSAL DE TABLAS, CUADROS Y MATRICES DE DATOS:
  * Diferencia entre tablas de catálogo/inventario y matrices conceptuales relacionales.
  */
 export function buildUniversalTablesDirective(isExhaustiveMode: boolean = false): string {
   if (isExhaustiveMode) {
-    return `📊 TRATAMIENTO UNIVERSAL DE TABLAS, CUADROS Y MATRICES (MODO MINUCIOSO / EXHAUSTIVO):
-Las tablas y diagramas concentran el conocimiento de mayor densidad y exigencia evaluativa del material. Debes procesarlas diferenciando con rigor su naturaleza pedagógica:
-
-a) Tablas de Inventario, Catálogo o Valores de Referencia (listas de componentes, constantes numéricas, posologías, composiciones):
-   - PROHIBICIÓN DE MEMORIA CIEGA: Queda prohibido formular preguntas aisladas y mecánicas sobre celdas individuales descontextualizadas (ej. '¿Qué valor exacto aparece en la fila 14?').
-   - EVALUACIÓN DE ALTO NIVEL: Evalúa valores extremos significativos (máximos y mínimos determinantes), umbrales críticos de corte que condicionan un cambio de estado, casos atípicos que rompen la tendencia general y correlaciones directas o inversas entre columnas.
-   - REGLA ANTI-MONOTONÍA: Prohibido generar más de 2 preguntas con la misma sintaxis o plantilla interrogativa procedentes de la misma matriz.
-
-b) Matrices Conceptuales y Relacionales (cruces de causas, mecanismos, efectos, órganos diana, clasificaciones normativas o taxonomías):
-   - Evalúa el cruce conceptual entre filas y columnas, la relación de causalidad y la diferenciación sistemática entre categorías adyacentes.
-   - Exige discriminar por qué un elemento pertenece a una categoría y no a otra según los criterios de la tabla.`;
+    return EXHAUSTIVE_TABLES_DIRECTIVE;
   }
 
   return `📊 TRATAMIENTO UNIVERSAL DE TABLAS, CUADROS Y MATRICES (MODO NORMAL / ESTÁNDAR):
