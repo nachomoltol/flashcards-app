@@ -97,25 +97,64 @@ Toda batería de preguntas tipo test debe estructurarse obligatoriamente bajo la
    - Enfoque: Escenarios de alta discriminación donde se evalúan excepciones a la regla general, criterios de exclusión, dilemas profesionales o distinción sutil entre opciones casi idénticas con distractores altamente verosímiles.`;
 
 /**
- * CALIBRACIÓN UNIVERSAL: MODO NORMAL VS. MODO MINUCIOSO:
+ * PRINCIPIO DE ECONOMÍA CONCEPTUAL Y CERO REDUNDANCIA DE HECHO:
+ * Prohíbe terminantemente generar más de una tarjeta sobre el mismo hecho singular,
+ * pero permite y exige evaluar múltiples facetas independientes de una misma entidad.
+ */
+export const CONCEPTUAL_ECONOMY_DIRECTIVE = `⚖️ PRINCIPIO UNIVERSAL DE ECONOMÍA CONCEPTUAL Y CERO REDUNDANCIA DE HECHO:
+- PROHIBICIÓN DE DUPLICIDAD FACTUAL: Queda TERMINANTEMENTE PROHIBIDO generar más de una tarjeta sobre el MISMO hecho, hallazgo, mecanismo específico o dato de respuesta, con total independencia de que se reformule el enunciado, se altere el orden de las opciones o se cambie la perspectiva gramatical.
+- CLARIFICACIÓN ESENCIAL (FACETAS INDEPENDIENTES VS. MISMO HECHO SINGULAR): Una misma entidad, sujeto, nutriente, fármaco, norma jurídica, institución o concepto general (ej. el folato, un artículo legal, una enzima o un protocolo de red) PUEDE Y DEBE ser objeto de varias tarjetas si el texto describe múltiples facetas sustanciales independientes (por ejemplo: su papel fisiológico, su cuadro deficitario clínico, sus interacciones medicamentosas o su estabilidad físico-química). Lo que queda estrictamente vetado es duplicar la evaluación sobre el mismo hecho singular o conclusión fáctica idéntica.`;
+
+/**
+ * PRINCIPIO DE COBERTURA HORIZONTAL (BARRIDO DE ENTIDADES INDEPENDIENTES):
+ * Exige identificar todos los subepígrafes y núcleos de conocimiento sin agotar la atención en un único párrafo.
+ */
+export const HORIZONTAL_COVERAGE_DIRECTIVE = `🌐 PRINCIPIO UNIVERSAL DE COBERTURA HORIZONTAL (BARRIDO DE ENTIDADES INDEPENDIENTES):
+- IDENTIFICACIÓN PANORÁMICA DE NÚCLEOS: Identifica todos los subepígrafes, secciones temáticas y núcleos de conocimiento distintos que componen la página o sección analizada.
+- PROHIBICIÓN DE HIPER-CONCENTRACIÓN EN UN SOLO PÁRRAFO: Queda terminantemente PROHIBIDO agotar la atención o volcar toda la generación en un único párrafo o concepto llamativo dejando otros bloques sustanciales de la misma página en blanco. Cada faceta troncal descrita en el material debe contar con su correspondiente tarjeta de evaluación para garantizar una cobertura equilibrada, homogénea y representativa de toda la sección.`;
+
+/**
+ * PRINCIPIO DE DENSIDAD ADAPTATIVA PURA AL CONTENIDO:
+ * Modula la extracción según la riqueza intrínseca del texto, sin cuotas ni topes numéricos arbitrarios.
+ */
+export const ADAPTIVE_DENSITY_DIRECTIVE = `🌊 PRINCIPIO UNIVERSAL DE DENSIDAD ADAPTATIVA PURA AL CONTENIDO:
+- CERO CUOTAS ARTIFICIALES: No fuerces un volumen artificial ni intentes alcanzar un número predeterminado o arbitrario de preguntas. La cantidad de tarjetas debe ser el reflejo natural, fiel y exacto de la riqueza objetiva del texto.
+- PÁGINAS TRANSICIONALES O DE BAJA DENSIDAD: Si una página es meramente introductoria, transicional, de índice o con escaso contenido evaluable, extrae con sobriedad únicamente lo genuinamente relevante (aunque resulte en una sola tarjeta o un conjunto vacío []). No introduzcas preguntas triviales de relleno.
+- PÁGINAS DE ALTA DENSIDAD CONCEPTUAL: Si la página contiene una alta densidad de mecanismos, clasificaciones, patologías, relaciones causa-efecto o prescripciones técnicas, extrae con rigor cada una de sus facetas sustanciales sin autocensurarte por suposiciones o límites numéricos arbitrarios.`;
+
+/**
+ * CALIBRACIÓN UNIVERSAL: MODO NORMAL VS. MODO EXHAUSTIVO (ESTRATIFICADO):
  */
 export function buildUniversalCalibrationDirective(isExhaustiveMode: boolean = false): string {
+  const qualitativeReadingCore = `${CONCEPTUAL_ECONOMY_DIRECTIVE}
+
+${HORIZONTAL_COVERAGE_DIRECTIVE}
+
+${ADAPTIVE_DENSITY_DIRECTIVE}`;
+
   if (isExhaustiveMode) {
-    return `🔬 CALIBRACIÓN PEDAGÓGICA UNIVERSAL: MODO MINUCIOSO (ALTA EXIGENCIA / ENFOQUE 100%):
-- PROFUNDIDAD INTEGRAL: Evalúa todo el espectro sustancial del documento sin omitir subdivisiones teóricas, excepciones a la regla general, clasificaciones secundarias, etimología, umbrales numéricos críticos, valores de referencia y contrastes sutiles.
-- REGLA DE CALIDAD PEDAGÓGICA: "Exprimir el texto" significa elevar al máximo la discriminación conceptual y el análisis crítico. Está TERMINANTEMENTE PROHIBIDO convertir la generación en una copia mecánica o inventario memorístico pasivo de listas. Cada detalle evaluado debe tener relevancia funcional o metodológica dentro de la disciplina.`;
+    return `🔬 CALIBRACIÓN PEDAGÓGICA UNIVERSAL: MODO EXHAUSTIVO (EXTRACCIÓN ESTRATIFICADA EN DOS CAPAS):
+${qualitativeReadingCore}
+
+ESTRUCTURA OBLIGATORIA EN DOS CAPAS:
+1. CAPA 1 - BASE TRONCAL Y CONCEPTUAL ("tarjetas_troncales"): Extrae con rigor e intensidad todos los conceptos clave, definiciones sustanciales, clasificaciones vertebrales, principios rectores y mecanismos de causa-efecto de la página (idéntico al modo normal), respetando la cobertura horizontal de todas las entidades.
+2. CAPA 2 - ESCRUTINIO PROFUNDO ADICIONAL OBLIGATORIO ("escrutinio_profundo"): Desciende a una capa complementaria de máxima discriminación evaluando cruces relacionales entre filas y columnas de tablas o matrices, umbrales numéricos de referencia, excepciones normativas o técnicas a las reglas generales, casos límite y notas al pie o recuadros secundarios.
+- REGLA DE VALOR FORMATIVO: Ambas capas deben aportar preguntas sólidas de examen. Se prohíbe la copia mecánica pasiva de listas o preguntas superficiales de relleno.`;
   }
 
-  return `🎯 CALIBRACIÓN PEDAGÓGICA UNIVERSAL: MODO NORMAL (ENFOQUE 80/20):
-- NÚCLEO SUSTANCIAL: Concéntrate en el 20% de los conceptos que explican el 80% de la materia: definiciones fundamentales, mecanismos centrales, principios rectores y relaciones de alto nivel.
-- FILTRO ANTI-SATURACIÓN: Excluye deliberadamente notas al pie accesorias, cifras secundarias sin relevancia clínica/jurídica/técnica, excepciones ultra-raras y detalles enciclopédicos que sobrecarguen la sesión de estudio básica.`;
+  return `🎯 CALIBRACIÓN PEDAGÓGICA UNIVERSAL: MODO NORMAL (EXTRACCIÓN TRONCAL INTENSA):
+${qualitativeReadingCore}
+
+ENFOQUE OPERATIVO EN MODO NORMAL:
+- CUERPO TEÓRICO Y MECANISMOS: Concéntrate con máxima intensidad en el cuerpo teórico, mecanismos explicativos, definiciones canónicas, clasificaciones vertebrales y relaciones causa-efecto de cada página, asegurando la cobertura horizontal equilibrada de todas las entidades independientes descritas.
+- TRATAMIENTO ESTÁNDAR DE TABLAS Y CUADROS: Puedes formular preguntas de síntesis o aspectos relevantes de tablas y cuadros si aportan valor general al entendimiento del tema, pero sin descender a escudriñar de forma minuciosa cada casilla aislada, nota al pie secundaria o excepción accesoria.`;
 }
 
 /**
  * DIRECTIVA DE COBERTURA INTEGRAL Y CRUCE RELACIONAL DE TABLAS:
  * Prohíbe el barrido mecánico celda a celda y exige cruces relacionales de orden superior.
  */
-export const EXHAUSTIVE_TABLES_DIRECTIVE = `📊 DIRECTIVA DE COBERTURA INTEGRAL Y CRUCE RELACIONAL DE TABLAS:
+export const EXHAUSTIVE_TABLES_DIRECTIVE = `📊 DIRECTIVA DE COBERTURA INTEGRAL Y CRUCE RELACIONAL DE TABLAS (MODO EXHAUSTIVO):
 Cuando el texto contenga tablas, cuadros sinópticos o matrices de datos:
 1. PROHIBICIÓN DE BARRIDO MECÁNICO AISLADO: Queda terminantemente PROHIBIDO formular preguntas de memoria ciega sobre celdas individuales inconexas (ej. '¿Qué dato exacto figura en la fila 3?').
 2. CRUCE RELACIONAL DE DATOS: Genera preguntas de orden superior que comparen y relacionen la información de la tabla:
@@ -133,31 +172,28 @@ export function buildUniversalTablesDirective(isExhaustiveMode: boolean = false)
     return EXHAUSTIVE_TABLES_DIRECTIVE;
   }
 
-  return `📊 TRATAMIENTO UNIVERSAL DE TABLAS, CUADROS Y MATRICES (MODO NORMAL / ESTÁNDAR):
-En modo estándar, las tablas deben evaluarse desde su jerarquía conceptual troncal y conclusiones de alto nivel:
-a) Evalúa la regla, patrón o principio general que sintetiza la matriz.
-b) Compara a gran escala las columnas o categorías principales, enfocando tendencias globales y relaciones causa-efecto determinantes.
-c) Evalúa únicamente umbrales de decisión críticos o excepciones notorias señaladas en la tabla.
-d) Queda TERMINANTEMENTE PROHIBIDO desglosar mecánicamente celdas individuales o hacer preguntas memorísticas sobre filas secundarias aisladas.`;
+  return `📊 TRATAMIENTO ESTÁNDAR DE TABLAS Y CUADROS (MODO NORMAL):
+En modo normal, si el documento contiene tablas, matrices o cuadros:
+a) EVALUACIÓN GLOBAL Y RELEVANCIA GENERAL: Se formulan preguntas centradas en la síntesis, propósito de conjunto o conclusiones relevantes que aporten valor general a la comprensión del tema.
+b) PROHIBICIÓN DE MINUCIOSIDAD ACCESORIA: Queda prohibido escudriñar minuciosamente cada casilla aislada, nota al pie secundaria o excepción accesoria sin contexto global.`;
 }
 
 /**
  * DIRECTIVA UNIVERSAL DE MODO MINUCIOSO / QUIRÚRGICO:
  * Cobertura en profundidad mediante barrido multinivel y tratamiento inteligente de cuadros.
  */
-export const EXHAUSTIVE_MODE_MANDATE = `🔬 DIRECTIVA UNIVERSAL DE MODO MINUCIOSO (COBERTURA EN PROFUNDIDAD):
+export const EXHAUSTIVE_MODE_MANDATE = `🔬 DIRECTIVA UNIVERSAL DE MODO EXHAUSTIVO (COBERTURA EN PROFUNDIDAD):
 1. BARRIDO MULTINIVEL DE LA PÁGINA:
    Analiza la totalidad de la página actual sin omitir ninguna sección evaluable.
-   - Párrafos Teóricos: Extrae cada concepto sustancial, relación causa-efecto, mecanismo fisiológico/técnico, criterio de clasificación o excepción formal.
-   - Recuadros y Evidencia Secundaria: Interroga activamente los recuadros de investigación, alertas técnicas, enfoques por etapas o notas clínicas/jurídicas al margen.
-   - La cantidad de preguntas generadas debe reflejar fielmente la riqueza real del texto, profundizando en todas sus capas conceptuales.
+   - Párrafos Teóricos: Extrae cada concepto sustancial, relación causa-efecto, mecanismo funcional o técnico, criterio de clasificación o excepción formal a la regla general.
+   - Recuadros y Evidencia Secundaria: Interroga activamente los recuadros de investigación, notas de aplicación, alertas técnicas, enfoques por etapas o notas complementarias al margen.
+   - La cantidad de preguntas generadas debe reflejar fielmente la riqueza real del texto, profundizando en todas sus capas conceptuales y detalles técnicos relevantes.
 
-2. TRATAMIENTO INTELIGENTE DE CUADROS Y TABLAS:
-   En tablas o matrices de datos, asegura una cobertura representativa y de alto valor formativo:
-   - Evalúa patrones por categorías y grupos de datos relevantes (cuáles lideran, cuáles se minimizan).
-   - Compara variaciones del dato según el estado, la preparación o la condición técnica expuesta.
-   - Evalúa valores umbral, límites críticos de seguridad o parámetros de referencia.
-   - Evita la memorización aislada y descontextualizada de casillas secundarias cuando no aportan comprensión al conjunto.`;
+2. TRATAMIENTO RELACIONAL DE TABLAS Y MATRICES:
+   En tablas o matrices de datos, asegura un análisis sistemático y de alto valor formativo:
+   - Cruce relacional de orden superior entre filas y columnas, patrones comparativos (mayor que, menor que, diferencias clave).
+   - Identificación de valores umbral, límites críticos de seguridad o parámetros cuantitativos de referencia.
+   - Correlación bidireccional y casos extremos, prohibiendo la memorización ciega de celdas aisladas sin sentido formativo.`;
 
 /**
  * DIRECTIVA EXCLUSIVA PARA MODO DOCENTE / DIDÁCTICO:

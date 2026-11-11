@@ -737,7 +737,15 @@ export function DocumentUploader({
       setSuccessCount(generatedCards.length);
 
       if (typeof result.nextCursorPage === 'number') {
-        setNextCursorPage(result.nextCursorPage);
+        const parsedLimit = pageEnd.trim() ? parseInt(pageEnd.trim(), 10) : undefined;
+        const activeLimit = parsedLimit && !isNaN(parsedLimit) ? parsedLimit : (totalPagesForRun || undefined);
+        if (activeLimit && result.nextCursorPage > activeLimit) {
+          setNextCursorPage(null);
+        } else {
+          setNextCursorPage(result.nextCursorPage);
+        }
+      } else {
+        setNextCursorPage(null);
       }
 
       setStatus('success');
@@ -794,6 +802,8 @@ export function DocumentUploader({
     : false;
   const isPageableDoc = isPdf || isDocx;
   const effectiveTotalPages = isPdf ? pdfTotalPages : docxTotalPages;
+  const parsedPageEnd = pageEnd.trim() ? parseInt(pageEnd.trim(), 10) : undefined;
+  const activeRunEndPage = parsedPageEnd && !isNaN(parsedPageEnd) ? parsedPageEnd : effectiveTotalPages;
 
   const isSinglePage = Boolean(
     isPageableDoc &&
@@ -1070,25 +1080,25 @@ export function DocumentUploader({
             </div>
           )}
 
-          {/* Si es documento por páginas / tramos, mostramos ÚNICAMENTE la caja de progreso limpia */}
-          {isPageableDoc && typeof nextCursorPage === 'number' ? (
+          {/* Si es documento por páginas / tramos y restan páginas, mostramos la caja de progreso y marcapáginas */}
+          {isPageableDoc && typeof nextCursorPage === 'number' && (!activeRunEndPage || nextCursorPage <= activeRunEndPage) ? (
             <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 text-blue-950 dark:text-blue-200 text-xs text-center max-w-md mx-auto shadow-xs">
               <div className="flex items-center justify-center gap-1.5 flex-wrap">
                 <span className="text-xs">📖</span>
                 <span className="font-medium text-blue-950 dark:text-blue-200">
-                  Páginas:{' '}
+                  Páginas analizadas:{' '}
                   <strong className="text-blue-950 dark:text-white font-semibold">
                     {lastStartPage && lastStartPage !== nextCursorPage
-                      ? `de la ${lastStartPage} a la ${nextCursorPage}`
-                      : `página ${nextCursorPage}`}
+                      ? `de la ${lastStartPage} a la ${nextCursorPage - 1}`
+                      : `hasta la página ${nextCursorPage - 1}`}
                   </strong>
-                  {effectiveTotalPages && (
-                    <span className="text-blue-900/80 dark:text-blue-300"> (de {effectiveTotalPages} págs)</span>
+                  {activeRunEndPage && (
+                    <span className="text-blue-900/80 dark:text-blue-300"> (de {activeRunEndPage} págs)</span>
                   )}
                 </span>
                 <span className="mx-1 text-blue-400">•</span>
                 <span className="text-[11px] text-blue-900/80 dark:text-blue-300 font-medium">
-                  Marcapáginas en pág. {nextCursorPage}
+                  Siguiente tanda: pág. {nextCursorPage}
                 </span>
               </div>
             </div>
@@ -1096,6 +1106,11 @@ export function DocumentUploader({
             <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-950 dark:text-emerald-200 text-xs text-center max-w-md mx-auto shadow-xs">
               <p className="font-medium">
                 ✅ <strong className="font-semibold text-emerald-950 dark:text-emerald-300">{t('deck_detail.cards_added_title', 'Tarjetas añadidas con éxito.')}</strong>
+                {isPageableDoc && activeRunEndPage && (
+                  <span className="block text-[11px] text-emerald-800 dark:text-emerald-300 mt-0.5 font-normal">
+                    🎉 Se ha completado el análisis íntegro de las páginas delimitadas (hasta pág. {activeRunEndPage}).
+                  </span>
+                )}
               </p>
             </div>
           )}
@@ -1106,7 +1121,7 @@ export function DocumentUploader({
 
           {/* Actions-First Header Buttons (Always immediately visible without scrolling) */}
           <div className="bg-slate-900/95 backdrop-blur-sm border border-slate-800 p-2.5 rounded-xl flex flex-wrap items-center justify-center gap-2 shadow-md print:hidden">
-            {isPageableDoc && typeof nextCursorPage === 'number' ? (
+            {isPageableDoc && typeof nextCursorPage === 'number' && (!activeRunEndPage || nextCursorPage <= activeRunEndPage) ? (
               <button
                 type="button"
                 onClick={() => {
@@ -1118,7 +1133,7 @@ export function DocumentUploader({
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
                 </svg>
-                <span>Continuar extrayendo (Retomar desde pág. {nextCursorPage})</span>
+                <span>Continuar extrayendo (Retomar desde pág. {nextCursorPage}{activeRunEndPage ? ` de ${activeRunEndPage}` : ''})</span>
               </button>
             ) : (
               <button
@@ -2763,7 +2778,7 @@ export function DocumentUploader({
                         </svg>
                         <span>
                           {isPageableDoc
-                            ? (typeof nextCursorPage === 'number'
+                            ? (typeof nextCursorPage === 'number' && (!activeRunEndPage || nextCursorPage <= activeRunEndPage)
                                 ? t('ai_uploader.continue_extract_btn', { page: nextCursorPage }, isEn ? `Continue extracting (Resume p. ${nextCursorPage})` : `Continuar extrayendo (Retomar pág. ${nextCursorPage})`)
                                 : t('ai_uploader.extract_action_btn', { count: cardCount }, isEn ? `Extract ${cardCount} cards` : `Extraer ${cardCount} tarjetas`))
                             : (isMeticulousPhase
