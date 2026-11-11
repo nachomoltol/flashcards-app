@@ -143,17 +143,20 @@ d) Queda TERMINANTEMENTE PROHIBIDO desglosar mecánicamente celdas individuales 
 
 /**
  * DIRECTIVA UNIVERSAL DE MODO MINUCIOSO / QUIRÚRGICO:
- * Cobertura total de la riqueza real del texto y explotación funcional de tablas y cuadros.
+ * Agotamiento completo de página y cruce con sentido en cuadros y tablas.
  */
-export const EXHAUSTIVE_MODE_MANDATE = `🔬 DIRECTIVA UNIVERSAL DE MODO MINUCIOSO / QUIRÚRGICO:
-Analiza la totalidad del contenido de esta sección o página sin pasar por alto ningún dato relevante.
-1. COBERTURA TOTAL DE LA RIQUEZA REAL: No dejes ningún concepto nuclear, mecanismo, cifra de referencia, excepción o regla técnica sin transformar en pregunta de evaluación. La densidad y cantidad de preguntas generadas debe responder fielmente a la riqueza real del texto, sin auto-limitarte si la página es densa.
-2. EXPRIMIR TABLAS Y CUADROS SIN RELLENO: En tablas, diagramas o cuadros de datos, exprime el valor funcional de la información:
-   - Contrasta filas, elementos o categorías adyacentes (diferencias críticas).
-   - Evalúa los valores límite, umbrales máximos, mínimos y parámetros de alerta.
-   - Pregunta por el significado funcional y las consecuencias prácticas de las cifras o condiciones expuestas.
-   - Incluye las notas al pie o excepciones señaladas entre paréntesis.
-   - Queda prohibida la memoria ciega de casillas sueltas descontextualizadas por mero relleno.`;
+export const EXHAUSTIVE_MODE_MANDATE = `🔬 DIRECTIVA UNIVERSAL DE MODO MINUCIOSO (AGOTAMIENTO DE PÁGINA Y CRUCE CON SENTIDO):
+1. AGOTAMIENTO COMPLETO DE LA PÁGINA:
+   Analiza la página actual de principio a fin sin pasar por alto ningún dato relevante.
+   - Extrae y formula preguntas sobre cada hecho sustancial, mecanismo, principio funcional, cifra crítica, normativa o excepción.
+   - La cantidad de preguntas generadas debe responder fielmente a la densidad real del texto: si la página contiene mucha información sustancial, no te auto-limites; si contiene poca información, no inventes preguntas banales de relleno.
+   - Agota todo el contenido evaluable antes de dar por concluida la página.
+
+2. TRATAMIENTO INTELIGENTE DE CUADROS, TABLAS Y ESQUEMAS (CRUCE CON SENTIDO):
+   Cuando encuentres tablas, matrices de datos o esquemas comparativos, queda terminantemente PROHIBIDO formular preguntas sobre casillas individuales aisladas por mero relleno de memoria ciega. Debes exprimir su valor formativo mediante relaciones de orden superior:
+   - Contraste Directo: Formula preguntas que comparen dos o más elementos, filas o categorías del cuadro, evaluando sus diferencias clave.
+   - Jerarquías y Extremos: Evalúa los valores límite, categorías dominantes, umbrales máximos/mínimos o elementos excepcionales.
+   - Condicionantes y Repercusión: Evalúa cómo y por qué cambia un dato según el estado, la condición o las aclaraciones en notas al pie.`;
 
 /**
  * DIRECTIVA EXCLUSIVA PARA MODO DOCENTE / DIDÁCTICO:

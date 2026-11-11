@@ -2353,10 +2353,10 @@ DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de esta pági
             : '';
 
           const exhaustiveQuotaMandate = isExhaustiveMode
-            ? `\n\n🚨 ENFOQUE MINUCIOSO ACTIVO (META RESTANTE: ${remainingToTarget} PREGUNTAS):
-- Extrae con precisión quirúrgica cada concepto, tabla, mecanismo o excepción de esta página.
-- No omitas datos relevantes ni te detengas prematuramente si la página contiene información sustancial.
-- Evita duplicar la misma pregunta con redacciones idénticas.`
+            ? `\n\n🚨 ENFOQUE MINUCIOSO ACTIVO:
+- Analiza la totalidad de esta página de principio a fin.
+- Transforma en preguntas de evaluación cada concepto sustancial, relación de tablas, mecanismo o excepción sin dejar contenido a medias.
+- No te detengas hasta haber cubierto los datos clave de la página.`
             : '';
 
           const currentPageSystemPrompt = `${singlePageSystemPrompt}${historyDirective}${exhaustiveQuotaMandate}`;
@@ -2444,15 +2444,15 @@ Formula supuestos del mundo real, escenarios de toma de decisiones o problemas a
             }
           }
 
-          // Si al sumar se supera el targetCount, recorta el array exactamente al límite solicitado
-          if (tarjetasAcumuladas.length > targetCount) {
+          // Si al sumar se supera el targetCount, en modo normal se recorta; en modo minucioso se conserva la totalidad de la página
+          if (!isExhaustiveMode && tarjetasAcumuladas.length > targetCount) {
             tarjetasAcumuladas = tarjetasAcumuladas.slice(0, targetCount);
           }
 
-          // Si alcanzamos el límite exacto de tarjetas solicitadas para este lote, detenemos el bucle
+          // Si alcanzamos el objetivo, en modo normal nos detenemos; en modo minucioso completamos la página actual sin truncar
           if (tarjetasAcumuladas.length >= targetCount) {
             console.log(
-              `[Bucle Acumulador Backend - Modo Estudio] 🎯 Objetivo alcanzado: ${tarjetasAcumuladas.length} tarjetas exactas en Página ${currentPage}.`
+              `[Bucle Acumulador Backend - Modo Estudio] 🎯 Objetivo alcanzado/superado: ${tarjetasAcumuladas.length} tarjetas en Página ${currentPage}.`
             );
             break;
           }
@@ -2482,7 +2482,11 @@ Formula supuestos del mundo real, escenarios de toma de decisiones o problemas a
         };
       }
 
-      const processedCards = processGeneratedCards(tarjetasAcumuladas, targetCount, cardFormat);
+      const processedCards = processGeneratedCards(
+        tarjetasAcumuladas,
+        isExhaustiveMode ? tarjetasAcumuladas.length : targetCount,
+        cardFormat
+      );
 
       // Registrar uso en api_limits (1 crédito gastado por tirada exitosa)
       if (apiCheck) {
@@ -2797,10 +2801,10 @@ DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de esta pági
             : '';
 
           const exhaustiveQuotaMandate = isExhaustiveMode
-            ? `\n\n🚨 ENFOQUE MINUCIOSO ACTIVO (META RESTANTE: ${remainingToTarget} PREGUNTAS):
-- Extrae con precisión quirúrgica cada concepto, tabla, mecanismo o excepción de esta página.
-- No omitas datos relevantes ni te detengas prematuramente si la página contiene información sustancial.
-- Evita duplicar la misma pregunta con redacciones idénticas.`
+            ? `\n\n🚨 ENFOQUE MINUCIOSO ACTIVO:
+- Analiza la totalidad de esta página de principio a fin.
+- Transforma en preguntas de evaluación cada concepto sustancial, relación de tablas, mecanismo o excepción sin dejar contenido a medias.
+- No te detengas hasta haber cubierto los datos clave de la página.`
             : '';
 
           const currentPageSystemPrompt = `${singlePageSystemPrompt}${historyDirective}${exhaustiveQuotaMandate}`;
@@ -2908,13 +2912,14 @@ ${currentPageText}`;
             }
           }
 
-          if (tarjetasAcumuladas.length > targetCount) {
+          // Si al sumar se supera el targetCount, en modo normal se recorta; en modo minucioso se conserva la totalidad de la página
+          if (!isExhaustiveMode && tarjetasAcumuladas.length > targetCount) {
             tarjetasAcumuladas = tarjetasAcumuladas.slice(0, targetCount);
           }
 
           if (tarjetasAcumuladas.length >= targetCount) {
             console.log(
-              `[Bucle Acumulador Backend DOCX - Modo Estudio] 🎯 Objetivo alcanzado: ${tarjetasAcumuladas.length} tarjetas exactas en Página Virtual ${currentPage}.`
+              `[Bucle Acumulador Backend DOCX - Modo Estudio] 🎯 Objetivo alcanzado/superado: ${tarjetasAcumuladas.length} tarjetas en Página Virtual ${currentPage}.`
             );
             break;
           }
@@ -2944,7 +2949,11 @@ ${currentPageText}`;
         };
       }
 
-      const processedCards = processGeneratedCards(tarjetasAcumuladas, targetCount, cardFormat);
+      const processedCards = processGeneratedCards(
+        tarjetasAcumuladas,
+        isExhaustiveMode ? tarjetasAcumuladas.length : targetCount,
+        cardFormat
+      );
 
       if (apiCheck) {
         await recordApiUsage(apiCheck.userId);
