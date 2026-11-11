@@ -738,6 +738,8 @@ export function DocumentUploader({
 
       if (typeof result.nextCursorPage === 'number') {
         setNextCursorPage(result.nextCursorPage);
+      } else {
+        setNextCursorPage(null);
       }
 
       setStatus('success');

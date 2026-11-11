@@ -2454,6 +2454,7 @@ Formula supuestos del mundo real, escenarios de toma de decisiones o problemas a
             console.log(
               `[Bucle Acumulador Backend - Modo Estudio] 🎯 Objetivo alcanzado/superado: ${tarjetasAcumuladas.length} tarjetas en Página ${currentPage}.`
             );
+            lastProcessedPage = currentPage;
             break;
           }
 
@@ -2493,11 +2494,12 @@ Formula supuestos del mundo real, escenarios de toma de decisiones o problemas a
         await recordApiUsage(apiCheck.userId);
       }
 
-      const isExhausted = tarjetasAcumuladas.length < targetCount && lastProcessedPage >= finalPage;
+      const hasReachedEnd = lastProcessedPage >= finalPage;
+      const isExhausted = hasReachedEnd || tarjetasAcumuladas.length < targetCount;
 
-      const nextCursor = tarjetasAcumuladas.length >= targetCount
-        ? lastProcessedPage + 1
-        : lastProcessedPage;
+      const nextCursor = hasReachedEnd
+        ? undefined
+        : (tarjetasAcumuladas.length >= targetCount ? lastProcessedPage + 1 : lastProcessedPage);
 
       // Retorno del Cursor (El Marcapáginas):
       // El Server Action debe devolver al cliente la página exacta para la siguiente extracción (nextCursorPage).
@@ -2921,6 +2923,7 @@ ${currentPageText}`;
             console.log(
               `[Bucle Acumulador Backend DOCX - Modo Estudio] 🎯 Objetivo alcanzado/superado: ${tarjetasAcumuladas.length} tarjetas en Página Virtual ${currentPage}.`
             );
+            lastProcessedPage = currentPage;
             break;
           }
 
@@ -2959,11 +2962,12 @@ ${currentPageText}`;
         await recordApiUsage(apiCheck.userId);
       }
 
-      const isExhausted = tarjetasAcumuladas.length < targetCount && lastProcessedPage >= finalPage;
+      const hasReachedEnd = lastProcessedPage >= finalPage;
+      const isExhausted = hasReachedEnd || tarjetasAcumuladas.length < targetCount;
 
-      const nextCursor = tarjetasAcumuladas.length >= targetCount
-        ? lastProcessedPage + 1
-        : lastProcessedPage;
+      const nextCursor = hasReachedEnd
+        ? undefined
+        : (tarjetasAcumuladas.length >= targetCount ? lastProcessedPage + 1 : lastProcessedPage);
 
       return {
         success: true,
