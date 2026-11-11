@@ -14,6 +14,7 @@ import { deduplicateCandidateCards } from '@/lib/cardDeduplication';
 import { GEMINI_DEFAULT_MODEL } from '@/lib/aiConfig';
 import {
   PRACTICAL_MODE_DIRECTIVE,
+  EXHAUSTIVE_MODE_MANDATE,
   buildDidacticModeDirective,
   buildUniversalCalibrationDirective,
   buildUniversalTablesDirective,
@@ -2129,19 +2130,9 @@ ${STRICT_GROUNDING_DIRECTIVE}
 
 ${EDITORIAL_ARTIFACTS_DIRECTIVE}`;
 
-      const exhaustiveDirective = `🚨 MODO EXHAUSTIVO FORZADO: Anula cualquier instrucción de resumen, brevedad o selección pedagógica. Realiza una cobertura exhaustiva del 100% de conceptos y tablas mediante cruce relacional y análisis comparativo, sin repetir datos ya preguntados. Prioriza la exhaustividad sobre la síntesis. Analiza profundamente todo el texto de la página extrayendo cualquier concepto, normativa o dato clave. Si encuentras tablas, gráficos o listas, actúa como un extractor implacable: extrae tarjetas individuales cruzando absolutamente TODOS los datos posibles de celdas, filas y columnas, sin resumir ni agrupar. No dejes ningún dato estructurado ni textual relevante sin extraer. Tienes terminantemente prohibido omitir datos o resumir información por considerarla secundaria.
-
-${COMPREHENSIVE_SWEEP_DIRECTIVE}
-
-${SINGLE_CORE_CONCEPT_DIRECTIVE}
-
-${CONTENT_HIERARCHY_DIRECTIVE}
-
-${EXHAUSTIVE_TABLES_DIRECTIVE}
-
-${STRICT_GROUNDING_DIRECTIVE}
-
-${EDITORIAL_ARTIFACTS_DIRECTIVE}`;
+      const exhaustiveDirective = isExhaustiveMode
+        ? `\n\n${EXHAUSTIVE_MODE_MANDATE}\n\n`
+        : '';
 
       const isDocenteMode = pedagogicalMode === 'didactic' || (pedagogicalMode as unknown as string) === 'docente';
 
@@ -2362,10 +2353,10 @@ DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de esta pági
             : '';
 
           const exhaustiveQuotaMandate = isExhaustiveMode
-            ? `\n\n🚨 DIRECTIVA DE COBERTURA Y CALIDAD (CUOTA RESTANTE: ${remainingToTarget} TARJETAS):
-- Si la página contiene tablas, matrices de datos o clasificaciones densas, extrae preguntas independientes de tantas filas y cruces numéricos como existan hasta cumplir la cuota requerida.
-- Si la página es texto continuo (prosa/teoría), extrae con rigor quirúrgico cada dato fáctico, definición, mecanismo y excepción relevante.
-- IMPORTANTE: No dupliques preguntas con diferente redacción ni inventes preguntas sobre listas de palabras al margen o datos ajenos al documento para alcanzar un número artificial. Si has extraído todos los hechos sustanciales de esta página, concluye tu respuesta; el motor secuencial del servidor continuará acumulando tarjetas en las siguientes páginas del documento hasta completar el objetivo.`
+            ? `\n\n🚨 ENFOQUE MINUCIOSO ACTIVO (META RESTANTE: ${remainingToTarget} PREGUNTAS):
+- Extrae con precisión quirúrgica cada concepto, tabla, mecanismo o excepción de esta página.
+- No omitas datos relevantes ni te detengas prematuramente si la página contiene información sustancial.
+- Evita duplicar la misma pregunta con redacciones idénticas.`
             : '';
 
           const currentPageSystemPrompt = `${singlePageSystemPrompt}${historyDirective}${exhaustiveQuotaMandate}`;
@@ -2560,19 +2551,9 @@ ${STRICT_GROUNDING_DIRECTIVE}
 
 ${EDITORIAL_ARTIFACTS_DIRECTIVE}`;
 
-      const exhaustiveDirective = `🚨 MODO EXHAUSTIVO FORZADO: Anula cualquier instrucción de resumen, brevedad o selección pedagógica. Realiza una cobertura exhaustiva del 100% de conceptos y tablas mediante cruce relacional y análisis comparativo, sin repetir datos ya preguntados. Prioriza la exhaustividad sobre la síntesis. Analiza profundamente todo el texto de la página virtual extrayendo cualquier concepto, normativa o dato clave. Si encuentras tablas, gráficos o listas, actúa como un extractor implacable: extrae tarjetas individuales cruzando absolutamente TODOS los datos posibles de celdas, filas y columnas, sin resumir ni agrupar. No dejes ningún dato estructurado ni textual relevante sin extraer. Tienes terminantemente prohibido omitir datos o resumir información por considerarla secundaria.
-
-${COMPREHENSIVE_SWEEP_DIRECTIVE}
-
-${SINGLE_CORE_CONCEPT_DIRECTIVE}
-
-${CONTENT_HIERARCHY_DIRECTIVE}
-
-${EXHAUSTIVE_TABLES_DIRECTIVE}
-
-${STRICT_GROUNDING_DIRECTIVE}
-
-${EDITORIAL_ARTIFACTS_DIRECTIVE}`;
+      const exhaustiveDirective = isExhaustiveMode
+        ? `\n\n${EXHAUSTIVE_MODE_MANDATE}\n\n`
+        : '';
 
       const isDocenteMode = pedagogicalMode === 'didactic' || (pedagogicalMode as unknown as string) === 'docente';
 
@@ -2816,10 +2797,10 @@ DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de esta pági
             : '';
 
           const exhaustiveQuotaMandate = isExhaustiveMode
-            ? `\n\n🚨 DIRECTIVA DE COBERTURA Y CALIDAD (CUOTA RESTANTE: ${remainingToTarget} TARJETAS):
-- Si la sección contiene tablas, imágenes o clasificaciones densas, extrae preguntas independientes de tantas filas, cruces o diagramas como existan hasta cumplir la cuota requerida.
-- Si la sección es texto continuo (prosa/teoría), extrae con rigor quirúrgico cada dato fáctico, definición, mecanismo y excepción relevante.
-- IMPORTANTE: No dupliques preguntas con diferente redacción ni inventes preguntas sobre listas de palabras al margen o datos ajenos al documento para alcanzar un número artificial. Si has extraído todos los hechos sustanciales de esta página virtual, concluye tu respuesta; el motor secuencial del servidor continuará acumulando tarjetas en las siguientes páginas del documento hasta completar el objetivo.`
+            ? `\n\n🚨 ENFOQUE MINUCIOSO ACTIVO (META RESTANTE: ${remainingToTarget} PREGUNTAS):
+- Extrae con precisión quirúrgica cada concepto, tabla, mecanismo o excepción de esta página.
+- No omitas datos relevantes ni te detengas prematuramente si la página contiene información sustancial.
+- Evita duplicar la misma pregunta con redacciones idénticas.`
             : '';
 
           const currentPageSystemPrompt = `${singlePageSystemPrompt}${historyDirective}${exhaustiveQuotaMandate}`;

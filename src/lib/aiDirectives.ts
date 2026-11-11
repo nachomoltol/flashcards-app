@@ -142,6 +142,20 @@ d) Queda TERMINANTEMENTE PROHIBIDO desglosar mecánicamente celdas individuales 
 }
 
 /**
+ * DIRECTIVA UNIVERSAL DE MODO MINUCIOSO / QUIRÚRGICO:
+ * Cobertura total de la riqueza real del texto y explotación funcional de tablas y cuadros.
+ */
+export const EXHAUSTIVE_MODE_MANDATE = `🔬 DIRECTIVA UNIVERSAL DE MODO MINUCIOSO / QUIRÚRGICO:
+Analiza la totalidad del contenido de esta sección o página sin pasar por alto ningún dato relevante.
+1. COBERTURA TOTAL DE LA RIQUEZA REAL: No dejes ningún concepto nuclear, mecanismo, cifra de referencia, excepción o regla técnica sin transformar en pregunta de evaluación. La densidad y cantidad de preguntas generadas debe responder fielmente a la riqueza real del texto, sin auto-limitarte si la página es densa.
+2. EXPRIMIR TABLAS Y CUADROS SIN RELLENO: En tablas, diagramas o cuadros de datos, exprime el valor funcional de la información:
+   - Contrasta filas, elementos o categorías adyacentes (diferencias críticas).
+   - Evalúa los valores límite, umbrales máximos, mínimos y parámetros de alerta.
+   - Pregunta por el significado funcional y las consecuencias prácticas de las cifras o condiciones expuestas.
+   - Incluye las notas al pie o excepciones señaladas entre paréntesis.
+   - Queda prohibida la memoria ciega de casillas sueltas descontextualizadas por mero relleno.`;
+
+/**
  * DIRECTIVA EXCLUSIVA PARA MODO DOCENTE / DIDÁCTICO:
  * Diseñada para profesores que preparan baterías de ejercicios para sus alumnos a partir de fichas,
  * ejercicios o vocabularios, eliminando referencias de aula y transformando listas en problemas prácticos.
