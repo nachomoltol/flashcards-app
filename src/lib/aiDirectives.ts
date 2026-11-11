@@ -143,20 +143,21 @@ d) Queda TERMINANTEMENTE PROHIBIDO desglosar mecánicamente celdas individuales 
 
 /**
  * DIRECTIVA UNIVERSAL DE MODO MINUCIOSO / QUIRÚRGICO:
- * Agotamiento completo de página y cruce con sentido en cuadros y tablas.
+ * Cobertura en profundidad mediante barrido multinivel y tratamiento inteligente de cuadros.
  */
-export const EXHAUSTIVE_MODE_MANDATE = `🔬 DIRECTIVA UNIVERSAL DE MODO MINUCIOSO (AGOTAMIENTO DE PÁGINA Y CRUCE CON SENTIDO):
-1. AGOTAMIENTO COMPLETO DE LA PÁGINA:
-   Analiza la página actual de principio a fin sin pasar por alto ningún dato relevante.
-   - Extrae y formula preguntas sobre cada hecho sustancial, mecanismo, principio funcional, cifra crítica, normativa o excepción.
-   - La cantidad de preguntas generadas debe responder fielmente a la densidad real del texto: si la página contiene mucha información sustancial, no te auto-limites; si contiene poca información, no inventes preguntas banales de relleno.
-   - Agota todo el contenido evaluable antes de dar por concluida la página.
+export const EXHAUSTIVE_MODE_MANDATE = `🔬 DIRECTIVA UNIVERSAL DE MODO MINUCIOSO (COBERTURA EN PROFUNDIDAD):
+1. BARRIDO MULTINIVEL DE LA PÁGINA:
+   Analiza la totalidad de la página actual sin omitir ninguna sección evaluable.
+   - Párrafos Teóricos: Extrae cada concepto sustancial, relación causa-efecto, mecanismo fisiológico/técnico, criterio de clasificación o excepción formal.
+   - Recuadros y Evidencia Secundaria: Interroga activamente los recuadros de investigación, alertas técnicas, enfoques por etapas o notas clínicas/jurídicas al margen.
+   - La cantidad de preguntas generadas debe reflejar fielmente la riqueza real del texto, profundizando en todas sus capas conceptuales.
 
-2. TRATAMIENTO INTELIGENTE DE CUADROS, TABLAS Y ESQUEMAS (CRUCE CON SENTIDO):
-   Cuando encuentres tablas, matrices de datos o esquemas comparativos, queda terminantemente PROHIBIDO formular preguntas sobre casillas individuales aisladas por mero relleno de memoria ciega. Debes exprimir su valor formativo mediante relaciones de orden superior:
-   - Contraste Directo: Formula preguntas que comparen dos o más elementos, filas o categorías del cuadro, evaluando sus diferencias clave.
-   - Jerarquías y Extremos: Evalúa los valores límite, categorías dominantes, umbrales máximos/mínimos o elementos excepcionales.
-   - Condicionantes y Repercusión: Evalúa cómo y por qué cambia un dato según el estado, la condición o las aclaraciones en notas al pie.`;
+2. TRATAMIENTO INTELIGENTE DE CUADROS Y TABLAS:
+   En tablas o matrices de datos, asegura una cobertura representativa y de alto valor formativo:
+   - Evalúa patrones por categorías y grupos de datos relevantes (cuáles lideran, cuáles se minimizan).
+   - Compara variaciones del dato según el estado, la preparación o la condición técnica expuesta.
+   - Evalúa valores umbral, límites críticos de seguridad o parámetros de referencia.
+   - Evita la memorización aislada y descontextualizada de casillas secundarias cuando no aportan comprensión al conjunto.`;
 
 /**
  * DIRECTIVA EXCLUSIVA PARA MODO DOCENTE / DIDÁCTICO:
