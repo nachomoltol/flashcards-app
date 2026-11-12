@@ -227,12 +227,18 @@ ${qualitativeReadingCore}
    - PRIORIDAD #2 (EL EXTRA EXHAUSTIVO EN TABLAS Y PIES DE IMAGEN): Sumado a las preguntas del texto, sácale punta a todas las tablas/cuadros de la página y a los pies de imagen, diagramas o recuadros que contengan información relevante y digna de estudio, hasta alcanzar entre 22 y 25 tarjetas en páginas densas.`;
   }
 
-  return `🎯 CALIBRACIÓN PEDAGÓGICA UNIVERSAL: MODO NORMAL (EXTRACCIÓN TRONCAL INTEGRAL MEDIANTE INVENTARIO FACTUAL):
+  return `🎯 CALIBRACIÓN PEDAGÓGICA UNIVERSAL: MODO NORMAL (EXTRACCIÓN TRONCAL EQUILIBRADA DE 8 A 12 TARJETAS):
 ${qualitativeReadingCore}
 
-ENFOQUE OPERATIVO EN MODO NORMAL:
-- COBERTURA TRONCAL DEL 100% (SIN TOPES POR PÁGINA): No apliques ningún techo artificial de 3 a 5 tarjetas por página. Tu objetivo en Modo Teórico Normal es cubrir el 100% de los conceptos troncales, definiciones, funciones, orígenes, mecanismos y consecuencias del texto principal de la página. Si una página tiene 3 conceptos clave, genera 3 tarjetas; si una página es densa y contiene múltiples conceptos troncales distintos en sus 4 dimensiones, genera las 17 a 20 tarjetas necesarias para que el estudiante domine todo el contenido importante de esa página sin lagunas.
-- TRATAMIENTO ESTÁNDAR DE TABLAS Y CUADROS: En Modo Normal, las tablas solo se preguntan en su conclusión o síntesis general (sin bajar al desglose minucioso de filas/columnas secundarias ni notas al pie marginales). En tablas de catálogo o listas extensas, queda prohibido memorizar elementos individuales aislados; se permite como máximo 1 tarjeta de síntesis sobre el criterio clasificador o regla general.`;
+ENFOQUE OPERATIVO EN MODO NORMAL (META ADAPTATIVA DE 8 A 12 TARJETAS POR PÁGINA SUSTANCIAL):
+1. COBERTURA COMPLETA DEL TEXTO PRINCIPAL (PROHIBIDO QUEDARSE CORTO):
+   Barre todos los epígrafes, términos clave definidos y párrafos de prosa para extraer todas las definiciones, funciones, mecanismos, patologías/consecuencias y valores de referencia principales (adultos/estándar) sin omitir ningún concepto importante del tema. El estudiante debe dominar el 100% de la materia troncal explicada.
+2. CERO REDUNDANCIA TEXTO-CUADRO RESUMEN:
+   Si un concepto, función, regla o patología ya fue evaluado desde el texto en prosa, queda TERMINANTEMENTE PROHIBIDO generar una segunda pregunta sobre ese mismo hecho desde un cuadro resumen o esquema sintético (y viceversa). Un hecho evaluado en el texto = cero preguntas adicionales repetitivas desde su cuadro resumen.
+3. TABLAS DE DATOS SIN MICRO-DESPIECE:
+   En tablas de baremos, valores de ingesta, mediciones o clasificaciones complejas, extrae los valores generales principales y las excepciones clínicas o normativas más destacadas, pero NO despieces fila por fila los subgrupos secundarios ni los tramos específicos por edad o subcategorías accesorias (reservados al Modo Exhaustivo).
+4. EXCLUSIÓN DE PERIFERIA:
+   Omite pies de figura, notas al pie de tablas y recuadros de curiosidades o cuadros anecdóticos (reservados al Modo Exhaustivo). Reserva las 8 a 12 tarjetas de la página para el conocimiento troncal indispensable.`;
 }
 
 /**
