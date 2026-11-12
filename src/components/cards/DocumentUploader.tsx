@@ -661,6 +661,16 @@ export function DocumentUploader({
         return;
       }
 
+      // Validar si el rango ya fue completado de forma limpia (ej. fin de documento en páginas de repaso)
+      if ((result as any).rangeCompleted === true) {
+        setStatus('idle');
+        setErrorMessage(null);
+        setNextCursorPage(null);
+        setMaterialExhaustedNotice(null);
+        alert((result as any).message || '¡Rango completado! Se ha llegado al final de las páginas seleccionadas.');
+        return;
+      }
+
       // Validar resultado de la IA sin lanzar errores fatales
       if (!result.success || !result.cards || result.cards.length === 0) {
         if (result.error === 'LIMIT_REACHED' || result.error === 'AD_REQUIRED') {

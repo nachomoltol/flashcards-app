@@ -6,14 +6,22 @@ import type { DocenteFormat, TargetAudience } from '@/types/cards';
  * Estructura obligatoria: [Contexto o caso operativo] + [Conflicto, necesidad o restricción técnica] + [Pregunta de toma de decisiones o intervención].
  */
 export const PRACTICAL_MODE_DIRECTIVE = `🎯 DIRECTIVA UNIVERSAL DE ENFOQUE PRÁCTICO Y SITUACIONAL (PROBLEM-BASED LEARNING):
-Toda tarjeta en modo práctico debe formularse mediante un supuesto o escenario aplicado del mundo real.
-ESTRUCTURA OBLIGATORIA DEL ENUNCIADO:
+Toda tarjeta en modo práctico debe formularse mediante una situación aplicada, caso real o escenario de decisión del mundo real.
+ESTRUCTURA DEL ENUNCIADO:
 [Contexto operativo específico] + [Conflicto de variables, síntoma o restricción técnica] + [Pregunta de toma de decisiones o intervención concreta].
 
-🚨 REGLA DE DEPENDENCIA CONTEXTUAL ESTRICTA (ANTI-CASO COSMÉTICO):
-1. CRITERIO DE VALIDEZ PRÁCTICA: La pregunta DEBE ser IMPOSIBLE de responder sin los datos y condiciones del supuesto. Queda terminantemente PROHIBIDO anteponer un escenario decorativo a una pregunta teórica de manual (ej. es INVÁLIDO escribir 'Un bombero acude a un incendio, ¿a qué temperatura hierve el agua?').
-2. INTERACCIÓN DE VARIABLES: El caso debe obligar a relacionar al menos dos datos del texto (ej. valores de análisis, antecedentes, condiciones de contorno, plazos legales, especificaciones técnicas concurrentes).
-3. DISTRACTORES PRÁCTICOS: Las opciones incorrectas deben representar fallos de juicio plausibles, errores procedimentales frecuentes o vías de intervención alternativas pero contraindicadas en ese supuesto concreto.`;
+🚨 REGLAS OBLIGATORIAS DE COBERTURA TOTAL Y TRANSFORMACIÓN DEL INVENTARIO:
+1. COBERTURA 100% DEL INVENTARIO (1 HECHO CLAVE = 1 MINI-CASO APLICADO):
+   El Modo Práctico NO puede dejar menos conceptos evaluados que el Modo Teórico. Cada hecho sustancial identificado en las 4 dimensiones del "inventario_factual" (incluyendo qué es una entidad, cuál es su función, su fuente/origen o su fallo) debe tener su propia tarjeta en forma de situación aplicada, caso práctico o escenario de decisión.
+
+2. ELIMINACIÓN DEL REQUISITO DE COMBINAR MÚLTIPLES VARIABLES:
+   Se permite tanto el planteamiento de casos que integren variables como mini-escenarios directos focalizados en un único concepto clave cuando sea necesario para evaluar una definición funcional, un origen o un mecanismo base sin dejarlo fuera del mazo.
+
+3. CÓMO PREGUNTAR CONCEPTOS BASE DE FORMA PRÁCTICA (SIN PREGUNTA TEÓRICA PLANA):
+   Para evaluar una definición, fuente o función básica en Modo Práctico sin caer en la pregunta teórica plana ('¿Qué es X?'), plantea una situación real breve donde ese concepto, fuente o mecanismo esté ocurriendo o sea necesario elegirlo (ej. un caso clínico breve, una elección de pauta nutricional, una situación técnica o procesal concreta) y pregunta cuál es el elemento implicado, la decisión correcta o el mecanismo que explica lo que sucede en el caso.
+
+4. DISTRACTORES PRÁCTICOS:
+   Las opciones incorrectas deben representar fallos de juicio plausibles, errores procedimentales frecuentes o vías de intervención alternativas pero contraindicadas en ese supuesto concreto.`;
 
 /**
  * DIRECTIVA UNIVERSAL DE CALIBRACIÓN PSICOMÉTRICA DE DISTRACTORES (ZERO-OBVIOUS / ANTI-HEURÍSTICAS):
@@ -72,7 +80,10 @@ Antes de emitir cada tarjeta en el JSON final, realiza obligatoriamente una veri
    - Las alternativas incorrectas deben pertenecer al dominio temático del texto para exigir discriminación real, pero deben ser indiscutiblemente falsas, incompletas o no aplicables frente al caso planteado.
 3. CONCORDANCIA EN VERDADERO/FALSO Y CLOZE:
    - En tarjetas 'true_false', si el texto de la justificación demuestra que la premisa es errónea, la respuesta en 'back' DEBE comenzar categóricamente con '**Falso**', y viceversa.
-   - En tarjetas 'cloze', la palabra o fórmula revelada en el reverso DEBE encajar gramatical y conceptualmente con exactitud en el espacio marcado con [...] en el anverso.`;
+   - En tarjetas 'cloze', la palabra o fórmula revelada en el reverso DEBE encajar gramatical y conceptualmente con exactitud en el espacio marcado con [...] en el anverso.
+4. PROHIBICIÓN ESTRICTA DE RESPUESTAS TAUTOLÓGICAS:
+   - La opción correcta JAMÁS debe repetir la misma afirmación de la pregunta con otras palabras sin aportar la causa o explicación real.
+   - Ejemplo erróneo prohibido: Si la pregunta dice '¿Por qué la celulosa carece de valor energético en la dieta humana?', la opción correcta NO PUEDE ser 'Porque no aporta energía al organismo' (tautología vacía), sino la causa biológica/funcional real: 'Porque el aparato digestivo humano carece de enzimas para hidrolizar sus enlaces beta-glucosídicos'.`;
 
 /**
  * LEY DE PROPORCIÓN COGNITIVA UNIVERSAL (TAXONOMÍA DE BLOOM 30/50/20):
@@ -114,54 +125,128 @@ export const HORIZONTAL_COVERAGE_DIRECTIVE = `🌐 PRINCIPIO UNIVERSAL DE COBERT
 - PROHIBICIÓN DE HIPER-CONCENTRACIÓN EN UN SOLO PÁRRAFO: Queda terminantemente PROHIBIDO agotar la atención o volcar toda la generación en un único párrafo o concepto llamativo dejando otros bloques sustanciales de la misma página en blanco. Cada faceta troncal descrita en el material debe contar con su correspondiente tarjeta de evaluación para garantizar una cobertura equilibrada, homogénea y representativa de toda la sección.`;
 
 /**
- * PRINCIPIO DE DENSIDAD ADAPTATIVA PURA AL CONTENIDO:
- * Modula la extracción según la riqueza intrínseca del texto, sin cuotas ni topes numéricos arbitrarios.
+ * DIRECTIVA DE INVENTARIO FACTUAL PREVIO Y RIGOR DE EXTRACCIÓN:
+ * Obliga al modelo a desglosar primero todos los hechos atómicos del texto antes de emitir las tarjetas.
  */
-export const ADAPTIVE_DENSITY_DIRECTIVE = `🌊 PRINCIPIO UNIVERSAL DE DENSIDAD ADAPTATIVA PURA AL CONTENIDO:
-- CERO CUOTAS ARTIFICIALES: No fuerces un volumen artificial ni intentes alcanzar un número predeterminado o arbitrario de preguntas. La cantidad de tarjetas debe ser el reflejo natural, fiel y exacto de la riqueza objetiva del texto.
-- PÁGINAS TRANSICIONALES O DE BAJA DENSIDAD: Si una página es meramente introductoria, transicional, de índice o con escaso contenido evaluable, extrae con sobriedad únicamente lo genuinamente relevante (aunque resulte en una sola tarjeta o un conjunto vacío []). No introduzcas preguntas triviales de relleno.
-- PÁGINAS DE ALTA DENSIDAD CONCEPTUAL: Si la página contiene una alta densidad de mecanismos, clasificaciones, patologías, relaciones causa-efecto o prescripciones técnicas, extrae con rigor cada una de sus facetas sustanciales sin autocensurarte por suposiciones o límites numéricos arbitrarios.`;
+export const FACTUAL_INVENTORY_DIRECTIVE = `📋 DIRECTIVA DE INVENTARIO FACTUAL PREVIO (SCAFFOLDING COGNITIVO OBLIGATORIO Y MATRIZ DE 4 DIMENSIONES):
+Antes de redactar la primera tarjeta en el array "cards", debes identificar y desglosar obligatoriamente en "inventario_factual" cada afirmación factual, definición canónica, dato cuantitativo, mecanismo causa-efecto, excepción técnica/normativa o cruce de tabla sustancial presente en el material analizado.
+
+1. MATRIZ UNIVERSAL DE 4 DIMENSIONES (CONTRA LA ATENCIÓN ASIMÉTRICA):
+   Cuando analices una entidad, concepto, proceso o norma en la página, queda PROHIBIDO saltar únicamente al dato más llamativo o dramático (ej. la enfermedad clínica o la sanción) dando por sentada la base. Revisa obligatoriamente las 4 dimensiones presentes en el texto para cada concepto:
+   - 1) Identidad/Definición (qué es exactamente, naturaleza o concepto).
+   - 2) Función/Mecanismo basal (qué hace y cómo funciona, proceso).
+   - 3) Origen/Fuente/Entrada (de dónde se obtiene, cómo se sintetiza, absorbe o inicia, inputs o legitimación).
+   - 4) Consecuencia/Patología/Límite (qué ocurre si falla, falta, sobra, sanción o qué excepciones tiene).
+   (Más Dimensión 5: detalles de tablas, cifras o notas si aplica).
+
+2. CORRESPONDENCIA ESTRICTA 1 A 1 (INVENTARIO -> TARJETAS):
+   Todo hecho sustancial listado en "inventario_factual" DEBE tener su tarjeta correspondiente en "cards". Ninguna dimensión inventariada puede quedar huérfana de pregunta. Queda terminantemente PROHIBIDO inventar preguntas o basarse en hechos ausentes del inventario.
+
+3. FILTRO REFLEXIVO DE SUFICIENCIA DE EXAMEN ("¿APROBARÍA EL ALUMNO?"):
+   AUTOCOMPROBACIÓN ANTES DE CERRAR LA PÁGINA: Antes de cerrar el array "cards", hazte esta pregunta crítica: Si un estudiante fuera a un examen oficial sobre esta página habiendo estudiado ÚNICAMENTE las tarjetas que acabas de generar, ¿quedaría algún concepto importante, mecanismo, origen, función o dato clave del texto con el que el tribunal pudiera pillarle en blanco? Si la respuesta es sí, genera inmediatamente las tarjetas necesarias para cubrir esa laguna.`;
 
 /**
- * CALIBRACIÓN UNIVERSAL: MODO NORMAL VS. MODO EXHAUSTIVO (ESTRATIFICADO):
+ * PRINCIPIO DE DENSIDAD PROPORCIONAL Y EXTRACCIÓN SOSTENIDA:
+ * Calibra el volumen de extracción según la riqueza intrínseca del texto asegurando que no se produzca lazy extraction.
+ */
+export const PROPORTIONAL_DENSITY_DIRECTIVE = `🌊 PRINCIPIO UNIVERSAL DE DENSIDAD PROPORCIONAL Y EXTRACCIÓN SOSTENIDA:
+- PÁGINAS DE ALTA DENSIDAD CONCEPTUAL: Si la página contiene múltiples mecanismos, clasificaciones, patologías, relaciones causa-efecto, tablas o prescripciones técnicas, debes vaciar sistemáticamente su contenido transformando cada hecho sustancial del inventario en su correspondiente tarjeta de evaluación.
+- PÁGINAS TRANSICIONALES O DE BAJA DENSIDAD: Si una página es meramente introductoria, transicional, de índice o con escaso contenido evaluable, extrae con sobriedad únicamente lo genuinamente relevante (o un conjunto vacío [] en "cards" indicando core_exhausted: true), sin introducir preguntas triviales de relleno.`;
+
+// Alias de retrocompatibilidad
+export const ADAPTIVE_DENSITY_DIRECTIVE = PROPORTIONAL_DENSITY_DIRECTIVE;
+
+/**
+ * DIRECTIVA UNIVERSAL DE EXCLUSIÓN DE METÁFORAS, ANALOGÍAS Y EQUIVALENCIAS VISUALES DOMÉSTICAS:
+ * Prohíbe formular preguntas sobre analogías domésticas, alegorías o metáforas pedagógicas del texto
+ * (ej. "el ribosoma funciona como una fábrica", "la membrana es como una puerta"),
+ * así como sobre infografías de porciones que comparen medidas con objetos cotidianos
+ * (ej. "pelota de tenis", "baraja de cartas", "disco de hockey", "dado", "puño cerrado").
+ */
+export const EXCLUSION_ANALOGIES_DIRECTIVE = `🚫 DIRECTIVA UNIVERSAL DE EXCLUSIÓN DE METÁFORAS, ANALOGÍAS Y EQUIVALENCIAS VISUALES DOMÉSTICAS:
+1. PROHIBICIÓN DE EVALUAR METÁFORAS O ALEGORÍAS RETÓRICAS:
+   Cuando el autor o texto utilice metáforas cotidianas, recursos estilísticos o analogías para facilitar la comprensión (ej. 'como un director de orquesta', 'como una batería recargable', 'como una llave y cerradura'), queda TERMINANTEMENTE PROHIBIDO crear preguntas cuya respuesta o distractor sea la metáfora o analogía misma. La evaluación debe versar con rigor sobre el concepto, mecanismo técnico o principio real.
+2. PROHIBICIÓN TOTAL DE EQUIVALENCIAS CON OBJETOS COTIDIANOS O DOMÉSTICOS:
+   Queda TERMINANTEMENTE PROHIBIDO formular preguntas (ni siquiera en Modo Exhaustivo, Práctico, Cloze o Verdadero/Falso) sobre recuadros, listas o tablas que comparen porciones, medidas, pesos o magnitudes con objetos cotidianos, deportivos o partes del cuerpo (ej. comparar gramos, tazas o tamaños con una pelota de tenis, pelota de béisbol, pelota de golf, disco de hockey, baraja de cartas, videocinta, caja de cerillos, ratón de computadora, disco de computadora, pieza de scrabble, dado, puño o dedos de la mano). Ignora por completo esas comparaciones visuales domésticas; jamás preguntes '¿qué objeto representa visualmente...?' ni '¿cómo se visualiza la cantidad de...?'.
+   - Pregunta SIEMPRE por la magnitud cuantitativa real, peso, volumen o valor técnico (gramos, mililitros, raciones oficiales del grupo), NUNCA por el objeto doméstico utilizado como analogía visual.`;
+
+/**
+ * DIRECTIVA DE AUTONOMÍA COGNITIVA (CERO REFERENCIAS EDITORIALES / LOCALIZACIONES DE PÁGINA):
+ * Erradica fórmulas del tipo "Según el Cuadro 3", "Como indica la Figura 2.1", "En este capítulo", etc.
+ */
+export const NO_EDITORIAL_REFERENCES_DIRECTIVE = `📖 DIRECTIVA DE AUTONOMÍA COGNITIVA Y CERO REFERENCIAS EDITORIALES:
+- Las preguntas deben ser completamente autónomas, directas e independientes del soporte físico o editorial.
+- Queda TERMINANTEMENTE PROHIBIDO redactar enunciados o justificaciones con referencias contextuales internas como: 'Según el autor', 'De acuerdo con el Cuadro X', 'Como se menciona en la Figura Y', 'En esta página', 'En el presente capítulo', 'En la tabla del texto'.
+- Formula la pregunta directamente sobre el hecho, regla o concepto de la disciplina (ej. '¿Cuál es el valor umbral...?', '¿Qué efecto produce...?', 'En el caso de...').`;
+
+/**
+ * DIRECTIVA DE DETECCIÓN DE PÁGINAS DE RESUMEN, REPASO, CUESTIONARIOS O ACTIVIDADES FINALES DE CAPÍTULO:
+ * Evita duplicar conceptos ya evaluados en páginas previas cuando se procesa una sección de recapitulación o cuestionario final.
+ */
+export const CHAPTER_SUMMARY_PAGES_DIRECTIVE = `📑 DIRECTIVA DE PÁGINAS DE RESUMEN, REPASO, CUESTIONARIOS O CASOS FINALES:
+- Si la página analizada corresponde a una sección de 'Resumen', 'Resumen del capítulo', 'Puntos clave', 'Ideas principales', 'Recapitulación', 'Repaso', 'Preguntas de repaso', 'Review Questions', 'Temas de discusión', 'Actividades sugeridas', 'Autoevaluación', 'Cuestionario', 'Actividades de repaso', 'Caso de ejemplo', 'Estudio de caso' o 'Casos de ejercicio final' del propio libro:
+- PROHIBICIÓN DE DUPLICACIÓN: Queda terminantemente PROHIBIDO extraer o reformular preguntas tomadas de los cuestionarios o preguntas de repaso del propio libro, pues evalúan conceptos ya explicados en el cuerpo del capítulo.
+- Queda TERMINANTEMENTE PROHIBIDO leer las preguntas de opción múltiple de la sección 'REPASO' del libro para convertirlas en tarjetas o volver a preguntar datos básicos (como calorías por gramo, composición química elemental o definiciones iniciales) que ya fueron extraídos en las primeras páginas del capítulo.
+- Devuelve un conjunto vacío [] en "cards" y core_exhausted: true salvo que exista un concepto teórico sustancial completamente inédito que no haya sido mencionado antes en ninguna página previa.`;
+
+/**
+ * DIRECTIVA DE PROCESOS SECUENCIALES, EQUIVALENCIAS TÉCNICAS Y CÁLCULOS EN OPCIÓN MÚLTIPLE:
+ */
+export const MULTIPLE_CHOICE_PROCESS_DIRECTIVE = `⚙️ DIRECTIVA DE PROCESOS SECUENCIALES, CÁLCULOS Y EQUIVALENCIAS TÉCNICAS EN TEST:
+1. PROCESOS SECUENCIALES Y FASES TEMPORALES:
+   - Cuando se evalúe un proceso por etapas (ej. ciclo celular, procedimiento administrativo, secuencia de protocolos o algoritmos), los distractores deben representar permutaciones plausibles del orden cronológico, omisiones de pasos críticos o confusión entre la fase precedente y la subsecuente.
+2. CÁLCULOS MATEMÁTICOS Y RESULTADOS CUANTITATIVOS:
+   - Si la pregunta exige un cálculo o aplicación de fórmula (ej. balances calóricos, plazos procesales, conversiones de unidades), calcula PRIMERO el resultado exacto en el campo "justification".
+   - Las opciones deben incluir distractores cuantitativos realistas con sus unidades correspondientes (errores típicos de redondeo, olvido de una variable o uso de la constante equivocada), NUNCA cifras disparatadas ni números sin unidades.
+3. EQUIVALENCIAS TÉCNICAS Y SINÓNIMOS CIENTÍFICOS:
+   - En preguntas de terminología o sinonimia técnica, evita opciones triviales o pistas obvias; los distractores deben pertenecer al mismo campo semántico disciplinar.`;
+
+/**
+ * CALIBRACIÓN UNIVERSAL: MODO NORMAL VS. MODO EXHAUSTIVO (UNIFICADO MEDIANTE INVENTARIO FACTUAL):
  */
 export function buildUniversalCalibrationDirective(isExhaustiveMode: boolean = false): string {
   const qualitativeReadingCore = `${CONCEPTUAL_ECONOMY_DIRECTIVE}
 
 ${HORIZONTAL_COVERAGE_DIRECTIVE}
 
-${ADAPTIVE_DENSITY_DIRECTIVE}`;
+${PROPORTIONAL_DENSITY_DIRECTIVE}
+
+${FACTUAL_INVENTORY_DIRECTIVE}
+
+${EXCLUSION_ANALOGIES_DIRECTIVE}
+
+${NO_EDITORIAL_REFERENCES_DIRECTIVE}
+
+${CHAPTER_SUMMARY_PAGES_DIRECTIVE}`;
 
   if (isExhaustiveMode) {
-    return `🔬 CALIBRACIÓN PEDAGÓGICA UNIVERSAL: MODO EXHAUSTIVO (EXTRACCIÓN ESTRATIFICADA EN DOS CAPAS):
+    return `### DIRECTIVA DE CALIBRACIÓN UNIVERSAL — MODO EXHAUSTIVO:
 ${qualitativeReadingCore}
-
-ESTRUCTURA OBLIGATORIA EN DOS CAPAS:
-1. CAPA 1 - BASE TRONCAL Y CONCEPTUAL ("tarjetas_troncales"): Extrae con rigor e intensidad todos los conceptos clave, definiciones sustanciales, clasificaciones vertebrales, principios rectores y mecanismos de causa-efecto de la página (idéntico al modo normal), respetando la cobertura horizontal de todas las entidades.
-2. CAPA 2 - ESCRUTINIO PROFUNDO ADICIONAL OBLIGATORIO ("escrutinio_profundo"): Desciende a una capa complementaria de máxima discriminación evaluando cruces relacionales entre filas y columnas de tablas o matrices, umbrales numéricos de referencia, excepciones normativas o técnicas a las reglas generales, casos límite y notas al pie o recuadros secundarios.
-- REGLA DE VALOR FORMATIVO: Ambas capas deben aportar preguntas sólidas de examen. Se prohíbe la copia mecánica pasiva de listas o preguntas superficiales de relleno.`;
+2. PRIORIDAD ABSOLUTA AL TEXTO PRINCIPAL + DENSIDAD AMPLIADA (22 A 25 TARJETAS POR PÁGINA):
+   - PRIORIDAD #1 (EL TEXTO ES SAGRADO): Tu obligación principal e innegociable es vaciar a fondo el TEXTO PRINCIPAL de la página párrafo por párrafo, extrayendo todas las preguntas troncales que sacarías en el modo estándar (definiciones, clasificaciones, partes, funciones, causas, efectos y mecanismos) MÁS todos los detalles finos del texto (cifras, porcentajes, rangos, cálculos, excepciones y denominaciones o sinónimos técnicos). Jamás sacrifiques preguntas del texto principal.
+   - PRIORIDAD #2 (EL EXTRA EXHAUSTIVO EN TABLAS Y PIES DE IMAGEN): Sumado a las preguntas del texto, sácale punta a todas las tablas/cuadros de la página y a los pies de imagen, diagramas o recuadros que contengan información relevante y digna de estudio, hasta alcanzar entre 22 y 25 tarjetas en páginas densas.`;
   }
 
-  return `🎯 CALIBRACIÓN PEDAGÓGICA UNIVERSAL: MODO NORMAL (EXTRACCIÓN TRONCAL INTENSA):
+  return `🎯 CALIBRACIÓN PEDAGÓGICA UNIVERSAL: MODO NORMAL (EXTRACCIÓN TRONCAL INTEGRAL MEDIANTE INVENTARIO FACTUAL):
 ${qualitativeReadingCore}
 
 ENFOQUE OPERATIVO EN MODO NORMAL:
-- CUERPO TEÓRICO Y MECANISMOS: Concéntrate con máxima intensidad en el cuerpo teórico, mecanismos explicativos, definiciones canónicas, clasificaciones vertebrales y relaciones causa-efecto de cada página, asegurando la cobertura horizontal equilibrada de todas las entidades independientes descritas.
-- TRATAMIENTO ESTÁNDAR DE TABLAS Y CUADROS: Puedes formular preguntas de síntesis o aspectos relevantes de tablas y cuadros si aportan valor general al entendimiento del tema, pero sin descender a escudriñar de forma minuciosa cada casilla aislada, nota al pie secundaria o excepción accesoria.`;
+- COBERTURA TRONCAL DEL 100% (SIN TOPES POR PÁGINA): No apliques ningún techo artificial de 3 a 5 tarjetas por página. Tu objetivo en Modo Teórico Normal es cubrir el 100% de los conceptos troncales, definiciones, funciones, orígenes, mecanismos y consecuencias del texto principal de la página. Si una página tiene 3 conceptos clave, genera 3 tarjetas; si una página es densa y contiene múltiples conceptos troncales distintos en sus 4 dimensiones, genera las 17 a 20 tarjetas necesarias para que el estudiante domine todo el contenido importante de esa página sin lagunas.
+- TRATAMIENTO ESTÁNDAR DE TABLAS Y CUADROS: En Modo Normal, las tablas solo se preguntan en su conclusión o síntesis general (sin bajar al desglose minucioso de filas/columnas secundarias ni notas al pie marginales). En tablas de catálogo o listas extensas, queda prohibido memorizar elementos individuales aislados; se permite como máximo 1 tarjeta de síntesis sobre el criterio clasificador o regla general.`;
 }
 
 /**
  * DIRECTIVA DE COBERTURA INTEGRAL Y CRUCE RELACIONAL DE TABLAS:
- * Prohíbe el barrido mecánico celda a celda y exige cruces relacionales de orden superior.
+ * Prohíbe el barrido mecánico celda a celda y exige cruces relacionales de orden superior con mentalidad de tribunal.
  */
-export const EXHAUSTIVE_TABLES_DIRECTIVE = `📊 DIRECTIVA DE COBERTURA INTEGRAL Y CRUCE RELACIONAL DE TABLAS (MODO EXHAUSTIVO):
-Cuando el texto contenga tablas, cuadros sinópticos o matrices de datos:
-1. PROHIBICIÓN DE BARRIDO MECÁNICO AISLADO: Queda terminantemente PROHIBIDO formular preguntas de memoria ciega sobre celdas individuales inconexas (ej. '¿Qué dato exacto figura en la fila 3?').
-2. CRUCE RELACIONAL DE DATOS: Genera preguntas de orden superior que comparen y relacionen la información de la tabla:
-   - Comparación entre filas o categorías (mayor que, menor que, diferencias clave).
-   - Identificación de casos extremos (valores máximos, mínimos, excepciones señaladas).
-   - Correlación bidireccional (ej. dadas unas condiciones o propiedades, identificar a qué entidad o categoría de la tabla corresponden).
-3. COBERTURA TOTAL SIN DUPLICIDAD: Asegura que todas las entidades principales de la tabla queden evaluadas, pero NUNCA formules dos preguntas distintas sobre el mismo cruce o valor idéntico.`;
+export const EXHAUSTIVE_TABLES_DIRECTIVE = `### DIRECTIVA DE TABLAS, CUADROS Y PIES DE IMAGEN — MODO EXHAUSTIVO:
+1. PRIORIDAD AL TEXTO Y COMPLEMENTO DE TABLAS:
+   - Asegúrate siempre de haber extraído primero todas las preguntas del texto en prosa de la página.
+2. SACAR PUNTA A TODOS LOS CUADROS Y TABLAS CON SENTIDO PRÁCTICO Y DE ESTUDIO:
+   - Desglosa FILA POR FILA todas las tablas y cuadros de la página (generando entre 8 y 16 preguntas cuando la tabla sea completa) con verdadero SENTIDO PRÁCTICO Y UTILIDAD DE ESTUDIO: evalúa de forma independiente las definiciones, orígenes/fuentes, funciones, mecanismos, síntomas/deficiencias, comparaciones según condición o estado, valores extremos (máximo y mínimo de cada categoría) y notas al pie.
+   - Verifica siempre la alineación exacta de fila y columna para no cruzar datos entre filas distintas.
+3. PIES DE IMAGEN, ESQUEMAS Y RECUADROS RELEVANTES:
+   - Exprime también los pies de figura, esquemas, ilustraciones explicadas y recuadros laterales o de vocabulario siempre que contengan definiciones, mecanismos o datos relevantes dignos de estudio.`;
 
 /**
  * TRATAMIENTO UNIVERSAL DE TABLAS, CUADROS Y MATRICES DE DATOS:
@@ -175,25 +260,28 @@ export function buildUniversalTablesDirective(isExhaustiveMode: boolean = false)
   return `📊 TRATAMIENTO ESTÁNDAR DE TABLAS Y CUADROS (MODO NORMAL):
 En modo normal, si el documento contiene tablas, matrices o cuadros:
 a) EVALUACIÓN GLOBAL Y RELEVANCIA GENERAL: Se formulan preguntas centradas en la síntesis, propósito de conjunto o conclusiones relevantes que aporten valor general a la comprensión del tema.
-b) PROHIBICIÓN DE MINUCIOSIDAD ACCESORIA: Queda prohibido escudriñar minuciosamente cada casilla aislada, nota al pie secundaria o excepción accesoria sin contexto global.`;
+b) PROHIBICIÓN DE MINUCIOSIDAD ACCESORIA: Queda prohibido escudriñar minuciosamente cada casilla aislada, nota al pie secundaria o excepción accesoria sin contexto global. En tablas de catálogo o inventarios extensos, se permite como máximo 1 tarjeta que sintetice el criterio o regla general, vetando memorizar filas individuales secundarias.`;
 }
 
 /**
  * DIRECTIVA UNIVERSAL DE MODO MINUCIOSO / QUIRÚRGICO:
- * Cobertura en profundidad mediante barrido multinivel y tratamiento inteligente de cuadros.
+ * Cobertura en profundidad mediante estructura de doble capa obligatoria.
  */
-export const EXHAUSTIVE_MODE_MANDATE = `🔬 DIRECTIVA UNIVERSAL DE MODO EXHAUSTIVO (COBERTURA EN PROFUNDIDAD):
-1. BARRIDO MULTINIVEL DE LA PÁGINA:
-   Analiza la totalidad de la página actual sin omitir ninguna sección evaluable.
-   - Párrafos Teóricos: Extrae cada concepto sustancial, relación causa-efecto, mecanismo funcional o técnico, criterio de clasificación o excepción formal a la regla general.
-   - Recuadros y Evidencia Secundaria: Interroga activamente los recuadros de investigación, notas de aplicación, alertas técnicas, enfoques por etapas o notas complementarias al margen.
-   - La cantidad de preguntas generadas debe reflejar fielmente la riqueza real del texto, profundizando en todas sus capas conceptuales y detalles técnicos relevantes.
+export const EXHAUSTIVE_MODE_MANDATE = `🔬 DIRECTIVA UNIVERSAL DE MODO EXHAUSTIVO (ESTRUCTURA DE DOBLE CAPA OBLIGATORIA Y MENTALIDAD DE TRIBUNAL):
+En páginas con contenido evaluable, no apliques topes restrictivos que limiten páginas ultra-densas; extrae todas las tarjetas necesarias (ej. de 22 a 25+ tarjetas en páginas de altísima densidad y tablas conceptuales) para cubrir el 100% de la página antes de pasar a la siguiente.
 
-2. TRATAMIENTO RELACIONAL DE TABLAS Y MATRICES:
-   En tablas o matrices de datos, asegura un análisis sistemático y de alto valor formativo:
-   - Cruce relacional de orden superior entre filas y columnas, patrones comparativos (mayor que, menor que, diferencias clave).
-   - Identificación de valores umbral, límites críticos de seguridad o parámetros cuantitativos de referencia.
-   - Correlación bidireccional y casos extremos, prohibiendo la memorización ciega de celdas aisladas sin sentido formativo.`;
+ESTRUCTURA DE DOBLE CAPA OBLIGATORIA:
+1. CAPA 1 (100% DE LA BASE TRONCAL):
+   Debe incluir absolutamente todas las preguntas troncales de las 4 dimensiones que generaría el Modo Teórico Normal: qué es (identidad/definición), qué hace y cómo funciona (función/mecanismo), de dónde procede o cómo se inicia (origen/fuente) y qué ocurre si falla o se excede (consecuencia/patología/límite). Queda terminantemente PROHIBIDO sacrificar preguntas troncales del texto por hacer preguntas de tablas.
+
+2. CAPA 2 (PROFUNDIDAD DE EXAMEN AVANZADO / OPOSICIÓN - TABLAS, CIFRAS Y NOTAS):
+   Añade encima de la Capa 1 el escrutinio de tablas, cuadros comparativos, valores cuantitativos, excepciones y notas al pie, aplicando la REGLA DE ORO DE ALTO VALOR EXAMINABLE (PROHIBIDO EL DETALLE BASURA):
+   Actúa como un examinador humano experto, NO como un lector mecánico de celdas al azar. Queda PROHIBIDO formular preguntas triviales o memorísticas sobre datos aislados sin relevancia conceptual.
+   De cada tabla, cuadro o nota, extrae preguntas enfocadas en:
+   - 1) Los extremos y líderes (el valor más alto, el más bajo, la fuente principal o el caso prototípico).
+   - 2) El rasgo diferencial crítico que permite distinguir la entidad A de la entidad B.
+   - 3) Los puntos de corte, umbrales cuantitativos o dosis que cambian una clasificación o decisión.
+   - 4) Las excepciones llamativas o contraintuitivas a la regla general.`;
 
 /**
  * DIRECTIVA EXCLUSIVA PARA MODO DOCENTE / DIDÁCTICO:
@@ -208,7 +296,7 @@ export function buildDidacticModeDirective(
   const didacticTranslationClause = `
 PRINCIPIO UNIVERSAL DE FIDELIDAD FACTUAL Y TRADUCCIÓN DIDÁCTICA:
 - FIDELIDAD AL CONTENIDO: Todos los hechos, reglas, conceptos, relaciones y respuestas deben derivarse estrictamente del texto fuente aportado. Queda terminantemente prohibido inventar información, alterar reglas o introducir hechos ausentes en el documento.
-- DESCOMPRESIÓN LÉXICA Y ANALOGÍAS: Cuando el texto original presente una densidad conceptual, jurídica, técnica o científica superior al nivel de desarrollo cognitivo de la audiencia seleccionada, tu labor pedagógica consiste en traducir el concepto a un lenguaje accesible mediante analogías funcionales del entorno real y relaciones causa-efecto transparentes, sin relajar ni desvirtuar el rigor factual.
+- DESCOMPRESIÓN LÉXICA Y ANALOGÍAS: Cuando el texto original presente una densidad conceptual superior al nivel cognitivo de la audiencia, tu labor pedagógica permite usar ejemplos cotidianos accesibles para clarificar el concepto en la justificación o en un caso práctico aplicado. Sin embargo, queda TERMINANTEMENTE PROHIBIDO preguntar como materia de examen una metáfora del autor o evaluar equivalencias domésticas de objetos (pelotas, barajas, etc.); la pregunta debe versar siempre sobre el concepto, mecanismo o magnitud real sin desvirtuar el rigor factual.
 - TÉRMINOS CLAVE: Si un término técnico o formal es indispensable para la disciplina evaluada, introdúcelo con precisión y añade en el reverso su puente explicativo o significado funcional para afianzar su asimilación real.`;
 
   let audienceInstruction = '';

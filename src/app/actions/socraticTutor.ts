@@ -32,6 +32,7 @@ export interface TutorQuotaStatus {
   freeLimit: number;
   remainingFree: number;
   bonusCredits: number;
+  tutorAdCredits: number;
   requiresAd: boolean;
 }
 
@@ -110,6 +111,7 @@ export async function getTutorQuotaStatusAction(
       freeLimit: 3,
       remainingFree: 3,
       bonusCredits: 0,
+      tutorAdCredits: 0,
       requiresAd: false,
     };
   }
@@ -127,6 +129,7 @@ export async function getTutorQuotaStatusAction(
         free_limit?: number;
         remaining_free?: number;
         bonus_credits?: number;
+        tutor_ad_credits?: number;
         requires_ad?: boolean;
       };
 
@@ -135,6 +138,7 @@ export async function getTutorQuotaStatusAction(
       const count = typeof res.count === 'number' ? res.count : 0;
       const remainingFree = isPro ? 9999 : (typeof res.remaining_free === 'number' ? res.remaining_free : Math.max(0, 3 - count));
       const bonusCredits = typeof res.bonus_credits === 'number' ? res.bonus_credits : 0;
+      const tutorAdCredits = typeof res.tutor_ad_credits === 'number' ? res.tutor_ad_credits : 0;
 
       return {
         isPro,
@@ -143,7 +147,8 @@ export async function getTutorQuotaStatusAction(
         freeLimit: 3,
         remainingFree,
         bonusCredits,
-        requiresAd: !isPro && count >= 3 && bonusCredits <= 0,
+        tutorAdCredits,
+        requiresAd: !isPro && count >= 3 && tutorAdCredits <= 0,
       };
     }
   } catch (err) {
@@ -154,7 +159,7 @@ export async function getTutorQuotaStatusAction(
   try {
     const { data: record } = await supabase
       .from('api_limits')
-      .select('tier, tutor_consultations_count, last_tutor_date, bonus_credits')
+      .select('tier, tutor_consultations_count, last_tutor_date, bonus_credits, tutor_ad_credits')
       .eq('user_id', userId)
       .maybeSingle();
 
@@ -166,6 +171,7 @@ export async function getTutorQuotaStatusAction(
       const isSameMonth = lastMonth === currentMonth;
       const count = isSameMonth ? (record.tutor_consultations_count || 0) : 0;
       const bonusCredits = record.bonus_credits || 0;
+      const tutorAdCredits = typeof (record as any).tutor_ad_credits === 'number' ? (record as any).tutor_ad_credits : 0;
       const remainingFree = isPro ? 9999 : Math.max(0, 3 - count);
 
       return {
@@ -175,7 +181,8 @@ export async function getTutorQuotaStatusAction(
         freeLimit: 3,
         remainingFree,
         bonusCredits,
-        requiresAd: !isPro && count >= 3 && bonusCredits <= 0,
+        tutorAdCredits,
+        requiresAd: !isPro && count >= 3 && tutorAdCredits <= 0,
       };
     }
   } catch (directErr) {
@@ -189,6 +196,7 @@ export async function getTutorQuotaStatusAction(
     freeLimit: 3,
     remainingFree: 3,
     bonusCredits: 0,
+    tutorAdCredits: 0,
     requiresAd: false,
   };
 }
@@ -285,7 +293,7 @@ export async function askSocraticTutorAction(input: SocraticTutorInput): Promise
 
     // 2. Verificar que el usuario tenga acceso válido y no tenga bloqueada la cuota
     const quota = await getTutorQuotaStatusAction(userId, accessToken);
-    if (!quota.isPro && (quota.requiresAd || (quota.remainingFree <= 0 && quota.bonusCredits <= 0))) {
+    if (!quota.isPro && (quota.requiresAd || (quota.remainingFree <= 0 && quota.tutorAdCredits <= 0))) {
       return {
         success: false,
         error: 'AD_REQUIRED',

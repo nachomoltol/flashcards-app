@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { parseMultipleChoice, parseBackContent } from '@/components/cards/FormattedCardView';
+import { stripOptionPrefix, sanitizeCardFrontText } from '@/lib/cardUtils';
 import { useLanguageStore } from '@/stores';
 import type { CardFormat } from '@/types/database';
 
@@ -26,13 +27,80 @@ export interface PrintExamSheetProps {
 }
 
 /**
- * Reemplaza los marcadores cloze {{c1::palabra}} y [...] por espacios en blanco para el alumno.
+ * Sanitiza textos de solución eliminando secuencias corruptas de asteriscos y comillas.
  */
-function formatClozeForStudent(text: string): string {
+function sanitizeSolutionText(text: string): string {
   if (!text) return '';
   return text
-    .replace(/\{\{c\d+::(.*?)\}\}/g, '[  ____________________  ]')
-    .replace(/\[\.\.\.\]/g, '[  ____________________  ]');
+    .replace(/\*{1,3}/g, '')
+    .replace(/^"+|"+$/g, '')
+    .trim();
+}
+
+/**
+ * Limpia el texto de justificación eliminando prefijos redundantes ("Explicación:", "Justificación:")
+ * y frases mecánicas de inicio para un diseño fluido y profesional.
+ */
+function sanitizeExplanationText(raw: string): string {
+  if (!raw) return '';
+  let text = raw
+    .replace(/VEREDICTO_EXACTO\s*[:=]\s*[^\r\n]+/gi, '')
+    .replace(/^\s*(?:explicaci[oó]n|justificaci[oó]n|fundamento|raz[oó]n)\s*:\s*/i, '')
+    .replace(/^\s*(?:seg[uú]n\s+(?:el\s+cuadro|la\s+tabla|el\s+gr[aá]fico|la\s+figura)\s+[^,.:]+[,.:]\s*)/i, '')
+    .replace(/^\s*(?:el\s+texto\s+establece\s+expl[ií]citamente\s+que\s+)/i, '')
+    .replace(/^\s*la\s+pregunta\s+de\s+repaso(?:\s+n[uú]mero)?\s+\d+\s+(?:identifica|vincula|senala|indica|establece|describe|explica)\s+(?:que\s+)?/i, '')
+    .replace(/\*{3,}/g, '')
+    .trim();
+
+  // Asegura que comience siempre en mayúscula
+  text = text.replace(/^([a-záéíóúñ])/i, (m) => m.toUpperCase());
+  return text;
+}
+
+/**
+ * Reemplaza los marcadores cloze {{c1::palabra}}, [...] y huecos vacíos por un elemento HTML indivisible
+ * que jamás se parte al final de línea ni cuela caracteres residuales.
+ */
+function renderClozeStudentContent(text: string): React.ReactNode {
+  if (!text) return '';
+  // Limpiar numeración de lista inicial que duplique el índice de la pregunta (ej. "1. ")
+  let cleanText = text.replace(/^\s*\d+[\.\)\-]\s+/, '').trim();
+
+  // Pre-normalización universal de huecos defectuosos a marcador canónico [...]
+  // 1. Huecos con casilla Unicode o guiones con casilla (_☐, ☐, [☐])
+  cleanText = cleanText.replace(/_*\u2610_*|\[\s*\u2610\s*\]/g, '[...]');
+  // 2. Corchetes abiertos con guiones bajos sin cerrar ([______ seguidos de espacio, signo de puntuación o fin de línea)
+  cleanText = cleanText.replace(/\[\s*_{2,}(?!\s*\])/g, '[...]');
+  // 3. Guiones bajos sueltos de cierre (_{2,}\s*\d*\s*\])
+  cleanText = cleanText.replace(/(?<!\[)\s*_{2,}\s*\d*\s*\]/g, '[...]');
+  // 4. Secuencias de corchetes con guiones/puntos o 3 o más guiones bajos sueltos (____)
+  cleanText = cleanText.replace(/\[\s*[_.\-\u2026\s\d]*\]|_{3,}/g, '[...]');
+  // 5. Limpiar corchetes huérfanos duplicados como [...]\s*\[\s*\]
+  cleanText = cleanText.replace(/\[\.\.\.\]\s*\[\s*\]/g, '[...]');
+
+  // Tamaño adaptable del hueco: compacto (10 guiones) si hay 2 o más huecos; estándar (16 guiones) si es 1
+  const gapMatches = cleanText.match(/(\{\{c\d+::.*?\}\}|\[\.\.\.\])/g);
+  const gapCount = gapMatches ? gapMatches.length : 0;
+  const gapText = gapCount >= 2 ? '[__________]' : '[________________]';
+
+  const splitRegex = /(\{\{c\d+::.*?\}\}|\[\.\.\.\])/g;
+  const matchRegex = /^(\{\{c\d+::.*?\}\}|\[\.\.\.\])$/;
+  const parts = cleanText.split(splitRegex);
+
+  return parts.map((part, i) => {
+    if (matchRegex.test(part)) {
+      return (
+        <span
+          key={`cloze-gap-${i}`}
+          className="inline-block whitespace-nowrap font-mono font-bold text-neutral-800 px-1 mx-1"
+          style={{ whiteSpace: 'nowrap', display: 'inline-block' }}
+        >
+          {gapText}
+        </span>
+      );
+    }
+    return part;
+  });
 }
 
 /**
@@ -41,10 +109,17 @@ function formatClozeForStudent(text: string): string {
 function formatClozeForTeacher(text: string): { highlighted: string; hiddenWords: string[] } {
   if (!text) return { highlighted: '', hiddenWords: [] };
   const hiddenWords: string[] = [];
-  const highlighted = text.replace(/\{\{c\d+::(.*?)\}\}/g, (_, word) => {
+  let highlighted = text.replace(/\{\{c\d+::(.*?)\}\}/g, (_, word) => {
     hiddenWords.push(word);
     return `[${word}]`;
   });
+  highlighted = highlighted
+    .replace(/_*\u2610_*|\[\s*\u2610\s*\]/g, '[...]')
+    .replace(/\[\s*_{2,}(?!\s*\])/g, '[...]')
+    .replace(/(?<!\[)\s*_{2,}\s*\d*\s*\]/g, '[...]')
+    .replace(/\[\s*[_.\-\u2026\s\d]*\]|_{3,}/g, '[...]')
+    .replace(/\[\s*\]/g, '')
+    .trim();
   return { highlighted, hiddenWords };
 }
 
@@ -237,11 +312,18 @@ export function PrintExamSheet({
         {/* Lista Continua de Preguntas */}
         <div className="space-y-3 pt-1">
           {cards.map((card, index) => {
-            const fmt = (
+            const isClozePattern = /(\{\{c\d+::.*?\}\}|\[\s*(?:\.{2,}|\u2026+|_{2,}|\d+)?\s*\])/.test(card.front || '');
+            let fmt = (
               card.cardFormat ||
               card.card_format ||
               (card.card_type === 'cloze' ? 'cloze' : 'basic')
             ) as CardFormat;
+
+            if (fmt === 'basic' && isClozePattern) {
+              fmt = 'cloze';
+            }
+
+            const cleanFront = sanitizeCardFrontText(card.front);
 
             return (
               <article
@@ -251,7 +333,7 @@ export function PrintExamSheet({
               >
                 {/* 1. Opción Múltiple (Test) */}
                 {fmt === 'multiple_choice' && (() => {
-                  const parsed = parseMultipleChoice(card.front);
+                  const parsed = parseMultipleChoice(cleanFront);
                   const isShortOptions =
                     parsed.options.length > 0 &&
                     parsed.options.every((opt) => opt.text.length <= 48);
@@ -261,7 +343,7 @@ export function PrintExamSheet({
                       <div className="flex items-start gap-1.5">
                         <span className="font-bold shrink-0">{index + 1}.</span>
                         <p className="font-medium text-black">
-                          {parsed.question || card.front}
+                          {sanitizeCardFrontText(parsed.question) || cleanFront}
                         </p>
                       </div>
 
@@ -283,7 +365,7 @@ export function PrintExamSheet({
                                 <strong className="font-bold uppercase">
                                   {opt.key})
                                 </strong>{' '}
-                                {opt.text.replace(/^\s*(?:\*{1,2}|_{1,2})?\(?([a-dA-D]|\d+)[\)\.\:\-\]](?:\*{1,2}|_{1,2})?\s*/, '').trim()}
+                                {stripOptionPrefix(opt.text)}
                               </span>
                             </div>
                           ))}
@@ -291,7 +373,7 @@ export function PrintExamSheet({
                       ) : (
                         <div className="pl-5 pt-1 text-[9pt] italic text-neutral-500">
                           {/* Fallback si el texto no separó opciones */}
-                          {card.front}
+                          {cleanFront}
                         </div>
                       )}
                     </div>
@@ -303,7 +385,7 @@ export function PrintExamSheet({
                   <div className="space-y-1">
                     <div className="flex items-start gap-1.5">
                       <span className="font-bold shrink-0">{index + 1}.</span>
-                      <p className="font-medium text-black">{card.front}</p>
+                      <p className="font-medium text-black">{cleanFront}</p>
                     </div>
                     <div className="flex items-center gap-6 pl-5 pt-0.5 text-[9.5pt]">
                       <span className="flex items-center gap-1.5">
@@ -327,9 +409,9 @@ export function PrintExamSheet({
                   <div className="space-y-1">
                     <div className="flex items-start gap-1.5">
                       <span className="font-bold shrink-0">{index + 1}.</span>
-                      <p className="font-medium text-black leading-relaxed">
-                        {formatClozeForStudent(card.front)}
-                      </p>
+                      <div className="font-medium text-black leading-relaxed">
+                        {renderClozeStudentContent(cleanFront)}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -339,7 +421,7 @@ export function PrintExamSheet({
                   <div className="space-y-1">
                     <div className="flex items-start gap-1.5">
                       <span className="font-bold shrink-0">{index + 1}.</span>
-                      <p className="font-medium text-black">{card.front}</p>
+                      <p className="font-medium text-black">{cleanFront}</p>
                     </div>
                     {/* Líneas pautadas compactas para responder */}
                     <div className="pl-5 pt-1 space-y-2">
@@ -447,9 +529,11 @@ export function PrintExamSheet({
                           <span className="text-emerald-700 font-bold mr-1">
                             {t('deck_detail.print_solution_label', isEn ? 'Solution:' : 'Solución:')}
                           </span>
-                          {clozeTeacher?.hiddenWords.length
-                            ? clozeTeacher.hiddenWords.join(', ')
-                            : parsedBack.verdict || card.back}
+                          {sanitizeSolutionText(
+                            clozeTeacher?.hiddenWords.length
+                              ? clozeTeacher.hiddenWords.join(', ')
+                              : parsedBack.verdict || card.back
+                          )}
                         </span>
                         {clozeTeacher?.highlighted && (
                           <p className="text-[8.5pt] text-neutral-600 mt-1 italic leading-snug">
@@ -463,7 +547,7 @@ export function PrintExamSheet({
                           <strong className="font-bold uppercase mr-1">
                             {mcResolution.letter.toUpperCase()})
                           </strong>{' '}
-                          {mcResolution.text}
+                          {stripOptionPrefix(sanitizeSolutionText(mcResolution.text))}
                         </span>
                       </div>
                     ) : (
@@ -472,7 +556,7 @@ export function PrintExamSheet({
                           <span className="text-emerald-700 font-bold mr-1">
                             {t('deck_detail.print_solution_label', isEn ? 'Solution:' : 'Solución:')}
                           </span>
-                          {parsedBack.verdict || card.back}
+                          {sanitizeSolutionText(parsedBack.verdict || card.back)}
                         </span>
                       </div>
                     )}
@@ -493,7 +577,7 @@ export function PrintExamSheet({
                                   ? 'Reasoned Explanation:'
                                   : 'Justificación Razonada:')}
                           </strong>
-                          {mcResolution ? mcResolution.explanation : parsedBack.explanation}
+                          {sanitizeExplanationText(mcResolution ? mcResolution.explanation : parsedBack.explanation)}
                         </p>
                       </div>
                     )}

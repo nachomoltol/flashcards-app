@@ -114,6 +114,7 @@ export function ProModal({
     welcomeGenerations: number;
     tutorConsultationsCount?: number;
     tutorAdsUsed?: number;
+    tutorAdCredits?: number;
     adsUsedInCycle: number;
     remainingAds: number;
   } | null>(null);
@@ -138,6 +139,7 @@ export function ProModal({
           welcomeGenerations: res.welcomeGenerations,
           tutorConsultationsCount: res.tutorConsultationsCount,
           tutorAdsUsed: res.tutorAdsUsed,
+          tutorAdCredits: res.tutorAdCredits,
           adsUsedInCycle: res.adsUsedInCycle,
           remainingAds: res.remainingAds,
         });
@@ -363,9 +365,41 @@ export function ProModal({
         } catch (sessionErr) {
           console.warn('[ProModal] No se pudo obtener el token de sesión:', sessionErr);
         }
-        const claim = await claimAdRewardAction(user?.id, accessToken);
+        const isTutorReward = featureName === 'tutor';
+        const claim = await claimAdRewardAction(user?.id, accessToken, isTutorReward ? 'tutor' : 'deck');
 
         if (claim.success) {
+          if (isTutorReward) {
+            // Recompensa para el Profesor Socrático: actualización reactiva inmediata y ejecución directa
+            setUserLimits((prev) => {
+              const currentTutorCredits = prev?.tutorAdCredits ?? 0;
+              const newTutorCredits = currentTutorCredits + 1;
+              if (!prev) {
+                return {
+                  tier: 'free',
+                  count: 0,
+                  bonusCredits: 0,
+                  welcomeGenerations: 5,
+                  tutorAdCredits: newTutorCredits,
+                  adsUsedInCycle: 0,
+                  remainingAds: 25,
+                };
+              }
+              return {
+                ...prev,
+                tutorAdCredits: newTutorCredits,
+              };
+            });
+
+            fetchUserLimits();
+            setIsWatchingAd(false);
+            setAdLoadingPhase('idle');
+            close();
+            // Ejecutar inmediatamente la consulta que estaba esperando el anuncio
+            store.onRewardSuccess?.();
+            return;
+          }
+
           // 1. Actualización reactiva inmediata en la UI para descontar el contador
           setUserLimits((prev) => {
             const currentBonus = prev?.bonusCredits ?? 0;
@@ -374,13 +408,12 @@ export function ProModal({
                 ? claim.bonusCredits
                 : currentBonus + 1;
             const count = typeof claim.generationsCount === 'number' ? claim.generationsCount : (prev?.count ?? 0);
-            const tutorAdsUsed = prev?.tutorAdsUsed ?? 0;
             const adsUsedInCycle = typeof claim.adsUsedInCycle === 'number'
               ? claim.adsUsedInCycle
-              : (count + newBonus + tutorAdsUsed);
+              : (count + newBonus);
             const remainingAds = typeof claim.remainingAds === 'number'
               ? claim.remainingAds
-              : Math.max(0, 45 - adsUsedInCycle);
+              : Math.max(0, 25 - adsUsedInCycle);
 
             if (!prev) {
               return {
@@ -388,7 +421,6 @@ export function ProModal({
                 count,
                 bonusCredits: newBonus,
                 welcomeGenerations: 5,
-                tutorAdsUsed,
                 adsUsedInCycle,
                 remainingAds,
               };
@@ -689,13 +721,15 @@ export function ProModal({
 
                   {/* NIVEL 2 (ALTERNATIVA GRATUITA POR ANUNCIO): BOTÓN GRANDE Y VISTOSO */}
                   {(() => {
+                    const isTutor = featureName === 'tutor';
                     const isFreeTier = !userLimits || userLimits.tier === 'free';
-                    const isZeroBalance = isFreeTier && (userLimits?.bonusCredits ?? 0) <= 0;
-                    const tutorAdsUsed = userLimits?.tutorAdsUsed ?? Math.max(0, (userLimits?.tutorConsultationsCount || 0) - 3);
-                    const adsUsedInCycle = userLimits?.adsUsedInCycle ?? ((userLimits?.count || 0) + (userLimits?.bonusCredits || 0) + tutorAdsUsed);
+                    const isZeroBalance = isTutor
+                      ? isFreeTier && (userLimits?.tutorAdCredits ?? 0) <= 0
+                      : isFreeTier && (userLimits?.bonusCredits ?? 0) <= 0;
+                    const adsUsedInCycle = userLimits?.adsUsedInCycle ?? ((userLimits?.count || 0) + (userLimits?.bonusCredits || 0));
                     const remainingAds = userLimits?.remainingAds !== undefined
                       ? userLimits.remainingAds
-                      : Math.max(0, 45 - adsUsedInCycle);
+                      : Math.max(0, 25 - adsUsedInCycle);
 
                     return (
                       <div
@@ -712,25 +746,31 @@ export function ProModal({
                               {isZeroBalance ? 'OPCIÓN RECOMENDADA EN MÓVIL • GRATIS' : 'OPCIÓN 2 • GRATUITA'}
                             </div>
                             <h3 className="text-sm sm:text-base font-extrabold text-zinc-950 dark:text-white tracking-tight">
-                              Obtén saldo con un vídeo corto
+                              {isTutor ? 'Desbloquea esta consulta con un vídeo' : 'Obtén saldo con un vídeo corto'}
                             </h3>
                           </div>
 
                           <div className="text-right pl-2 shrink-0">
                             <span className="inline-block px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 border border-emerald-300 dark:border-emerald-500/40 text-emerald-950 dark:text-emerald-300 font-extrabold text-[10px]">
-                              +1 GRATIS
+                              {isTutor ? '+1 CONSULTA' : '+1 GRATIS'}
                             </span>
                           </div>
                         </div>
 
                         <p className="text-xs sm:text-sm font-medium text-zinc-700 dark:text-zinc-200 leading-snug">
-                          Mira un vídeo patrocinado de AdMob y tu generación se reanudará de inmediato.
+                          {isTutor
+                            ? 'Mira un vídeo patrocinado de AdMob y tu consulta con el Profesor Socrático se responderá al instante.'
+                            : 'Mira un vídeo patrocinado de AdMob y tu generación se reanudará de inmediato.'}
                         </p>
 
                         <div className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-900 dark:text-amber-300 font-mono">
-                          <span>Cupo mensual: hasta 45 anuncios</span>
+                          <span>{isTutor ? 'Consultas con anuncio: ILIMITADAS' : 'Cupo mensual: hasta 25 anuncios'}</span>
                           <strong className="font-bold">
-                            {remainingAds > 0 ? `${remainingAds} disponibles este mes` : 'Cupo mensual completado'}
+                            {isTutor
+                              ? 'Ilimitadas (1 anuncio / consulta)'
+                              : remainingAds > 0
+                              ? `${remainingAds} disponibles este mes`
+                              : 'Cupo mensual completado'}
                           </strong>
                         </div>
 
@@ -779,7 +819,7 @@ export function ProModal({
                             <button
                               type="button"
                               onClick={handleWatchAd}
-                              disabled={isWatchingAd || remainingAds <= 0}
+                              disabled={isWatchingAd || (!isTutor && remainingAds <= 0)}
                               className="w-full min-h-[44px] sm:min-h-[46px] inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:via-orange-400 hover:to-amber-500 text-neutral-950 font-bold text-xs sm:text-sm shadow-md shadow-amber-600/20 active:scale-[0.99] transition cursor-pointer disabled:opacity-80 disabled:cursor-not-allowed group"
                             >
                               {isWatchingAd ? (
@@ -791,12 +831,12 @@ export function ProModal({
                                       : t('pro_modal.admob_preparing', 'Preparando anuncio...')}
                                   </span>
                                 </>
-                              ) : remainingAds <= 0 ? (
-                                <span>Cupo mensual de 45 anuncios completado</span>
+                              ) : !isTutor && remainingAds <= 0 ? (
+                                <span>Cupo mensual de 25 anuncios completado</span>
                               ) : (
                                 <>
                                   <PlayCircle className="w-4 h-4 fill-neutral-950 text-amber-300 group-hover:scale-110 transition-transform shrink-0" />
-                                  <span>Ver vídeo corto (+1 generación gratis)</span>
+                                  <span>{isTutor ? 'Ver vídeo corto (+1 consulta gratis)' : 'Ver vídeo corto (+1 generación gratis)'}</span>
                                 </>
                               )}
                             </button>
@@ -983,11 +1023,11 @@ export function ProModal({
 
                   {/* NIVEL 2: OPCIÓN GRATUITA (DISPONIBLE EN APP ANDROID / FLUJO HÍBRIDO GUIADO) */}
                   {(() => {
-                    const tutorAdsUsed = userLimits?.tutorAdsUsed ?? Math.max(0, (userLimits?.tutorConsultationsCount || 0) - 3);
-                    const adsUsedInCycle = userLimits?.adsUsedInCycle ?? ((userLimits?.count || 0) + (userLimits?.bonusCredits || 0) + tutorAdsUsed);
+                    const isTutor = featureName === 'tutor';
+                    const adsUsedInCycle = userLimits?.adsUsedInCycle ?? ((userLimits?.count || 0) + (userLimits?.bonusCredits || 0));
                     const remainingAdsWeb = userLimits?.remainingAds !== undefined
                       ? userLimits.remainingAds
-                      : Math.max(0, 45 - adsUsedInCycle);
+                      : Math.max(0, 25 - adsUsedInCycle);
 
                     return (
                       <div className="relative p-3.5 sm:p-4 rounded-2xl bg-gradient-to-b from-amber-50/90 via-white to-amber-50/40 dark:from-neutral-900 dark:via-neutral-900 dark:to-neutral-950 border-2 border-amber-400 dark:border-amber-500/60 shadow-md shadow-amber-500/10 space-y-3">
@@ -998,13 +1038,17 @@ export function ProModal({
                               {isEn ? 'Free Option • Via Android App' : 'Opción Gratuita • Vía App Android'}
                             </div>
                             <h3 className="text-sm sm:text-base font-extrabold text-zinc-950 dark:text-white tracking-tight">
-                              {isEn ? 'Recharge balance from your mobile' : 'Recarga saldo desde tu móvil'}
+                              {isTutor
+                                ? (isEn ? 'Unlock consultation from your mobile' : 'Desbloquea consultas desde tu móvil')
+                                : (isEn ? 'Recharge balance from your mobile' : 'Recarga saldo desde tu móvil')}
                             </h3>
                           </div>
 
                           <div className="text-right pl-2 shrink-0">
                             <span className="inline-block px-2.5 py-0.5 rounded-full bg-amber-200/90 dark:bg-amber-500/30 border border-amber-400 dark:border-amber-400/70 text-amber-950 dark:text-amber-100 font-extrabold text-[10px] uppercase tracking-wider shadow-sm">
-                              {remainingAdsWeb > 0
+                              {isTutor
+                                ? (isEn ? 'Unlimited via Ads' : 'Ilimitadas con Anuncios')
+                                : remainingAdsWeb > 0
                                 ? (isEn ? `${remainingAdsWeb} available this month` : `${remainingAdsWeb} disponibles este mes`)
                                 : (isEn ? 'Monthly quota reached' : 'Cupo mensual completado')}
                             </span>

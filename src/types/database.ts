@@ -20,6 +20,7 @@ export type Database = {
           generations_count: number
           last_generation_date: string | null
           tutor_consultations_count?: number
+          tutor_ad_credits?: number
           last_tutor_date?: string | null
           tier: 'free' | 'pro' | 'vip'
           stripe_customer_id?: string | null
@@ -36,6 +37,7 @@ export type Database = {
           generations_count?: number
           last_generation_date?: string | null
           tutor_consultations_count?: number
+          tutor_ad_credits?: number
           last_tutor_date?: string | null
           tier?: 'free' | 'pro' | 'vip'
           stripe_customer_id?: string | null
@@ -52,6 +54,7 @@ export type Database = {
           generations_count?: number
           last_generation_date?: string | null
           tutor_consultations_count?: number
+          tutor_ad_credits?: number
           last_tutor_date?: string | null
           tier?: 'free' | 'pro' | 'vip'
           stripe_customer_id?: string | null
@@ -406,6 +409,13 @@ export type Database = {
         Returns: Json
       }
       add_bonus_credit: {
+        Args: {
+          p_user_id: string
+          p_amount?: number
+        }
+        Returns: Json
+      }
+      add_tutor_ad_credit: {
         Args: {
           p_user_id: string
           p_amount?: number

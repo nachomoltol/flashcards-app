@@ -22,7 +22,7 @@ export interface QuotaCheckResult {
  * 2. FREE:
  *    - Fase Bienvenida (< 5 generaciones iniciales): Permitido sin anuncios.
  *    - Fase Anuncios (>= 5 generaciones):
- *        - Si generaciones del mes >= 50: Bloqueado por cuota mensual agotada ('LIMIT_REACHED').
+ *        - Si generaciones del mes >= 30: Bloqueado por cuota mensual agotada ('LIMIT_REACHED').
  *        - Si bonus_credits <= 0: Bloqueado requiriendo anuncio ('AD_REQUIRED').
  *        - Si bonus_credits > 0: Permitido (+1 generación disponible).
  */
@@ -36,7 +36,7 @@ export async function checkUserGenerationQuota(
       currentCount: 0,
       bonusCredits: 0,
       welcomeGenerations: 0,
-      monthlyLimit: 50,
+      monthlyLimit: 30,
       reason: 'LIMIT_REACHED',
     };
   }
@@ -63,7 +63,7 @@ export async function checkUserGenerationQuota(
       const count = typeof res.count === 'number' ? res.count : 0;
       const bonusCredits = typeof res.bonus_credits === 'number' ? res.bonus_credits : 0;
       const welcomeGenerations = typeof res.welcome_generations === 'number' ? res.welcome_generations : 0;
-      const monthlyLimit = res.monthly_limit || (tier === 'pro' || tier === 'vip' ? 120 : 50);
+      const monthlyLimit = res.monthly_limit || (tier === 'pro' || tier === 'vip' ? 120 : 30);
 
       if (res.allowed === false) {
         return {
@@ -145,12 +145,12 @@ export async function checkUserGenerationQuota(
           currentCount: count,
           bonusCredits,
           welcomeGenerations,
-          monthlyLimit: 50,
+          monthlyLimit: 30,
         };
       }
 
-      // Fase Anuncios: máximo 50 mensuales (5 bienvenida + 45 anuncios)
-      if (count >= 50) {
+      // Fase Anuncios: máximo 25 con anuncios (5 bienvenida + 25 anuncios = 30 mensuales totales)
+      if (count >= 25) {
         return {
           canGenerate: false,
           tier: 'free',
@@ -158,7 +158,7 @@ export async function checkUserGenerationQuota(
           currentCount: count,
           bonusCredits,
           welcomeGenerations,
-          monthlyLimit: 50,
+          monthlyLimit: 30,
           reason: 'LIMIT_REACHED',
         };
       }
@@ -172,7 +172,7 @@ export async function checkUserGenerationQuota(
           currentCount: count,
           bonusCredits: 0,
           welcomeGenerations,
-          monthlyLimit: 50,
+          monthlyLimit: 30,
           reason: 'AD_REQUIRED',
         };
       }
@@ -184,7 +184,7 @@ export async function checkUserGenerationQuota(
         currentCount: count,
         bonusCredits,
         welcomeGenerations,
-        monthlyLimit: 50,
+        monthlyLimit: 30,
       };
     }
 
@@ -196,7 +196,7 @@ export async function checkUserGenerationQuota(
       currentCount: 0,
       bonusCredits: 0,
       welcomeGenerations: 0,
-      monthlyLimit: 50,
+      monthlyLimit: 30,
     };
   } catch (err) {
     console.warn('Advertencia en comprobación preventiva de cuota:', err);
@@ -207,7 +207,7 @@ export async function checkUserGenerationQuota(
       currentCount: 0,
       bonusCredits: 1,
       welcomeGenerations: 0,
-      monthlyLimit: 50,
+      monthlyLimit: 30,
     };
   }
 }

@@ -1,6 +1,94 @@
 import type { GeneratedCard } from '@/types/cards';
 
 /**
+ * Función universal de saneamiento de prefijos de opciones.
+ * Elimina EXCLUSIVAMENTE letras de opción a-d / A-D seguidas de ), ., - o : y espacio obligatorio.
+ * JAMÁS elimina dígitos numéricos al inicio, garantizando que opciones numéricas como "100 mg/dl", "70 mg/dl", "0.5 g" conserven intactos todos sus dígitos.
+ */
+export function stripOptionPrefix(text: string): string {
+  if (!text) return '';
+  return text
+    // Elimina estrictamente prefijos con letra de opción [a-dA-D] seguidas de delimitador formal y espacio
+    .replace(/^\s*(?:\*{1,2}|_{1,2})?\(?[a-dA-D][\)\.\:\-\]](?:\*{1,2}|_{1,2})?\s+/i, '')
+    .replace(/^\s*(?:\*{1,2}|_{1,2})?\([a-dA-D]\)(?:\*{1,2}|_{1,2})?\s+/i, '')
+    .trim();
+}
+
+/**
+ * Sanitiza el texto del anverso (front o question) eliminando muletillas editoriales
+ * de localización en el libro (cuadros, tablas, figuras, páginas o referencias a estudios).
+ */
+export function sanitizeCardFrontText(rawFront: string): string {
+  if (!rawFront) return '';
+  let text = rawFront.trim();
+
+  // Limpieza inicial contra doble apertura errónea en enunciados narrativos / viñetas clínicas:
+  // Ej: "¿Un paciente acude a consulta. ¿Qué...?" -> "Un paciente acude a consulta. ¿Qué...?"
+  text = text.replace(/^\s*¿\s*([^?]+?\.\s*¿)/, '$1');
+
+  // Limpieza si quedaron dos signos '¿' abiertos en la misma oración (ej. "¿De acuerdo con..., ¿qué...?")
+  text = text.replace(/¿\s*([^?]*?)\s*¿/g, '¿$1');
+
+  // 1. Limpieza al inicio de la oración
+  // Ej: "De acuerdo con el Cuadro 4-3, ¿qué..." -> "¿Qué..."
+  // Ej: "Según la Tabla 2, el proceso..." -> "El proceso..."
+  // Ej: "En el Cuadro 4-3 se describe que... ¿cuál...?"
+  text = text.replace(
+    /^(?:¿\s*)?(?:de\s+acuerdo\s+con|seg[uú]n|conforme\s+a|en)\s+(?:el\s+cuadro|la\s+tabla|la\s+figura|el\s+gr[aá]fico|la\s+ilustraci[oó]n|la\s+secci[oó]n|el\s+recuadro)\s+(?:de\s+[^,.:\n?]+|\d+(?:[.\-_]\d+)?)?(?:\s*\([^)]*\))?\s*[,.:;]?\s*(?:se\s+muestra\s+que|se\s+indica\s+que|se\s+describe\s+que)?\s*[,.:;]?\s*(?:¿\s*)?/i,
+    ''
+  );
+
+  // Limpieza de referencias a estudios/documento al inicio
+  text = text.replace(
+    /^(?:¿\s*)?(?:seg[uú]n|de\s+acuerdo\s+con)\s+(?:el\s+documento|el\s+texto|el\s+art[ií]culo|el\s+estudio(?:\s+(?:mencionado|citado)(?:\s+en\s+el\s+recuadro(?:\s+['"][^'"]*['"])?)?)?)\s*[,.:;]?\s*(?:¿\s*)?/i,
+    ''
+  );
+
+  // 2. Limpieza en medio o al final de la oración
+  // Ej: "¿En qué rango se clasifican estos alimentos según el Cuadro 4-3?" -> "¿En qué rango se clasifican estos alimentos?"
+  // Ej: "...según la información del Cuadro 4-3?" -> "...?"
+  text = text.replace(
+    /\s*[,;]?\s*(?:de\s+acuerdo\s+con|seg[uú]n|conforme\s+a)\s+(?:el\s+cuadro|la\s+tabla|la\s+figura|el\s+gr[aá]fico|el\s+documento|el\s+texto|la\s+informaci[oó]n\s+del\s+cuadro|la\s+informaci[oó]n\s+de\s+la\s+tabla)\s+(?:de\s+[^,.:?\n]+|\d+(?:[.\-_]\d+)?)?\s*(\?|\.|$)/gi,
+    '$1'
+  );
+
+  text = text.replace(
+    /\s*[,;]?\s*seg[uú]n\s+el\s+estudio(?:\s+(?:mencionado|citado)(?:\s+en\s+el\s+recuadro(?:\s+['"][^'"]*['"])?)?)?\s*(\?|\.|$)/gi,
+    '$1'
+  );
+
+  // Re-chequeo tras limpieza por si quedaron signos '¿' redundantes
+  text = text.replace(/¿\s*([^?]*?)\s*¿/g, '¿$1');
+
+  // 3. Ajuste de puntuación y espaciado previo a signos de interrogación
+  text = text.replace(/\s+\?/g, '?').replace(/\s+\./g, '.').trim();
+
+  // Si el texto termina en '?' pero no contiene ningún '¿'
+  if (text.endsWith('?') && !text.includes('¿')) {
+    // Si hay un punto y espacio antes de la pregunta final (ej: narrativa/caso clínico + pregunta)
+    const lastDotSpaceIndex = text.lastIndexOf('. ');
+    if (lastDotSpaceIndex !== -1 && lastDotSpaceIndex < text.length - 2) {
+      const narrativePart = text.substring(0, lastDotSpaceIndex + 2);
+      const questionPart = text.substring(lastDotSpaceIndex + 2).trim();
+      if (/^[a-záéíóúñ]/i.test(questionPart)) {
+        text = `${narrativePart}¿${questionPart}`;
+      }
+    } else if (!text.startsWith('¿') && /^[a-záéíóúñ]/i.test(text)) {
+      // Oración única sin puntos intermedios
+      text = `¿${text}`;
+    }
+  }
+
+  // Asegurar que la primera letra tras cualquier '¿' sea mayúscula
+  text = text.replace(/(¿\s*)([a-záéíóúñ])/gi, (_, prefix, letter) => `${prefix}${letter.toUpperCase()}`);
+  if (!text.startsWith('¿')) {
+    text = text.replace(/^([a-záéíóúñ])/i, (match) => match.toUpperCase());
+  }
+
+  return text;
+}
+
+/**
  * Algoritmo de mezcla Fisher-Yates para barajar arrays aleatoriamente.
  */
 export function shuffleArray<T>(array: T[]): T[] {
@@ -51,7 +139,7 @@ export function randomizeMultipleChoiceCard(card: GeneratedCard): GeneratedCard 
   const options: { origKey: string; text: string }[] = [];
 
   if (rawOptionsBlock) {
-    const optRegex = /(?:\(?([a-dA-D])\s*[\)\.\-\]\:]|\b([a-dA-D])\))\s*([\s\S]*?)(?=(?:(?:\r?\n|\s+)(?:\(?[a-dA-D]\s*[\)\.\-\]\:]|\b[a-dA-D]\))\s+)|$)/gi;
+    const optRegex = /(?:^|\r?\n)\s*(?:\(?([a-dA-D])\s*[\)\.\-\]\:]|\b([a-dA-D])\))\s*([\s\S]*?)(?=(?:\r?\n\s*(?:\(?[a-dA-D]\s*[\)\.\-\]\:]|\b[a-dA-D]\))\s+)|$)/gi;
     let optMatch: RegExpExecArray | null;
 
     while ((optMatch = optRegex.exec(rawOptionsBlock)) !== null) {
