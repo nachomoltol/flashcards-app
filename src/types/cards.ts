@@ -5,6 +5,7 @@ export type { CardFormat };
 export interface GeneratedCard {
   id?: string;
   generation_index?: number;
+  relevance_tier?: 'A_core' | 'B_exam_detail' | 'C_trivial_filler' | string;
   front: string;
   back: string;
   cardFormat: CardFormat;
@@ -23,6 +24,8 @@ export interface GenerateCardsResult {
   error?: string;
   nextCursorPage?: number;
   startCursorPage?: number;
+  rangeCompleted?: boolean;
+  message?: string;
 }
 
 export type DocenteFormat =
@@ -53,6 +56,7 @@ export interface MultimodalDocumentInput {
   language?: string;
   coreExhaustedPrevious?: boolean;
   isExhaustiveMode?: boolean;
+  isPracticalMode?: boolean;
   pedagogicalMode?: 'academic' | 'didactic';
   docenteFormat?: DocenteFormat;
   targetAudience?: TargetAudience;
@@ -69,6 +73,7 @@ export interface UrlCardInput {
   existingQuestions?: string[];
   language?: string;
   coreExhaustedPrevious?: boolean;
+  isPracticalMode?: boolean;
   pedagogicalMode?: 'academic' | 'didactic';
   docenteFormat?: DocenteFormat;
   targetAudience?: TargetAudience;
@@ -89,6 +94,7 @@ export interface HandwrittenNotesInput {
   customPrompt?: string;
   focusInstruction?: string;
   language?: string;
+  isPracticalMode?: boolean;
   pedagogicalMode?: 'academic' | 'didactic';
   docenteFormat?: DocenteFormat;
   targetAudience?: TargetAudience;

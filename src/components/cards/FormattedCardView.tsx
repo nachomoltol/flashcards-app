@@ -62,8 +62,8 @@ export function parseMultipleChoice(frontText: string): ParsedMultipleChoice {
   const options: { key: string; text: string }[] = [];
 
   if (rawOptionsBlock) {
-    // Extraer cada opción mediante lookahead hasta la siguiente opción o fin de texto
-    const optRegex = /(?:\(?([a-dA-D])\s*[\)\.\-\]\:]|\b([a-dA-D])\))\s*([\s\S]*?)(?=(?:(?:\r?\n|\s+)(?:\(?[a-dA-D]\s*[\)\.\-\]\:]|\b[a-dA-D]\))\s+)|$)/gi;
+    // Extraer cada opción mediante lookahead hasta la siguiente opción o fin de texto (anclado a inicio o salto de línea)
+    const optRegex = /(?:^|\r?\n)\s*(?:\(?([a-dA-D])\s*[\)\.\-\]\:]|\b([a-dA-D])\))\s*([\s\S]*?)(?=(?:\r?\n\s*(?:\(?[a-dA-D]\s*[\)\.\-\]\:]|\b[a-dA-D]\))\s+)|$)/gi;
     let optMatch: RegExpExecArray | null;
 
     while ((optMatch = optRegex.exec(rawOptionsBlock)) !== null) {
@@ -181,6 +181,23 @@ function renderMarkdownBold(text: string) {
 }
 
 /**
+ * Limpia y capitaliza el bloque de explicación eliminando prefijos redundantes o frases delatorias.
+ */
+function cleanExplanation(text: string): string {
+  if (!text) return '';
+  let cleaned = text
+    .replace(/^(?:Explicación|Justificación|Fundamento|Razón):\s*/i, '')
+    .replace(/^\s*(?:seg[uú]n\s+(?:el\s+cuadro|la\s+tabla|el\s+gr[aá]fico|la\s+figura)\s+[^,.:]+[,.:]\s*)/i, '')
+    .replace(/^\s*(?:el\s+texto\s+establece\s+expl[ií]citamente\s+que\s+)/i, '')
+    .replace(/^\s*la\s+pregunta\s+de\s+repaso(?:\s+n[uú]mero)?\s+\d+\s+(?:identifica|vincula|senala|indica|establece|describe|explica)\s+(?:que\s+)?/i, '')
+    .trim();
+
+  // Asegura que comience siempre en mayúscula
+  cleaned = cleaned.replace(/^([a-záéíóúñ])/i, (m) => m.toUpperCase());
+  return cleaned;
+}
+
+/**
  * Estructura y separa el reverso en veredicto/respuesta clave y explicación técnica detallada.
  */
 export function parseBackContent(
@@ -195,7 +212,7 @@ export function parseBackContent(
   if (lines.length > 1) {
     return {
       verdict: lines[0],
-      explanation: lines.slice(1).join('\n\n'),
+      explanation: cleanExplanation(lines.slice(1).join('\n\n')),
     };
   }
 
@@ -204,7 +221,7 @@ export function parseBackContent(
   if (explanationSplit.length > 1 && explanationSplit[0].trim()) {
     return {
       verdict: explanationSplit[0].trim(),
-      explanation: explanationSplit.slice(1).join(' ').trim(),
+      explanation: cleanExplanation(explanationSplit.slice(1).join(' ')),
     };
   }
 
@@ -214,7 +231,7 @@ export function parseBackContent(
     if (tfMatch && tfMatch[2].trim()) {
       return {
         verdict: tfMatch[1],
-        explanation: tfMatch[2].trim(),
+        explanation: cleanExplanation(tfMatch[2].trim()),
       };
     }
   }
@@ -225,14 +242,14 @@ export function parseBackContent(
     if (mcMatch && mcMatch[2].trim()) {
       return {
         verdict: mcMatch[1].trim(),
-        explanation: mcMatch[2].trim(),
+        explanation: cleanExplanation(mcMatch[2].trim()),
       };
     }
     const mcDashMatch = trimmed.match(/^(\(?[a-dA-D][\)\.\:\-]\s*[^\-\–\n]+?)\s*[\-\–]\s+([\s\S]+)$/);
     if (mcDashMatch && mcDashMatch[2].trim()) {
       return {
         verdict: mcDashMatch[1].trim(),
-        explanation: mcDashMatch[2].trim(),
+        explanation: cleanExplanation(mcDashMatch[2].trim()),
       };
     }
   }

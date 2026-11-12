@@ -4,12 +4,12 @@ import { use, useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Search, X, Award, Zap, FileText, HelpCircle, Plus, Sparkles, Share2, Printer, Camera } from 'lucide-react';
 import { useDeckStore, useCardStore, useProModalStore, useAuthStore, useLanguageStore } from '@/stores';
-import { supabase } from '@/lib/supabase';
-import { CardEditor, DocumentUploader, FormattedCardView, UrlCardGenerator, HandwrittenNotesUploader } from '@/components/cards';
+import { CardEditor, DocumentUploader, FormattedCardView, UrlCardGenerator, HandwrittenNotesUploader, InfoTooltip } from '@/components/cards';
 import { ShareDeckModal, QuickStudyGuideModal, StudyModesHelpModal, PrintExamSheet } from '@/components/decks';
 import { generateCardsAction } from '@/app/actions/generateCards';
 import { checkUserGenerationQuota } from '@/lib/quotaGuard';
 import { getDeckColorStyles } from '@/lib/colors';
+import { detectPlatform } from '@/lib/platform';
 import type { CardFormat } from '@/types/database';
 
 interface DeckPageProps {
@@ -25,6 +25,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
   const { openProModal } = useProModalStore();
   const { user } = useAuthStore();
   const { language, t } = useLanguageStore();
+  const isEn = language === 'en';
 
   // Estado para el buscador de tarjetas en el mazo
   const [searchQuery, setSearchQuery] = useState('');
@@ -36,6 +37,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
   const [aiTopic, setAiTopic] = useState('');
   const [aiCardFormat, setAiCardFormat] = useState<CardFormat>('multiple_choice');
   const [aiCardCount, setAiCardCount] = useState<number>(10);
+  const [aiIsPracticalMode, setAiIsPracticalMode] = useState<boolean>(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [aiSuccessMessage, setAiSuccessMessage] = useState<string | null>(null);
@@ -51,30 +53,6 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
 
   // Estado para el acordeón del Editor Manual de Tarjetas (cerrado por defecto para evitar saturar la pantalla)
   const [isManualEditorOpen, setIsManualEditorOpen] = useState(false);
-
-  // Estatus de suscripción PRO / VIP del usuario
-  const [isPro, setIsPro] = useState(false);
-
-  useEffect(() => {
-    if (!user?.id) return;
-    const uid: string = user.id;
-    async function checkTier() {
-      try {
-        const { data } = await supabase
-          .from('api_limits')
-          .select('tier')
-          .eq('user_id', uid)
-          .maybeSingle();
-
-        if (data && (data.tier === 'pro' || data.tier === 'vip')) {
-          setIsPro(true);
-        }
-      } catch (err) {
-        console.warn('Error al verificar estatus PRO:', err);
-      }
-    }
-    checkTier();
-  }, [user?.id]);
 
   useEffect(() => {
     fetchDeckById(id);
@@ -104,11 +82,21 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
   };
 
   const handlePrintExam = () => {
-    if (!isPro) {
-      openProModal(false, 'print');
-      return;
-    }
-    if (typeof window !== 'undefined') {
+    if (typeof window === 'undefined') return;
+    const platform = detectPlatform();
+    const isAndroidNative =
+      platform.isNativeAndroid ||
+      Boolean(
+        (window as unknown as { Capacitor?: { isNativePlatform: () => boolean; getPlatform: () => string } })
+          .Capacitor?.isNativePlatform() &&
+        (window as unknown as { Capacitor?: { isNativePlatform: () => boolean; getPlatform: () => string } })
+          .Capacitor?.getPlatform() === 'android'
+      );
+
+    if (isAndroidNative) {
+      const printUrl = `https://www.flashmente.com/decks/${id}/print`;
+      window.open(printUrl, '_system');
+    } else {
       window.print();
     }
   };
@@ -122,6 +110,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
         setAiError(null);
         setAiSuccessMessage(null);
         setAiCoreExhausted(false);
+        setAiIsPracticalMode(false);
         setAiMode('multimodal');
         setIsAiModalOpen(true);
       });
@@ -131,6 +120,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
     setAiError(null);
     setAiSuccessMessage(null);
     setAiCoreExhausted(false);
+    setAiIsPracticalMode(false);
     setAiMode('multimodal');
     setIsAiModalOpen(true);
   };
@@ -162,7 +152,11 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
       existingFronts,
       user?.id,
       language,
-      aiCoreExhausted || isMeticulousPhase
+      aiCoreExhausted || isMeticulousPhase,
+      'academic',
+      'mixed_test',
+      'auto',
+      aiIsPracticalMode
     );
 
     if (!result.success || !result.cards) {
@@ -346,18 +340,11 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                 title={
                   cards.length === 0
                     ? t('deck_detail.empty_print_tooltip', 'El mazo no contiene preguntas para imprimir')
-                    : !isPro
-                      ? t('deck_detail.print_pro_only', 'Exportar a PDF / Imprimir es exclusivo para PRO')
-                      : t('deck_detail.export_pdf_btn', 'Exportar a PDF / Imprimir')
+                    : t('deck_detail.export_pdf_btn', 'Exportar a PDF / Imprimir')
                 }
               >
                 <Printer className="w-4 h-4 text-[var(--deck-accent)] shrink-0" />
                 <span className="truncate">{t('deck_detail.export_pdf_short', 'Imprimir / PDF')}</span>
-                {!isPro && (
-                  <span className="px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white leading-none shadow-xs">
-                    PRO
-                  </span>
-                )}
               </button>
             </div>
           </div>
@@ -680,7 +667,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
 
       {/* Modal: Generar con IA (Gemini Flash Multimodal) */}
       {isAiModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/75 backdrop-blur-sm animate-in fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/75 backdrop-blur-sm animate-in fade-in print:hidden">
           <div className="w-full max-w-xl rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 sm:p-6 shadow-2xl relative space-y-3 sm:space-y-4 max-h-[92vh] overflow-y-auto">
             {/* Header */}
             <div className="flex items-center justify-between">
@@ -960,6 +947,74 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
                     </div>
                   </div>
 
+                  {/* Selector Enfoque de las Preguntas: Teórico vs Práctico */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 flex items-center">
+                        <span>{t('ai_uploader.approach_label', isEn ? 'Question approach' : 'Enfoque de las preguntas')}</span>
+                        <InfoTooltip
+                          placement="bottom"
+                          title={t('ai_uploader.tooltip_approach_title', isEn ? 'Theoretical vs. Practical Approach' : 'Enfoque Teórico vs. Práctico')}
+                          content={
+                            <div className="space-y-2 text-[11px] leading-relaxed">
+                              <p>
+                                <strong className="text-slate-900 dark:text-white block font-semibold mb-0.5">
+                                  📖 {t('ai_uploader.approach_theoretical', isEn ? 'Theoretical' : 'Teórico')}:
+                                </strong>
+                                {isEn
+                                  ? 'Direct concepts, definitions, legal deadlines, and factual recall. Ideal for initial study and memorizing essential data.'
+                                  : 'Conceptos directos, definiciones, plazos legales y datos concretos. Ideal para primera vuelta y fijar contenidos esenciales.'}
+                              </p>
+                              <p>
+                                <strong className="text-violet-600 dark:text-violet-400 block font-semibold mb-0.5">
+                                  🎯 {t('ai_uploader.approach_practical', isEn ? 'Practical' : 'Práctico')}:
+                                </strong>
+                                {isEn
+                                  ? 'Problem-based learning, clinical patient vignettes, legal cases, and professional decision-making scenarios.'
+                                  : 'Supuestos prácticos, casos clínicos de pacientes, problemas de derecho y situaciones reales de toma de decisiones.'}
+                              </p>
+                            </div>
+                          }
+                        />
+                      </label>
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md font-mono text-neutral-500 dark:text-neutral-400">
+                        {aiIsPracticalMode
+                          ? `🎯 ${t('ai_uploader.approach_practical', isEn ? 'Practical' : 'Práctico')}`
+                          : `📖 ${t('ai_uploader.approach_theoretical', isEn ? 'Theoretical' : 'Teórico')}`}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        disabled={isGenerating}
+                        onClick={() => setAiIsPracticalMode(false)}
+                        className={`min-h-[44px] py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                          !aiIsPracticalMode
+                            ? 'bg-violet-500/10 border-violet-500 text-violet-700 dark:text-violet-300 ring-1 ring-violet-500 font-bold'
+                            : 'bg-neutral-50 dark:bg-neutral-950 border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:border-neutral-300'
+                        } disabled:opacity-50`}
+                      >
+                        <span>📖</span>
+                        <span>{t('ai_uploader.approach_theoretical', isEn ? 'Theoretical' : 'Teórico')}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={isGenerating}
+                        onClick={() => setAiIsPracticalMode(true)}
+                        className={`min-h-[44px] py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                          aiIsPracticalMode
+                            ? 'bg-violet-500/10 border-violet-500 text-violet-700 dark:text-violet-300 ring-1 ring-violet-500 font-bold'
+                            : 'bg-neutral-50 dark:bg-neutral-950 border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:border-neutral-300'
+                        } disabled:opacity-50`}
+                      >
+                        <span>🎯</span>
+                        <span>{t('ai_uploader.approach_practical', isEn ? 'Practical' : 'Práctico')}</span>
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Mensaje de ayuda visualmente atractivo cuando aún no está en fase minuciosa */}
                   {!isMeticulousPhase && (
                     <div className="p-2.5 rounded-lg bg-violet-50 dark:bg-violet-500/10 border border-violet-200 dark:border-violet-500/20 text-[11px] text-violet-800 dark:text-violet-200/90 flex items-start gap-2 leading-relaxed">
@@ -1051,11 +1106,25 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
       />
     </div>
 
-    {/* Documento de Impresión Ultra-Compacto (Examen Alumnos + Solucionario Docente) */}
+    {/* Documento de Impresión Ultra-Compacto (Cuaderno de Repaso / Examen Docente) */}
     <PrintExamSheet
-      deckTitle={currentDeck?.title || t('deck_detail.untitled_deck', 'Examen de Evaluación')}
+      deckTitle={currentDeck?.title || t('deck_detail.untitled_deck', 'Mazo de Estudio')}
       deckDescription={currentDeck?.description}
       cards={cards}
+      pedagogicalMode={
+        Boolean(
+          currentDeck?.description?.toLowerCase().includes('docente') ||
+          currentDeck?.description?.toLowerCase().includes('didactic')
+        )
+          ? 'didactic'
+          : 'academic'
+      }
+      isDocenteMode={
+        Boolean(
+          currentDeck?.description?.toLowerCase().includes('docente') ||
+          currentDeck?.description?.toLowerCase().includes('didactic')
+        )
+      }
     />
   </>
 );

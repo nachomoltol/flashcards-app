@@ -72,7 +72,7 @@ export function SocraticTutorDrawer({
 
     // Si es usuario Free y requiere ver anuncio (omitido si venimos de desbloquearlo por anuncio)
     if (!forceBypassAdCheck && quotaStatus && !quotaStatus.isPro && quotaStatus.requiresAd) {
-      useProModalStore.getState().openProModal(true, null, () => handleAskTutor(true));
+      useProModalStore.getState().openProModal(true, 'tutor', () => handleAskTutor(true));
       return;
     }
 
@@ -102,14 +102,14 @@ export function SocraticTutorDrawer({
                 ...prev,
                 count: prev.count + 1,
                 remainingFree: typeof res.remainingFree === 'number' ? res.remainingFree : Math.max(0, prev.remainingFree - 1),
-                requiresAd: !prev.isPro && (typeof res.remainingFree === 'number' ? res.remainingFree <= 0 : prev.remainingFree - 1 <= 0) && prev.bonusCredits <= 0,
+                requiresAd: !prev.isPro && (typeof res.remainingFree === 'number' ? res.remainingFree <= 0 : prev.remainingFree - 1 <= 0) && prev.tutorAdCredits <= 0,
               }
             : null
         );
         fetchQuota();
       } else if (res.error === 'AD_REQUIRED' || res.error === 'LIMIT_REACHED') {
         setQuotaStatus((prev) => (prev ? { ...prev, requiresAd: true, remainingFree: 0 } : null));
-        useProModalStore.getState().openProModal(true, null, () => handleAskTutor(true));
+        useProModalStore.getState().openProModal(true, 'tutor', () => handleAskTutor(true));
         return;
       } else {
         setErrorMsg(res.error || t('socratic_tutor.error_generic', 'No se pudo consultar al tutor en este momento.'));

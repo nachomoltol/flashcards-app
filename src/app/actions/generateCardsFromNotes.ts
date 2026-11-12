@@ -3,11 +3,16 @@
 import { GoogleGenAI, Type } from '@google/genai';
 import { createClient } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
-import { checkUserGenerationQuota } from '@/lib/quotaGuard';
 import { createInitialCardValues } from '@/lib/fsrs';
 import { deduplicateCandidateCards } from '@/lib/cardDeduplication';
 import { randomizeMultipleChoiceCard } from '@/lib/cardUtils';
 import { GEMINI_DEFAULT_MODEL } from '@/lib/aiConfig';
+import {
+  buildDidacticModeDirective,
+  PRACTICAL_MODE_DIRECTIVE,
+  ZERO_MISMATCH_DIRECTIVE,
+  buildUniversalTablesDirective,
+} from '@/lib/aiDirectives';
 import type {
   CardFormat,
   GeneratedCard,
@@ -194,6 +199,7 @@ function processGeneratedCards(
 
       const rawExplanation = (card.justification || back)
         .replace(/^[a-d][\)\.\:\-]\s*/i, '')
+        .replace(/VEREDICTO_EXACTO\s*[:=]\s*[^\r\n]+/gi, '')
         .replace(/^(?:Explicación|Justificación):\s*/i, '')
         .trim();
 
@@ -219,6 +225,70 @@ function processGeneratedCards(
 }
 
 /**
+ * Valida la cuota de generación del usuario en api_limits exclusivamente desde el servidor
+ * mediante el RPC 'check_api_limit' de Supabase (sin importar módulos de cliente).
+ */
+async function checkServerQuota(
+  userId: string
+): Promise<{ allowed: boolean; reason?: 'LIMIT_REACHED' | 'AD_REQUIRED' }> {
+  try {
+    const { data: rpcData, error: rpcError } = await supabase.rpc('check_api_limit', {
+      p_user_id: userId,
+    });
+
+    if (!rpcError && rpcData) {
+      const res = rpcData as {
+        allowed?: boolean;
+        error?: 'LIMIT_REACHED' | 'AD_REQUIRED';
+        tier?: 'free' | 'pro' | 'vip';
+        bonus_credits?: number;
+      };
+
+      if (res.allowed === false) {
+        return {
+          allowed: false,
+          reason: res.error || 'LIMIT_REACHED',
+        };
+      }
+
+      return { allowed: true };
+    }
+
+    if (rpcError) {
+      console.warn('[generateCardsFromNotes] RPC check_api_limit error, fallback to table:', rpcError);
+    }
+
+    // Fallback a consulta directa sobre la tabla api_limits
+    const { data: directData } = await supabase
+      .from('api_limits')
+      .select('tier, generations_count, bonus_credits')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (directData) {
+      const tier = (directData.tier as 'free' | 'pro' | 'vip') || 'free';
+      const count = typeof directData.generations_count === 'number' ? directData.generations_count : 0;
+      const bonus = typeof directData.bonus_credits === 'number' ? directData.bonus_credits : 0;
+
+      if (tier === 'pro' || tier === 'vip') {
+        if (count >= 120) return { allowed: false, reason: 'LIMIT_REACHED' };
+        return { allowed: true };
+      }
+
+      if (count >= 50) return { allowed: false, reason: 'LIMIT_REACHED' };
+      if (bonus <= 0) return { allowed: false, reason: 'AD_REQUIRED' };
+
+      return { allowed: true };
+    }
+
+    return { allowed: true };
+  } catch (err) {
+    console.error('[generateCardsFromNotes] Error en checkServerQuota:', err);
+    return { allowed: true };
+  }
+}
+
+/**
  * Server Action: Genera tarjetas a partir de fotos de apuntes manuscritos.
  * Procesamiento 100% efímero en memoria RAM:
  * - Recibe imágenes en base64.
@@ -229,53 +299,76 @@ function processGeneratedCards(
 export async function generateCardsFromNotesAction(
   input: HandwrittenNotesInput
 ): Promise<GenerateCardsResult> {
-  const {
-    deckId,
-    userId: explicitUserId,
-    images,
-    cardFormat = 'multiple_choice',
-    cardCount = 10,
-    customPrompt,
-    focusInstruction,
-    language = 'es',
-  } = input;
-
-  if (!deckId) {
-    return { success: false, error: 'Identificador del mazo (deckId) no proporcionado.' };
-  }
-
-  if (!images || !Array.isArray(images) || images.length === 0) {
-    return { success: false, error: 'Debes seleccionar al menos una foto de apuntes.' };
-  }
-
-  if (images.length > 10) {
-    return { success: false, error: 'Se permite un máximo de 10 fotos por lote para asegurar calidad.' };
-  }
-
-  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENAI_API_KEY;
-  if (!apiKey) {
-    return {
-      success: false,
-      error:
-        'Clave GEMINI_API_KEY no configurada. Por favor define GEMINI_API_KEY en tu entorno.',
-    };
-  }
-
-  // 1. Control de cuota de generación
-  const resolvedUserId = await resolveUserId(deckId, explicitUserId);
-  if (!resolvedUserId) {
-    return { success: false, error: 'LIMIT_REACHED' };
-  }
-
-  const quotaCheck = await checkUserGenerationQuota(resolvedUserId);
-  if (!quotaCheck.canGenerate) {
-    return {
-      success: false,
-      error: quotaCheck.reason === 'AD_REQUIRED' ? 'AD_REQUIRED' : 'LIMIT_REACHED',
-    };
-  }
-
   try {
+    if (!input || typeof input !== 'object') {
+      return { success: false, error: 'Parámetros de entrada inválidos.', cards: [] };
+    }
+
+    const {
+      deckId,
+      userId: explicitUserId,
+      images = [],
+      cardFormat = 'multiple_choice',
+      cardCount = 10,
+      customPrompt,
+      focusInstruction,
+      language = 'es',
+      isPracticalMode = false,
+      pedagogicalMode = 'academic',
+      docenteFormat = 'mixed_test',
+      targetAudience = 'auto',
+    } = input;
+
+    if (!deckId) {
+      return { success: false, error: 'Identificador del mazo (deckId) no proporcionado.', cards: [] };
+    }
+
+    if (!images || !Array.isArray(images) || images.length === 0) {
+      return { success: false, error: 'Debes seleccionar al menos una foto de apuntes.', cards: [] };
+    }
+
+    if (images.length > 10) {
+      return { success: false, error: 'Se permite un máximo de 10 fotos por lote para asegurar calidad.', cards: [] };
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENAI_API_KEY;
+    if (!apiKey) {
+      return {
+        success: false,
+        error:
+          'Clave GEMINI_API_KEY no configurada. Por favor define GEMINI_API_KEY en tu entorno.',
+        cards: [],
+      };
+    }
+
+    // Inicializar cliente de base de datos en servidor
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+    const supabaseUrl =
+      process.env.NEXT_PUBLIC_SUPABASE_URL ||
+      process.env.SUPABASE_URL ||
+      'https://placeholder.supabase.co';
+
+    const dbClient = serviceRoleKey
+      ? createClient(supabaseUrl, serviceRoleKey, {
+          auth: { persistSession: false, autoRefreshToken: false },
+        })
+      : supabase;
+
+    // 1. Control de cuota de generación 100% Server-Side
+    const resolvedUserId = await resolveUserId(deckId, explicitUserId);
+    if (!resolvedUserId) {
+      return { success: false, error: 'LIMIT_REACHED', cards: [] };
+    }
+
+    const quotaCheck = await checkServerQuota(resolvedUserId);
+    if (!quotaCheck.allowed) {
+      return {
+        success: false,
+        error: quotaCheck.reason === 'AD_REQUIRED' ? 'AD_REQUIRED' : 'LIMIT_REACHED',
+        cards: [],
+      };
+    }
+
     const ai = new GoogleGenAI({ apiKey });
 
     // 2. Ordenar secuencialmente las imágenes y construir inlineData
@@ -288,6 +381,10 @@ export async function generateCardsFromNotesAction(
     }));
 
     const effectiveInstruction = (customPrompt || focusInstruction || '').trim();
+
+    const isDocenteMode = pedagogicalMode === 'didactic' || (pedagogicalMode as unknown as string) === 'docente';
+    const didacticDirective = isDocenteMode ? `\n\n${buildDidacticModeDirective(docenteFormat, targetAudience)}\n` : '';
+    const practicalDirective = isPracticalMode ? `\n\n${PRACTICAL_MODE_DIRECTIVE}\n` : '';
 
     // 3. Prompt pedagógico especializado para OCR de caligrafía
     const systemPromptText = `ERES UN PROFESOR UNIVERSITARIO Y ANALISTA CALIGRÁFICO MULTIMODAL ESPECIALIZADO EN EXTRACCIÓN DIDÁCTICA DE APUNTES MANUSCRITOS.
@@ -306,7 +403,13 @@ TUS REGLAS DE ORO:
    - Cada tarjeta debe ser autocontenida y evaluar un concepto concreto.
 
 3. REGLAS DE FORMATO SOLICITADO ("${cardFormat}"):
-${getFormatInstructions(cardFormat)}
+${getFormatInstructions(cardFormat)}${didacticDirective}${practicalDirective}
+
+4. TRATAMIENTO DE TABLAS Y ESQUEMAS:
+${buildUniversalTablesDirective(false)}
+
+5. AUTO-AUDITORÍA LÓGICA (ZERO-MISMATCH):
+${ZERO_MISMATCH_DIRECTIVE}
 
 ${effectiveInstruction ? `INSTRUCCIÓN ESPECÍFICA DEL ESTUDIANTE:\n"${effectiveInstruction}"\n` : ''}
 
@@ -350,18 +453,6 @@ IDIOMA DE SALIDA: ${language === 'en' ? 'Inglés' : 'Español'}.`;
     }
 
     // 5. Deduplicación con tarjetas existentes en el mazo
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    const supabaseUrl =
-      process.env.NEXT_PUBLIC_SUPABASE_URL ||
-      process.env.SUPABASE_URL ||
-      'https://placeholder.supabase.co';
-
-    const dbClient = serviceRoleKey
-      ? createClient(supabaseUrl, serviceRoleKey, {
-          auth: { persistSession: false, autoRefreshToken: false },
-        })
-      : supabase;
-
     const { data: existingRows } = await dbClient
       .from('cards')
       .select('front, back')
@@ -425,11 +516,12 @@ IDIOMA DE SALIDA: ${language === 'en' ? 'Inglés' : 'Español'}.`;
       core_exhausted: isExhausted,
     };
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Error al procesar las fotos de apuntes';
+    const message = err instanceof Error ? err.message : 'Error al procesar notas';
     console.error('[generateCardsFromNotesAction] Error:', err);
     return {
       success: false,
-      error: `Error al procesar los apuntes con Gemini: ${message}`,
+      error: message,
+      cards: [],
     };
   }
 }

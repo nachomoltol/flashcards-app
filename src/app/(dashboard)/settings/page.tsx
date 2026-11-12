@@ -2,14 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Ticket, CheckCircle2, AlertCircle, ShieldCheck } from 'lucide-react';
+import { Ticket, CheckCircle2, AlertCircle, ShieldCheck, Sparkles } from 'lucide-react';
 import { useAuthStore, useSettingsStore, useTutorialStore, useLanguageStore, useProModalStore, DEFAULT_FSRS_SETTINGS } from '@/stores';
 import { redeemPromoCodeAction } from '@/app/actions/redeemPromoCode';
 import { TUTORIAL_STORAGE_KEY } from '@/components/onboarding/WelcomeTutorial';
+import { usePlatform } from '@/lib/platform';
 
 export default function SettingsPage() {
   const { user } = useAuthStore();
   const { t } = useLanguageStore();
+  const platform = usePlatform();
   const {
     settings,
     isLoading,
@@ -449,98 +451,112 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Sección: Suscripción y Bonos Promocionales (VIP / PRO) */}
-        <div className="p-6 rounded-2xl bg-white dark:bg-neutral-900 border border-purple-200 dark:border-purple-500/25 shadow-sm space-y-5">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h2 className="text-base font-bold text-neutral-900 dark:text-white tracking-tight flex items-center gap-2">
-                <Ticket className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                <span>{t('settings.promo_section_title', 'Suscripción y Bonos Promocionales')}</span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-50 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-500/30">
-                  PRO & VIP
-                </span>
-              </h2>
-              <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
-                {t('settings.promo_section_desc', 'Gestiona tu suscripción mensual o canjea un código promocional/VIP para generaciones ilimitadas.')}
-              </p>
-            </div>
-          </div>
-
-          {/* Tarjeta Plan PRO Ilimitado (Stripe Direct Checkout) */}
-          <div className="p-4 rounded-xl bg-gradient-to-r from-purple-500/10 via-indigo-500/10 to-violet-500/10 border border-purple-500/25 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-sm text-neutral-900 dark:text-white">Flashmente PRO Ilimitado</span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-600 text-white">3,50 €/mes</span>
+        {/* Sección: Suscripción y Bonos Promocionales (VIP / PRO) - Oculto en iOS Nativo por Guidelines 2.1(b) y 3.1.1 */}
+        {!platform.isNativeIOS ? (
+          <div className="p-6 rounded-2xl bg-white dark:bg-neutral-900 border border-purple-200 dark:border-purple-500/25 shadow-sm space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h2 className="text-base font-bold text-neutral-900 dark:text-white tracking-tight flex items-center gap-2">
+                  <Ticket className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                  <span>{t('settings.promo_section_title', 'Suscripción y Bonos Promocionales')}</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-50 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-500/30">
+                    PRO & VIP
+                  </span>
+                </h2>
+                <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                  {t('settings.promo_section_desc', 'Gestiona tu suscripción mensual o canjea un código promocional/VIP para generaciones ilimitadas.')}
+                </p>
               </div>
-              <p className="text-xs text-neutral-600 dark:text-neutral-400">
-                {t('settings.pro_card_desc', 'Generaciones con IA ilimitadas, procesamiento de PDF, Audio y YouTube, y algoritmo FSRS sin esperas.')}
-              </p>
             </div>
-            <button
-              type="button"
-              onClick={() => openProModal(false)}
-              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold text-xs transition active:scale-95 cursor-pointer shrink-0 shadow-md shadow-purple-600/25 flex items-center justify-center gap-1.5"
-            >
-              <span>{t('settings.manage_pro_btn', 'Gestionar o Activar PRO')}</span>
-            </button>
-          </div>
 
-          <div className="pt-1 max-w-xl space-y-2">
-            <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block">
-              {t('settings.have_promo_code', '¿Tienes un código promocional o bono VIP?')}
-            </span>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={promoCode}
-                onChange={(e) => {
-                  setPromoCode(e.target.value.toUpperCase());
-                  if (promoResult) setPromoResult(null);
-                }}
-                placeholder={t('settings.promo_placeholder', 'EJ: ESTUDIANTE2026')}
-                className="flex-1 bg-neutral-50 dark:bg-neutral-950/80 border border-neutral-300 dark:border-neutral-700 focus:border-purple-500 rounded-xl px-3.5 py-2 text-xs sm:text-sm text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none uppercase tracking-wider font-mono transition"
-                disabled={isRedeeming}
-              />
+            {/* Tarjeta Plan PRO Ilimitado (Stripe Direct Checkout) */}
+            <div className="p-4 rounded-xl bg-gradient-to-r from-purple-500/10 via-indigo-500/10 to-violet-500/10 border border-purple-500/25 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-sm text-neutral-900 dark:text-white">Flashmente PRO Ilimitado</span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-600 text-white">3,50 €/mes</span>
+                </div>
+                <p className="text-xs text-neutral-600 dark:text-neutral-400">
+                  {t('settings.pro_card_desc', 'Generaciones con IA ilimitadas, procesamiento de PDF, Audio y YouTube, y algoritmo FSRS sin esperas.')}
+                </p>
+              </div>
               <button
                 type="button"
-                onClick={handleRedeemPromo}
-                disabled={isRedeeming || !promoCode.trim()}
-                className="px-5 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 disabled:opacity-50 text-white font-medium text-xs sm:text-sm flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer disabled:cursor-not-allowed shrink-0 shadow-md shadow-purple-600/30"
+                onClick={() => openProModal(false)}
+                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold text-xs transition active:scale-95 cursor-pointer shrink-0 shadow-md shadow-purple-600/25 flex items-center justify-center gap-1.5"
               >
-                {isRedeeming ? (
-                  <div className="w-4 h-4 border-2 border-white/80 border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <span>{t('settings.redeem_button', 'Canjear Bono')}</span>
-                )}
+                <span>{t('settings.manage_pro_btn', 'Gestionar o Activar PRO')}</span>
               </button>
             </div>
 
-            {promoResult && (
-              <div
-                className={`mt-3 p-3 rounded-xl text-xs flex items-center gap-2.5 animate-in fade-in ${
-                  promoResult.type === 'success'
-                    ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-800 dark:text-emerald-200'
-                    : 'bg-red-500/15 border border-red-500/30 text-red-800 dark:text-red-200'
-                }`}
-              >
-                {promoResult.type === 'success' ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500 dark:text-emerald-400 shrink-0" />
-                ) : (
-                  <AlertCircle className="w-4 h-4 text-red-500 dark:text-red-400 shrink-0" />
-                )}
-                <div>
-                  <p className="font-semibold">{promoResult.message}</p>
-                  {promoResult.tier && (
-                    <p className="text-[11px] opacity-90 mt-0.5">
-                      {t('settings.tier_active', 'Nivel activo:')} <span className="uppercase font-bold tracking-wider">{promoResult.tier}</span> {t('settings.tier_unlimited', '(Generaciones ilimitadas)')}
-                    </p>
+            <div className="pt-1 max-w-xl space-y-2">
+              <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block">
+                {t('settings.have_promo_code', '¿Tienes un código promocional o bono VIP?')}
+              </span>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={promoCode}
+                  onChange={(e) => {
+                    setPromoCode(e.target.value.toUpperCase());
+                    if (promoResult) setPromoResult(null);
+                  }}
+                  placeholder={t('settings.promo_placeholder', 'EJ: ESTUDIANTE2026')}
+                  className="flex-1 bg-neutral-50 dark:bg-neutral-950/80 border border-neutral-300 dark:border-neutral-700 focus:border-purple-500 rounded-xl px-3.5 py-2 text-xs sm:text-sm text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none uppercase tracking-wider font-mono transition"
+                  disabled={isRedeeming}
+                />
+                <button
+                  type="button"
+                  onClick={handleRedeemPromo}
+                  disabled={isRedeeming || !promoCode.trim()}
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 disabled:opacity-50 text-white font-medium text-xs sm:text-sm flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer disabled:cursor-not-allowed shrink-0 shadow-md shadow-purple-600/30"
+                >
+                  {isRedeeming ? (
+                    <div className="w-4 h-4 border-2 border-white/80 border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <span>{t('settings.redeem_button', 'Canjear Bono')}</span>
                   )}
-                </div>
+                </button>
               </div>
-            )}
+
+              {promoResult && (
+                <div
+                  className={`mt-3 p-3 rounded-xl text-xs flex items-center gap-2.5 animate-in fade-in ${
+                    promoResult.type === 'success'
+                      ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-800 dark:text-emerald-200'
+                      : 'bg-red-500/15 border border-red-500/30 text-red-800 dark:text-red-200'
+                  }`}
+                >
+                  {promoResult.type === 'success' ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500 dark:text-emerald-400 shrink-0" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 text-red-500 dark:text-red-400 shrink-0" />
+                  )}
+                  <div>
+                    <p className="font-semibold">{promoResult.message}</p>
+                    {promoResult.tier && (
+                      <p className="text-[11px] opacity-90 mt-0.5">
+                        {t('settings.tier_active', 'Nivel activo:')} <span className="uppercase font-bold tracking-wider">{promoResult.tier}</span> {t('settings.tier_unlimited', '(Generaciones ilimitadas)')}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="p-6 rounded-2xl bg-white dark:bg-neutral-900 border border-purple-200 dark:border-purple-500/25 shadow-sm space-y-3">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+              <h2 className="text-base font-bold text-neutral-900 dark:text-white tracking-tight">
+                Acceso y Generaciones en iOS
+              </h2>
+            </div>
+            <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed">
+              Flashmente para iOS ofrece una experiencia de estudio completa sustentada por anuncios bonificados. Puedes generar tarjetas de estudio y consultar al tutor socrático con tu cuota diaria y ampliarla en cualquier momento viendo vídeos cortos sin coste alguno.
+            </p>
+          </div>
+        )}
 
         {/* Sección 3: Tutorial y Guía de Bienvenida */}
         <div className="p-6 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-4">

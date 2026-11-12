@@ -225,5 +225,11 @@
 			<string>zmvupbp57q.skadnetwork</string>
 		</dict>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Flashmente necesita acceso a la cámara para capturar fotos de tus apuntes y cuadernos y convertirlos en tarjetas de estudio con IA.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Flashmente necesita acceso a tu galería para que puedas seleccionar imágenes de apuntes existentes y generar tarjetas de estudio.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Flashmente requiere permiso para guardar imágenes procesadas en tu fototeca si decides exportarlas.</string>
 </dict>
 </plist>

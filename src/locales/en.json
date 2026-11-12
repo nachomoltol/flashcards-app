@@ -305,6 +305,13 @@
     "error_save_failed": "Could not save card to Supabase. Check your connection."
   },
   "ai_uploader": {
+    "approach_label": "Question approach",
+    "approach_theoretical": "Theoretical",
+    "approach_theoretical_desc": "Direct concepts & facts",
+    "approach_practical": "Practical",
+    "approach_practical_desc": "Real-world cases & scenarios",
+    "tooltip_approach_title": "Theoretical vs. Practical Approach",
+    "tooltip_approach_body": "Choose Theoretical to memorize definitions, core concepts, legal terms, and exact facts (ideal for first study passes and retaining foundational knowledge). Choose Practical to formulate problem-based cases, clinical patient vignettes, legal scenarios, professional decision-making, and real-life applications.",
     "card_format_label": "Card Format",
     "card_count_label": "Card Quantity",
     "pdf_page_warning": "⚠️ Attention to numbering: Enter the page number indicated by the top counter of your PDF viewer (e.g. 96 of 569), NOT the number printed on the sheet corner. Cover pages and forewords cause these numbers not to match.",

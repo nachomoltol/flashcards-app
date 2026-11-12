@@ -114,6 +114,7 @@ export function ProModal({
     welcomeGenerations: number;
     tutorConsultationsCount?: number;
     tutorAdsUsed?: number;
+    tutorAdCredits?: number;
     adsUsedInCycle: number;
     remainingAds: number;
   } | null>(null);
@@ -138,6 +139,7 @@ export function ProModal({
           welcomeGenerations: res.welcomeGenerations,
           tutorConsultationsCount: res.tutorConsultationsCount,
           tutorAdsUsed: res.tutorAdsUsed,
+          tutorAdCredits: res.tutorAdCredits,
           adsUsedInCycle: res.adsUsedInCycle,
           remainingAds: res.remainingAds,
         });
@@ -363,9 +365,41 @@ export function ProModal({
         } catch (sessionErr) {
           console.warn('[ProModal] No se pudo obtener el token de sesión:', sessionErr);
         }
-        const claim = await claimAdRewardAction(user?.id, accessToken);
+        const isTutorReward = featureName === 'tutor';
+        const claim = await claimAdRewardAction(user?.id, accessToken, isTutorReward ? 'tutor' : 'deck');
 
         if (claim.success) {
+          if (isTutorReward) {
+            // Recompensa para el Profesor Socrático: actualización reactiva inmediata y ejecución directa
+            setUserLimits((prev) => {
+              const currentTutorCredits = prev?.tutorAdCredits ?? 0;
+              const newTutorCredits = currentTutorCredits + 1;
+              if (!prev) {
+                return {
+                  tier: 'free',
+                  count: 0,
+                  bonusCredits: 0,
+                  welcomeGenerations: 5,
+                  tutorAdCredits: newTutorCredits,
+                  adsUsedInCycle: 0,
+                  remainingAds: 25,
+                };
+              }
+              return {
+                ...prev,
+                tutorAdCredits: newTutorCredits,
+              };
+            });
+
+            fetchUserLimits();
+            setIsWatchingAd(false);
+            setAdLoadingPhase('idle');
+            close();
+            // Ejecutar inmediatamente la consulta que estaba esperando el anuncio
+            store.onRewardSuccess?.();
+            return;
+          }
+
           // 1. Actualización reactiva inmediata en la UI para descontar el contador
           setUserLimits((prev) => {
             const currentBonus = prev?.bonusCredits ?? 0;
@@ -374,13 +408,12 @@ export function ProModal({
                 ? claim.bonusCredits
                 : currentBonus + 1;
             const count = typeof claim.generationsCount === 'number' ? claim.generationsCount : (prev?.count ?? 0);
-            const tutorAdsUsed = prev?.tutorAdsUsed ?? 0;
             const adsUsedInCycle = typeof claim.adsUsedInCycle === 'number'
               ? claim.adsUsedInCycle
-              : (count + newBonus + tutorAdsUsed);
+              : (count + newBonus);
             const remainingAds = typeof claim.remainingAds === 'number'
               ? claim.remainingAds
-              : Math.max(0, 45 - adsUsedInCycle);
+              : Math.max(0, 25 - adsUsedInCycle);
 
             if (!prev) {
               return {
@@ -388,7 +421,6 @@ export function ProModal({
                 count,
                 bonusCredits: newBonus,
                 welcomeGenerations: 5,
-                tutorAdsUsed,
                 adsUsedInCycle,
                 remainingAds,
               };
@@ -606,6 +638,8 @@ export function ProModal({
               <p className="text-xs sm:text-sm font-medium text-zinc-600 dark:text-zinc-300 leading-normal">
                 {userLimits?.tier === 'pro' || userLimits?.tier === 'vip'
                   ? 'Has completado 120 generaciones este mes. Tu cuota se reinicia el día 1.'
+                  : platform.isNativeIOS
+                  ? 'Desbloquea generaciones adicionales viendo un breve vídeo sin coste:'
                   : 'Elige una de las dos opciones para continuar generando flashcards:'}
               </p>
             </div>
@@ -646,56 +680,54 @@ export function ProModal({
                  ======================================================= */}
               {platform.isNativeApp ? (
                 <div className="space-y-2.5 sm:space-y-3">
-                  {/* NIVEL 1 (PRIORITARIO / BOTÓN PRINCIPAL): PLAN PRO STRIPE */}
-                  <div className="relative p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-neutral-900 border-2 border-purple-600 dark:border-purple-500 shadow-md shadow-purple-500/10 dark:shadow-purple-950/40 space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-500/25 border border-purple-300 dark:border-purple-400/40 text-purple-900 dark:text-purple-200 text-[9px] font-bold uppercase tracking-wider">
-                          <Sparkles className="w-2.5 h-2.5 text-purple-600 dark:text-purple-300" />
-                          OPCIÓN 1 • RECOMENDADA
+                  {/* NIVEL 1 (PRIORITARIO / BOTÓN PRINCIPAL): PLAN PRO STRIPE (SOLO ANDROID / WEB) */}
+                  {!platform.isNativeIOS && (
+                    <div className="relative p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-neutral-900 border-2 border-purple-600 dark:border-purple-500 shadow-md shadow-purple-500/10 dark:shadow-purple-950/40 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-500/25 border border-purple-300 dark:border-purple-400/40 text-purple-900 dark:text-purple-200 text-[9px] font-bold uppercase tracking-wider">
+                            <Sparkles className="w-2.5 h-2.5 text-purple-600 dark:text-purple-300" />
+                            OPCIÓN 1 • RECOMENDADA
+                          </div>
+                          <h3 className="text-sm sm:text-base font-bold text-neutral-900 dark:text-white">
+                            Flashmente PRO — Alta Capacidad
+                          </h3>
                         </div>
-                        <h3 className="text-sm sm:text-base font-bold text-neutral-900 dark:text-white">
-                          Flashmente PRO — Alta Capacidad
-                        </h3>
+
+                        <div className="text-right pl-2 shrink-0">
+                          <div className="flex items-baseline justify-end gap-1">
+                            <span className="text-xl sm:text-2xl font-black text-neutral-950 dark:text-white tracking-tight">3,50€</span>
+                            <span className="text-xs font-bold text-purple-700 dark:text-purple-300">/mes</span>
+                          </div>
+                          <span className="text-[10px] font-medium text-neutral-600 dark:text-neutral-300 block -mt-0.5">Sin permanencia</span>
+                        </div>
                       </div>
 
-                      <div className="text-right pl-2 shrink-0">
-                        <div className="flex items-baseline justify-end gap-1">
-                          <span className="text-xl sm:text-2xl font-black text-neutral-950 dark:text-white tracking-tight">3,50€</span>
-                          <span className="text-xs font-bold text-purple-700 dark:text-purple-300">/mes</span>
-                        </div>
-                        <span className="text-[10px] font-medium text-neutral-600 dark:text-neutral-300 block -mt-0.5">Sin permanencia</span>
-                      </div>
-                    </div>
+                      <p className="text-xs text-neutral-700 dark:text-neutral-300 leading-snug">
+                        Alta Capacidad: Hasta 120 generaciones de mazos al mes (¡suficiente para todo tu temario!), sin pausas por anuncios y con acceso total.
+                      </p>
 
-                    <p className="text-xs text-neutral-700 dark:text-neutral-300 leading-snug">
-                      Alta Capacidad: Hasta 120 generaciones de mazos al mes (¡suficiente para todo tu temario!), sin pausas por anuncios y con acceso total.
-                    </p>
-
-                    {/* CUMPLIMIENTO GOOGLE PLAY & APP STORE (GUIDELINE 3.1.3): EN APP NATIVA NO SE MUESTRA CHECKOUT DE PAGO DIRECTO */}
-                    <div className="p-3 sm:p-3.5 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-500/30 text-purple-900 dark:text-purple-200 text-xs flex items-start gap-2.5 shadow-sm">
-                      <Globe className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0 mt-0.5" />
-                      {platform.isNativeIOS ? (
-                        <p className="leading-relaxed font-medium">
-                          Flashmente PRO está disponible para cuentas con suscripción activa. Esta versión móvil permite desbloquear generaciones adicionales mediante vídeos bonificados.
-                        </p>
-                      ) : (
+                      {/* CUMPLIMIENTO GOOGLE PLAY (GUIDELINE 3.1.3): EN APP NATIVA NO SE MUESTRA CHECKOUT DE PAGO DIRECTO */}
+                      <div className="p-3 sm:p-3.5 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-500/30 text-purple-900 dark:text-purple-200 text-xs flex items-start gap-2.5 shadow-sm">
+                        <Globe className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0 mt-0.5" />
                         <p className="leading-relaxed font-medium">
                           Gestiona o activa tu suscripción PRO desde nuestra web oficial <strong className="font-bold underline decoration-purple-400 underline-offset-2">flashmente.com</strong> iniciando sesión con esta misma cuenta.
                         </p>
-                      )}
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   {/* NIVEL 2 (ALTERNATIVA GRATUITA POR ANUNCIO): BOTÓN GRANDE Y VISTOSO */}
                   {(() => {
+                    const isTutor = featureName === 'tutor';
                     const isFreeTier = !userLimits || userLimits.tier === 'free';
-                    const isZeroBalance = isFreeTier && (userLimits?.bonusCredits ?? 0) <= 0;
-                    const tutorAdsUsed = userLimits?.tutorAdsUsed ?? Math.max(0, (userLimits?.tutorConsultationsCount || 0) - 3);
-                    const adsUsedInCycle = userLimits?.adsUsedInCycle ?? ((userLimits?.count || 0) + (userLimits?.bonusCredits || 0) + tutorAdsUsed);
+                    const isZeroBalance = isTutor
+                      ? isFreeTier && (userLimits?.tutorAdCredits ?? 0) <= 0
+                      : isFreeTier && (userLimits?.bonusCredits ?? 0) <= 0;
+                    const adsUsedInCycle = userLimits?.adsUsedInCycle ?? ((userLimits?.count || 0) + (userLimits?.bonusCredits || 0));
                     const remainingAds = userLimits?.remainingAds !== undefined
                       ? userLimits.remainingAds
-                      : Math.max(0, 45 - adsUsedInCycle);
+                      : Math.max(0, 25 - adsUsedInCycle);
 
                     return (
                       <div
@@ -709,28 +741,34 @@ export function ProModal({
                           <div className="space-y-0.5">
                             <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-500/25 border border-amber-300 dark:border-amber-400/60 text-amber-950 dark:text-amber-200 text-[10px] font-extrabold uppercase tracking-wider">
                               <Tv className="w-3 h-3 text-amber-700 dark:text-amber-300" />
-                              {isZeroBalance ? 'OPCIÓN RECOMENDADA EN MÓVIL • GRATIS' : 'OPCIÓN 2 • GRATUITA'}
+                              {isZeroBalance ? 'OPCIÓN RECOMENDADA EN MÓVIL • GRATIS' : platform.isNativeIOS ? 'ACCESO GRATUITO POR VÍDEO' : 'OPCIÓN 2 • GRATUITA'}
                             </div>
                             <h3 className="text-sm sm:text-base font-extrabold text-zinc-950 dark:text-white tracking-tight">
-                              Obtén saldo con un vídeo corto
+                              {isTutor ? 'Desbloquea esta consulta con un vídeo' : platform.isNativeIOS ? 'Desbloquea generaciones con un vídeo corto' : 'Obtén saldo con un vídeo corto'}
                             </h3>
                           </div>
 
                           <div className="text-right pl-2 shrink-0">
                             <span className="inline-block px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 border border-emerald-300 dark:border-emerald-500/40 text-emerald-950 dark:text-emerald-300 font-extrabold text-[10px]">
-                              +1 GRATIS
+                              {isTutor ? '+1 CONSULTA' : '+1 GRATIS'}
                             </span>
                           </div>
                         </div>
 
                         <p className="text-xs sm:text-sm font-medium text-zinc-700 dark:text-zinc-200 leading-snug">
-                          Mira un vídeo patrocinado de AdMob y tu generación se reanudará de inmediato.
+                          {isTutor
+                            ? 'Mira un vídeo patrocinado de AdMob y tu consulta con el Profesor Socrático se responderá al instante.'
+                            : 'Mira un vídeo patrocinado de AdMob y tu generación se reanudará de inmediato.'}
                         </p>
 
                         <div className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-900 dark:text-amber-300 font-mono">
-                          <span>Cupo mensual: hasta 45 anuncios</span>
+                          <span>{isTutor ? 'Consultas con anuncio: ILIMITADAS' : 'Cupo mensual: hasta 25 anuncios'}</span>
                           <strong className="font-bold">
-                            {remainingAds > 0 ? `${remainingAds} disponibles este mes` : 'Cupo mensual completado'}
+                            {isTutor
+                              ? 'Ilimitadas (1 anuncio / consulta)'
+                              : remainingAds > 0
+                              ? `${remainingAds} disponibles este mes`
+                              : 'Cupo mensual completado'}
                           </strong>
                         </div>
 
@@ -779,7 +817,7 @@ export function ProModal({
                             <button
                               type="button"
                               onClick={handleWatchAd}
-                              disabled={isWatchingAd || remainingAds <= 0}
+                              disabled={isWatchingAd || (!isTutor && remainingAds <= 0)}
                               className="w-full min-h-[44px] sm:min-h-[46px] inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:via-orange-400 hover:to-amber-500 text-neutral-950 font-bold text-xs sm:text-sm shadow-md shadow-amber-600/20 active:scale-[0.99] transition cursor-pointer disabled:opacity-80 disabled:cursor-not-allowed group"
                             >
                               {isWatchingAd ? (
@@ -791,12 +829,12 @@ export function ProModal({
                                       : t('pro_modal.admob_preparing', 'Preparando anuncio...')}
                                   </span>
                                 </>
-                              ) : remainingAds <= 0 ? (
-                                <span>Cupo mensual de 45 anuncios completado</span>
+                              ) : !isTutor && remainingAds <= 0 ? (
+                                <span>Cupo mensual de 25 anuncios completado</span>
                               ) : (
                                 <>
                                   <PlayCircle className="w-4 h-4 fill-neutral-950 text-amber-300 group-hover:scale-110 transition-transform shrink-0" />
-                                  <span>Ver vídeo corto (+1 generación gratis)</span>
+                                  <span>{isTutor ? 'Ver vídeo corto (+1 consulta gratis)' : 'Ver vídeo corto (+1 generación gratis)'}</span>
                                 </>
                               )}
                             </button>
@@ -983,11 +1021,11 @@ export function ProModal({
 
                   {/* NIVEL 2: OPCIÓN GRATUITA (DISPONIBLE EN APP ANDROID / FLUJO HÍBRIDO GUIADO) */}
                   {(() => {
-                    const tutorAdsUsed = userLimits?.tutorAdsUsed ?? Math.max(0, (userLimits?.tutorConsultationsCount || 0) - 3);
-                    const adsUsedInCycle = userLimits?.adsUsedInCycle ?? ((userLimits?.count || 0) + (userLimits?.bonusCredits || 0) + tutorAdsUsed);
+                    const isTutor = featureName === 'tutor';
+                    const adsUsedInCycle = userLimits?.adsUsedInCycle ?? ((userLimits?.count || 0) + (userLimits?.bonusCredits || 0));
                     const remainingAdsWeb = userLimits?.remainingAds !== undefined
                       ? userLimits.remainingAds
-                      : Math.max(0, 45 - adsUsedInCycle);
+                      : Math.max(0, 25 - adsUsedInCycle);
 
                     return (
                       <div className="relative p-3.5 sm:p-4 rounded-2xl bg-gradient-to-b from-amber-50/90 via-white to-amber-50/40 dark:from-neutral-900 dark:via-neutral-900 dark:to-neutral-950 border-2 border-amber-400 dark:border-amber-500/60 shadow-md shadow-amber-500/10 space-y-3">
@@ -998,13 +1036,17 @@ export function ProModal({
                               {isEn ? 'Free Option • Via Android App' : 'Opción Gratuita • Vía App Android'}
                             </div>
                             <h3 className="text-sm sm:text-base font-extrabold text-zinc-950 dark:text-white tracking-tight">
-                              {isEn ? 'Recharge balance from your mobile' : 'Recarga saldo desde tu móvil'}
+                              {isTutor
+                                ? (isEn ? 'Unlock consultation from your mobile' : 'Desbloquea consultas desde tu móvil')
+                                : (isEn ? 'Recharge balance from your mobile' : 'Recarga saldo desde tu móvil')}
                             </h3>
                           </div>
 
                           <div className="text-right pl-2 shrink-0">
                             <span className="inline-block px-2.5 py-0.5 rounded-full bg-amber-200/90 dark:bg-amber-500/30 border border-amber-400 dark:border-amber-400/70 text-amber-950 dark:text-amber-100 font-extrabold text-[10px] uppercase tracking-wider shadow-sm">
-                              {remainingAdsWeb > 0
+                              {isTutor
+                                ? (isEn ? 'Unlimited via Ads' : 'Ilimitadas con Anuncios')
+                                : remainingAdsWeb > 0
                                 ? (isEn ? `${remainingAdsWeb} available this month` : `${remainingAdsWeb} disponibles este mes`)
                                 : (isEn ? 'Monthly quota reached' : 'Cupo mensual completado')}
                             </span>
@@ -1115,211 +1157,232 @@ export function ProModal({
                100% PRO en todas las plataformas — CERO ANUNCIOS NI ADMOB.
                ========================================================================= */
             <div className="space-y-4 animate-in fade-in">
-              {/* Tarjeta Plan Mensual Alta Capacidad (3,50€/mes) */}
-              <div className="relative p-5 sm:p-6 rounded-2xl bg-white dark:bg-neutral-900 border-2 border-purple-600 dark:border-purple-500 shadow-xl shadow-purple-500/10 dark:shadow-purple-950/40 space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="space-y-1.5">
+              {platform.isNativeIOS ? (
+                <div className="relative p-5 sm:p-6 rounded-2xl bg-white dark:bg-neutral-900 border-2 border-purple-600 dark:border-purple-500 shadow-xl shadow-purple-500/10 dark:shadow-purple-950/40 space-y-4">
+                  <div className="space-y-2">
                     <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-500/25 border border-purple-300 dark:border-purple-400/40 text-purple-900 dark:text-purple-200 text-[10px] font-bold uppercase tracking-wider">
                       <Sparkles className="w-3 h-3 text-purple-600 dark:text-purple-300" />
-                      SUSCRIPCIÓN FLASHMENTE PRO
+                      ACCESO A FUNCIONES AVANZADAS
                     </div>
                     <h3 className="text-base sm:text-lg font-bold text-neutral-900 dark:text-white">
-                      Plan Mensual Alta Capacidad
+                      Generación Multimodal y Exportación
                     </h3>
-                    <p className="text-xs text-neutral-700 dark:text-neutral-300 leading-relaxed max-w-md">
-                      Alta Capacidad: Hasta 120 generaciones de mazos al mes (¡suficiente para todo tu temario!), generación desde Vídeo, Audio, PDF, Tutor Socrático 24/7 y exportación a PDF.
+                    <p className="text-xs text-neutral-700 dark:text-neutral-300 leading-relaxed">
+                      Las funciones avanzadas de procesamiento están disponibles para cuentas sincronizadas. En esta versión para iOS dispones de una experiencia completa de estudio con cuota gratuita ampliable mediante vídeos bonificados.
                     </p>
                   </div>
-
-                  <div className="text-right pl-3 shrink-0">
-                    <div className="flex items-baseline justify-end gap-1">
-                      <span className="text-3xl sm:text-4xl font-black text-neutral-950 dark:text-white tracking-tight">3,50€</span>
-                      <span className="text-xs font-bold text-purple-700 dark:text-purple-300">/mes</span>
-                    </div>
-                    <span className="text-[10px] font-medium text-neutral-600 dark:text-neutral-300 block mt-0.5">Sin permanencia</span>
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      onClick={handleClose}
+                      className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold text-xs sm:text-sm transition cursor-pointer shadow-md shadow-purple-700/20 active:scale-[0.99]"
+                    >
+                      Entendido, continuar
+                    </button>
                   </div>
                 </div>
-
-                {/* BOTÓN DIRECTO A STRIPE EN WEB / MENSAJE INFORMATIVO EN APPS NATIVAS (GOOGLE PLAY & APP STORE 3.1.1 / 3.1.3) */}
-                {platform.isNativeApp ? (
-                  <div className="p-3.5 sm:p-4 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-500/30 text-purple-900 dark:text-purple-200 text-xs sm:text-sm flex items-start gap-2.5 shadow-sm">
-                    <Globe className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600 dark:text-purple-400 shrink-0 mt-0.5" />
-                    {platform.isNativeIOS ? (
-                      <p className="leading-relaxed font-medium">
-                        Flashmente PRO está disponible para cuentas con suscripción activa. Esta versión móvil permite desbloquear generaciones adicionales mediante vídeos bonificados.
+              ) : (
+                <div className="relative p-5 sm:p-6 rounded-2xl bg-white dark:bg-neutral-900 border-2 border-purple-600 dark:border-purple-500 shadow-xl shadow-purple-500/10 dark:shadow-purple-950/40 space-y-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1.5">
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-500/25 border border-purple-300 dark:border-purple-400/40 text-purple-900 dark:text-purple-200 text-[10px] font-bold uppercase tracking-wider">
+                        <Sparkles className="w-3 h-3 text-purple-600 dark:text-purple-300" />
+                        SUSCRIPCIÓN FLASHMENTE PRO
+                      </div>
+                      <h3 className="text-base sm:text-lg font-bold text-neutral-900 dark:text-white">
+                        Plan Mensual Alta Capacidad
+                      </h3>
+                      <p className="text-xs text-neutral-700 dark:text-neutral-300 leading-relaxed max-w-md">
+                        Alta Capacidad: Hasta 120 generaciones de mazos al mes (¡suficiente para todo tu temario!), generación desde Vídeo, Audio, PDF, Tutor Socrático 24/7 y exportación a PDF.
                       </p>
-                    ) : (
+                    </div>
+
+                    <div className="text-right pl-3 shrink-0">
+                      <div className="flex items-baseline justify-end gap-1">
+                        <span className="text-3xl sm:text-4xl font-black text-neutral-950 dark:text-white tracking-tight">3,50€</span>
+                        <span className="text-xs font-bold text-purple-700 dark:text-purple-300">/mes</span>
+                      </div>
+                      <span className="text-[10px] font-medium text-neutral-600 dark:text-neutral-300 block mt-0.5">Sin permanencia</span>
+                    </div>
+                  </div>
+
+                  {/* BOTÓN DIRECTO A STRIPE EN WEB / MENSAJE INFORMATIVO EN APPS NATIVAS (GOOGLE PLAY 3.1.3) */}
+                  {platform.isNativeApp ? (
+                    <div className="p-3.5 sm:p-4 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-500/30 text-purple-900 dark:text-purple-200 text-xs sm:text-sm flex items-start gap-2.5 shadow-sm">
+                      <Globe className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600 dark:text-purple-400 shrink-0 mt-0.5" />
                       <p className="leading-relaxed font-medium">
                         Gestiona o activa tu suscripción PRO desde nuestra web oficial <strong className="font-bold underline decoration-purple-400 underline-offset-2">flashmente.com</strong> iniciando sesión con esta misma cuenta.
                       </p>
-                    )}
-                  </div>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      onClick={handleSubscribe}
-                      disabled={isSubscribing}
-                      className="w-full min-h-[50px] inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-violet-600 hover:from-purple-500 hover:via-indigo-500 hover:to-violet-500 text-white font-bold text-sm shadow-xl shadow-purple-700/30 active:scale-[0.99] transition cursor-pointer disabled:opacity-70 group"
-                    >
-                      {isSubscribing ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-white/80 border-t-transparent rounded-full animate-spin" />
-                          <span>{t('pro_modal.connecting_gateway', 'Conectando con pasarela segura...')}</span>
-                        </>
-                      ) : (
-                        <>
-                          <CreditCard className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                          <span>{t('pro_modal.cta_subscribe', 'Suscribirse ahora')} — 3,50 €/mes</span>
-                          <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-                        </>
-                      )}
-                    </button>
-
-                    {stripeNotice && (
-                      <div className="p-2.5 rounded-xl bg-purple-100 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-500/30 text-purple-800 dark:text-purple-200 text-xs text-center animate-in fade-in">
-                        <p>{stripeNotice}</p>
-                      </div>
-                    )}
-
-                    <div className="flex items-center justify-center gap-2 text-[11px] text-neutral-500 dark:text-neutral-400 pt-1">
-                      <Lock className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                      <span>{t('pro_modal.stripe_notice', 'Transacción 100% segura y encriptada procesada por Stripe')}</span>
                     </div>
-                  </>
-                )}
-              </div>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleSubscribe}
+                        disabled={isSubscribing}
+                        className="w-full min-h-[50px] inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-violet-600 hover:from-purple-500 hover:via-indigo-500 hover:to-violet-500 text-white font-bold text-sm shadow-xl shadow-purple-700/30 active:scale-[0.99] transition cursor-pointer disabled:opacity-70 group"
+                      >
+                        {isSubscribing ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white/80 border-t-transparent rounded-full animate-spin" />
+                            <span>{t('pro_modal.connecting_gateway', 'Conectando con pasarela segura...')}</span>
+                          </>
+                        ) : (
+                          <>
+                            <CreditCard className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                            <span>{t('pro_modal.cta_subscribe', 'Suscribirse ahora')} — 3,50 €/mes</span>
+                            <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+                          </>
+                        )}
+                      </button>
+
+                      {stripeNotice && (
+                        <div className="p-2.5 rounded-xl bg-purple-100 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-500/30 text-purple-800 dark:text-purple-200 text-xs text-center animate-in fade-in">
+                          <p>{stripeNotice}</p>
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-center gap-2 text-[11px] text-neutral-500 dark:text-neutral-400 pt-1">
+                        <Lock className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                        <span>{t('pro_modal.stripe_notice', 'Transacción 100% segura y encriptada procesada por Stripe')}</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
           {/* =========================================================================
-              CANJEAR CÓDIGO PROMOCIONAL O VIP
+              CANJEAR CÓDIGO PROMOCIONAL O VIP (OCULTO EN IOS NATIVO: GUIDELINE 3.1.1)
               (Colapsable en límite agotado para asegurar cero scroll móvil)
               ========================================================================= */}
-          {isLimitReached ? (
-            <div className="pt-1 text-center">
-              {!showPromoCode ? (
-                <button
-                  type="button"
-                  onClick={() => setShowPromoCode(true)}
-                  className="text-xs font-medium text-zinc-500 hover:text-purple-600 dark:text-zinc-400 dark:hover:text-zinc-200 underline underline-offset-4 cursor-pointer transition inline-flex items-center gap-1.5 py-0.5"
-                >
-                  <Ticket className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-                  <span>{t('pro_modal.promo_title', '¿Tienes un código promocional o VIP?')}</span>
-                </button>
-              ) : (
-                <div className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-neutral-900/90 border border-zinc-200 dark:border-neutral-800 space-y-2 text-left animate-in fade-in shadow-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
-                      <Ticket className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-                      Canjear código
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setShowPromoCode(false)}
-                      className="text-xs font-medium text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors cursor-pointer"
-                    >
-                      Ocultar
-                    </button>
-                  </div>
-                  <form onSubmit={handleRedeemCode} className="space-y-1.5">
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={promoCode}
-                        onChange={(e) => {
-                          setPromoCode(e.target.value.toUpperCase());
-                          if (redeemStatus) setRedeemStatus(null);
-                        }}
-                        placeholder="EJ: ESTUDIANTE2026"
-                        className="flex-1 bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 focus:border-purple-500 rounded-xl px-3 py-1.5 text-xs text-neutral-900 dark:text-white uppercase font-mono tracking-wider"
-                        disabled={isRedeeming}
-                      />
+          {!platform.isNativeIOS && (
+            isLimitReached ? (
+              <div className="pt-1 text-center">
+                {!showPromoCode ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowPromoCode(true)}
+                    className="text-xs font-medium text-zinc-500 hover:text-purple-600 dark:text-zinc-400 dark:hover:text-zinc-200 underline underline-offset-4 cursor-pointer transition inline-flex items-center gap-1.5 py-0.5"
+                  >
+                    <Ticket className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                    <span>{t('pro_modal.promo_title', '¿Tienes un código promocional o VIP?')}</span>
+                  </button>
+                ) : (
+                  <div className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-neutral-900/90 border border-zinc-200 dark:border-neutral-800 space-y-2 text-left animate-in fade-in shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                        <Ticket className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                        Canjear código
+                      </span>
                       <button
-                        type="submit"
-                        disabled={isRedeeming || !promoCode.trim()}
-                        className="px-3.5 py-1.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-200 text-white dark:text-neutral-900 font-semibold text-xs"
+                        type="button"
+                        onClick={() => setShowPromoCode(false)}
+                        className="text-xs font-medium text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors cursor-pointer"
                       >
-                        {isRedeeming ? '...' : 'Canjear'}
+                        Ocultar
                       </button>
                     </div>
-                    {redeemStatus && (
-                      <p className={`text-xs ${redeemStatus.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
-                        {redeemStatus.message}
-                      </p>
-                    )}
-                  </form>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-neutral-950/70 border border-neutral-200 dark:border-neutral-800/80 space-y-2.5">
-              <div className="flex items-center gap-2">
-                <Ticket className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                <h3 className="text-xs font-semibold text-neutral-900 dark:text-white">
-                  {t('pro_modal.promo_title', '¿Tienes un código promocional o VIP?')}
-                </h3>
-              </div>
-              <p className="text-[11px] text-neutral-600 dark:text-neutral-400">
-                {t('pro_modal.promo_desc', 'Canjea tu bono para activar el nivel VIP con generaciones ilimitadas.')}
-              </p>
-
-              <form onSubmit={handleRedeemCode} className="space-y-2 pt-1">
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    id="promo-code-input"
-                    value={promoCode}
-                    onChange={(e) => {
-                      setPromoCode(e.target.value.toUpperCase());
-                      if (redeemStatus) setRedeemStatus(null);
-                    }}
-                    placeholder={t('pro_modal.promo_placeholder', 'EJ: ESTUDIANTE2026')}
-                    className="flex-1 bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 focus:border-purple-500 rounded-xl px-3.5 py-2 text-xs text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none uppercase tracking-wider font-mono transition"
-                    disabled={isRedeeming}
-                  />
-                  <button
-                    type="submit"
-                    disabled={isRedeeming || !promoCode.trim()}
-                    className="px-4 py-2 rounded-xl bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 border border-neutral-300 dark:border-neutral-700 text-neutral-900 dark:text-white font-medium text-xs flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
-                  >
-                    {isRedeeming ? (
-                      <div className="w-3.5 h-3.5 border-2 border-neutral-600 dark:border-white/80 border-t-transparent rounded-full animate-spin" />
-                    ) : (
-                      <span>{t('pro_modal.promo_button', 'Canjear')}</span>
-                    )}
-                  </button>
-                </div>
-
-                {redeemStatus && (
-                  <div
-                    className={`p-2.5 rounded-xl text-xs flex items-center gap-2 animate-in fade-in ${
-                      redeemStatus.type === 'success'
-                        ? 'bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/30 text-emerald-800 dark:text-emerald-200'
-                        : 'bg-red-50 dark:bg-red-500/15 border border-red-200 dark:border-red-500/30 text-red-800 dark:text-red-200'
-                    }`}
-                  >
-                    {redeemStatus.type === 'success' ? (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                    ) : (
-                      <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0" />
-                    )}
-                    <div className="leading-snug">
-                      <p className="font-semibold">{redeemStatus.message}</p>
-                      {redeemStatus.tier && (
-                        <p className="text-[11px] opacity-90 mt-0.5">
-                          {t('pro_modal.active_tier', 'Nivel activo:')}{' '}
-                          <span className="uppercase font-bold tracking-wider">
-                            {redeemStatus.tier}
-                          </span>{' '}
-                          {t('pro_modal.unlimited_gens', '(Hasta 120 generaciones/mes)')}
+                    <form onSubmit={handleRedeemCode} className="space-y-1.5">
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={promoCode}
+                          onChange={(e) => {
+                            setPromoCode(e.target.value.toUpperCase());
+                            if (redeemStatus) setRedeemStatus(null);
+                          }}
+                          placeholder="EJ: ESTUDIANTE2026"
+                          className="flex-1 bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 focus:border-purple-500 rounded-xl px-3 py-1.5 text-xs text-neutral-900 dark:text-white uppercase font-mono tracking-wider"
+                          disabled={isRedeeming}
+                        />
+                        <button
+                          type="submit"
+                          disabled={isRedeeming || !promoCode.trim()}
+                          className="px-3.5 py-1.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-200 text-white dark:text-neutral-900 font-semibold text-xs"
+                        >
+                          {isRedeeming ? '...' : 'Canjear'}
+                        </button>
+                      </div>
+                      {redeemStatus && (
+                        <p className={`text-xs ${redeemStatus.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
+                          {redeemStatus.message}
                         </p>
                       )}
-                    </div>
+                    </form>
                   </div>
                 )}
-              </form>
-            </div>
+              </div>
+            ) : (
+              <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-neutral-950/70 border border-neutral-200 dark:border-neutral-800/80 space-y-2.5">
+                <div className="flex items-center gap-2">
+                  <Ticket className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                  <h3 className="text-xs font-semibold text-neutral-900 dark:text-white">
+                    {t('pro_modal.promo_title', '¿Tienes un código promocional o VIP?')}
+                  </h3>
+                </div>
+                <p className="text-[11px] text-neutral-600 dark:text-neutral-400">
+                  {t('pro_modal.promo_desc', 'Canjea tu bono para activar el nivel VIP con generaciones ilimitadas.')}
+                </p>
+
+                <form onSubmit={handleRedeemCode} className="space-y-2 pt-1">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      id="promo-code-input"
+                      value={promoCode}
+                      onChange={(e) => {
+                        setPromoCode(e.target.value.toUpperCase());
+                        if (redeemStatus) setRedeemStatus(null);
+                      }}
+                      placeholder={t('pro_modal.promo_placeholder', 'EJ: ESTUDIANTE2026')}
+                      className="flex-1 bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 focus:border-purple-500 rounded-xl px-3.5 py-2 text-xs text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none uppercase tracking-wider font-mono transition"
+                      disabled={isRedeeming}
+                    />
+                    <button
+                      type="submit"
+                      disabled={isRedeeming || !promoCode.trim()}
+                      className="px-4 py-2 rounded-xl bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 border border-neutral-300 dark:border-neutral-700 text-neutral-900 dark:text-white font-medium text-xs flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                    >
+                      {isRedeeming ? (
+                        <div className="w-3.5 h-3.5 border-2 border-neutral-600 dark:border-white/80 border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <span>{t('pro_modal.promo_button', 'Canjear')}</span>
+                      )}
+                    </button>
+                  </div>
+
+                  {redeemStatus && (
+                    <div
+                      className={`p-2.5 rounded-xl text-xs flex items-center gap-2 animate-in fade-in ${
+                        redeemStatus.type === 'success'
+                          ? 'bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/30 text-emerald-800 dark:text-emerald-200'
+                          : 'bg-red-50 dark:bg-red-500/15 border border-red-200 dark:border-red-500/30 text-red-800 dark:text-red-200'
+                      }`}
+                    >
+                      {redeemStatus.type === 'success' ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      ) : (
+                        <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0" />
+                      )}
+                      <div className="leading-snug">
+                        <p className="font-semibold">{redeemStatus.message}</p>
+                        {redeemStatus.tier && (
+                          <p className="text-[11px] opacity-90 mt-0.5">
+                            {t('pro_modal.active_tier', 'Nivel activo:')}{' '}
+                            <span className="uppercase font-bold tracking-wider">
+                              {redeemStatus.tier}
+                            </span>{' '}
+                            {t('pro_modal.unlimited_gens', '(Hasta 120 generaciones/mes)')}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </form>
+              </div>
+            )
           )}
 
           {/* Tarjeta de Beneficios Destacados (Solo en Hard Paywall, ocultos en límite agotado para asegurar cero scroll móvil) */}

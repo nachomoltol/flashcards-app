@@ -9,9 +9,23 @@ import { PDFDocument } from 'pdf-lib';
 import { YoutubeTranscript } from 'youtube-transcript';
 import { createClient } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
-import { randomizeMultipleChoiceCard } from '@/lib/cardUtils';
+import { randomizeMultipleChoiceCard, stripOptionPrefix, sanitizeCardFrontText } from '@/lib/cardUtils';
 import { deduplicateCandidateCards } from '@/lib/cardDeduplication';
 import { GEMINI_DEFAULT_MODEL } from '@/lib/aiConfig';
+import {
+  PRACTICAL_MODE_DIRECTIVE,
+  EXHAUSTIVE_MODE_MANDATE,
+  buildDidacticModeDirective,
+  buildUniversalCalibrationDirective,
+  buildUniversalTablesDirective,
+  ZERO_MISMATCH_DIRECTIVE,
+  DISTRACTOR_VEROSIMILITUDE_DIRECTIVE,
+  TEXT_DENSITY_ADAPTIVE_DISTRACTOR_DIRECTIVE,
+  EXCLUSION_ANALOGIES_DIRECTIVE,
+  NO_EDITORIAL_REFERENCES_DIRECTIVE,
+  CHAPTER_SUMMARY_PAGES_DIRECTIVE,
+  MULTIPLE_CHOICE_PROCESS_DIRECTIVE,
+} from '@/lib/aiDirectives';
 import type {
   CardFormat,
   GeneratedCard,
@@ -22,171 +36,157 @@ import type {
   TargetAudience,
 } from '@/types/cards';
 
-const flashcardSchema = {
-  type: Type.OBJECT,
-  description: 'Objeto con tarjetas de estudio de alta precisión y radar de profundidad',
-  properties: {
-    conceptos_identificados: {
-      type: Type.ARRAY,
-      description:
-        'Antes de crear las tarjetas, analiza el texto y haz un listado interno de conceptos clave, datos numéricos o hechos únicos presentes en el texto que NO estén en el historial de tarjetas previas. Usa esta lista como mapa para generar el array de cards.',
-      items: {
-        type: Type.STRING,
-      },
-    },
-    core_exhausted: {
-      type: Type.BOOLEAN,
-      description:
-        'true ÚNICAMENTE si la LISTA TRONCAL se ha vaciado matemáticamente y todos los conceptos principales del material ya han sido extraídos en tarjetas existentes o en este lote; false si aún queda al menos un concepto troncal por evaluar.',
-    },
-    cards: {
-      type: Type.ARRAY,
-      description:
-        'Array dinámico con tarjetas de estudio de alta precisión según el formato solicitado (multiple_choice, basic, cloze o true_false). Puede contener cualquier número de tarjetas de 1 a 30 sin longitud fija obligatoria.',
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          generation_index: {
-            type: Type.INTEGER,
-            description:
-              'Índice secuencial estricto obligatorio de la tarjeta (1, 2, 3... del lote generado).',
-          },
-          justification: {
-            type: Type.STRING,
-            description:
-              'Razonamiento factual, cálculo o cita técnica extraída del documento que justifica con rigor absoluto la respuesta ANTES de marcar la opción correcta (Chain of Thought).',
-          },
-          question: {
-            type: Type.STRING,
-            description:
-              'Enunciado limpio y directo de la pregunta sin letras ni opciones.',
-          },
-          options: {
-            type: Type.ARRAY,
-            description:
-              'Array con exactamente 4 opciones de respuesta distintas para multiple_choice: [opción 0, opción 1, opción 2, opción 3]. Omitir o dejar vacío en basic, cloze o true_false.',
-            items: {
-              type: Type.STRING,
-            },
-          },
-          correct_option_index: {
-            type: Type.INTEGER,
-            description:
-              'Índice numérico de 0 a 3 de la opción verdadera en el array options (0 para la primera, 1 para la segunda, 2 para la tercera, 3 para la cuarta). Exclusivo de multiple_choice.',
-          },
-          front: {
-            type: Type.STRING,
-            description:
-              'Anverso de la tarjeta según el formato solicitado (pregunta directa para basic, texto con [...] para cloze, afirmación categórica para true_false, o pregunta con opciones a-d para multiple_choice).',
-          },
-          back: {
-            type: Type.STRING,
-            description:
-              'Respuesta exacta seguida obligatoriamente de la explicación y justificación técnica basada en el documento.',
-          },
-          cardFormat: {
-            type: Type.STRING,
-            description: 'Formato de la tarjeta: "multiple_choice", "basic", "cloze" o "true_false"',
-          },
-        },
-        required: ['generation_index', 'front', 'back', 'cardFormat'],
-      },
-    },
+interface FactualItem {
+  id: string;
+  tipo: string;
+  declaracion_factual: string;
+}
+
+const factualItemSchemaProperties = {
+  id: {
+    type: Type.STRING,
+    description: 'Identificador correlativo del hecho (ej. H1, H2, H3...).',
   },
-  required: ['conceptos_identificados', 'core_exhausted', 'cards'],
+  tipo: {
+    type: Type.STRING,
+    description:
+      'Dimensión del hecho extraído: "1_identidad_definicion" (qué es, naturaleza o concepto), "2_funcion_mecanismo" (para qué sirve, cómo actúa, proceso), "3_origen_fuente_requisitos" (de dónde procede, cómo se obtiene/absorbe, inputs o legitimación), "4_consecuencia_falla_limite" (qué pasa si falta/sobra, patología, sanción, excepción o límite), o "5_detalle_tabla_nota" (cruce comparativo de tabla, cifra crítica o nota técnica en modo exhaustivo).',
+  },
+  declaracion_factual: {
+    type: Type.STRING,
+    description:
+      'Declaración fáctica atómica, precisa e inequívoca extraída fielmente del material analizado.',
+  },
 };
 
+const factualItemRequiredFields = ['id', 'tipo', 'declaracion_factual'];
+
+const cardItemSchemaProperties = {
+  generation_index: {
+    type: Type.INTEGER,
+    description:
+      'Índice secuencial estricto obligatorio de la tarjeta (1, 2, 3... de la página procesada).',
+  },
+  justification: {
+    type: Type.STRING,
+    description:
+      'Razonamiento factual, cálculo o cita técnica extraída del documento que justifica con rigor absoluto la respuesta ANTES de marcar la opción correcta (Chain of Thought).',
+  },
+  question: {
+    type: Type.STRING,
+    description:
+      'Enunciado limpio y directo de la pregunta sin letras ni opciones.',
+  },
+  options: {
+    type: Type.ARRAY,
+    description:
+      'Array con exactamente 4 opciones de respuesta distintas para multiple_choice: [opción 0, opción 1, opción 2, opción 3]. Omitir o dejar vacío en basic, cloze o true_false.',
+    items: {
+      type: Type.STRING,
+    },
+  },
+  correct_option_index: {
+    type: Type.INTEGER,
+    description:
+      'Índice numérico de 0 a 3 de la opción verdadera en el array options (0 para la primera, 1 para la segunda, 2 para la tercera, 3 para la cuarta). Exclusivo de multiple_choice.',
+  },
+  front: {
+    type: Type.STRING,
+    description:
+      'Anverso de la tarjeta según el formato solicitado (pregunta directa para basic, texto con [...] para cloze, afirmación categórica para true_false, o pregunta con opciones a-d para multiple_choice).',
+  },
+  back: {
+    type: Type.STRING,
+    description:
+      'Respuesta exacta seguida obligatoriamente de la explicación y justificación técnica basada en el documento.',
+  },
+  cardFormat: {
+    type: Type.STRING,
+    description: 'Formato de la tarjeta: "multiple_choice", "basic", "cloze" o "true_false"',
+  },
+  relevance_tier: {
+    type: Type.STRING,
+    description:
+      'Nivel de valor examinable de esta tarjeta: "A_core" (evalúa una de las 4 dimensiones troncales: definición/identidad, mecanismo/función, origen/fuente/requisito, o consecuencia/patología/límite), "B_exam_detail" (evalúa un dato cuantitativo fino, matiz diferencial, excepción o extremo de tabla), o "C_trivial_filler" (pregunta de relleno irrelevante, obvia, sacada de un pie de foto decorativo, introducción anecdótica o repetida solo para intentar alcanzar el cupo en una página con poco texto).',
+  },
+};
+
+const cardItemRequiredFields = [
+  'generation_index',
+  'front',
+  'back',
+  'cardFormat',
+  'options',
+  'correct_option_index',
+];
+
 /**
- * Esquema de extracción universal página por página (sin límites artificiales mínimos ni máximos)
+ * Esquema unificado de extracción de conocimiento con Inventario Factual previo.
+ * Fuerza a Gemini a desglosar primero todos los hechos atómicos del texto antes de generar las tarjetas.
  */
-const singlePageExtractionSchema = {
+const unifiedExtractionSchema = {
   type: Type.OBJECT,
-  description: 'Objeto de extracción universal de conocimiento por página',
+  description:
+    'Objeto de extracción universal de conocimiento con inventario factual previo y tarjetas de estudio',
   properties: {
-    conceptos_identificados: {
+    inventario_factual: {
       type: Type.ARRAY,
       description:
-        'Listado de conceptos clave, datos precisos, normativas o hechos únicos identificados en esta página.',
+        'Mapeo obligatorio previo de TODOS los conceptos y hechos evaluables de la página analizada. Para cada entidad o tema de la página, debes rastrear e inventariar activamente sus 4 dimensiones presentes en el texto (1_identidad_definicion, 2_funcion_mecanismo, 3_origen_fuente_requisitos, 4_consecuencia_falla_limite) más los detalles de tablas/notas si aplica. Cada ítem de este inventario DEBE transformarse obligatoriamente en una tarjeta dentro de "cards".',
       items: {
-        type: Type.STRING,
+        type: Type.OBJECT,
+        properties: factualItemSchemaProperties,
+        required: factualItemRequiredFields,
       },
     },
     core_exhausted: {
       type: Type.BOOLEAN,
       description:
-        'true si la página está casi vacía o se han extraído absolutamente todos sus conceptos relevantes; false si aún contiene información.',
+        'true si el material o página está casi vacío o se han extraído absolutamente todos sus conceptos relevantes; false si aún contiene información adicional por evaluar.',
+    },
+    page_classification: {
+      type: Type.STRING,
+      description:
+        'Clasificación estructural de la página actual: "standard_content" (páginas con desarrollo teórico normal Y TAMBIÉN páginas que contengan Tablas Conceptuales, Sintéticas o Comparativas de estudio que relacionen categorías, tipos, agentes o elementos con sus orígenes, funciones, mecanismos, normativas o efectos, las cuales deben desglosarse íntegramente al 100%), "catalog_table_only" (reservado EXCLUSIVAMENTE para páginas compuestas casi en su totalidad por un directorio o listado masivo de consulta de decenas de ejemplos o baremos numéricos repetitivos sin desarrollo conceptual), o "review_or_case_exercises" (páginas finales de capítulo con cuestionarios de Repaso, Autoevaluación o Ejercicios para el alumno).',
     },
     cards: {
       type: Type.ARRAY,
       description:
-        'Array dinámico con todas las tarjetas de estudio extraídas de esta página según el formato solicitado, sin límite máximo ni mínimo artificial.',
+        'Array dinámico con tarjetas de estudio de alta precisión según el formato solicitado, donde cada tarjeta evalúa directa y rigurosamente los hechos catalogados en el inventario_factual.',
       items: {
         type: Type.OBJECT,
-        properties: {
-          generation_index: {
-            type: Type.INTEGER,
-            description:
-              'Índice secuencial estricto obligatorio de la tarjeta (1, 2, 3... de la página procesada).',
-          },
-          justification: {
-            type: Type.STRING,
-            description:
-              'Razonamiento factual, cálculo o cita técnica extraída del documento que justifica con rigor absoluto la respuesta ANTES de marcar la opción correcta (Chain of Thought).',
-          },
-          question: {
-            type: Type.STRING,
-            description:
-              'Enunciado limpio y directo de la pregunta sin letras ni opciones.',
-          },
-          options: {
-            type: Type.ARRAY,
-            description:
-              'Array con exactamente 4 opciones de respuesta distintas para multiple_choice: [opción 0, opción 1, opción 2, opción 3]. Omitir o dejar vacío en basic, cloze o true_false.',
-            items: {
-              type: Type.STRING,
-            },
-          },
-          correct_option_index: {
-            type: Type.INTEGER,
-            description:
-              'Índice numérico de 0 a 3 de la opción verdadera en el array options (0 para la primera, 1 para la segunda, 2 para la tercera, 3 para la cuarta). Exclusivo de multiple_choice.',
-          },
-          front: {
-            type: Type.STRING,
-            description:
-              'Anverso de la tarjeta según el formato solicitado (pregunta directa para basic, texto con [...] para cloze, afirmación categórica para true_false, o pregunta con opciones a-d para multiple_choice).',
-          },
-          back: {
-            type: Type.STRING,
-            description:
-              'Respuesta exacta seguida obligatoriamente de la explicación y justificación técnica basada en el documento.',
-          },
-          cardFormat: {
-            type: Type.STRING,
-            description: 'Formato de la tarjeta: "multiple_choice", "basic", "cloze" o "true_false"',
-          },
-        },
-        required: ['generation_index', 'front', 'back', 'cardFormat'],
+        properties: cardItemSchemaProperties,
+        required: cardItemRequiredFields,
       },
     },
   },
-  required: ['conceptos_identificados', 'cards'],
+  required: ['inventario_factual', 'cards'],
 };
+
+// Aliases unificados para garantizar compatibilidad retroactiva total
+const flashcardSchema = unifiedExtractionSchema;
+const singlePageExtractionSchema = unifiedExtractionSchema;
+const tieredExhaustiveExtractionSchema = unifiedExtractionSchema;
+
+void flashcardSchema;
+void singlePageExtractionSchema;
+void tieredExhaustiveExtractionSchema;
 
 /**
  * REGLA INQUEBRANTABLE DE RELEVANCIA COGNITIVA:
  * Erradica preguntas sobre artefactos de maquetación, notas al pie editoriales, símbolos tipográficos,
  * índices/glosarios marginales, datos biográficos ficticios o permisos editoriales.
  */
-const EDITORIAL_ARTIFACTS_DIRECTIVE = `REGLA DE EXCLUSIÓN DE METADATOS Y ESTRUCTURA EDITORIAL:
-- Queda estrictamente PROHIBIDO generar preguntas sobre cajas de 'Términos Clave', vocabularios al margen o listas de conceptos que sirvan de índice en el documento. La evaluación debe versar sobre la explicación teórica, la evidencia o los datos descritos en los párrafos, gráficos y tablas, NUNCA sobre la presencia o ausencia de palabras en un recuadro de términos.
-- Queda estrictamente PROHIBIDO generar preguntas sobre datos anecdóticos de personajes ficticios en casos de estudio (ej. peso en la infancia, pertenencia a equipos escolares de personajes ficticios) o notas de créditos editoriales (ej. 'reimpreso con permiso de...'). Concéntrate en la clínica, la patología, la intervención nutricional y el fundamento fisiológico.
-- PROHIBICIÓN ESTRICTA SOBRE MENÚS Y DATOS ANECTÓDICOS DE CASOS FICTICIOS:
-  * Queda terminantemente PROHIBIDO generar preguntas sobre detalles accesorios o gramaticales de platillos/menús de casos de estudio ficticios (ej. peso en gramos del pan de ajo, tamaño de las albóndigas, marcas de aderezos caseros o ingredientes secundarios de ejemplos narrativos).
-  * Las preguntas clínicas deben centrarse EXCLUSIVAMENTE en la patología médica, los requerimientos energéticos/nutricionales oficiales, la fisiología, el cálculo de gasto metabólico o los lineamientos dietéticos universales, NUNCA en la memorización de los gramos de comida descritos en un ejemplo narrativo de personaje.
-- Tienes TERMINANTEMENTE PROHIBIDO formular preguntas sobre la estructura editorial o gráfica del documento (por ejemplo: 'según el símbolo †', 'qué indica el asterisco', 'qué significan los números entre paréntesis en la tabla', 'en qué columna se encuentra X', 'según la nota al pie').
-- Si una tabla o pie de página contiene datos relevantes (ej. gramos de fibra, dosis clínicas, fechas, normativas), formula la pregunta DIRECTAMENTE sobre el concepto o hecho real (ej: '¿Cuántos gramos de fibra por ración aportan las frambuesas?' en lugar de '¿Qué fruta tiene el valor (4) según el Cuadro 4-3?').
-- Pregunta SIEMPRE por el conocimiento sustancial, conceptual y factual, nunca por cómo fue maquetado, listado o simbolizado en el libro.`;
+const EDITORIAL_ARTIFACTS_DIRECTIVE = `REGLA UNIVERSAL DE EXCLUSIÓN DE METADATOS Y ESTRUCTURA EDITORIAL:
+- Queda estrictamente PROHIBIDO formular preguntas sobre cajas de 'Términos Clave', vocabularios al margen, índices o glosarios que sirvan de resumen o listado en el documento. La evaluación debe versar sobre la explicación teórica, la evidencia, las relaciones o los datos descritos en el cuerpo del texto, NUNCA sobre la presencia o ausencia de palabras en un recuadro accesorio.
+- Queda estrictamente PROHIBIDO formular preguntas sobre datos anecdóticos de personajes ficticios en viñetas o ejemplos narrativos (ej. nombres de personajes en supuestos pedagógicos, datos biográficos intrascendentes) o notas de créditos editoriales (ej. 'reimpreso con permiso de...'). Concéntrate en los principios, la disciplina, la técnica, la regla y el fundamento sustancial.
+- Tienes TERMINANTEMENTE PROHIBIDO formular preguntas sobre la maquetación o estructura editorial del documento (por ejemplo: 'según el símbolo †', 'qué indica el asterisco', 'qué significan los números entre paréntesis en la tabla', 'en qué columna se encuentra X', 'según la nota al pie').
+- Si un gráfico, tabla o nota al margen contiene datos sustanciales, formula la pregunta DIRECTAMENTE sobre el concepto o hecho real evaluable, NUNCA sobre el número de cuadro, símbolo o disposición editorial en la página.
+- Pregunta SIEMPRE por el conocimiento sustancial y factual, jamás por cómo fue maquetado o diagramado en la página.
+
+${EXCLUSION_ANALOGIES_DIRECTIVE}
+
+${NO_EDITORIAL_REFERENCES_DIRECTIVE}`;
 
 /**
  * Regla de formato obligatoria inyectada dinámicamente en el System Prompt y Reglas Globales.
@@ -217,9 +217,10 @@ function getFormatInstructions(format: CardFormat = 'multiple_choice'): string {
       return `FORMATO INNEGOCIABLE: multiple_choice (Opción Múltiple / Test Determinista con Chain of Thought):
 Cada tarjeta tipo test DEBE seguir rigurosamente este flujo cognitivo de 4 pasos obligatorios:
 
-1º "justification": Redacta PRIMERO el razonamiento factual, cálculo u operación matemática exacta citando el documento ANTES de elegir o marcar la opción correcta (Chain of Thought).
+1º "justification": Redacta PRIMERO el razonamiento factual, cálculo u operación matemática exacta citando el documento ANTES de elegir o marcar la opción correcta (Chain of Thought), concluyendo OBLIGATORIAMENTE en su última línea con la etiqueta:
+   VEREDICTO_EXACTO: [texto exacto de la opción ganadora]
 2º "question": Escribe el enunciado limpio y directo de la pregunta de examen, sin incluir opciones ni letras a, b, c, d.
-3º "options": Proporciona un array con exactamente 4 alternativas plausibles [opción 0, opción 1, opción 2, opción 3] extraídas del texto.
+3º "options": Proporciona un array con exactamente 4 alternativas [opción 0, opción 1, opción 2, opción 3] derivadas del texto. Deben cumplir SIMETRÍA ESTRUCTURAL (longitud visual similar y redacción paralela, erradicando la heurística de que 'la más larga es la correcta') y originarse de las 4 fuentes taxonómicas permitidas (mecanismos cruzados afines, umbrales cuantitativos limítrofes, afirmaciones verídicas no pertinentes o inversión causa-efecto/falsos amigos). Queda terminantemente PROHIBIDO incluir opciones absurdas o descartables por sentido común.
 4º "correct_option_index": Asigna el número entero estricto (0, 1, 2 o 3) correspondiente a la opción verdadera justificada en "options".
 
 ESTRUCTURA DE COMPATIBILIDAD EN "front" Y "back":
@@ -228,10 +229,15 @@ ESTRUCTURA DE COMPATIBILIDAD EN "front" Y "back":
   b) [Texto opción 1]
   c) [Texto opción 2]
   d) [Texto opción 3]
-- "back": Debe contener la opción verdadera con su letra formal y su texto, seguida de:
-  '\\n\\nExplicación: [Justificación técnica extraída del campo justification]'.
+- "back": Debe comenzar obligatoriamente con la opción verdadera con su letra formal y su texto, seguida de la etiqueta de veredicto y la explicación técnica:
+  [letra]) [Texto opción 0]
+  VEREDICTO_EXACTO: [Texto opción ganadora]
+
+  Explicación: [Justificación técnica extraída del campo justification]
 - "cardFormat": "multiple_choice"
-- ${EDITORIAL_ARTIFACTS_DIRECTIVE}`;
+- ${EDITORIAL_ARTIFACTS_DIRECTIVE}
+
+${MULTIPLE_CHOICE_PROCESS_DIRECTIVE}`;
 
     case 'cloze':
       return `FORMATO OBLIGATORIO: cloze (Texto para rellenar / Cloze):
@@ -271,152 +277,6 @@ const RIGOR_WARNING_DIRECTIVE = `RIGOR MATEMÁTICO EN LA PROPIEDAD "core_exhaust
 - core_exhausted DEBE ser FALSE si todavía queda en el texto fuente al menos UN concepto o definición troncal sin evaluar.
 - BAJO NINGÚN CONCEPTO marques core_exhausted: true basándote en la cantidad total de tarjetas de forma arbitraria; debe responder exclusivamente al vaciado real de la materia troncal del material proporcionado.`;
 
-/**
- * DIRECTIVA EXCLUSIVA PARA MODO DOCENTE / DIDÁCTICO:
- * Diseñada para profesores que preparan baterías de ejercicios para sus alumnos a partir de fichas,
- * ejercicios o vocabularios, eliminando referencias de aula y transformando listas en problemas prácticos.
- * Incluye calibración por edad internacional, taxonomía de Bloom y libertad de formatos según docenteFormat y targetAudience.
- */
-function buildDidacticModeDirective(
-  docenteFormat: DocenteFormat = 'mixed_test',
-  targetAudience: TargetAudience = 'auto'
-): string {
-  const didacticTranslationClause = `
-PRINCIPIO UNIVERSAL DE FIDELIDAD FACTUAL Y TRADUCCIÓN DIDÁCTICA:
-- FIDELIDAD AL CONTENIDO: Todos los hechos, reglas, conceptos, relaciones y respuestas deben derivarse estrictamente del texto fuente aportado. Queda terminantemente prohibido inventar información, alterar reglas o introducir hechos ausentes en el documento.
-- DESCOMPRESIÓN LÉXICA Y ANALOGÍAS: Cuando el texto original presente una densidad conceptual, jurídica, técnica o científica superior al nivel de desarrollo cognitivo de la audiencia seleccionada, tu labor pedagógica consiste en traducir el concepto a un lenguaje accesible mediante analogías funcionales del entorno real y relaciones causa-efecto transparentes, sin relajar ni desvirtuar el rigor factual.
-- TÉRMINOS CLAVE: Si un término técnico o formal es indispensable para la disciplina evaluada, introdúcelo con precisión y añade en el reverso su puente explicativo o significado funcional para afianzar su asimilación real.`;
-
-  let audienceInstruction = '';
-  switch (targetAudience) {
-    case '9-11_years':
-      audienceInstruction = `🎯 CALIBRACIÓN PEDAGÓGICA UNIVERSAL - EDUCACIÓN PRIMARIA (9 A 11 AÑOS / ELEMENTARY):
-- NIVEL COGNITIVO (TAXONOMÍA DE BLOOM): Comprensión y Aplicación práctica cotidiana.
-- ENFOQUE: Relaciones de causa-efecto directas, identificación de conceptos clave y utilidad o manifestación observable en el mundo real.
-- DIRECTIVA UNIVERSAL DE DISCRIMINACIÓN:
-  * Queda estrictamente PROHIBIDO basar preguntas o distractores en la memorización mecánica de cifras cuantitativas secundarias, constantes, porcentajes aislados o fechas accesorias.
-  * El valor pedagógico debe radicar en entender el "por qué" y el "para qué", no en retener números sin contexto explicativo.
-  * Emplea oraciones cortas, dinámicas y claras con un tono estimulante, cercano y motivador.
-  * Queda terminantemente PROHIBIDA la subordinación sintáctica innecesaria y los tecnicismos abstractos sin un puente explicativo directo.
-${didacticTranslationClause}`;
-      break;
-
-    case '12-14_years':
-      audienceInstruction = `🎯 CALIBRACIÓN PEDAGÓGICA UNIVERSAL - SECUNDARIA INICIAL (12 A 14 AÑOS / MIDDLE SCHOOL):
-- NIVEL COGNITIVO (TAXONOMÍA DE BLOOM): Comprensión y Discriminación conceptual.
-- ENFOQUE: Comparación y contraste entre conceptos afines, taxonomías, clasificaciones y resolución de problemas guiados con rigor léxico intermedio.
-- DIRECTIVA UNIVERSAL DE DISCRIMINACIÓN:
-  * Plantea preguntas orientadas a diferenciar matices entre categorías similares, estructurar clasificaciones y aplicar conceptos a situaciones concretas guiadas.
-  * Emplea oraciones directas, vocabulario disciplinar progresivo y preguntas que estimulen el razonamiento estructurado sin ambigüedades ni subordinación excesiva.
-${didacticTranslationClause}`;
-      break;
-
-    case '15-17_years':
-      audienceInstruction = `🎯 CALIBRACIÓN PEDAGÓGICA UNIVERSAL - BACHILLERATO / SECUNDARIA SUPERIOR (15 A 17 AÑOS / HIGH SCHOOL):
-- NIVEL COGNITIVO (TAXONOMÍA DE BLOOM): Aplicación y Análisis sistemático.
-- ENFOQUE: Relaciones sistémicas, mecanismos, procesos secuenciales, deducción lógica y dominio de la terminología técnica o formal de la disciplina.
-- DIRECTIVA UNIVERSAL DE DISCRIMINACIÓN:
-  * Exige análisis de dependencias multivariables, causas subyacentes, inferencias lógicas, etapas de procesos y justificaciones estructuradas.
-  * Genera distractores plausibles que representen trampas de razonamiento, confusiones conceptuales o errores metodológicos frecuentes en la materia.
-${didacticTranslationClause}`;
-      break;
-
-    case 'university_plus':
-      audienceInstruction = `🎯 CALIBRACIÓN PEDAGÓGICA UNIVERSAL - UNIVERSIDAD, POSGRADO Y OPOSICIONES (+18 AÑOS / HIGHER EDUCATION):
-- NIVEL COGNITIVO (TAXONOMÍA DE BLOOM): Análisis crítico, Evaluación y Diagnóstico.
-- ENFOQUE: Casos complejos, resolución de escenarios reales, excepciones normativas o doctrinales, y máxima precisión técnica y metodológica.
-- DIRECTIVA UNIVERSAL DE DISCRIMINACIÓN:
-  * Nivel de máxima exigencia analítica: valoración crítica de supuestos, resolución de dilemas técnicos o profesionales, interpretación de excepciones a la regla general y contraste riguroso de alternativas excluyentes.
-  * Terminología especializada y rigor metodológico acorde a estándares universitarios y tribunales de oposición, sin simplificaciones artificiales.`;
-      break;
-
-    case 'auto':
-    default:
-      audienceInstruction = `🎯 CALIBRACIÓN PEDAGÓGICA UNIVERSAL - DETECCIÓN AUTOMÁTICA SEGÚN EL TEXTO:
-- Analiza la densidad léxica, complejidad conceptual y nivel formativo intrínseco del texto fuente para ajustar automáticamente el nivel en la Taxonomía de Bloom (desde comprensión fundamental hasta análisis crítico y evaluación), calibrando proporcionalmente la sintaxis, el vocabulario técnico y la profundidad evaluativa.`;
-      break;
-  }
-
-  // PROTOCOLO DE DISTRIBUCIÓN COGNITIVA UNIVERSAL (TAXONOMÍA DE BLOOM OBLIGATORIA)
-  const bloomTaxonomyInstruction = `🧠 PROTOCOLO DE DISTRIBUCIÓN COGNITIVA UNIVERSAL (TAXONOMÍA DE BLOOM OBLIGATORIA):
-Debes estructurar la batería de preguntas distribuyendo el nivel cognitivo de los ejercicios bajo la siguiente proporción estricta:
-1. 30% NIVEL BÁSICO (Recordar / Comprender):
-   - Identificación pura de conceptos, definiciones esenciales, terminología fundamental y reconocimiento de hechos explícitos.
-2. 40% NIVEL INTERMEDIO (Aplicar / Analizar):
-   - Escenarios prácticos aplicados, diferenciación entre conceptos similares, uso de reglas o fórmulas en situaciones nuevas y análisis de causas y consecuencias.
-3. 30% NIVEL AVANZADO (Evaluar / Pensamiento Crítico):
-   - Supuestos de diagnóstico, resolución de casos límite o atípicos, detección de excepciones a la regla general, juicio fundamentado o razonamiento deductivo complejo.`;
-
-  // FORMATO DE EVALUACIÓN DOCENTE
-  let formatInstruction = '';
-  switch (docenteFormat) {
-    case 'multiple_choice':
-      formatInstruction = `📋 FORMATO DE EVALUACIÓN EXCLUSIVO: SOLO TEST / OPCIÓN MÚLTIPLE DETERMINISTA (FORMATO "multiple_choice"):
-- TODAS las tarjetas DEBEN ser formuladas estrictamente en formato "multiple_choice".
-- En cada tarjeta debes generar obligatoriamente:
-  1º "justification": Razonamiento técnico del texto antes de elegir la respuesta (Chain of Thought).
-  2º "question": Enunciado limpio de la pregunta sin opciones.
-  3º "options": Exactamente 4 alternativas plausibles en el array options [0, 1, 2, 3].
-  4º "correct_option_index": Número entero (0 a 3) de la opción verdadera justificada.
-- En "front" coloca la pregunta con sus 4 opciones a-d y en "back" la opción verdadera con su justificación. Queda terminantemente PROHIBIDO devolver tarjetas en otro formato.`;
-      break;
-    case 'true_false':
-      formatInstruction = `📋 FORMATO DE EVALUACIÓN EXCLUSIVO: SOLO VERDADERO O FALSO (FORMATO "true_false"):
-- TODAS las tarjetas DEBEN ser formuladas estrictamente en formato "true_false".
-- En "front" formula una afirmación clara y categórica para evaluar.
-- En "back" indica obligatoriamente "Verdadero" o "Falso" acompañado de una justificación rigurosa basada en el texto. Queda terminantemente PROHIBIDO devolver tarjetas en otro formato.`;
-      break;
-    case 'cloze':
-      formatInstruction = `📋 FORMATO DE EVALUACIÓN EXCLUSIVO: SOLO TEXTO CON HUECOS / CLOZE (FORMATO "cloze"):
-- TODAS las tarjetas DEBEN ser formuladas estrictamente en formato "cloze".
-- En "front" presenta una oración o párrafo contextualizado donde los conceptos clave a evaluar estén encerrados entre corchetes [como este].
-- En "back" incluye los términos ocultos con una explicación concisa. Queda terminantemente PROHIBIDO devolver tarjetas en otro formato.`;
-      break;
-    case 'basic':
-      formatInstruction = `📋 FORMATO DE EVALUACIÓN EXCLUSIVO: SOLO PREGUNTA CORTA / DIRECTA (FORMATO "basic"):
-- TODAS las tarjetas DEBEN ser formuladas estrictamente en formato "basic".
-- En "front" formula una pregunta directa y concisa sobre un concepto clave.
-- En "back" redacta la respuesta directa y sintetizada. Queda terminantemente PROHIBIDO devolver tarjetas en otro formato.`;
-      break;
-    case 'open_cases':
-      formatInstruction = `📋 FORMATO DE EVALUACIÓN EXCLUSIVO: CASOS DE DESARROLLO CON RÚBRICA (FORMATO "basic"):
-- TODAS las tarjetas DEBEN ser formuladas estrictamente en formato "basic".
-- ANVERSO ("front"): Presenta un caso de estudio práctico, situación hipotética o problema del mundo real ("Caso práctico: ...", "Supuesto real: ...", "Problema aplicado: ...").
-- REVERSO ("back"): Debe incluir obligatoriamente:
-  1. "Respuesta Modelo / Solución": Desarrollo completo y justificación técnica esperada del alumno.
-  2. "Rúbrica de Corrección Docente": Criterios de evaluación desglosados (criterios de logro, penalizaciones y escala de calificación para que el profesor califique al estudiante).`;
-      break;
-    case 'mixed_test':
-    default:
-      formatInstruction = `📝 FORMATO DE EVALUACIÓN: TEST VARIADO / MIXTO (LIBERTAD COMPLETA DE FORMATOS):
-- TIENES ABSOLUTA LIBERTAD para alternar dinámicamente entre los 4 formatos disponibles ("multiple_choice", "basic", "cloze", "true_false") según lo que mejor evalúe cada concepto y nivel taxonómico de Bloom:
-  * "multiple_choice": Para discriminación de conceptos, reglas y opciones excluyentes (4 alternativas en array options).
-  * "cloze": Para fijar definiciones exactas, vocabulario o términos técnicos entre corchetes [...].
-  * "true_false": Para evaluar afirmaciones críticas y contrastar errores comunes.
-  * "basic": Para conceptos clave o explicaciones breves.
-- Diseña un conjunto variado y equilibrado de formatos respetando las cuotas de Bloom (30% básico, 40% intermedio, 30% avanzado).`;
-      break;
-  }
-
-  return `DIRECTIVA EXCLUSIVA PARA MODO DOCENTE / DIDÁCTICO:
-- Este modo está diseñado para profesores y formadores que preparan baterías de examen, ejercicios y evaluaciones para sus estudiantes en cualquier disciplina.
-- PROHIBICIÓN ABSOLUTA DE METADATOS EDITORIALES O DE AULA: Queda terminantemente PROHIBIDO utilizar fórmulas como 'Según el Bloque X', 'En la Unidad Y', 'En el Ejercicio Z', '¿Cuál es la frase de ejemplo del autor?' o hacer referencia a páginas o partes físicas de la ficha. La pregunta debe formularse como un ítem de examen directo, profesional e independiente.
-- TRANSFORMACIÓN EN CASOS PRÁCTICOS Y COMPETENCIALES:
-  * Transforma las listas teóricas y enumeraciones pasivas en problemas o preguntas de razonamiento competencial y aplicación funcional.
-  * Si el material contiene vocabulario o idiomas, formula oraciones contextualizadas con huecos ('______') para evaluar el uso en contexto, o preguntas de equivalencia/traducción funcional directa e inversa.
-  * Queda terminantemente PROHIBIDO generar preguntas sobre símbolos fonéticos o pronunciación figurada escrita (ej. /tiː.tʃər/).
-
-${audienceInstruction}
-
-${bloomTaxonomyInstruction}
-
-${formatInstruction}
-
-REGLA DE COBERTURA HOMOGÉNEA Y BARRIDO INTEGRAL (DE PRINCIPIO A FIN):
-- Es OBLIGATORIO realizar un barrido homogéneo y equilibrado por la TOTALIDAD del texto fuente aportado (desde la primera página o párrafo inicial hasta la última sección).
-- Queda terminantemente prohibido concentrar las preguntas en la introducción o los primeros temas dejando el resto del documento sin evaluar.
-- LÍMITE MÁXIMO ESTRICTO: Hasta 40 preguntas por documento/lote.`;
-}
 
 /**
  * Genera la sección de formato e integridad para el Modo Docente en lotes de página (PDF / DOCX).
@@ -463,27 +323,16 @@ REGLA DE INTEGRIDAD: Devuelve un objeto JSON estructurado con "conceptos_identif
 
 /**
  * TRATAMIENTO DE TABLAS EN MODO NORMAL (JERARQUÍA CONCEPTUAL TRONCAL):
- * Evalúa las tablas desde su significado global, reglas generales y umbrales críticos sin fragmentar fila a fila.
+ * Directiva universal que evalúa matrices, tablas y catálogos desde su significado global,
+ * umbrales críticos y tendencias sin caer en memorismo monótono repetitivo.
  */
-const NORMAL_TABLES_DIRECTIVE = `TRATAMIENTO DE TABLAS, MATRICES Y ESQUEMAS (MODO NORMAL - JERARQUÍA CONCEPTUAL TRONCAL):
-Las tablas, matrices y diagramas contienen información estructurada de alto valor. En este modo debes evaluarlas desde su significado global y conclusiones rectoras:
-a) Evalúa la regla o principio general que resume o clasifica la tabla.
-b) Plantea comparaciones conceptuales de alto nivel entre las categorías o columnas principales.
-c) Evalúa únicamente umbrales de corte, excepciones determinantes o valores críticos que condicionen una decisión o cambio de estado.
-Queda PROHIBIDO desglosar mecánicamente cada fila o celda secundaria en preguntas independientes aisladas. La cantidad de preguntas dependerá de la densidad sustancial de la tabla, priorizando siempre la comprensión del patrón sobre la memorización atomizada de listas de datos. Reserva el desglose quirúrgico celda a celda para el Modo Exhaustivo.`;
+const NORMAL_TABLES_DIRECTIVE = buildUniversalTablesDirective(false);
 
 /**
  * PROTOCOLO OBLIGATORIO DE EXTRACCIÓN DE TABLAS EN MODO EXHAUSTIVO (QUIRÚRGICO CELDA A CELDA):
- * Obliga a desglosar sistemáticamente las tablas, diagramas, matrices e infografías.
+ * Desglosa sistemáticamente cruces de variables, umbrales y excepciones evitando preguntas mecánicas idénticas.
  */
-const EXHAUSTIVE_TABLES_DIRECTIVE = `TRATAMIENTO RIGUROSO DE TABLAS, MATRICES Y FIGURAS:
-Las tablas, diagramas e imágenes contienen la mayor densidad evaluable del documento. Tienes terminantemente PROHIBIDO despachar una tabla con 1 o 2 preguntas genéricas de resumen.
-Debes desglosarla sistemáticamente:
-a) Preguntar por cruces de variables (fila vs. columna, parámetro A frente a parámetro B).
-b) Evaluar valores numéricos críticos, unidades de medida, umbrales de corte o rangos de referencia.
-c) Evaluar criterios de inclusión/exclusión, diagnósticos diferenciales o excepciones a la norma presentes en notas al pie de la tabla.
-Si una tabla es densa, estás OBLIGADO a generar múltiples preguntas independientes sobre sus diferentes celdas y relaciones.
-En modo exhaustivo, cuando encuentres una tabla, esquema de absorción o clasificación con múltiples elementos, debes generar preguntas independientes para cada elemento sustancial (por ejemplo, cada nutriente, enzima, plazo legal o parámetro relevante). No las agrupes ni omitas elementos individuales.`;
+const EXHAUSTIVE_TABLES_DIRECTIVE = buildUniversalTablesDirective(true);
 
 // Alias de retrocompatibilidad
 const TABLES_AND_FIGURES_DIRECTIVE = EXHAUSTIVE_TABLES_DIRECTIVE;
@@ -492,27 +341,31 @@ const TABLES_AND_FIGURES_DIRECTIVE = EXHAUSTIVE_TABLES_DIRECTIVE;
  * REFORMULACIÓN DEL OBJETIVO: EXPRIMIDO TOTAL SIN ALUCINACIÓN:
  * Directiva de anclaje estricto al documento sin amenazas coercitivas que fuercen alucinaciones.
  */
-const STRICT_GROUNDING_DIRECTIVE = `EXHAUSTIVIDAD RIGUROSA Y ANCLAJE ESTRICTO (GROUNDING):
-Tu misión en modo exhaustivo es no dejar ningún dato sustancial fuera: exprime cada definición, mecanismo causal, clasificación y tabla.
-Sin embargo, te está ESTRICTAMENTE PROHIBIDO recurrir a tu conocimiento general para incorporar conceptos, enfermedades, leyes o tratamientos que NO aparezcan explícitamente en el texto o figuras de las páginas provistas. Si el material académico real de las páginas seleccionadas ha sido completamente evaluado sin omitir nada, cierra el lote con las tarjetas obtenidas. La exactitud y fidelidad al documento prevalecen sobre el volumen.`;
+const STRICT_GROUNDING_DIRECTIVE = `RIGOR FACTUAL Y ANCLAJE ESTRICTO AL DOCUMENTO (GROUNDING):
+Tu misión es extraer con fidelidad y rigor la información sustancial del texto sin omitir conceptos clave, mecanismos explicativos, principios rectores, clasificaciones ni definiciones fundamentales.
+Queda ESTRICTAMENTE PROHIBIDO recurrir a tu conocimiento general externo para incorporar conceptos, hechos, normas o datos que NO figuren explícitamente en el texto o figuras provistas. Si el contenido sustancial de la página ha sido evaluado con fidelidad, cierra el lote con las tarjetas obtenidas. La exactitud y fidelidad al documento prevalecen sobre cualquier conjetura.`;
 
 /**
- * DIRECTIVA UNIVERSAL DE BARRIDO INTEGRAL Y COBERTURA TEMÁTICA (SWEEP):
+ * DIRECTIVA UNIVERSAL DE COBERTURA HORIZONTAL Y DENSIDAD ADAPTATIVA (SWEEP):
  */
-const COMPREHENSIVE_SWEEP_DIRECTIVE = `COBERTURA INTEGRAL Y EXHAUSTIVIDAD PEDAGÓGICA:
-En modo exhaustivo, debes realizar un barrido sistemático de la página de arriba a abajo. Asegúrate de que cada sección, definición doctrinal/científica, mecanismo causal, clasificación o principio fundamental cuente con al menos una pregunta que evalúe su contenido antes de profundizar en subdivisiones. Queda prohibido saltarse párrafos teóricos sustanciales.`;
+const COMPREHENSIVE_SWEEP_DIRECTIVE = `COBERTURA HORIZONTAL Y DENSIDAD ADAPTATIVA:
+Realiza un barrido transversal y equilibrado de toda la página o sección identificando todos sus subepígrafes y núcleos de conocimiento distintos. Queda terminantemente PROHIBIDO agotar la atención o hiper-concentrar la generación en un único párrafo o concepto llamativo dejando otros bloques sustanciales en blanco. Modula la densidad adaptativa de forma pura según la riqueza intrínseca del texto: si la página es transicional o introductoria, extrae con sobriedad únicamente lo relevante (incluso una o ninguna tarjeta); si presenta alta densidad conceptual, extrae con rigor todas sus facetas sustanciales sin cuotas ni topes numéricos arbitrarios.`;
+
+const EXHAUSTIVE_SWEEP_DIRECTIVE = `COBERTURA HORIZONTAL Y PROFUNDIDAD EXHAUSTIVA:
+Realiza un barrido transversal y equilibrado de toda la página o sección identificando todos sus subepígrafes y núcleos de conocimiento distintos. Queda terminantemente PROHIBIDO agotar la atención o hiper-concentrar la generación en un único párrafo o concepto llamativo dejando otros bloques sustanciales en blanco. En Modo Exhaustivo, extrae con rigor e intensidad cada definición, mecanismo, clasificación, cifra y dato relevante presente en el texto principal y sus tablas/recuadros.`;
 
 /**
- * DIRECTIVA UNIVERSAL DE CONCEPTO NUCLEAR ÚNICO (ANTI-CLONES):
+ * DIRECTIVA UNIVERSAL DE ECONOMÍA CONCEPTUAL Y CERO REDUNDANCIA DE HECHO (ANTI-CLONES):
  */
-const SINGLE_CORE_CONCEPT_DIRECTIVE = `REGLA DE CONCEPTO NUCLEAR ÚNICO (CERO DUPLICADOS):
-Cada tarjeta debe evaluar un objetivo de aprendizaje o dato completamente diferenciado. Está TERMINANTEMENTE PROHIBIDO generar dos o más tarjetas que evalúen la misma definición, el mismo término, el mismo órgano, la misma ley o el mismo hecho cambiando únicamente el fraseo del enunciado o el orden de las alternativas. Si un concepto ya ha sido evaluado en las tarjetas previas del historial acumulado, busca activamente otros conceptos aún no cubiertos de la página.`;
+const SINGLE_CORE_CONCEPT_DIRECTIVE = `ECONOMÍA CONCEPTUAL Y CERO REDUNDANCIA DE HECHO:
+Queda terminantemente PROHIBIDO generar más de una tarjeta sobre el MISMO hecho, hallazgo puntual, mecanismo específico o dato de respuesta, con independencia de que se reformule el enunciado, se altere el orden de las opciones o se cambie la perspectiva.
+DISTINCIÓN ESENCIAL (FACETAS INDEPENDIENTES VS. MISMO HECHO SINGULAR): Una misma entidad, nutriente, fármaco, norma o concepto general (ej. el folato, un artículo legal, una enzima o un protocolo de red) PUEDE Y DEBE ser objeto de varias tarjetas si el texto describe múltiples facetas sustanciales independientes (ej. su papel fisiológico, su cuadro deficitario clínico, sus interacciones medicamentosas o su estabilidad físico-química). Lo que queda estrictamente vetado es duplicar la evaluación sobre el mismo hecho singular o conclusión fáctica idéntica.`;
 
 /**
  * DIRECTIVA UNIVERSAL DE JERARQUÍA DE CONTENIDO (SUSTANCIA VS. ANÉCDOTAS):
  */
-const CONTENT_HIERARCHY_DIRECTIVE = `JERARQUÍA DEL CONTENIDO (EXCLUSIÓN TAJANTE DE MARCAS Y CURIOSIDADES COMERCIALES):
-Prioriza siempre los principios teóricos, fundamentos científicos, relaciones causa-efecto, tablas académicas/fisiológicas y clasificaciones troncales sobre cuadros de datos puramente ilustrativos, ejemplos comerciales, marcas o recuadros de curiosidades. Queda TERMINANTEMENTE PROHIBIDO generar tarjetas sobre cuadros comparativos de comida rápida, marcas comerciales o recuadros divulgativos de consumo (por ejemplo, 'Tamaño excesivo en Estados Unidos', marcas de restaurantes o gramos de sodio, grasas o calorías de productos comerciales). Reserva el 100% de las tarjetas para la teoría académica sustancial y las tablas formativas/científicas.`;
+const CONTENT_HIERARCHY_DIRECTIVE = `JERARQUÍA DEL CONTENIDO (SUSTANCIA VS. ANÉCDOTAS Y CASOS ILUSTRATIVOS):
+Prioriza siempre los principios rectores, fundamentos teóricos/científicos, relaciones causa-efecto, normativas, mecanismos funcionales y clasificaciones troncales sobre cuadros puramente decorativos, ejemplos comerciales, marcas o recuadros de curiosidades divulgativas. Queda TERMINANTEMENTE PROHIBIDO generar tarjetas sobre menciones de marcas comerciales, anécdotas de consumo o ejemplos periféricos de relleno. Reserva el 100% de las tarjetas para el conocimiento académico y profesional sustancial.`;
 
 const buildSystemPrompt = (
   existingCardsLength: number,
@@ -521,14 +374,16 @@ const buildSystemPrompt = (
   pedagogicalMode?: 'academic' | 'didactic',
   docenteFormat: DocenteFormat = 'mixed_test',
   targetAudience: TargetAudience = 'auto',
-  isExhaustiveMode: boolean = false
+  isExhaustiveMode: boolean = false,
+  isPracticalMode: boolean = false
 ) => {
   const tablesDirective = isExhaustiveMode ? EXHAUSTIVE_TABLES_DIRECTIVE : NORMAL_TABLES_DIRECTIVE;
+  const sweepDirective = isExhaustiveMode ? EXHAUSTIVE_SWEEP_DIRECTIVE : COMPREHENSIVE_SWEEP_DIRECTIVE;
 
   // 1. EL NÚCLEO DEL COMPORTAMIENTO (Universal y Exhaustivo)
   let prompt = `Eres Flashmente, un motor de extracción de conocimiento de alto rendimiento. Tu objetivo es diseccionar el texto proporcionado y generar tarjetas de estudio (flashcards) rigurosas. No resumas el texto. Actúa como un interrogador minucioso.
 
-${COMPREHENSIVE_SWEEP_DIRECTIVE}
+${sweepDirective}
 
 ${SINGLE_CORE_CONCEPT_DIRECTIVE}
 
@@ -568,6 +423,26 @@ DEBES explorar conceptos, relaciones, celdas de tablas o párrafos que aún NO h
 
   if (pedagogicalMode === 'didactic') {
     prompt += `\n${buildDidacticModeDirective(docenteFormat, targetAudience)}\n`;
+    if (isPracticalMode) {
+      prompt += `\n${PRACTICAL_MODE_DIRECTIVE}\n`;
+    }
+    if (isExhaustiveMode) {
+      prompt += `\n${buildUniversalCalibrationDirective(true)}\n`;
+      prompt += `\n${EXHAUSTIVE_MODE_MANDATE}\n`;
+    }
+    prompt += `\n${DISTRACTOR_VEROSIMILITUDE_DIRECTIVE}\n`;
+    prompt += `\n${ZERO_MISMATCH_DIRECTIVE}\n`;
+  } else {
+    prompt += `\n${TEXT_DENSITY_ADAPTIVE_DISTRACTOR_DIRECTIVE}\n`;
+    if (isPracticalMode) {
+      prompt += `\n${PRACTICAL_MODE_DIRECTIVE}\n`;
+    }
+    prompt += `\n${buildUniversalCalibrationDirective(isExhaustiveMode)}\n`;
+    prompt += `\n${DISTRACTOR_VEROSIMILITUDE_DIRECTIVE}\n`;
+    prompt += `\n${ZERO_MISMATCH_DIRECTIVE}\n`;
+    if (isExhaustiveMode) {
+      prompt += `\n${EXHAUSTIVE_MODE_MANDATE}\n`;
+    }
   }
 
   prompt += `\n${EDITORIAL_ARTIFACTS_DIRECTIVE}\n`;
@@ -585,7 +460,8 @@ function getGlobalRules(
   pedagogicalMode?: 'academic' | 'didactic',
   docenteFormat: DocenteFormat = 'mixed_test',
   targetAudience: TargetAudience = 'auto',
-  isExhaustiveMode: boolean = false
+  isExhaustiveMode: boolean = false,
+  isPracticalMode: boolean = false
 ): string {
   const tablesDirective = isExhaustiveMode ? EXHAUSTIVE_TABLES_DIRECTIVE : NORMAL_TABLES_DIRECTIVE;
   let formatRule = '';
@@ -632,10 +508,21 @@ function getGlobalRules(
     : `2. ${STRICT_GROUNDING_DIRECTIVE} Objetivo de extracción: hasta ${countStr} tarjetas reales respaldadas por la fuente.
 3. ÍNDICE DE SEGUIMIENTO OBLIGATORIO: Para cada tarjeta, asigna un \`generation_index\` estrictamente secuencial (1, 2, 3...). Detén la generación al alcanzar las ${countStr} tarjetas o si el material académico real se ha agotado por completo sin inventar datos externos.`;
 
-  const didacticRule =
-    pedagogicalMode === 'didactic'
-      ? `\n\n13. ${buildDidacticModeDirective(docenteFormat, targetAudience)}`
-      : '';
+  const isDocenteMode =
+    pedagogicalMode === 'didactic' || (pedagogicalMode as unknown as string) === 'docente';
+
+  const didacticRule = isDocenteMode
+    ? `\n\n13. ${buildDidacticModeDirective(docenteFormat, targetAudience)}`
+    : `\n\n13. ${TEXT_DENSITY_ADAPTIVE_DISTRACTOR_DIRECTIVE}`;
+
+  const practicalRule = isPracticalMode ? `\n\n14. ${PRACTICAL_MODE_DIRECTIVE}` : '';
+  const calibrationRule = isDocenteMode
+    ? (isExhaustiveMode ? `\n\n15. ${buildUniversalCalibrationDirective(true)}` : '')
+    : `\n\n15. ${buildUniversalCalibrationDirective(isExhaustiveMode)}`;
+  const distractorRule = `\n\n16. ${DISTRACTOR_VEROSIMILITUDE_DIRECTIVE}`;
+  const zeroMismatchRule = `\n\n17. ${ZERO_MISMATCH_DIRECTIVE}`;
+
+  const sweepDirective = isExhaustiveMode ? EXHAUSTIVE_SWEEP_DIRECTIVE : COMPREHENSIVE_SWEEP_DIRECTIVE;
 
   return `REGLAS GLOBALES INQUEBRANTABLES DE BLINDAJE (ESTILO NOTEBOOKLM):
 1. REGLA DE ORO (Estilo NotebookLM): NO inventes información. Tu única fuente de verdad es el texto. Si un concepto, dato o respuesta no se puede deducir directa y explícitamente del texto proporcionado, DEBES omitirlo. No uses conocimiento previo externo.
@@ -644,11 +531,11 @@ ${directiveRule}
 5. PRECISIÓN Y GROUNDING: Toda pregunta, afirmación, distractor o respuesta debe estar basada estricta y textualmente en el texto fuente.
 6. ACRÓNIMOS: Todo acrónimo debe ir acompañado obligatoriamente de su nombre completo si figura en la fuente (ejemplo: "ARN (Ácido Ribonucleico)", "TCP (Transmission Control Protocol)").
 7. INTEGRIDAD ESTRUCTURAL DEL JSON (PRIORIDAD ABSOLUTA): Debes devolver un objeto JSON válido con los campos "conceptos_identificados" (array de strings con conceptos clave no evaluados), "core_exhausted" (booleano) y "cards" (${cardRequirement}). Sé sintético y directo en el enunciado de las preguntas y opciones, y riguroso, explicativo y profundamente justificado en el reverso ("back"), incluyendo siempre la justificación técnica basada en la fuente.
-8. ${COMPREHENSIVE_SWEEP_DIRECTIVE}
+8. ${sweepDirective}
 9. ${SINGLE_CORE_CONCEPT_DIRECTIVE}
 10. ${CONTENT_HIERARCHY_DIRECTIVE}
 11. ${tablesDirective}
-12. ${EDITORIAL_ARTIFACTS_DIRECTIVE}${didacticRule}`;
+12. ${EDITORIAL_ARTIFACTS_DIRECTIVE}${didacticRule}${practicalRule}${calibrationRule}${distractorRule}${zeroMismatchRule}`;
 }
 
 interface ParsedPageRange {
@@ -992,15 +879,48 @@ function buildProgressMemorySection(existingCards?: ExistingCardHistoryItem[]): 
   return '';
 }
 
+
+/**
+ * Expresión regular determinista para descartar tarjetas que pregunten por metadatos de cuadros o tablas
+ */
+const DISALLOWED_TABLE_METADATA_REGEX =
+  /cl[ií]nica mayo|rochester|par[eé]ntesis en (el cuadro|la tabla)|asteriscos? en (el cuadro|la tabla)|nota al pie (del cuadro|de la tabla)|fuente (bibliogr[aá]fica|original) (del cuadro|de la tabla)|instituci[oó]n (que )?(elabor[oó]|proporcion[oó]|adapt[oó]) (el cuadro|la tabla)|referencia normativa utilizada para determinar|criterio t[eé]cnico utilizado en (el cuadro|la tabla)|est[aá]ndares de intercambio diab[eé]tico|formas de preparaci[oó]n.*(cuadro|tabla)/i;
+
+/**
+ * Expresión regular determinista para descartar preguntas sobre analogías domésticas o infografías de porciones con objetos cotidianos
+ */
+const DISALLOWED_DOMESTIC_ANALOGIES_REGEX =
+  /pelota de tenis|pelota de golf|pelota de b[eé]isbol|disco de hockey|baraja( de cartas)?|videocinta|rat[oó]n de (una )?computadora|caja de cerillos|pieza de scrabble|disco de computadora|c[ií]rculo entre el pulgar|cubo de \d|cuchar[oó]n peque[ñn]o|pu[ñn]ado|pulgar de una mujer|palma de la mano|pu[ñn]o de una persona|pu[ñn]o peque[ñn]o|equival[ea] visualmente|referencia visual para (estimar )?una porci[oó]n|objeto (cotidiano|dom[eé]stico|se utiliza|sirve|representa).*(visualizar|estimar).*(porci[oó]n|taza|gramos|raci[oó]n|alimento|medida)/i;
+
+/**
+ * Filtro determinista contra contenido vetado por las directivas universales.
+ * Si isFocusActive es true (el usuario activó un Enfoque Temático específico "Verso Libre"),
+ * se desactivan estas restricciones para permitir estudiar a fondo cualquier cuadro o contenido solicitado.
+ * Si allowTableMetadata es true, se exime de la prohibición de metadatos de tabla, manteniendo activo el veto a analogías domésticas.
+ */
+function isDisallowedCardContent(card: GeneratedCard, allowTableMetadata = false, isFocusActive = false): boolean {
+  if (isFocusActive) return false;
+  const textToScan = `${card.front || ''} ${card.question || ''} ${card.back || ''} ${(card.options || []).join(' ')}`;
+  const matchesTableMetadata = !allowTableMetadata && DISALLOWED_TABLE_METADATA_REGEX.test(textToScan);
+  return (
+    matchesTableMetadata ||
+    DISALLOWED_DOMESTIC_ANALOGIES_REGEX.test(textToScan)
+  );
+}
+
 /**
  * Normaliza y procesa las tarjetas generadas garantizando la estructura de 4 opciones para preguntas tipo test.
  */
 function processGeneratedCards(
   parsedCards: GeneratedCard[],
   targetCount: number,
-  cardFormat: CardFormat
+  cardFormat: CardFormat,
+  allowTableMetadata = false
 ): GeneratedCard[] {
-  return parsedCards.slice(0, targetCount).map((card, idx) => {
+  const allowedCards = parsedCards
+    .filter((card) => !isDisallowedCardContent(card, allowTableMetadata))
+    .filter((card) => card.relevance_tier !== 'C_trivial_filler');
+  return allowedCards.slice(0, targetCount).map((card, idx) => {
     let front = (card.front || '').trim();
     let back = (card.back || '').trim();
     const resolvedFormat = (card.cardFormat as CardFormat) || cardFormat;
@@ -1021,10 +941,10 @@ function processGeneratedCards(
       const letters = ['a', 'b', 'c', 'd'];
       const rawOpts = card.options
         .slice(0, 4)
-        .map((opt) => String(opt).replace(/^[a-d][\)\.\:\-]\s*/i, '').trim());
+        .map((opt) => stripOptionPrefix(String(opt)));
       let correctIdx = Math.min(Math.max(0, Math.floor(card.correct_option_index)), 3);
 
-      // Reconciliación de seguridad determinista entre justification y rawOpts
+      // Reconciliación de seguridad determinista entre justification, veredicto explícito y rawOpts
       const rawJustification = (card.justification || back || '').trim();
       if (rawJustification && rawOpts.length === 4) {
         const normalizeForMatch = (s: string) =>
@@ -1036,34 +956,52 @@ function processGeneratedCards(
             .replace(/\s+/g, ' ')
             .trim();
 
-        const justNorm = normalizeForMatch(rawJustification);
-        const currentTargetNorm = normalizeForMatch(rawOpts[correctIdx]);
+        // 1. Extraer veredicto explícito si existe la etiqueta VEREDICTO_EXACTO
+        const fullSource = `${rawJustification}\n${back}`;
+        const explicitMatch = fullSource.match(
+          /(?:VEREDICTO_EXACTO|VEREDICTO|RESPUESTA_CANONICA|RESPUESTA_CANÓNICA|RESPUESTA_CORRECTA)\s*[:=]\s*([^\r\n]+)/i
+        );
+        const explicitVerdictNorm = explicitMatch ? normalizeForMatch(explicitMatch[1]) : '';
 
-        // Comprobar si la opción apuntada actualmente por correctIdx está respaldada en la justificación
-        const isCurrentSupported =
-          currentTargetNorm.length > 0 &&
-          (justNorm.includes(currentTargetNorm) ||
-            new RegExp(`(?:^|\\s)${currentTargetNorm}(?:$|\\s)`).test(justNorm));
+        // 2. Comprobar si alguna opción coincide directamente con el veredicto explícito
+        let explicitFoundIdx = -1;
+        if (explicitVerdictNorm) {
+          for (let i = 0; i < 4; i++) {
+            const optNorm = normalizeForMatch(rawOpts[i]);
+            if (!optNorm) continue;
+            if (
+              optNorm === explicitVerdictNorm ||
+              explicitVerdictNorm === optNorm ||
+              explicitVerdictNorm.startsWith(optNorm) ||
+              optNorm.startsWith(explicitVerdictNorm)
+            ) {
+              explicitFoundIdx = i;
+              break;
+            }
+          }
+        }
 
-        if (!isCurrentSupported) {
-          // Si la opción apuntada entra en discrepancia con la justificación, buscar si otra opción sí coincide
-          let bestCandidateIdx = -1;
-          let bestCandidateScore = 0;
+        if (explicitFoundIdx !== -1) {
+          correctIdx = explicitFoundIdx;
+          card.correct_option_index = correctIdx;
+        } else {
+          // 3. Evaluador comparativo simultáneo de las 4 opciones
+          // Aislar la parte conclusiva y detectar expresiones de exclusión/negación
+          const justNorm = normalizeForMatch(rawJustification);
+          const conclusionRegex =
+            /(?:por tanto|en consecuencia|por lo que|por ende|el resultado es|la respuesta correcta es|la opcion correcta es|opcion correcta|concluye que|es decir|correcto es|correcta es|aporta[n]?|corresponde[n]? a|se define como|equivale[n]? a|consiste en)/i;
+          const conclusionPart = justNorm.split(conclusionRegex).pop() || justNorm;
 
-          // Seccionar la parte conclusiva de la justificación para priorizar afirmaciones finales
-          const conclusionPart =
-            justNorm
-              .split(
-                /(?:por tanto|en consecuencia|por lo que|por ende|el resultado es|la respuesta correcta es|la opcion correcta es|opcion correcta|concluye que|es decir|correcto es|correcta es)/i
-              )
-              .pop() || justNorm;
+          const exclusionRegex =
+            /(?:a diferencia de|en cambio|mientras que|no es|no son|no corresponde|no aplica|a excepcion de|frente a|contrariamente a|a pesar de|distinto de|lejos de)/i;
+
+          // Puntuación comparativa simultánea para cada opción [0..3]
+          const scores = [0, 0, 0, 0];
 
           for (let i = 0; i < 4; i++) {
-            if (i === correctIdx) continue;
             const optNorm = normalizeForMatch(rawOpts[i]);
             if (!optNorm || optNorm.length < 2) continue;
 
-            let score = 0;
             const inConclusion =
               conclusionPart.includes(optNorm) ||
               new RegExp(`(?:^|\\s)${optNorm}(?:$|\\s)`).test(conclusionPart);
@@ -1072,19 +1010,42 @@ function processGeneratedCards(
               new RegExp(`(?:^|\\s)${optNorm}(?:$|\\s)`).test(justNorm);
 
             if (inConclusion) {
-              score += 2;
+              scores[i] += 15;
             } else if (inWholeJust) {
-              score += 1;
+              scores[i] += 5;
             }
 
-            if (score > bestCandidateScore) {
-              bestCandidateScore = score;
-              bestCandidateIdx = i;
+            // Penalización estricta si aparece precedida por expresiones de exclusión o negación
+            const optIndexInJust = justNorm.indexOf(optNorm);
+            if (optIndexInJust > 0) {
+              const precedingWindow = justNorm.substring(
+                Math.max(0, optIndexInJust - 45),
+                optIndexInJust
+              );
+              if (exclusionRegex.test(precedingWindow)) {
+                scores[i] -= 25; // Fuertemente descartada como distractor mencionado
+              }
             }
           }
 
-          if (bestCandidateIdx !== -1 && bestCandidateScore > 0) {
-            correctIdx = bestCandidateIdx;
+          // Bonificación leve por fidelidad al índice original emitido si tiene soporte positivo
+          if (scores[correctIdx] > 0) {
+            scores[correctIdx] += 2;
+          }
+
+          // Determinar el mejor candidato
+          let bestIdx = correctIdx;
+          let maxScore = scores[correctIdx];
+
+          for (let i = 0; i < 4; i++) {
+            if (scores[i] > maxScore) {
+              maxScore = scores[i];
+              bestIdx = i;
+            }
+          }
+
+          if (bestIdx !== correctIdx && maxScore > 0) {
+            correctIdx = bestIdx;
             card.correct_option_index = correctIdx;
           }
         }
@@ -1093,19 +1054,24 @@ function processGeneratedCards(
       const correctText = rawOpts[correctIdx];
       cleanedOpts = rawOpts;
 
-      // Obtener el enunciado limpio de la pregunta (priorizando question sobre front)
-      const qText = (card.question || front)
+      // Obtener el enunciado limpio de la pregunta sanitizado sin referencias editoriales
+      const sanitizedQ = sanitizeCardFrontText(card.question || front);
+      const qText = sanitizedQ
         .replace(/(?:^|\r?\n|\s+)(?:\(?a\s*[\)\.\-\]\:]|\ba\))\s+[\s\S]*$/i, '')
         .trim();
 
       const formattedOpts = rawOpts.map((opt, i) => `${letters[i]}) ${opt}`).join('\n');
       front = `${qText}\n\n${formattedOpts}`;
 
-      // Obtener la justificación (priorizando justification sobre el reverso existente)
-      const rawExplanation = (card.justification || back)
-        .replace(/^[a-d][\)\.\:\-]\s*/i, '')
-        .replace(/^(?:Explicación|Justificación):\s*/i, '')
+      // Obtener la justificación eliminando etiquetas internas de veredicto y capitalizando
+      let rawExplanation = stripOptionPrefix(card.justification || back)
+        .replace(/VEREDICTO_EXACTO\s*[:=]\s*[^\r\n]+/gi, '')
+        .replace(/^(?:Explicación|Justificación|Fundamento|Razón):\s*/i, '')
+        .replace(/^\s*(?:seg[uú]n\s+(?:el\s+cuadro|la\s+tabla|el\s+gr[aá]fico|la\s+figura)\s+[^,.:]+[,.:]\s*)/i, '')
+        .replace(/^\s*(?:el\s+texto\s+establece\s+expl[ií]citamente\s+que\s+)/i, '')
+        .replace(/^\s*la\s+pregunta\s+de\s+repaso(?:\s+n[uú]mero)?\s+\d+\s+(?:identifica|vincula|senala|indica|establece|describe|explica)\s+(?:que\s+)?/i, '')
         .trim();
+      rawExplanation = rawExplanation.replace(/^([a-záéíóúñ])/i, (m) => m.toUpperCase());
 
       back = `${letters[correctIdx]}) ${correctText}${
         rawExplanation ? `\n\nExplicación: ${rawExplanation}` : ''
@@ -1121,12 +1087,14 @@ function processGeneratedCards(
       const letters = ['a', 'b', 'c', 'd'];
       const rawOpts = card.options
         .slice(0, 4)
-        .map((opt) => String(opt).replace(/^[a-d][\)\.\:\-]\s*/i, '').trim());
+        .map((opt) => stripOptionPrefix(String(opt)));
       cleanedOpts = rawOpts;
       const formattedOpts = rawOpts
         .map((opt, i) => `${letters[i]}) ${opt}`)
         .join('\n');
-      front = `${front}\n\n${formattedOpts}`;
+      front = `${sanitizeCardFrontText(front)}\n\n${formattedOpts}`;
+    } else {
+      front = sanitizeCardFrontText(front);
     }
 
     const cleaned: GeneratedCard = {
@@ -1140,7 +1108,7 @@ function processGeneratedCards(
         isMultipleChoice && (cleanedOpts || (card.options && Array.isArray(card.options)))
           ? cleanedOpts || card.options!.map(String)
           : undefined,
-      question: card.question,
+      question: card.question ? sanitizeCardFrontText(card.question) : undefined,
       justification: card.justification,
       correct_option_index: card.correct_option_index,
     };
@@ -1152,12 +1120,14 @@ function processGeneratedCards(
 interface ParsedGeminiBatch {
   cards: GeneratedCard[];
   coreExhausted: boolean;
+  pageClassification?: string;
   conceptosIdentificados?: string[];
+  inventarioFactual?: FactualItem[];
 }
 
 /**
  * Parsea y valida de forma resiliente la respuesta JSON de Gemini para un lote individual.
- * Elimina bloques de formato markdown si están presentes y extrae el array de tarjetas y el estado de agotamiento troncal.
+ * Elimina bloques de formato markdown si están presentes y extrae el array de tarjetas, inventario factual y estado de agotamiento troncal.
  */
 function parseGeminiBatchResponse(rawText: string | undefined): ParsedGeminiBatch {
   if (!rawText || !rawText.trim()) {
@@ -1172,33 +1142,71 @@ function parseGeminiBatchResponse(rawText: string | undefined): ParsedGeminiBatc
   }
 
   const parsedData = JSON.parse(cleanJson) as
-    | { conceptos_identificados?: string[]; core_exhausted?: boolean; cards?: GeneratedCard[] }
+    | {
+        conceptos_identificados?: string[];
+        inventario_factual?: FactualItem[];
+        core_exhausted?: boolean;
+        page_classification?: string;
+        cards?: GeneratedCard[];
+        tarjetas_troncales?: GeneratedCard[];
+        escrutinio_profundo?: GeneratedCard[];
+      }
     | GeneratedCard[];
 
   let cards: GeneratedCard[] = [];
   let coreExhausted = false;
+  let pageClassification: string | undefined;
   let conceptosIdentificados: string[] | undefined;
+  let inventarioFactual: FactualItem[] | undefined;
 
   if (Array.isArray(parsedData)) {
     cards = parsedData;
-  } else if (parsedData && Array.isArray(parsedData.cards)) {
-    cards = parsedData.cards;
+  } else if (parsedData && typeof parsedData === 'object') {
     coreExhausted = Boolean(parsedData.core_exhausted);
+    if (typeof parsedData.page_classification === 'string') {
+      pageClassification = parsedData.page_classification.trim();
+    }
     if (Array.isArray(parsedData.conceptos_identificados)) {
       conceptosIdentificados = parsedData.conceptos_identificados;
+    }
+    if (Array.isArray(parsedData.inventario_factual)) {
+      inventarioFactual = parsedData.inventario_factual;
+      // Si conceptos_identificados no viene explícito, lo derivamos enriquecido desde el inventario factual
+      if (!conceptosIdentificados || conceptosIdentificados.length === 0) {
+        conceptosIdentificados = parsedData.inventario_factual.map(
+          (f) => `[${f.id || 'H'}] (${f.tipo || 'hecho'}) ${f.declaracion_factual || ''}`.trim()
+        );
+      }
+    }
+
+    // 1. Array estándar 'cards' (Modo Normal, Modo Docente o Esquema Unificado con Inventario)
+    if (Array.isArray(parsedData.cards)) {
+      cards.push(...parsedData.cards);
+    }
+
+    // 2. Capa 1 Modo Exhaustivo Estratificado ('tarjetas_troncales' para retrocompatibilidad)
+    if (Array.isArray(parsedData.tarjetas_troncales)) {
+      cards.push(...parsedData.tarjetas_troncales);
+    }
+
+    // 3. Capa 2 Modo Exhaustivo Estratificado ('escrutinio_profundo' para retrocompatibilidad)
+    if (Array.isArray(parsedData.escrutinio_profundo)) {
+      cards.push(...parsedData.escrutinio_profundo);
     }
   } else {
     throw new Error('El JSON devuelto no contiene un array de tarjetas válido.');
   }
 
-  if (cards.length === 0) {
+  if (cards.length === 0 && !coreExhausted && pageClassification !== 'review_or_case_exercises') {
     throw new Error('El array de tarjetas devuelto por Gemini está vacío.');
   }
 
   return {
     cards,
     coreExhausted,
+    pageClassification,
     conceptosIdentificados,
+    inventarioFactual,
   };
 }
 
@@ -1209,8 +1217,8 @@ const GEMINI_MODEL = GEMINI_DEFAULT_MODEL;
 
 /**
  * Configuración estricta de Gemini generada dinámicamente según el formato de tarjeta:
- * - temperature: 0.1 para forzar respuestas deterministas, eliminar la creatividad y evitar alucinaciones.
- * - responseMimeType: 'application/json' y responseJsonSchema: flashcardSchema para forzar la estructura de salida con Chain of Thought.
+ * - temperature: 0.25 en Modo Exhaustivo (para exploración sutil de detalles) y 0.15 en Modo Normal.
+ * - responseMimeType: 'application/json' y responseJsonSchema para forzar la estructura de salida.
  * - systemInstruction: System Prompt adaptado dinámicamente con buildSystemPrompt basándose en coreExhaustedPrevious e historial sintetizado en tópicos.
  */
 function getGeminiConfig(
@@ -1222,7 +1230,8 @@ function getGeminiConfig(
   isExhaustiveMode: boolean = false,
   pedagogicalMode?: 'academic' | 'didactic',
   docenteFormat: DocenteFormat = 'mixed_test',
-  targetAudience: TargetAudience = 'auto'
+  targetAudience: TargetAudience = 'auto',
+  isPracticalMode: boolean = false
 ) {
   void format;
   void requestedCount;
@@ -1234,9 +1243,10 @@ function getGeminiConfig(
       pedagogicalMode,
       docenteFormat,
       targetAudience,
-      isExhaustiveMode
+      isExhaustiveMode,
+      isPracticalMode
     ),
-    temperature: isExhaustiveMode ? 0.1 : 0.15,
+    temperature: isExhaustiveMode ? 0.25 : 0.15,
     responseMimeType: 'application/json',
     responseJsonSchema: flashcardSchema,
     maxOutputTokens: 8192,
@@ -1450,12 +1460,12 @@ async function enforceApiLimit(
       }
 
       // Fase Ads (welcome_generations >= 5):
-      // Si generations_count >= 50 -> LIMIT_REACHED
-      if (count >= 50) {
+      // Si generations_count >= 25 -> LIMIT_REACHED (5 bienvenida + 25 anuncios = 30 total)
+      if (count >= 25) {
         return { error: 'LIMIT_REACHED' };
       }
 
-      // Si generations_count < 50: verificar bonus_credits
+      // Si generations_count < 25: verificar bonus_credits
       if (bonusCredits <= 0) {
         return { error: 'AD_REQUIRED' };
       }
@@ -1570,7 +1580,8 @@ export async function generateCardsAction(
   coreExhaustedPrevious: boolean = false,
   pedagogicalMode: 'academic' | 'didactic' = 'academic',
   docenteFormat: DocenteFormat = 'mixed_test',
-  targetAudience: TargetAudience = 'auto'
+  targetAudience: TargetAudience = 'auto',
+  isPracticalMode: boolean = false
 ): Promise<GenerateCardsResult> {
   const cleanTopic = topic.trim();
   if (!cleanTopic) {
@@ -1641,12 +1652,12 @@ ENFOQUE DE PARTICIÓN CONCURRENTE (LOTE 1/2): Concéntrate en la DEFINICIÓN, ET
 
 ${RIGOR_WARNING_DIRECTIVE}
 
-${getGlobalRules(cardFormat, batch1Target, existingCards.length, pedagogicalMode)}
+${getGlobalRules(cardFormat, batch1Target, existingCards.length, pedagogicalMode, docenteFormat, targetAudience, false, isPracticalMode)}
 
 ${getFormatInstructions(cardFormat)}
 
 ${progressMemoryPrompt ? `${progressMemoryPrompt}\n\n` : ''}REGLA CRÍTICA DE INTEGRIDAD:
-La integridad estructural del JSON es prioridad absoluta y DEBES devolver un objeto con "conceptos_identificados" (array de strings), "core_exhausted" (booleano) y "cards" (${note1} "${cardFormat}", numeradas estrictamente con generation_index del 1 al N).
+La integridad estructural del JSON es prioridad absoluta y DEBES devolver un objeto con "inventario_factual" (array de objetos con id, tipo y declaracion_factual como mapa previo), "core_exhausted" (booleano) y "cards" (${note1} "${cardFormat}", numeradas estrictamente con generation_index del 1 al N).
 
 ${languageDirective}`;
 
@@ -1657,12 +1668,12 @@ ENFOQUE DE PARTICIÓN CONCURRENTE (LOTE 2/2): Concéntrate en el DIAGNÓSTICO, T
 
 ${RIGOR_WARNING_DIRECTIVE}
 
-${getGlobalRules(cardFormat, batch2Target, existingCards.length, pedagogicalMode)}
+${getGlobalRules(cardFormat, batch2Target, existingCards.length, pedagogicalMode, docenteFormat, targetAudience, false, isPracticalMode)}
 
 ${getFormatInstructions(cardFormat)}
 
 ${progressMemoryPrompt ? `${progressMemoryPrompt}\n\n` : ''}REGLA CRÍTICA DE INTEGRIDAD:
-La integridad estructural del JSON es prioridad absoluta y DEBES devolver un objeto con "conceptos_identificados" (array de strings), "core_exhausted" (booleano) y "cards" (${note2} "${cardFormat}", numeradas estrictamente con generation_index del 1 al N).
+La integridad estructural del JSON es prioridad absoluta y DEBES devolver un objeto con "inventario_factual" (array de objetos con id, tipo y declaracion_factual como mapa previo), "core_exhausted" (booleano) y "cards" (${note2} "${cardFormat}", numeradas estrictamente con generation_index del 1 al N).
 
 ${languageDirective}`;
 
@@ -1683,7 +1694,8 @@ ${languageDirective}`;
             false,
             pedagogicalMode,
             docenteFormat,
-            targetAudience
+            targetAudience,
+            isPracticalMode
           ),
         }),
         ai.models.generateContent({
@@ -1698,7 +1710,8 @@ ${languageDirective}`;
             false,
             pedagogicalMode,
             docenteFormat,
-            targetAudience
+            targetAudience,
+            isPracticalMode
           ),
         }),
       ]);
@@ -1760,12 +1773,12 @@ Cubre los conceptos clave sobre el tema: "${cleanTopic}".
 
 ${RIGOR_WARNING_DIRECTIVE}
 
-${getGlobalRules(cardFormat, requestCount, existingCards.length, pedagogicalMode)}
+${getGlobalRules(cardFormat, requestCount, existingCards.length, pedagogicalMode, docenteFormat, targetAudience, false, isPracticalMode)}
 
 ${getFormatInstructions(cardFormat)}
 
 ${progressMemoryPrompt ? `${progressMemoryPrompt}\n\n` : ''}REGLA CRÍTICA DE INTEGRIDAD:
-La integridad estructural del JSON es prioridad absoluta y DEBES devolver un objeto con "conceptos_identificados" (array de strings como mapa de extracción), "core_exhausted" (booleano) y "cards" (${integrityNote} "${cardFormat}", numeradas estrictamente con generation_index del 1 al N). Para asegurar que las tarjetas quepan dentro del límite sin truncarse, formula preguntas, textos, opciones (si aplica) y respuestas directas y concisas.
+La integridad estructural del JSON es prioridad absoluta y DEBES devolver un objeto con "inventario_factual" (array de objetos con id, tipo y declaracion_factual como mapa de extracción), "core_exhausted" (booleano) y "cards" (${integrityNote} "${cardFormat}", numeradas estrictamente con generation_index del 1 al N). Para asegurar que las tarjetas quepan dentro del límite sin truncarse, formula preguntas, textos, opciones (si aplica) y respuestas directas y concisas.
 
 ${languageDirective}`;
 
@@ -1781,7 +1794,8 @@ ${languageDirective}`;
           false,
           pedagogicalMode,
           docenteFormat,
-          targetAudience
+          targetAudience,
+          isPracticalMode
         ),
       });
 
@@ -1807,7 +1821,7 @@ ${languageDirective}`;
       candidateCards: candidateCards,
       existingCards,
       apiKey,
-      similarityThreshold: 0.80,
+      similarityThreshold: 0.88,
       targetCount,
     });
 
@@ -1945,6 +1959,7 @@ export async function generateCardsFromDocumentAction(
     language = 'es',
     coreExhaustedPrevious = false,
     isExhaustiveMode = false,
+    isPracticalMode = false,
     pedagogicalMode = 'academic',
     docenteFormat = 'mixed_test',
     targetAudience = 'auto',
@@ -2172,36 +2187,54 @@ export async function generateCardsFromDocumentAction(
       // 2. Historial de tarjetas existentes en este mazo para el Gatekeeper y Memoria de Página
       const existingCards = await fetchExistingCardsHistory(deckId, existingQuestions);
 
+      const isFocusActive = Boolean(focusInstruction && focusInstruction.trim().length > 0);
+      const isTableFocus = isFocusActive && /\b(tabla|cuadro|\d)\b/i.test(focusInstruction);
+
       // 3. Directiva de Extracción: 'Modo Exhaustivo Forzado' vs 'Libertad Universal Estándar'
-      const tablesDirective = isExhaustiveMode ? EXHAUSTIVE_TABLES_DIRECTIVE : NORMAL_TABLES_DIRECTIVE;
+      // Si Enfoque Temático está activo, se desconectan las directivas restrictivas de tablas
+      const tablesDirective = isFocusActive ? '' : (isExhaustiveMode ? EXHAUSTIVE_TABLES_DIRECTIVE : NORMAL_TABLES_DIRECTIVE);
 
-      const universalDirective = `Tu objetivo es extraer TODOS los conceptos clave, datos precisos, normativas o hechos únicos de esta página, sin importar la temática del documento. No tienes un límite máximo por página. Si encuentras tablas, cronologías, gráficos o listas, extrae absolutamente todos los datos relevantes posibles. SIN EMBARGO, tienes ESTRICTAMENTE PROHIBIDO inventar información o hacer preguntas triviales de relleno. Si la página está casi vacía (ej. una portada, un índice o fotos decorativas), devuelve únicamente las preguntas válidas que encuentres, o un array vacío []. Sé implacable y exhaustivo donde haya conocimiento real, y conservador donde no lo haya.
+      const singleCoreConceptDirective = isExhaustiveMode
+        ? `### REGLA DE COBERTURA MULTIDIMENSIONAL SIN CLONES (MODO EXHAUSTIVO):
+En Modo Exhaustivo está expresamente PERMITIDO Y EXIGIDO formular tarjetas independientes para evaluar las distintas dimensiones o facetas de una misma entidad, concepto o proceso sustancial (por ejemplo: 1 tarjeta para su definición/sinónimo técnico, 1 para su origen/fuentes/requisitos, 1 para su función/mecanismo basal y 1 para su patología/consecuencia/límite).
+Lo que queda TERMINANTEMENTE PROHIBIDO es generar clones redundantes que pregunten exactamente el mismo dato fáctico con la misma respuesta nuclear reformulada.`
+        : SINGLE_CORE_CONCEPT_DIRECTIVE;
+
+      const sweepDirective = isExhaustiveMode ? EXHAUSTIVE_SWEEP_DIRECTIVE : COMPREHENSIVE_SWEEP_DIRECTIVE;
+
+      const universalDirective = isExhaustiveMode
+        ? `DIRECTIVA BASE UNIVERSAL DE EXTRACCIÓN TRONCAL RIGUROSA:
+Tu objetivo es diseccionar la página actual y extraer con rigor e intensidad TODOS sus conceptos clave, principios rectores, mecanismos de causa-efecto, definiciones sustanciales y clasificaciones vertebrales, con total independencia de la temática o disciplina del documento.
+- Extrae con rigor e intensidad cada concepto sustancial, mecanismo, definición, dato cuantitativo y clasificación del texto principal y sus tablas complementarias.
+- Queda ESTRICTAMENTE PROHIBIDO inventar información o formular preguntas triviales de relleno. Si la página contiene poco contenido evaluable (ej. una portada, un índice o imágenes decorativas), devuelve únicamente las preguntas válidas respaldadas por el texto, o un array vacío []. Sé implacable donde haya conocimiento sustancial, y sobrio donde no lo haya.
+
+${sweepDirective}
+
+${singleCoreConceptDirective}
+
+${CONTENT_HIERARCHY_DIRECTIVE}
+${tablesDirective ? `\n${tablesDirective}\n` : ''}
+${STRICT_GROUNDING_DIRECTIVE}
+
+${EDITORIAL_ARTIFACTS_DIRECTIVE}`
+        : `DIRECTIVA BASE UNIVERSAL DE EXTRACCIÓN TRONCAL RIGUROSA:
+Tu objetivo es diseccionar la página actual y extraer con rigor e intensidad TODOS sus conceptos clave, principios rectores, mecanismos de causa-efecto, definiciones sustanciales y clasificaciones vertebrales, con total independencia de la temática o disciplina del documento.
+- Modula la densidad adaptativa de forma pura según la riqueza intrínseca del texto, sin forzar cuotas ni topes numéricos arbitrarios.
+- Queda ESTRICTAMENTE PROHIBIDO inventar información o formular preguntas triviales de relleno. Si la página contiene poco contenido evaluable (ej. una portada, un índice o imágenes decorativas), devuelve únicamente las preguntas válidas respaldadas por el texto, o un array vacío []. Sé implacable donde haya conocimiento sustancial, y sobrio donde no lo haya.
 
 ${COMPREHENSIVE_SWEEP_DIRECTIVE}
 
-${SINGLE_CORE_CONCEPT_DIRECTIVE}
+${singleCoreConceptDirective}
 
 ${CONTENT_HIERARCHY_DIRECTIVE}
-
-${tablesDirective}
-
+${tablesDirective ? `\n${tablesDirective}\n` : ''}
 ${STRICT_GROUNDING_DIRECTIVE}
 
 ${EDITORIAL_ARTIFACTS_DIRECTIVE}`;
 
-      const exhaustiveDirective = `🚨 MODO EXHAUSTIVO FORZADO: Anula cualquier instrucción de resumen, brevedad o selección pedagógica. Extrae una tarjeta por cada dato, celda de tabla, gráfica o cruce de información sin omitir nada. Prioriza la exhaustividad sobre la síntesis. Analiza profundamente todo el texto de la página extrayendo cualquier concepto, normativa o dato clave. Si encuentras tablas, gráficos o listas, actúa como un extractor implacable: extrae tarjetas individuales cruzando absolutamente TODOS los datos posibles de celdas, filas y columnas, sin resumir ni agrupar. No dejes ningún dato estructurado ni textual relevante sin extraer. Tienes terminantemente prohibido omitir datos o resumir información por considerarla secundaria.
-
-${COMPREHENSIVE_SWEEP_DIRECTIVE}
-
-${SINGLE_CORE_CONCEPT_DIRECTIVE}
-
-${CONTENT_HIERARCHY_DIRECTIVE}
-
-${EXHAUSTIVE_TABLES_DIRECTIVE}
-
-${STRICT_GROUNDING_DIRECTIVE}
-
-${EDITORIAL_ARTIFACTS_DIRECTIVE}`;
+      const exhaustiveDirective = isExhaustiveMode
+        ? `\n\n${EXHAUSTIVE_MODE_MANDATE}\n\n`
+        : '';
 
       const isDocenteMode = pedagogicalMode === 'didactic' || (pedagogicalMode as unknown as string) === 'docente';
 
@@ -2216,35 +2249,67 @@ ${EDITORIAL_ARTIFACTS_DIRECTIVE}`;
 
       let singlePageSystemPrompt = '';
 
-      if (focusInstruction) {
-        singlePageSystemPrompt += `🚨 FILTRO DE ENFOQUE TEMÁTICO (PRIORIDAD ABSOLUTA):
-El usuario ha establecido el siguiente enfoque temático: "${focusInstruction}".
-Esta instrucción tiene PRIORIDAD ABSOLUTA y actúa como un filtro estricto sobre la extracción por defecto. Debes extraer conceptos clave, datos, tablas, normativas o hechos de esta página EXCLUSIVAMENTE o prioritariamente alineados con este enfoque. Si esta página no contiene información relacionada con dicho enfoque, no inventes preguntas ni introduzcas datos de relleno: devuelve un array vacío [] en "cards".\n\n`;
+      if (isFocusActive) {
+        singlePageSystemPrompt += `🚨 MODO ENFOQUE TEMÁTICO - VERSO LIBRE:
+El usuario ha solicitado centrarse específicamente en: "${focusInstruction}".
+Tu ÚNICA prioridad es exprimir al máximo todo lo relacionado con este tema en la página actual.
+Ignora cualquier restricción general sobre tablas o resúmenes de capítulo si guardan relación con este tema.
+Genera de 15 a 25 preguntas si la página contiene datos sustanciales sobre este tema.
+PAUTA UNIVERSAL CUANDO EL FOCO SEA UNA TABLA O CUADRO:
+Prioriza preguntas sobre:
+1) Comparaciones de variación según condición o estado.
+2) Extremos superiores e inferiores de cada categoría.
+3) Criterios generales y notas al pie.
+4) Elementos representativos de cada columna.\n\n`;
       }
 
       if (isDocenteMode) {
         singlePageSystemPrompt += `${buildDidacticModeDirective(docenteFormat, targetAudience)}\n\n`;
-      }
-
-      // Si el modo exhaustivo está activo, REEMPLAZA la directiva estándar para anular cualquier síntesis pedagógica o brevedad
-      if (isExhaustiveMode) {
-        singlePageSystemPrompt += `${exhaustiveDirective}\n\n`;
-      } else {
+        if (isPracticalMode) {
+          singlePageSystemPrompt += `${PRACTICAL_MODE_DIRECTIVE}\n\n`;
+        }
         singlePageSystemPrompt += `${universalDirective}\n\n`;
-      }
-
-      if (isDocenteMode) {
+        singlePageSystemPrompt += `${buildUniversalCalibrationDirective(isExhaustiveMode)}\n\n`;
+        singlePageSystemPrompt += `${EXCLUSION_ANALOGIES_DIRECTIVE}\n\n`;
+        singlePageSystemPrompt += `${NO_EDITORIAL_REFERENCES_DIRECTIVE}\n\n`;
+        if (!isFocusActive) {
+          singlePageSystemPrompt += `${CHAPTER_SUMMARY_PAGES_DIRECTIVE}\n\n`;
+        }
+        if (isExhaustiveMode) {
+          singlePageSystemPrompt += `${exhaustiveDirective}\n\n`;
+        }
+        singlePageSystemPrompt += `${DISTRACTOR_VEROSIMILITUDE_DIRECTIVE}\n\n`;
+        singlePageSystemPrompt += `${ZERO_MISMATCH_DIRECTIVE}\n\n`;
         singlePageSystemPrompt += `${getDidacticFormatSection(docenteFormat)}\n`;
         singlePageSystemPrompt += `\nRECORDATORIO MODO DOCENTE / DIDÁCTICO: Realiza un barrido homogéneo por todo el texto, transformando el contenido en ejercicios y problemas prácticos de examen para alumnos, omitiendo metadatos de aula (ejercicios, bloques, unidades) y omitiendo preguntas sobre transcripciones fonéticas.`;
       } else {
+        singlePageSystemPrompt += `${TEXT_DENSITY_ADAPTIVE_DISTRACTOR_DIRECTIVE}\n\n`;
+        if (isPracticalMode) {
+          singlePageSystemPrompt += `${PRACTICAL_MODE_DIRECTIVE}\n\n`;
+        }
+        singlePageSystemPrompt += `${buildUniversalCalibrationDirective(isExhaustiveMode)}\n\n`;
+        singlePageSystemPrompt += `${DISTRACTOR_VEROSIMILITUDE_DIRECTIVE}\n\n`;
+        singlePageSystemPrompt += `${ZERO_MISMATCH_DIRECTIVE}\n\n`;
+        singlePageSystemPrompt += `${EXCLUSION_ANALOGIES_DIRECTIVE}\n\n`;
+        singlePageSystemPrompt += `${NO_EDITORIAL_REFERENCES_DIRECTIVE}\n\n`;
+        if (!isFocusActive) {
+          singlePageSystemPrompt += `${CHAPTER_SUMMARY_PAGES_DIRECTIVE}\n\n`;
+        }
+        // universalDirective es la base obligatoria de calidad, rigor y sin artefactos
+        singlePageSystemPrompt += `${universalDirective}\n\n`;
+        if (isPracticalMode) {
+          singlePageSystemPrompt += `🎯 DIRECTIVA DE BARRIDO PRÁCTICO Y SITUACIONAL:
+Transforma el 100% de los hechos del inventario_factual (1 hecho clave = 1 mini-caso aplicado) sin omitir definiciones base, planteando situaciones reales breves de toma de decisiones o aplicación donde dicho concepto, mecanismo u origen sea indispensable para resolver el caso.\n\n`;
+        }
         singlePageSystemPrompt += `${getFormatRule(cardFormat)}`;
         singlePageSystemPrompt += `\n${getFormatInstructions(cardFormat)}`;
-        singlePageSystemPrompt += `\n\nREGLA DE INTEGRIDAD: Devuelve un objeto JSON estructurado con "conceptos_identificados" (array de strings con los conceptos encontrados en esta página), "core_exhausted" (booleano) y "cards" (array dinámico con todas las tarjetas extraídas sin límite máximo ni mínimo artificial, formuladas según el formato "${cardFormat}").`;
+        singlePageSystemPrompt += `\n\nREGLA DE INTEGRIDAD ESTRUCTURAL CON INVENTARIO FACTUAL:
+Devuelve un objeto JSON estructurado con:
+- "inventario_factual": array obligatorio de objetos [{ "id": "H1", "tipo": "1_identidad_definicion"|"2_funcion_mecanismo"|"3_origen_fuente_requisitos"|"4_consecuencia_falla_limite"|"5_detalle_tabla_nota", "declaracion_factual": "..." }] con el desglose exhaustivo de TODOS los hechos atómicos, definiciones y relaciones de la página antes de generar las tarjetas.
+- "core_exhausted": booleano que indica si la página ha sido vaciada conceptualmente.
+- "cards": array dinámico con las tarjetas de estudio generadas evaluando directa y rigurosamente los hechos del inventario_factual (numeradas estrictamente con generation_index del 1 al N, formuladas según el formato "${cardFormat}").`;
       }
 
-      if (isExhaustiveMode) {
-        singlePageSystemPrompt += `\nRECORDATORIO MODO EXHAUSTIVO: Extrae cada celda, fila, columna y dato sustancial sin resumir ni abreviar, priorizando el conocimiento pedagógico real y respetando la prohibición estricta de metadatos o recuadros de vocabulario al margen.`;
-      }
       singlePageSystemPrompt += buildLanguageDirective(language);
 
       let tarjetasAcumuladas: GeneratedCard[] = [];
@@ -2285,9 +2350,13 @@ Esta instrucción tiene PRIORIDAD ABSOLUTA y actúa como un filtro estricto sobr
 DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de este bloque que aún NO hayan sido preguntados. No repitas la misma pregunta con ligeras variaciones de redacción.`
             : '';
 
+          const exhaustiveDocenteFocus = isExhaustiveMode
+            ? `\n- PROFUNDIDAD EXHAUSTIVA DOCENTE: Dentro de la cuota asignada de ${currentChunkQuota} preguntas, prioriza formular preguntas que evalúen excepciones a reglas generales, contrastes conceptuales sutiles y cruces relacionales de tablas o matrices según EXHAUSTIVE_TABLES_DIRECTIVE a lo largo de todas las páginas del bloque (${chunk.startPage} a ${chunk.endPage}).`
+            : '';
+
           const chunkQuotaMandate = `\n\n🚨 DIRECTIVA DE CUOTA MATEMÁTICA DEL BLOQUE (EXACTAMENTE ${currentChunkQuota} PREGUNTAS):
 - Tu objetivo OBLIGATORIO para este bloque (páginas ${chunk.startPage} a ${chunk.endPage}) es generar exactamente ${currentChunkQuota} preguntas.
-- Realiza un barrido homogéneo cubriendo todas las páginas de este bloque (${chunk.startPage} a ${chunk.endPage}) para que este segmento aporte equitativamente al examen global sin saturar el inicio del documento.`;
+- Realiza un barrido homogéneo cubriendo todas las páginas de este bloque (${chunk.startPage} a ${chunk.endPage}) para que este segmento aporte equitativamente al examen global sin saturar el inicio del documento.${exhaustiveDocenteFocus}`;
 
           const currentChunkSystemPrompt = `${singlePageSystemPrompt}${historyDirective}${chunkQuotaMandate}`;
 
@@ -2297,8 +2366,8 @@ DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de este bloqu
               : `Páginas ${chunk.startPage} a ${chunk.endPage}`;
 
           const chunkUserPrompt = isExhaustiveMode
-            ? `Analiza el bloque (${pageLabel}) del documento aplicando la DIRECTIVA DE COBERTURA Y CALIDAD (cuota asignada: ${currentChunkQuota} tarjetas). Aplica la DIRECTIVA DE MODO DOCENTE / DIDÁCTICO para crear ejercicios prácticos de evaluación sin metadatos de aula. Si hay tablas o matrices, extrae preguntas independientes por celda o cruce. Formato: "${cardFormat}".`
-            : `Analiza el bloque (${pageLabel}) del documento adjunto y extrae exactamente ${currentChunkQuota} preguntas en formato "${cardFormat}". Aplica el Modo Docente / Didáctico: preguntas prácticas de examen sin metadatos de aula. Asegúrate de cubrir equilibradamente el contenido de todas las páginas del bloque.`;
+            ? `Analiza el bloque (${pageLabel}) del documento aplicando la DIRECTIVA DE COBERTURA Y CALIDAD (cuota asignada: exactamente ${currentChunkQuota} tarjetas). Desglosa en "inventario_factual" los hechos del bloque y genera las preguntas en "cards". Aplica la DIRECTIVA DE MODO DOCENTE / DIDÁCTICO para crear ejercicios prácticos de evaluación sin metadatos de aula. Evalúa excepciones, contrastes conceptuales y análisis relacional de tablas según EXHAUSTIVE_TABLES_DIRECTIVE a lo largo del bloque. Formato: "${docenteFormat}".`
+            : `Analiza el bloque (${pageLabel}) del documento adjunto desglosando en "inventario_factual" y extrayendo exactamente ${currentChunkQuota} preguntas en "cards" con formato de evaluación docente "${docenteFormat}". Aplica el Modo Docente / Didáctico: preguntas prácticas de examen sin metadatos de aula. Asegúrate de cubrir equilibradamente el contenido de todas las páginas del bloque.`;
 
           let chunkCandidateCards: GeneratedCard[] = [];
 
@@ -2320,7 +2389,7 @@ DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de este bloqu
                 systemInstruction: currentChunkSystemPrompt,
                 temperature: isExhaustiveMode ? 0.1 : 0.15,
                 responseMimeType: 'application/json',
-                responseJsonSchema: singlePageExtractionSchema,
+                responseJsonSchema: unifiedExtractionSchema,
                 maxOutputTokens: 8192,
               },
             });
@@ -2346,12 +2415,13 @@ DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de este bloqu
             );
           }
 
-          // Acumulación y Deduplicación rápida del bloque
+          // Acumulación y Deduplicación rápida del bloque (con gatekeeper vectorial)
           if (chunkCandidateCards.length > 0) {
             const { uniqueCards, duplicateCount } = await deduplicateCandidateCards({
               candidateCards: chunkCandidateCards,
               existingCards: accumulatedHistory,
-              similarityThreshold: isExhaustiveMode ? 0.92 : 0.80,
+              apiKey,
+              similarityThreshold: isExhaustiveMode ? 0.94 : 0.88,
               isExhaustiveMode,
             });
 
@@ -2403,22 +2473,60 @@ DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de este bloqu
           // Extraer lista de tópicos ya cubiertos (BD + páginas previas del lote) para evitar repeticiones a ciegas
           const coveredTopics = extractUniqueTopicsList(accumulatedHistory);
           const historyDirective = coveredTopics
-            ? `\n\nCONCEPTOS YA EVALUADOS EN ESTE MAZO O PÁGINAS PREVIAS: ${coveredTopics}.
+            ? isExhaustiveMode
+              ? `\n\nCONCEPTOS YA EVALUADOS EN ESTE MAZO O PÁGINAS PREVIAS: ${coveredTopics}.
+DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de esta página que aún NO hayan sido preguntados. No repitas la misma pregunta con ligeras variaciones de redacción.
+NOTA MODO EXHAUSTIVO: Aunque una entidad o tema general aparezca en la lista previa, si la página actual aporta NUEVOS datos, mecanismos, cifras, clasificaciones, funciones o filas de tablas sobre ese mismo tema que aún no han sido preguntados literalmente, DEBES generar todas las tarjetas correspondientes a estos nuevos datos.`
+              : `\n\nCONCEPTOS YA EVALUADOS EN ESTE MAZO O PÁGINAS PREVIAS: ${coveredTopics}.
 DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de esta página que aún NO hayan sido preguntados. No repitas la misma pregunta con ligeras variaciones de redacción.`
             : '';
 
           const exhaustiveQuotaMandate = isExhaustiveMode
-            ? `\n\n🚨 DIRECTIVA DE COBERTURA Y CALIDAD (CUOTA RESTANTE: ${remainingToTarget} TARJETAS):
-- Si la página contiene tablas, matrices de datos o clasificaciones densas, extrae preguntas independientes de tantas filas y cruces numéricos como existan hasta cumplir la cuota requerida.
-- Si la página es texto continuo (prosa/teoría), extrae con rigor quirúrgico cada dato fáctico, definición, mecanismo y excepción relevante.
-- IMPORTANTE: No dupliques preguntas con diferente redacción ni inventes preguntas sobre listas de palabras al margen o datos ajenos al documento para alcanzar un número artificial. Si has extraído todos los hechos sustanciales de esta página, concluye tu respuesta; el motor secuencial del servidor continuará acumulando tarjetas en las siguientes páginas del documento hasta completar el objetivo.`
-            : '';
+            ? `\n\n🎯 ENFOQUE EXHAUSTIVO (PRIORIDAD ABSOLUTA AL TEXTO + SUPLEMENTO DE TABLAS Y PIES DE IMAGEN):
+- Analiza la página y desglosa en "inventario_factual" absolutamente todas sus definiciones, clasificaciones vertebrales, mecanismos causa-efecto, cifras, porcentajes, cálculos, sinónimos técnicos y datos relevantes de tablas y pies de imagen.
+- META DE EXTRACCIÓN EN PÁGINAS DE CONTENIDO ('standard_content'): Tu objetivo es extraer entre 22 y 25 tarjetas sustanciales: vacía primero al 100% todo el TEXTO PRINCIPAL párrafo por párrafo (sin omitir nada de lo que incluye el modo estándar más todos los detalles finos del texto) y, SUMADO A ELLO, sácale punta con sentido práctico y de estudio a todas las tablas/cuadros y pies de imagen o recuadros relevantes de la página. Si la página tiene muy poco contenido real, detente al agotar los hechos legítimos o marca el resto como relevance_tier: 'C_trivial_filler'.
+- Genera en "cards" tarjetas de alta precisión evaluando todos los hechos catalogados y respetando las exclusiones de páginas de ejercicios/repaso.`
+            : `\n\n🎯 ENFOQUE TRONCAL EQUILIBRADO (MODO NORMAL: 8 A 12 TARJETAS):
+- Analiza la página y desglosa en "inventario_factual" sus conceptos vertebrales, definiciones, funciones y mecanismos clave del texto principal.
+- META DE EXTRACCIÓN EN PÁGINAS DE CONTENIDO ('standard_content'): Tu objetivo es extraer entre 8 y 12 tarjetas sustanciales cubriendo exhaustivamente todo el texto principal y sus conceptos clave sin omitir nada importante, pero evitando duplicar hechos entre texto y cuadros resumen y sin despiezar subfilas secundarias de tablas. Si la página tiene poco texto real, detente al agotar los hechos legítimos o marca el resto como relevance_tier: 'C_trivial_filler'.
+- Genera en "cards" tarjetas de alta precisión evaluando los hechos troncales catalogados, de forma proporcional al contenido real de la página y respetando estrictamente las exclusiones.`;
 
           const currentPageSystemPrompt = `${singlePageSystemPrompt}${historyDirective}${exhaustiveQuotaMandate}`;
 
-          const pageUserPrompt = isExhaustiveMode
-            ? `Analiza la Página ${currentPage} del documento adjunto aplicando la DIRECTIVA DE COBERTURA Y CALIDAD (cuota restante: ${remainingToTarget} tarjetas). Si hay tablas o matrices de datos, extrae preguntas independientes por cada fila o cruce numérico. Si es texto continuo, extrae hechos y definiciones sustanciales sin duplicar ni inventar preguntas sobre términos al margen, concluyendo cuando los datos sustanciales se agoten para que el servidor avance de página. Formato: "${cardFormat}".`
-            : `Analiza la Página ${currentPage} del documento adjunto y extrae todos los conceptos clave, datos precisos, normativas o hechos únicos posibles en formato "${cardFormat}".`;
+          const practicalInstruction = isPracticalMode
+            ? `ENFOQUE OBLIGATORIO: MODO PRÁCTICO Y SITUACIONAL (PROBLEM-BASED LEARNING).
+Transforma cada concepto o hecho identificado en "inventario_factual" en un supuesto del mundo real, escenario de toma de decisiones o problema aplicado. Queda terminantemente PROHIBIDO formular preguntas teóricas directas o definiciones de manual, y queda prohibido omitir conceptos sustanciales del inventario.`
+            : `Extrae todos los conceptos clave, datos precisos, normativas o hechos únicos posibles basándote en el inventario_factual.`;
+
+          const pageClassificationInstruction = isExhaustiveMode
+            ? `\nClasifica obligatoriamente la página en "page_classification":
+- "standard_content": página con contenido teórico, explicaciones, conceptos, fórmulas, texto continuo estándar O tablas conceptuales/comparativas (clasificaciones, patologías, mecanismos, enzimas, diferencias clave). En estas páginas se extrae con la densidad completa indicada.
+- "catalog_table_only": la página contiene de forma casi exclusiva una tabla de catálogo masivo, directorio o baremo numérico de consulta de decenas de elementos sin prosa explicativa. En Modo Exhaustivo, no te limites a 1 o 2 tarjetas: extrae entre 6 y 12 tarjetas sustanciales con sentido práctico y de estudio (comparaciones por condición/grupo, extremos superiores e inferiores más relevantes, patrones generales y notas al pie sustanciales).
+- "review_or_case_exercises": la página contiene preguntas de repaso, cuestionarios de autoevaluación, ejercicios finales de capítulo o casos de estudio de discusión del libro. Si es esta sección, devuelve un array vacío [] en "cards" para no duplicar preguntas del libro.`
+            : `\nClasifica obligatoriamente la página en "page_classification":
+- "standard_content": página con contenido teórico, explicaciones, conceptos, fórmulas, texto continuo estándar O tablas conceptuales/comparativas (clasificaciones, patologías, mecanismos, enzimas, diferencias clave). En estas páginas se extrae con la densidad completa indicada.
+- "catalog_table_only": la página contiene de forma casi exclusiva una tabla de catálogo masivo, directorio o baremo numérico de consulta de decenas de elementos sin prosa explicativa. Si es catálogo masivo, extrae como máximo 1 o 2 tarjetas conceptuales sobre el principio organizativo general o los extremos más notables.
+- "review_or_case_exercises": la página contiene preguntas de repaso, cuestionarios de autoevaluación, ejercicios finales de capítulo o casos de estudio de discusión del libro. Si es esta sección, devuelve un array vacío [] en "cards" para no duplicar preguntas del libro.`;
+
+          let pageUserPrompt = '';
+          if (isFocusActive) {
+            pageUserPrompt = `🎯 MODO ENFOQUE TEMÁTICO - VERSO LIBRE ACTIVO: El usuario ha solicitado generar tarjetas específicamente sobre: '${focusInstruction}'. Analiza la Página ${currentPage} del documento adjunto:
+1) Si esta página NO contiene información relacionada con '${focusInstruction}', devuelve obligatoriamente 'inventario_factual': [] y 'cards': [].
+2) ⚠️ PRECISIÓN DE OBJETIVO EN MODO ENFOQUE: Si el usuario solicita específicamente un 'Cuadro X' o 'Tabla X' (ej. 'Cuadro 4.3' o 'Tabla 4-3'), NO extraigas preguntas de una 'Figura X' o ilustración con el mismo número (ej. 'Figura 4-3') que trate de otro subtema en páginas anteriores: devuelve 'cards': [] hasta llegar a la página donde se encuentra realmente la Tabla/Cuadro solicitado.
+3) Si esta página SÍ contiene información o tablas sobre '${focusInstruction}', extrae de forma profunda y exhaustiva entre 15 y 25 preguntas sustanciales exprimiendo al máximo dicho tema. Formato: '${cardFormat}'.`;
+          } else if (isExhaustiveMode && !isPracticalMode) {
+            pageUserPrompt = `Analiza la Página ${currentPage} del documento adjunto desglosando obligatoriamente en "inventario_factual" entre 15 y 25 hechos atómicos de forma exhaustiva y genera en "cards" 1 tarjeta de estudio independiente por cada hecho catalogado en el inventario (relación 1 a 1 estricta, prohibido agrupar varios hechos en una sola tarjeta).
+PRIORIDAD #1 ABSOLUTA (TEXTO PRINCIPAL): Vacía primero cada párrafo del texto (definiciones, sinónimos o denominaciones alternativas, composiciones, partes, mecanismos, lugares de acción, cifras, porcentajes, rangos y cálculos) sin omitir nada de lo que incluye el modo estándar.
+PRIORIDAD #2 (SUPLEMENTO EXHAUSTIVO EN TABLAS Y PIES DE IMAGEN): Además del texto, desglosa FILA POR FILA todas las tablas y cuadros de la página (extrayendo entre 8 y 16 tarjetas sobre tipos, orígenes/fuentes, funciones, efectos/deficiencias, extremos y comparaciones con sentido práctico y de estudio) y exprime los pies de imagen, diagramas y recuadros con información relevante de examen.
+META DE EXTRACCIÓN ('standard_content'): Entre 20 y 25 tarjetas sustanciales por página. ${pageClassificationInstruction} ${practicalInstruction} Formato: "${cardFormat}".`;
+          } else if (isExhaustiveMode && isPracticalMode) {
+            pageUserPrompt = `Analiza la Página ${currentPage} del documento adjunto desglosando obligatoriamente en "inventario_factual" entre 15 y 25 hechos atómicos de forma exhaustiva y genera en "cards" 1 caso práctico/situacional independiente por cada hecho catalogado en el inventario (relación 1 a 1 estricta).
+PRIORIDAD #1 ABSOLUTA (TEXTO PRINCIPAL): Vacía primero cada párrafo del texto transformando cada concepto, mecanismo, cifra, cálculo o regla en un mini-caso aplicado con toma de decisiones.
+PRIORIDAD #2 (SUPLEMENTO EXHAUSTIVO EN TABLAS Y PIES DE IMAGEN): Además del texto, desglosa FILA POR FILA todas las tablas y cuadros de la página y exprime los pies de imagen y recuadros relevantes en forma de casos prácticos de estudio.
+META DE EXTRACCIÓN ('standard_content'): Entre 20 y 25 tarjetas sustanciales por página. ${pageClassificationInstruction} ${practicalInstruction} Formato: "${cardFormat}".`;
+          } else {
+            pageUserPrompt = `Analiza la Página ${currentPage} del documento adjunto desglosando en "inventario_factual" los conceptos troncales, definiciones y relaciones clave del texto principal, y genera en "cards" las tarjetas de estudio correspondientes evaluando los hechos troncales. META DE EXTRACCIÓN EN PÁGINAS DE CONTENIDO ('standard_content'): En páginas de contenido estándar, tu objetivo obligatorio es extraer entre 8 y 12 tarjetas sustanciales cubriendo exhaustivamente todo el texto principal y sus conceptos clave sin dejar lagunas de examen, evitando duplicar hechos entre texto y cuadros resumen y sin despiezar subfilas secundarias de tablas ni recuadros periféricos. Si la página tiene muy poco texto real y solo da para menos tarjetas legítimas, detente al agotar los hechos legítimos o márcalo como relevance_tier: 'C_trivial_filler'. ${pageClassificationInstruction} ${practicalInstruction} Formato: "${cardFormat}".`;
+          }
 
           let pageCandidateCards: GeneratedCard[] = [];
 
@@ -2438,9 +2546,9 @@ DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de esta pági
               ],
               config: {
                 systemInstruction: currentPageSystemPrompt,
-                temperature: isExhaustiveMode ? 0.1 : 0.15,
+                temperature: 0.15,
                 responseMimeType: 'application/json',
-                responseJsonSchema: singlePageExtractionSchema,
+                responseJsonSchema: unifiedExtractionSchema,
                 maxOutputTokens: 8192,
               },
             });
@@ -2448,7 +2556,56 @@ DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de esta pági
             if (pageResponse.text) {
               try {
                 const parsed = parseGeminiBatchResponse(pageResponse.text);
-                pageCandidateCards = parsed.cards || [];
+                let rawCards = parsed.cards || [];
+
+                // Criba programática instantánea de relleno por autoclasificación C_trivial_filler (omitida en Verso Libre)
+                if (!isFocusActive) {
+                  rawCards = rawCards.filter((card) => {
+                    if (card.relevance_tier === 'C_trivial_filler') {
+                      console.log(
+                        `[Bucle Acumulador Backend - Modo Estudio] Página ${currentPage}: Descartada tarjeta por autoclasificación C_trivial_filler: "${card.front || card.question}"`
+                      );
+                      return false;
+                    }
+                    return true;
+                  });
+                }
+
+                // Filtro determinista contra metadatos editoriales de tablas y analogías domésticas
+                rawCards = rawCards.filter((card) => {
+                  if (isDisallowedCardContent(card, isTableFocus, isFocusActive)) {
+                    console.log(
+                      `[Bucle Acumulador Backend - Modo Estudio] Página ${currentPage}: Descartada tarjeta por metadatos de tabla o analogía doméstica: "${card.front || card.question}"`
+                    );
+                    return false;
+                  }
+                  return true;
+                });
+
+                // CANDADO PROGRAMÁTICO (Code Gate) según page_classification
+                if (parsed.pageClassification === 'review_or_case_exercises') {
+                  console.log(
+                    `[Bucle Acumulador Backend - Modo Estudio] Página ${currentPage} clasificada como "review_or_case_exercises" (acumuladas: ${tarjetasAcumuladas.length}): descartando ${rawCards.length} tarjetas por ser cuestionarios/repaso finales del libro.`
+                  );
+                  rawCards = [];
+                } else if (parsed.pageClassification === 'catalog_table_only') {
+                  if (isFocusActive || isExhaustiveMode) {
+                    console.log(
+                      `[Bucle Acumulador Backend - Modo Estudio] Página ${currentPage} clasificada como "catalog_table_only", pero ${isExhaustiveMode ? 'Modo Exhaustivo' : 'Enfoque Temático'} está activo: se conservan el 100% de las tarjetas (${rawCards.length}).`
+                    );
+                  } else {
+                    const maxCatalogCards = 1;
+                    if (rawCards.length > maxCatalogCards) {
+                      console.log(
+                        `[Bucle Acumulador Backend - Modo Estudio] Página ${currentPage} clasificada como "catalog_table_only": recortando de ${rawCards.length} a máximo ${maxCatalogCards} tarjeta(s).`
+                      );
+                      rawCards = rawCards.slice(0, maxCatalogCards);
+                    }
+                  }
+                }
+
+                pageCandidateCards = rawCards;
+
                 console.log(
                   `[Bucle Acumulador Backend - Modo Estudio] Página ${currentPage}: Gemini devolvió ${pageCandidateCards.length} tarjetas brutas.`
                 );
@@ -2466,14 +2623,15 @@ DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de esta pági
             );
           }
 
-          // Acumulación y Deduplicación:
-          // Dentro del bucle por página aplicamos el filtro léxico rápido contra accumulatedHistory
+          // Acumulación y Deduplicación rápida (con gatekeeper vectorial habilitado)
           if (pageCandidateCards.length > 0) {
             const { uniqueCards, duplicateCount } = await deduplicateCandidateCards({
               candidateCards: pageCandidateCards,
               existingCards: accumulatedHistory,
-              similarityThreshold: isExhaustiveMode ? 0.92 : 0.80,
+              apiKey,
+              similarityThreshold: isFocusActive ? 0.94 : (isExhaustiveMode ? 0.94 : 0.88),
               isExhaustiveMode,
+              isFocusActive,
             });
 
             if (duplicateCount > 0) {
@@ -2493,15 +2651,10 @@ DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de esta pági
             }
           }
 
-          // Si al sumar se supera el targetCount, recorta el array exactamente al límite solicitado
-          if (tarjetasAcumuladas.length > targetCount) {
-            tarjetasAcumuladas = tarjetasAcumuladas.slice(0, targetCount);
-          }
-
-          // Si alcanzamos el límite exacto de tarjetas solicitadas para este lote, detenemos el bucle
+          // Si alcanzamos o superamos el objetivo, nos detenemos conservando íntegramente todas las tarjetas de la página actual sin truncar
           if (tarjetasAcumuladas.length >= targetCount) {
             console.log(
-              `[Bucle Acumulador Backend - Modo Estudio] 🎯 Objetivo alcanzado: ${tarjetasAcumuladas.length} tarjetas exactas en Página ${currentPage}.`
+              `[Bucle Acumulador Backend - Modo Estudio] 🎯 Objetivo alcanzado/superado: ${tarjetasAcumuladas.length} tarjetas en Página ${currentPage}.`
             );
             break;
           }
@@ -2516,33 +2669,50 @@ DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de esta pági
           candidateCards: tarjetasAcumuladas,
           existingCards,
           apiKey,
-          similarityThreshold: isExhaustiveMode ? 0.92 : 0.80,
+          similarityThreshold: isFocusActive ? 0.94 : (isExhaustiveMode ? 0.94 : 0.88),
           isExhaustiveMode,
+          isFocusActive,
         });
         tarjetasAcumuladas = semanticallyUnique;
       }
 
       if (tarjetasAcumuladas.length === 0) {
+        const hasReachedEnd = lastProcessedPage >= finalPage;
+        if (hasReachedEnd && existingCards.length > 0) {
+          return {
+            success: true,
+            cards: [],
+            rangeCompleted: true,
+            nextCursorPage: undefined,
+            startCursorPage: startPage,
+            message: `¡Rango completado! Se ha llegado al final de las páginas seleccionadas (pág. ${finalPage}); las últimas páginas corresponden a cuestionarios de repaso o su contenido ya está cubierto en el mazo.`,
+          };
+        }
         return {
           success: false,
           error: `No se pudieron extraer tarjetas únicas del rango procesado (págs. ${startPage} a ${lastProcessedPage}). Comprueba que las páginas contengan texto con información relevante y no estén ya en el mazo.`,
-          nextCursorPage: lastProcessedPage,
+          nextCursorPage: hasReachedEnd ? undefined : lastProcessedPage + 1,
           startCursorPage: startPage,
         };
       }
 
-      const processedCards = processGeneratedCards(tarjetasAcumuladas, targetCount, cardFormat);
+      const processedCards = processGeneratedCards(
+        tarjetasAcumuladas,
+        tarjetasAcumuladas.length,
+        cardFormat
+      );
 
       // Registrar uso en api_limits (1 crédito gastado por tirada exitosa)
       if (apiCheck) {
         await recordApiUsage(apiCheck.userId);
       }
 
-      const isExhausted = tarjetasAcumuladas.length < targetCount && lastProcessedPage >= finalPage;
+      const hasReachedEnd = lastProcessedPage >= finalPage;
+      const isExhausted = hasReachedEnd;
 
-      const nextCursor = tarjetasAcumuladas.length >= targetCount
-        ? lastProcessedPage + 1
-        : lastProcessedPage;
+      const nextCursor = hasReachedEnd
+        ? undefined
+        : lastProcessedPage + 1;
 
       // Retorno del Cursor (El Marcapáginas):
       // El Server Action debe devolver al cliente la página exacta para la siguiente extracción (nextCursorPage).
@@ -2583,36 +2753,54 @@ DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de esta pági
       // 2. Historial de tarjetas existentes en este mazo para el Gatekeeper y Memoria de Página
       const existingCards = await fetchExistingCardsHistory(deckId, existingQuestions);
 
+      const isFocusActive = Boolean(focusInstruction && focusInstruction.trim().length > 0);
+      const isTableFocus = isFocusActive && /\b(tabla|cuadro|\d)\b/i.test(focusInstruction);
+
       // 3. Directiva de Extracción: 'Modo Exhaustivo Forzado' vs 'Libertad Universal Estándar'
-      const tablesDirective = isExhaustiveMode ? EXHAUSTIVE_TABLES_DIRECTIVE : NORMAL_TABLES_DIRECTIVE;
+      // Si Enfoque Temático está activo, se desconectan las directivas restrictivas de tablas
+      const tablesDirective = isFocusActive ? '' : (isExhaustiveMode ? EXHAUSTIVE_TABLES_DIRECTIVE : NORMAL_TABLES_DIRECTIVE);
 
-      const universalDirective = `Tu objetivo es extraer TODOS los conceptos clave, datos precisos, normativas o hechos únicos de esta página virtual, sin importar la temática del documento. No tienes un límite máximo por página. Si encuentras tablas, cronologías o listas, extrae absolutamente todos los datos relevantes posibles. SIN EMBARGO, tienes ESTRICTAMENTE PROHIBIDO inventar información o hacer preguntas triviales de relleno. Si la página virtual contiene poco contenido relevante, devuelve únicamente las preguntas válidas que encuentres, o un array vacío []. Sé implacable y exhaustivo donde haya conocimiento real, y conservador donde no lo haya.
+      const singleCoreConceptDirective = isExhaustiveMode
+        ? `### REGLA DE COBERTURA MULTIDIMENSIONAL SIN CLONES (MODO EXHAUSTIVO):
+En Modo Exhaustivo está expresamente PERMITIDO Y EXIGIDO formular tarjetas independientes para evaluar las distintas dimensiones o facetas de una misma entidad, concepto o proceso sustancial (por ejemplo: 1 tarjeta para su definición/sinónimo técnico, 1 para su origen/fuentes/requisitos, 1 para su función/mecanismo basal y 1 para su patología/consecuencia/límite).
+Lo que queda TERMINANTEMENTE PROHIBIDO es generar clones redundantes que pregunten exactamente el mismo dato fáctico con la misma respuesta nuclear reformulada.`
+        : SINGLE_CORE_CONCEPT_DIRECTIVE;
+
+      const sweepDirective = isExhaustiveMode ? EXHAUSTIVE_SWEEP_DIRECTIVE : COMPREHENSIVE_SWEEP_DIRECTIVE;
+
+      const universalDirective = isExhaustiveMode
+        ? `DIRECTIVA BASE UNIVERSAL DE EXTRACCIÓN TRONCAL RIGUROSA:
+Tu objetivo es diseccionar la página virtual actual y extraer con rigor e intensidad TODOS sus conceptos clave, principios rectores, mecanismos de causa-efecto, definiciones sustanciales y clasificaciones vertebrales, con total independencia de la temática o disciplina del documento.
+- Extrae con rigor e intensidad cada concepto sustancial, mecanismo, definición, dato cuantitativo y clasificación del texto principal y sus tablas complementarias.
+- Queda ESTRICTAMENTE PROHIBIDO inventar información o formular preguntas triviales de relleno. Si la página virtual contiene poco contenido relevante, devuelve únicamente las preguntas válidas respaldadas por el texto, o un array vacío []. Sé implacable donde haya conocimiento sustancial, y sobrio donde no lo haya.
+
+${sweepDirective}
+
+${singleCoreConceptDirective}
+
+${CONTENT_HIERARCHY_DIRECTIVE}
+${tablesDirective ? `\n${tablesDirective}\n` : ''}
+${STRICT_GROUNDING_DIRECTIVE}
+
+${EDITORIAL_ARTIFACTS_DIRECTIVE}`
+        : `DIRECTIVA BASE UNIVERSAL DE EXTRACCIÓN TRONCAL RIGUROSA:
+Tu objetivo es diseccionar la página virtual actual y extraer con rigor e intensidad TODOS sus conceptos clave, principios rectores, mecanismos de causa-efecto, definiciones sustanciales y clasificaciones vertebrales, con total independencia de la temática o disciplina del documento.
+- Modula la densidad adaptativa de forma pura según la riqueza intrínseca del texto, sin forzar cuotas ni topes numéricos arbitrarios.
+- Queda ESTRICTAMENTE PROHIBIDO inventar información o formular preguntas triviales de relleno. Si la página virtual contiene poco contenido relevante, devuelve únicamente las preguntas válidas respaldadas por el texto, o un array vacío []. Sé implacable donde haya conocimiento sustancial, y sobrio donde no lo haya.
 
 ${COMPREHENSIVE_SWEEP_DIRECTIVE}
 
-${SINGLE_CORE_CONCEPT_DIRECTIVE}
+${singleCoreConceptDirective}
 
 ${CONTENT_HIERARCHY_DIRECTIVE}
-
-${tablesDirective}
-
+${tablesDirective ? `\n${tablesDirective}\n` : ''}
 ${STRICT_GROUNDING_DIRECTIVE}
 
 ${EDITORIAL_ARTIFACTS_DIRECTIVE}`;
 
-      const exhaustiveDirective = `🚨 MODO EXHAUSTIVO FORZADO: Anula cualquier instrucción de resumen, brevedad o selección pedagógica. Extrae una tarjeta por cada dato, celda de tabla, gráfica o cruce de información sin omitir nada. Prioriza la exhaustividad sobre la síntesis. Analiza profundamente todo el texto de la página virtual extrayendo cualquier concepto, normativa o dato clave. Si encuentras tablas, gráficos o listas, actúa como un extractor implacable: extrae tarjetas individuales cruzando absolutamente TODOS los datos posibles de celdas, filas y columnas, sin resumir ni agrupar. No dejes ningún dato estructurado ni textual relevante sin extraer. Tienes terminantemente prohibido omitir datos o resumir información por considerarla secundaria.
-
-${COMPREHENSIVE_SWEEP_DIRECTIVE}
-
-${SINGLE_CORE_CONCEPT_DIRECTIVE}
-
-${CONTENT_HIERARCHY_DIRECTIVE}
-
-${EXHAUSTIVE_TABLES_DIRECTIVE}
-
-${STRICT_GROUNDING_DIRECTIVE}
-
-${EDITORIAL_ARTIFACTS_DIRECTIVE}`;
+      const exhaustiveDirective = isExhaustiveMode
+        ? `\n\n${EXHAUSTIVE_MODE_MANDATE}\n\n`
+        : '';
 
       const isDocenteMode = pedagogicalMode === 'didactic' || (pedagogicalMode as unknown as string) === 'docente';
 
@@ -2627,35 +2815,67 @@ ${EDITORIAL_ARTIFACTS_DIRECTIVE}`;
 
       let singlePageSystemPrompt = '';
 
-      if (focusInstruction) {
-        singlePageSystemPrompt += `🚨 FILTRO DE ENFOQUE TEMÁTICO (PRIORIDAD ABSOLUTA):
-El usuario ha establecido el siguiente enfoque temático: "${focusInstruction}".
-Esta instrucción tiene PRIORIDAD ABSOLUTA y actúa como un filtro estricto sobre la extracción por defecto. Debes extraer conceptos clave, datos, tablas, normativas o hechos de esta página virtual EXCLUSIVAMENTE o prioritariamente alineados con este enfoque. Si esta página virtual no contiene información relacionada con dicho enfoque, no inventes preguntas ni introduzcas datos de relleno: devuelve un array vacío [] en "cards".\n\n`;
+      if (isFocusActive) {
+        singlePageSystemPrompt += `🚨 MODO ENFOQUE TEMÁTICO - VERSO LIBRE:
+El usuario ha solicitado centrarse específicamente en: "${focusInstruction}".
+Tu ÚNICA prioridad es exprimir al máximo todo lo relacionado con este tema en la página actual.
+Ignora cualquier restricción general sobre tablas o resúmenes de capítulo si guardan relación con este tema.
+Genera de 15 a 25 preguntas si la página contiene datos sustanciales sobre este tema.
+PAUTA UNIVERSAL CUANDO EL FOCO SEA UNA TABLA O CUADRO:
+Prioriza preguntas sobre:
+1) Comparaciones de variación según condición o estado.
+2) Extremos superiores e inferiores de cada categoría.
+3) Criterios generales y notas al pie.
+4) Elementos representativos de cada columna.\n\n`;
       }
 
       if (isDocenteMode) {
         singlePageSystemPrompt += `${buildDidacticModeDirective(docenteFormat, targetAudience)}\n\n`;
-      }
-
-      // Si el modo exhaustivo está activo, REEMPLAZA la directiva estándar para anular cualquier síntesis pedagógica o brevedad
-      if (isExhaustiveMode) {
-        singlePageSystemPrompt += `${exhaustiveDirective}\n\n`;
-      } else {
+        if (isPracticalMode) {
+          singlePageSystemPrompt += `${PRACTICAL_MODE_DIRECTIVE}\n\n`;
+        }
         singlePageSystemPrompt += `${universalDirective}\n\n`;
-      }
-
-      if (isDocenteMode) {
+        singlePageSystemPrompt += `${buildUniversalCalibrationDirective(isExhaustiveMode)}\n\n`;
+        singlePageSystemPrompt += `${EXCLUSION_ANALOGIES_DIRECTIVE}\n\n`;
+        singlePageSystemPrompt += `${NO_EDITORIAL_REFERENCES_DIRECTIVE}\n\n`;
+        if (!isFocusActive) {
+          singlePageSystemPrompt += `${CHAPTER_SUMMARY_PAGES_DIRECTIVE}\n\n`;
+        }
+        if (isExhaustiveMode) {
+          singlePageSystemPrompt += `${exhaustiveDirective}\n\n`;
+        }
+        singlePageSystemPrompt += `${DISTRACTOR_VEROSIMILITUDE_DIRECTIVE}\n\n`;
+        singlePageSystemPrompt += `${ZERO_MISMATCH_DIRECTIVE}\n\n`;
         singlePageSystemPrompt += `${getDidacticFormatSection(docenteFormat)}\n`;
         singlePageSystemPrompt += `\nRECORDATORIO MODO DOCENTE / DIDÁCTICO: Realiza un barrido homogéneo por todo el texto, transformando el contenido en ejercicios y problemas prácticos de examen para alumnos, omitiendo metadatos de aula (ejercicios, bloques, unidades) y omitiendo preguntas sobre transcripciones fonéticas.`;
       } else {
+        singlePageSystemPrompt += `${TEXT_DENSITY_ADAPTIVE_DISTRACTOR_DIRECTIVE}\n\n`;
+        if (isPracticalMode) {
+          singlePageSystemPrompt += `${PRACTICAL_MODE_DIRECTIVE}\n\n`;
+        }
+        singlePageSystemPrompt += `${buildUniversalCalibrationDirective(isExhaustiveMode)}\n\n`;
+        singlePageSystemPrompt += `${DISTRACTOR_VEROSIMILITUDE_DIRECTIVE}\n\n`;
+        singlePageSystemPrompt += `${ZERO_MISMATCH_DIRECTIVE}\n\n`;
+        singlePageSystemPrompt += `${EXCLUSION_ANALOGIES_DIRECTIVE}\n\n`;
+        singlePageSystemPrompt += `${NO_EDITORIAL_REFERENCES_DIRECTIVE}\n\n`;
+        if (!isFocusActive) {
+          singlePageSystemPrompt += `${CHAPTER_SUMMARY_PAGES_DIRECTIVE}\n\n`;
+        }
+        // universalDirective es la base obligatoria de calidad, rigor y sin artefactos
+        singlePageSystemPrompt += `${universalDirective}\n\n`;
+        if (isPracticalMode) {
+          singlePageSystemPrompt += `🎯 DIRECTIVA DE BARRIDO PRÁCTICO Y SITUACIONAL:
+Transforma el 100% de los hechos del inventario_factual (1 hecho clave = 1 mini-caso aplicado) sin omitir definiciones base, planteando situaciones reales breves de toma de decisiones o aplicación donde dicho concepto, mecanismo u origen sea indispensable para resolver el caso.\n\n`;
+        }
         singlePageSystemPrompt += `${getFormatRule(cardFormat)}`;
         singlePageSystemPrompt += `\n${getFormatInstructions(cardFormat)}`;
-        singlePageSystemPrompt += `\n\nREGLA DE INTEGRIDAD: Devuelve un objeto JSON estructurado con "conceptos_identificados" (array de strings con los conceptos encontrados en esta página virtual), "core_exhausted" (booleano) y "cards" (array dinámico con todas las tarjetas extraídas sin límite máximo ni mínimo artificial, formuladas según el formato "${cardFormat}").`;
+        singlePageSystemPrompt += `\n\nREGLA DE INTEGRIDAD ESTRUCTURAL CON INVENTARIO FACTUAL:
+Devuelve un objeto JSON estructurado con:
+- "inventario_factual": array obligatorio de objetos [{ "id": "H1", "tipo": "1_identidad_definicion"|"2_funcion_mecanismo"|"3_origen_fuente_requisitos"|"4_consecuencia_falla_limite"|"5_detalle_tabla_nota", "declaracion_factual": "..." }] con el desglose exhaustivo de TODOS los hechos atómicos, definiciones y relaciones de la página virtual antes de generar las tarjetas.
+- "core_exhausted": booleano que indica si la página virtual ha sido vaciada conceptualmente.
+- "cards": array dinámico con las tarjetas de estudio generadas evaluando directa y rigurosamente los hechos del inventario_factual (numeradas estrictamente con generation_index del 1 al N, formuladas según el formato "${cardFormat}").`;
       }
 
-      if (isExhaustiveMode) {
-        singlePageSystemPrompt += `\nRECORDATORIO MODO EXHAUSTIVO: Extrae cada celda, fila, columna y dato sustancial sin resumir ni abreviar, priorizando el conocimiento pedagógico real y respetando la prohibición estricta de metadatos o recuadros de vocabulario al margen.`;
-      }
       singlePageSystemPrompt += buildLanguageDirective(language);
 
       let tarjetasAcumuladas: GeneratedCard[] = [];
@@ -2698,9 +2918,13 @@ Esta instrucción tiene PRIORIDAD ABSOLUTA y actúa como un filtro estricto sobr
 DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de este bloque que aún NO hayan sido preguntados. No repitas la misma pregunta con ligeras variaciones de redacción.`
             : '';
 
+          const exhaustiveDocenteFocus = isExhaustiveMode
+            ? `\n- PROFUNDIDAD EXHAUSTIVA DOCENTE: Dentro de la cuota asignada de ${currentChunkQuota} preguntas, prioriza formular preguntas que evalúen excepciones a reglas generales, contrastes conceptuales sutiles y cruces relacionales de tablas o matrices según EXHAUSTIVE_TABLES_DIRECTIVE a lo largo de todas las páginas virtuales del bloque (${chunk.startPage} a ${chunk.endPage}).`
+            : '';
+
           const chunkQuotaMandate = `\n\n🚨 DIRECTIVA DE CUOTA MATEMÁTICA DEL BLOQUE (EXACTAMENTE ${currentChunkQuota} PREGUNTAS):
 - Tu objetivo OBLIGATORIO para este bloque (páginas virtuales ${chunk.startPage} a ${chunk.endPage}) es generar exactamente ${currentChunkQuota} preguntas.
-- Realiza un barrido homogéneo cubriendo todas las páginas de este bloque (${chunk.startPage} a ${chunk.endPage}) para que este segmento aporte equitativamente al examen global sin saturar el inicio del documento.`;
+- Realiza un barrido homogéneo cubriendo todas las páginas de este bloque (${chunk.startPage} a ${chunk.endPage}) para que este segmento aporte equitativamente al examen global sin saturar el inicio del documento.${exhaustiveDocenteFocus}`;
 
           const currentChunkSystemPrompt = `${singlePageSystemPrompt}${historyDirective}${chunkQuotaMandate}`;
 
@@ -2715,11 +2939,11 @@ DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de este bloqu
               : '';
 
           const chunkUserPrompt = isExhaustiveMode
-            ? `Analiza el bloque (${pageLabel}) del documento Word aplicando la DIRECTIVA DE COBERTURA Y CALIDAD (cuota asignada: ${currentChunkQuota} tarjetas). Aplica la DIRECTIVA DE MODO DOCENTE / DIDÁCTICO para crear ejercicios prácticos de evaluación sin metadatos de aula. ${imageNotice}Si hay tablas, diagramas o clasificaciones, extrae preguntas independientes por celda o cruce. Formato: "${cardFormat}".
-
+            ? `Analiza el bloque (${pageLabel}) del documento Word aplicando la DIRECTIVA DE COBERTURA Y CALIDAD (cuota asignada: exactamente ${currentChunkQuota} tarjetas). Desglosa en "inventario_factual" los hechos del bloque y genera las preguntas en "cards". Aplica la DIRECTIVA DE MODO DOCENTE / DIDÁCTICO para crear ejercicios prácticos de evaluación sin metadatos de aula. ${imageNotice}Evalúa excepciones, contrastes conceptuales y análisis relacional de tablas según EXHAUSTIVE_TABLES_DIRECTIVE a lo largo del bloque. Formato de evaluación: "${docenteFormat}".
+ 
 --- TEXTO DEL BLOQUE (${pageLabel}) ---
 ${chunkText}`
-            : `Analiza el bloque (${pageLabel}) del documento Word adjunto y extrae exactamente ${currentChunkQuota} preguntas en formato "${cardFormat}". Aplica el Modo Docente / Didáctico: preguntas prácticas de examen sin metadatos de aula.${imageNotice} Asegúrate de cubrir equilibradamente el contenido de todas las páginas virtuales del bloque.
+            : `Analiza el bloque (${pageLabel}) del documento Word adjunto desglosando en "inventario_factual" y extrayendo exactamente ${currentChunkQuota} preguntas en "cards" con formato de evaluación docente "${docenteFormat}". Aplica el Modo Docente / Didáctico: preguntas prácticas de examen sin metadatos de aula.${imageNotice} Asegúrate de cubrir equilibradamente el contenido de todas las páginas virtuales del bloque.
 
 --- TEXTO DEL BLOQUE (${pageLabel}) ---
 ${chunkText}`;
@@ -2754,7 +2978,7 @@ ${chunkText}`;
                 systemInstruction: currentChunkSystemPrompt,
                 temperature: isExhaustiveMode ? 0.1 : 0.15,
                 responseMimeType: 'application/json',
-                responseJsonSchema: singlePageExtractionSchema,
+                responseJsonSchema: unifiedExtractionSchema,
                 maxOutputTokens: 8192,
               },
             });
@@ -2780,12 +3004,13 @@ ${chunkText}`;
             );
           }
 
-          // Acumulación y Deduplicación rápida del bloque
+          // Acumulación y Deduplicación rápida del bloque (con gatekeeper vectorial)
           if (chunkCandidateCards.length > 0) {
             const { uniqueCards, duplicateCount } = await deduplicateCandidateCards({
               candidateCards: chunkCandidateCards,
               existingCards: accumulatedHistory,
-              similarityThreshold: isExhaustiveMode ? 0.92 : 0.80,
+              apiKey,
+              similarityThreshold: isExhaustiveMode ? 0.94 : 0.88,
               isExhaustiveMode,
             });
 
@@ -2837,16 +3062,23 @@ ${chunkText}`;
           // Extraer lista de tópicos ya cubiertos (BD + páginas previas del lote) para evitar repeticiones a ciegas
           const coveredTopics = extractUniqueTopicsList(accumulatedHistory);
           const historyDirective = coveredTopics
-            ? `\n\nCONCEPTOS YA EVALUADOS EN ESTE MAZO O PÁGINAS PREVIAS: ${coveredTopics}.
+            ? isExhaustiveMode
+              ? `\n\nCONCEPTOS YA EVALUADOS EN ESTE MAZO O PÁGINAS PREVIAS: ${coveredTopics}.
+DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de esta página que aún NO hayan sido preguntados. No repitas la misma pregunta con ligeras variaciones de redacción.
+NOTA MODO EXHAUSTIVO: Aunque una entidad o tema general aparezca en la lista previa, si la página actual aporta NUEVOS datos, mecanismos, cifras, clasificaciones, funciones o filas de tablas sobre ese mismo tema que aún no han sido preguntados literalmente, DEBES generar todas las tarjetas correspondientes a estos nuevos datos.`
+              : `\n\nCONCEPTOS YA EVALUADOS EN ESTE MAZO O PÁGINAS PREVIAS: ${coveredTopics}.
 DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de esta página que aún NO hayan sido preguntados. No repitas la misma pregunta con ligeras variaciones de redacción.`
             : '';
 
           const exhaustiveQuotaMandate = isExhaustiveMode
-            ? `\n\n🚨 DIRECTIVA DE COBERTURA Y CALIDAD (CUOTA RESTANTE: ${remainingToTarget} TARJETAS):
-- Si la sección contiene tablas, imágenes o clasificaciones densas, extrae preguntas independientes de tantas filas, cruces o diagramas como existan hasta cumplir la cuota requerida.
-- Si la sección es texto continuo (prosa/teoría), extrae con rigor quirúrgico cada dato fáctico, definición, mecanismo y excepción relevante.
-- IMPORTANTE: No dupliques preguntas con diferente redacción ni inventes preguntas sobre listas de palabras al margen o datos ajenos al documento para alcanzar un número artificial. Si has extraído todos los hechos sustanciales de esta página virtual, concluye tu respuesta; el motor secuencial del servidor continuará acumulando tarjetas en las siguientes páginas del documento hasta completar el objetivo.`
-            : '';
+            ? `\n\n🎯 ENFOQUE EXHAUSTIVO (PRIORIDAD ABSOLUTA AL TEXTO + SUPLEMENTO DE TABLAS Y PIES DE IMAGEN):
+- Analiza la página y desglosa en "inventario_factual" absolutamente todas sus definiciones, clasificaciones vertebrales, mecanismos causa-efecto, cifras, porcentajes, cálculos, sinónimos técnicos y datos relevantes de tablas y pies de imagen.
+- META DE EXTRACCIÓN EN PÁGINAS DE CONTENIDO ('standard_content'): Tu objetivo es extraer entre 22 y 25 tarjetas sustanciales: vacía primero al 100% todo el TEXTO PRINCIPAL párrafo por párrafo (sin omitir nada de lo que incluye el modo estándar más todos los detalles finos del texto) y, SUMADO A ELLO, sácale punta con sentido práctico y de estudio a todas las tablas/cuadros y pies de imagen o recuadros relevantes de la página. Si la página tiene muy poco contenido real, detente al agotar los hechos legítimos o marca el resto como relevance_tier: 'C_trivial_filler'.
+- Genera en "cards" tarjetas de alta precisión evaluando todos los hechos catalogados y respetando las exclusiones de páginas de ejercicios/repaso.`
+            : `\n\n🎯 ENFOQUE TRONCAL EQUILIBRADO (MODO NORMAL: 8 A 12 TARJETAS):
+- Analiza la página y desglosa en "inventario_factual" sus conceptos vertebrales, definiciones, funciones y mecanismos clave del texto principal.
+- META DE EXTRACCIÓN EN PÁGINAS DE CONTENIDO ('standard_content'): Tu objetivo es extraer entre 8 y 12 tarjetas sustanciales cubriendo exhaustivamente todo el texto principal y sus conceptos clave sin omitir nada importante, pero evitando duplicar hechos entre texto y cuadros resumen y sin despiezar subfilas secundarias de tablas. Si la página tiene poco texto real, detente al agotar los hechos legítimos o marca el resto como relevance_tier: 'C_trivial_filler'.
+- Genera en "cards" tarjetas de alta precisión evaluando los hechos troncales catalogados, de forma proporcional al contenido real de la página y respetando estrictamente las exclusiones.`;
 
           const currentPageSystemPrompt = `${singlePageSystemPrompt}${historyDirective}${exhaustiveQuotaMandate}`;
 
@@ -2854,15 +3086,55 @@ DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de esta pági
             ? ` Se adjuntan ${currentPageImages.length} imagen(es) o diagrama(s) incrustados en esta sección del documento Word. Analízalos visualmente con precisión para extraer datos, esquemas, clasificaciones o conceptos presentes en ellos.`
             : '';
 
-          const pageUserPrompt = isExhaustiveMode
-            ? `Analiza el contenido de la Página Virtual ${currentPage} del documento Word adjunto aplicando la DIRECTIVA DE COBERTURA Y CALIDAD (cuota restante: ${remainingToTarget} tarjetas). ${imageNotice}Si hay tablas, diagramas o datos estructurados, extrae preguntas independientes por cada dato relevante. Si es texto continuo, extrae hechos y definiciones sustanciales sin duplicar ni inventar preguntas sobre términos al margen, concluyendo cuando los datos sustanciales se agoten para que el servidor avance de página. Formato: "${cardFormat}".
+          const practicalInstructionWord = isPracticalMode
+            ? `ENFOQUE OBLIGATORIO: MODO PRÁCTICO Y SITUACIONAL (PROBLEM-BASED LEARNING).
+Transforma cada concepto o hecho identificado en "inventario_factual" en un supuesto del mundo real, escenario de toma de decisiones o problema aplicado. Queda terminantemente PROHIBIDO formular preguntas teóricas directas o definiciones de manual, y queda prohibido omitir conceptos sustanciales del inventario.`
+            : `Extrae todos los conceptos clave, datos precisos, normativas o hechos únicos posibles basándote en el inventario_factual.`;
 
---- TEXTO DE LA PÁGINA VIRTUAL ${currentPage} (${fileName || 'documento.docx'}) ---
-${currentPageText}`
-            : `Analiza el contenido de la Página Virtual ${currentPage} del documento Word adjunto y extrae todos los conceptos clave, datos precisos, normativas o hechos únicos posibles en formato "${cardFormat}".${imageNotice}
+          const pageClassificationInstructionWord = isExhaustiveMode
+            ? `\nClasifica obligatoriamente la página en "page_classification":
+- "standard_content": página con contenido teórico, explicaciones, conceptos, fórmulas, texto continuo estándar O tablas conceptuales/comparativas (clasificaciones, patologías, mecanismos, enzimas, diferencias clave). En estas páginas se extrae con la densidad completa indicada.
+- "catalog_table_only": la página contiene de forma casi exclusiva una tabla de catálogo masivo, directorio o baremo numérico de consulta de decenas de elementos sin prosa explicativa. En Modo Exhaustivo, no te limites a 1 o 2 tarjetas: extrae entre 6 y 12 tarjetas sustanciales con sentido práctico y de estudio (comparaciones por condición/grupo, extremos superiores e inferiores más relevantes, patrones generales y notas al pie sustanciales).
+- "review_or_case_exercises": la página contiene preguntas de repaso, cuestionarios de autoevaluación, ejercicios finales de capítulo o casos de estudio de discusión del libro. Si es esta sección, devuelve un array vacío [] en "cards" para no duplicar preguntas del libro.`
+            : `\nClasifica obligatoriamente la página en "page_classification":
+- "standard_content": página con contenido teórico, explicaciones, conceptos, fórmulas, texto continuo estándar O tablas conceptuales/comparativas (clasificaciones, patologías, mecanismos, enzimas, diferencias clave). En estas páginas se extrae con la densidad completa indicada.
+- "catalog_table_only": la página contiene de forma casi exclusiva una tabla de catálogo masivo, directorio o baremo numérico de consulta de decenas de elementos sin prosa explicativa. Si es catálogo masivo, extrae como máximo 1 o 2 tarjetas conceptuales sobre el principio organizativo general o los extremos más notables.
+- "review_or_case_exercises": la página contiene preguntas de repaso, cuestionarios de autoevaluación, ejercicios finales de capítulo o casos de estudio de discusión del libro. Si es esta sección, devuelve un array vacío [] en "cards" para no duplicar preguntas del libro.`;
+
+          const isFocusActiveWord = Boolean(focusInstruction && focusInstruction.trim().length > 0);
+          const isTableFocusWord = isFocusActiveWord && /\b(tabla|cuadro|\d)\b/i.test(focusInstruction);
+
+          let pageUserPrompt = '';
+          if (isFocusActiveWord) {
+            pageUserPrompt = `🎯 MODO ENFOQUE TEMÁTICO - VERSO LIBRE ACTIVO: El usuario ha solicitado generar tarjetas específicamente sobre: '${focusInstruction}'. Analiza el contenido de la Página Virtual ${currentPage} del documento Word adjunto:
+1) Si esta página NO contiene información relacionada con '${focusInstruction}', devuelve obligatoriamente 'inventario_factual': [] y 'cards': [].
+2) ⚠️ PRECISIÓN DE OBJETIVO EN MODO ENFOQUE: Si el usuario solicita específicamente un 'Cuadro X' o 'Tabla X' (ej. 'Cuadro 4.3' o 'Tabla 4-3'), NO extraigas preguntas de una 'Figura X' o ilustración con el mismo número (ej. 'Figura 4-3') que trate de otro subtema en páginas anteriores: devuelve 'cards': [] hasta llegar a la página donde se encuentra realmente la Tabla/Cuadro solicitado.
+3) Si esta página SÍ contiene información o tablas sobre '${focusInstruction}', extrae de forma profunda y exhaustiva entre 15 y 25 preguntas sustanciales exprimiendo al máximo dicho tema. Formato: '${cardFormat}'.
 
 --- TEXTO DE LA PÁGINA VIRTUAL ${currentPage} (${fileName || 'documento.docx'}) ---
 ${currentPageText}`;
+          } else if (isExhaustiveMode && !isPracticalMode) {
+            pageUserPrompt = `Analiza el contenido de la Página Virtual ${currentPage} del documento Word adjunto desglosando obligatoriamente en "inventario_factual" entre 15 y 25 hechos atómicos de forma exhaustiva y genera en "cards" 1 tarjeta de estudio independiente por cada hecho catalogado en el inventario (relación 1 a 1 estricta, prohibido agrupar varios hechos en una sola tarjeta).
+PRIORIDAD #1 ABSOLUTA (TEXTO PRINCIPAL): Vacía primero cada párrafo del texto (definiciones, sinónimos o denominaciones alternativas, composiciones, partes, mecanismos, lugares de acción, cifras, porcentajes, rangos y cálculos) sin omitir nada de lo que incluye el modo estándar.
+PRIORIDAD #2 (SUPLEMENTO EXHAUSTIVO EN TABLAS Y PIES DE IMAGEN): Además del texto, desglosa FILA POR FILA todas las tablas y cuadros de la página (extrayendo entre 8 y 16 tarjetas sobre tipos, orígenes/fuentes, funciones, efectos/deficiencias, extremos y comparaciones con sentido práctico y de estudio) y exprime los pies de imagen, diagramas y recuadros con información relevante de examen.
+META DE EXTRACCIÓN ('standard_content'): Entre 20 y 25 tarjetas sustanciales por página. ${pageClassificationInstructionWord} ${imageNotice}${practicalInstructionWord} Formato: "${cardFormat}".
+
+--- TEXTO DE LA PÁGINA VIRTUAL ${currentPage} (${fileName || 'documento.docx'}) ---
+${currentPageText}`;
+          } else if (isExhaustiveMode && isPracticalMode) {
+            pageUserPrompt = `Analiza el contenido de la Página Virtual ${currentPage} del documento Word adjunto desglosando obligatoriamente en "inventario_factual" entre 15 y 25 hechos atómicos de forma exhaustiva y genera en "cards" 1 caso práctico/situacional independiente por cada hecho catalogado en el inventario (relación 1 a 1 estricta).
+PRIORIDAD #1 ABSOLUTA (TEXTO PRINCIPAL): Vacía primero cada párrafo del texto transformando cada concepto, mecanismo, cifra, cálculo o regla en un mini-caso aplicado con toma de decisiones.
+PRIORIDAD #2 (SUPLEMENTO EXHAUSTIVO EN TABLAS Y PIES DE IMAGEN): Además del texto, desglosa FILA POR FILA todas las tablas y cuadros de la página y exprime los pies de imagen y recuadros relevantes en forma de casos prácticos de estudio.
+META DE EXTRACCIÓN ('standard_content'): Entre 20 y 25 tarjetas sustanciales por página. ${pageClassificationInstructionWord} ${imageNotice}${practicalInstructionWord} Formato: "${cardFormat}".
+
+--- TEXTO DE LA PÁGINA VIRTUAL ${currentPage} (${fileName || 'documento.docx'}) ---
+${currentPageText}`;
+          } else {
+            pageUserPrompt = `Analiza el contenido de la Página Virtual ${currentPage} del documento Word adjunto desglosando en "inventario_factual" los conceptos troncales, definiciones y relaciones clave del texto principal, y genera en "cards" las tarjetas de estudio correspondientes evaluando los hechos troncales. META DE EXTRACCIÓN EN PÁGINAS DE CONTENIDO ('standard_content'): En páginas de contenido estándar, tu objetivo obligatorio es extraer entre 8 y 12 tarjetas sustanciales cubriendo exhaustivamente todo el texto principal y sus conceptos clave sin dejar lagunas de examen, evitando duplicar hechos entre texto y cuadros resumen y sin despiezar subfilas secundarias de tablas ni recuadros periféricos. Si la página tiene muy poco texto real y solo da para menos tarjetas legítimas, detente al agotar los hechos legítimos o márcalo como relevance_tier: 'C_trivial_filler'. ${pageClassificationInstructionWord} ${imageNotice}${practicalInstructionWord} Formato: "${cardFormat}".
+
+--- TEXTO DE LA PÁGINA VIRTUAL ${currentPage} (${fileName || 'documento.docx'}) ---
+${currentPageText}`;
+          }
 
           // Construir contenido multimodal para Gemini: imágenes + texto
           const geminiContentParts: Array<
@@ -2893,9 +3165,9 @@ ${currentPageText}`;
               contents: geminiContentParts,
               config: {
                 systemInstruction: currentPageSystemPrompt,
-                temperature: isExhaustiveMode ? 0.1 : 0.15,
+                temperature: 0.15,
                 responseMimeType: 'application/json',
-                responseJsonSchema: singlePageExtractionSchema,
+                responseJsonSchema: unifiedExtractionSchema,
                 maxOutputTokens: 8192,
               },
             });
@@ -2903,7 +3175,56 @@ ${currentPageText}`;
             if (pageResponse.text) {
               try {
                 const parsed = parseGeminiBatchResponse(pageResponse.text);
-                pageCandidateCards = parsed.cards || [];
+                let rawCards = parsed.cards || [];
+
+                // Criba programática instantánea de relleno por autoclasificación C_trivial_filler (omitida en Verso Libre)
+                if (!isFocusActiveWord) {
+                  rawCards = rawCards.filter((card) => {
+                    if (card.relevance_tier === 'C_trivial_filler') {
+                      console.log(
+                        `[Bucle Acumulador Backend DOCX - Modo Estudio] Página Virtual ${currentPage}: Descartada tarjeta por autoclasificación C_trivial_filler: "${card.front || card.question}"`
+                      );
+                      return false;
+                    }
+                    return true;
+                  });
+                }
+
+                // Filtro determinista contra metadatos editoriales de tablas y analogías domésticas
+                rawCards = rawCards.filter((card) => {
+                  if (isDisallowedCardContent(card, isTableFocusWord, isFocusActiveWord)) {
+                    console.log(
+                      `[Bucle Acumulador Backend DOCX - Modo Estudio] Página Virtual ${currentPage}: Descartada tarjeta por metadatos de tabla o analogía doméstica: "${card.front || card.question}"`
+                    );
+                    return false;
+                  }
+                  return true;
+                });
+
+                // CANDADO PROGRAMÁTICO (Code Gate) según page_classification
+                if (parsed.pageClassification === 'review_or_case_exercises') {
+                  console.log(
+                    `[Bucle Acumulador Backend DOCX - Modo Estudio] Página Virtual ${currentPage} clasificada como "review_or_case_exercises" (acumuladas: ${tarjetasAcumuladas.length}): descartando ${rawCards.length} tarjetas por ser cuestionarios/repaso finales del libro.`
+                  );
+                  rawCards = [];
+                } else if (parsed.pageClassification === 'catalog_table_only') {
+                  if (isFocusActiveWord || isExhaustiveMode) {
+                    console.log(
+                      `[Bucle Acumulador Backend DOCX - Modo Estudio] Página Virtual ${currentPage} clasificada como "catalog_table_only", pero ${isExhaustiveMode ? 'Modo Exhaustivo' : 'Enfoque Temático'} está activo: se conservan el 100% de las tarjetas (${rawCards.length}).`
+                    );
+                  } else {
+                    const maxCatalogCards = 1;
+                    if (rawCards.length > maxCatalogCards) {
+                      console.log(
+                        `[Bucle Acumulador Backend DOCX - Modo Estudio] Página Virtual ${currentPage} clasificada como "catalog_table_only": recortando de ${rawCards.length} a máximo ${maxCatalogCards} tarjeta(s).`
+                      );
+                      rawCards = rawCards.slice(0, maxCatalogCards);
+                    }
+                  }
+                }
+
+                pageCandidateCards = rawCards;
+
                 console.log(
                   `[Bucle Acumulador Backend DOCX - Modo Estudio] Página Virtual ${currentPage}: Gemini devolvió ${pageCandidateCards.length} tarjetas brutas.`
                 );
@@ -2921,13 +3242,15 @@ ${currentPageText}`;
             );
           }
 
-          // Acumulación y Deduplicación rápida
+          // Acumulación y Deduplicación rápida (con gatekeeper vectorial habilitado)
           if (pageCandidateCards.length > 0) {
             const { uniqueCards, duplicateCount } = await deduplicateCandidateCards({
               candidateCards: pageCandidateCards,
               existingCards: accumulatedHistory,
-              similarityThreshold: isExhaustiveMode ? 0.92 : 0.80,
+              apiKey,
+              similarityThreshold: isFocusActiveWord ? 0.94 : (isExhaustiveMode ? 0.94 : 0.88),
               isExhaustiveMode,
+              isFocusActive: isFocusActiveWord,
             });
 
             if (duplicateCount > 0) {
@@ -2947,13 +3270,10 @@ ${currentPageText}`;
             }
           }
 
-          if (tarjetasAcumuladas.length > targetCount) {
-            tarjetasAcumuladas = tarjetasAcumuladas.slice(0, targetCount);
-          }
-
+          // Si alcanzamos o superamos el objetivo, nos detenemos conservando íntegramente todas las tarjetas de la página actual sin truncar
           if (tarjetasAcumuladas.length >= targetCount) {
             console.log(
-              `[Bucle Acumulador Backend DOCX - Modo Estudio] 🎯 Objetivo alcanzado: ${tarjetasAcumuladas.length} tarjetas exactas en Página Virtual ${currentPage}.`
+              `[Bucle Acumulador Backend DOCX - Modo Estudio] 🎯 Objetivo alcanzado/superado: ${tarjetasAcumuladas.length} tarjetas en Página Virtual ${currentPage}.`
             );
             break;
           }
@@ -2968,32 +3288,49 @@ ${currentPageText}`;
           candidateCards: tarjetasAcumuladas,
           existingCards,
           apiKey,
-          similarityThreshold: isExhaustiveMode ? 0.92 : 0.80,
+          similarityThreshold: isFocusActive ? 0.94 : (isExhaustiveMode ? 0.94 : 0.88),
           isExhaustiveMode,
+          isFocusActive,
         });
         tarjetasAcumuladas = semanticallyUnique;
       }
 
       if (tarjetasAcumuladas.length === 0) {
+        const hasReachedEnd = lastProcessedPage >= finalPage;
+        if (hasReachedEnd && existingCards.length > 0) {
+          return {
+            success: true,
+            cards: [],
+            rangeCompleted: true,
+            nextCursorPage: undefined,
+            startCursorPage: startPage,
+            message: `¡Rango completado! Se ha llegado al final de las páginas seleccionadas (pág. virtual ${finalPage}); las últimas páginas corresponden a cuestionarios de repaso o su contenido ya está cubierto en el mazo.`,
+          };
+        }
         return {
           success: false,
           error: `No se pudieron extraer tarjetas únicas del rango procesado (págs. virtuales ${startPage} a ${lastProcessedPage}). Comprueba que las páginas contengan texto con información relevante y no estén ya en el mazo.`,
-          nextCursorPage: lastProcessedPage,
+          nextCursorPage: hasReachedEnd ? undefined : lastProcessedPage + 1,
           startCursorPage: startPage,
         };
       }
 
-      const processedCards = processGeneratedCards(tarjetasAcumuladas, targetCount, cardFormat);
+      const processedCards = processGeneratedCards(
+        tarjetasAcumuladas,
+        tarjetasAcumuladas.length,
+        cardFormat
+      );
 
       if (apiCheck) {
         await recordApiUsage(apiCheck.userId);
       }
 
-      const isExhausted = tarjetasAcumuladas.length < targetCount && lastProcessedPage >= finalPage;
+      const hasReachedEnd = lastProcessedPage >= finalPage;
+      const isExhausted = hasReachedEnd;
 
-      const nextCursor = tarjetasAcumuladas.length >= targetCount
-        ? lastProcessedPage + 1
-        : lastProcessedPage;
+      const nextCursor = hasReachedEnd
+        ? undefined
+        : lastProcessedPage + 1;
 
       return {
         success: true,
@@ -3081,14 +3418,14 @@ REGLA ESTRICTA: Si el usuario proporciona una instrucción de enfoque (ej. un ca
           const wordPart1 = extractedWordText.slice(0, effectiveSplit);
           const wordPart2 = extractedWordText.slice(effectiveSplit);
 
-          const prompt1 = `Eres un pedagogo experto en diseño pedagógico. LOTE PARALELO (1/2): Concéntrate en la PRIMERA MITAD del documento. ${dirBatch1} ${getGlobalRules(cardFormat, batch1Target, existingCards.length, pedagogicalMode)} ${getFormatInstructions(cardFormat)} ${buildLanguageDirective(language)}`;
-          const prompt2 = `Eres un pedagogo experto en diseño pedagógico. LOTE PARALELO (2/2): Concéntrate en la SEGUNDA MITAD del documento. ${dirBatch2} ${getGlobalRules(cardFormat, batch2Target, existingCards.length, pedagogicalMode)} ${getFormatInstructions(cardFormat)} ${buildLanguageDirective(language)}`;
+          const prompt1 = `Eres un pedagogo experto en diseño pedagógico. LOTE PARALELO (1/2): Concéntrate en la PRIMERA MITAD del documento. ${dirBatch1} ${getGlobalRules(cardFormat, batch1Target, existingCards.length, pedagogicalMode, docenteFormat, targetAudience, isExhaustiveMode, isPracticalMode)} ${getFormatInstructions(cardFormat)} ${buildLanguageDirective(language)}`;
+          const prompt2 = `Eres un pedagogo experto en diseño pedagógico. LOTE PARALELO (2/2): Concéntrate en la SEGUNDA MITAD del documento. ${dirBatch2} ${getGlobalRules(cardFormat, batch2Target, existingCards.length, pedagogicalMode, docenteFormat, targetAudience, isExhaustiveMode, isPracticalMode)} ${getFormatInstructions(cardFormat)} ${buildLanguageDirective(language)}`;
 
           contentsBatch1 = [{ text: `${prompt1}\n\n${wordPart1}` }];
           contentsBatch2 = [{ text: `${prompt2}\n\n${wordPart2}` }];
         } else {
-          const prompt1 = `Eres un pedagogo experto en diseño pedagógico. LOTE PARALELO (1/2): Concéntrate en la primera mitad del audio/archivo. ${dirBatch1} ${getGlobalRules(cardFormat, batch1Target, existingCards.length, pedagogicalMode)} ${getFormatInstructions(cardFormat)} ${buildLanguageDirective(language)}`;
-          const prompt2 = `Eres un pedagogo experto en diseño pedagógico. LOTE PARALELO (2/2): Concéntrate en la segunda mitad del audio/archivo. ${dirBatch2} ${getGlobalRules(cardFormat, batch2Target, existingCards.length, pedagogicalMode)} ${getFormatInstructions(cardFormat)} ${buildLanguageDirective(language)}`;
+          const prompt1 = `Eres un pedagogo experto en diseño pedagógico. LOTE PARALELO (1/2): Concéntrate en la primera mitad del audio/archivo. ${dirBatch1} ${getGlobalRules(cardFormat, batch1Target, existingCards.length, pedagogicalMode, docenteFormat, targetAudience, isExhaustiveMode, isPracticalMode)} ${getFormatInstructions(cardFormat)} ${buildLanguageDirective(language)}`;
+          const prompt2 = `Eres un pedagogo experto en diseño pedagógico. LOTE PARALELO (2/2): Concéntrate en la segunda mitad del audio/archivo. ${dirBatch2} ${getGlobalRules(cardFormat, batch2Target, existingCards.length, pedagogicalMode, docenteFormat, targetAudience, isExhaustiveMode, isPracticalMode)} ${getFormatInstructions(cardFormat)} ${buildLanguageDirective(language)}`;
 
           contentsBatch1 = [
             {
@@ -3127,7 +3464,8 @@ REGLA ESTRICTA: Si el usuario proporciona una instrucción de enfoque (ej. un ca
               isExhaustiveMode,
               pedagogicalMode,
               docenteFormat,
-              targetAudience
+              targetAudience,
+              isPracticalMode
             ),
           }),
           ai.models.generateContent({
@@ -3142,7 +3480,8 @@ REGLA ESTRICTA: Si el usuario proporciona una instrucción de enfoque (ej. un ca
               isExhaustiveMode,
               pedagogicalMode,
               docenteFormat,
-              targetAudience
+              targetAudience,
+              isPracticalMode
             ),
           }),
         ]);
@@ -3209,7 +3548,7 @@ ${coverageText}${fileName ? ` Documento de referencia: "${fileName}".` : ''}
 
 ${RIGOR_WARNING_DIRECTIVE}
 
-${focusRuleSection ? `${focusRuleSection}\n\n` : ''}${getGlobalRules(cardFormat, requestCount, existingCards.length, pedagogicalMode, docenteFormat, targetAudience, isExhaustiveMode)}
+${focusRuleSection ? `${focusRuleSection}\n\n` : ''}${getGlobalRules(cardFormat, requestCount, existingCards.length, pedagogicalMode, docenteFormat, targetAudience, isExhaustiveMode, isPracticalMode)}
 
 ${getFormatInstructions(cardFormat)}
 
@@ -3252,7 +3591,8 @@ ${buildLanguageDirective(language)}`;
             isExhaustiveMode,
             pedagogicalMode,
             docenteFormat,
-            targetAudience
+            targetAudience,
+            isPracticalMode
           ),
         });
 
@@ -3288,7 +3628,7 @@ ${buildLanguageDirective(language)}`;
       candidateCards: candidateCards,
       existingCards,
       apiKey,
-      similarityThreshold: isExhaustiveMode ? 0.92 : 0.80,
+      similarityThreshold: isExhaustiveMode ? 0.94 : 0.88,
       targetCount,
       isExhaustiveMode,
     });
@@ -3388,6 +3728,7 @@ export async function generateCardsFromUrlAction(
     existingQuestions,
     language = 'es',
     coreExhaustedPrevious = false,
+    isPracticalMode = false,
     pedagogicalMode = 'academic',
     docenteFormat = 'mixed_test',
     targetAudience = 'auto',
@@ -3486,7 +3827,7 @@ ${coverageText} Fuente: ${sourceLabel} ("${sourceRef}").
 
 ${RIGOR_WARNING_DIRECTIVE}
 
-${focusRuleSection ? `${focusRuleSection}\n\n` : ''}${getGlobalRules(cardFormat, targetCount, existingCards.length, pedagogicalMode, docenteFormat, targetAudience)}
+${focusRuleSection ? `${focusRuleSection}\n\n` : ''}${getGlobalRules(cardFormat, targetCount, existingCards.length, pedagogicalMode, docenteFormat, targetAudience, false, isPracticalMode)}
 
 ${getFormatInstructions(cardFormat)}
 
@@ -3528,7 +3869,8 @@ ${buildLanguageDirective(language)}`;
             false,
             pedagogicalMode,
             docenteFormat,
-            targetAudience
+            targetAudience,
+            isPracticalMode
           ),
         });
         responseText = nativeResponse.text;
@@ -3575,7 +3917,8 @@ ${buildLanguageDirective(language)}`;
               false,
               pedagogicalMode,
               docenteFormat,
-              targetAudience
+              targetAudience,
+              isPracticalMode
             ),
           });
           responseText = fallbackResponse.text;
@@ -3654,7 +3997,8 @@ ${buildLanguageDirective(language)}`;
           false,
           pedagogicalMode,
           docenteFormat,
-          targetAudience
+          targetAudience,
+          isPracticalMode
         ),
       });
       responseText = webResponse.text;
@@ -3694,7 +4038,7 @@ ${buildLanguageDirective(language)}`;
       candidateCards: parsedCards,
       existingCards,
       apiKey,
-      similarityThreshold: 0.80,
+      similarityThreshold: 0.88,
       targetCount,
     });
 

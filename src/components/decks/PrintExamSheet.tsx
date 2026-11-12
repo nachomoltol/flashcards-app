@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { parseMultipleChoice, parseBackContent } from '@/components/cards/FormattedCardView';
+import { stripOptionPrefix, sanitizeCardFrontText } from '@/lib/cardUtils';
 import { useLanguageStore } from '@/stores';
 import type { CardFormat } from '@/types/database';
 
@@ -20,16 +21,86 @@ export interface PrintExamSheetProps {
   deckTitle?: string;
   deckDescription?: string | null;
   cards: PrintCardItem[];
+  pedagogicalMode?: 'academic' | 'didactic' | string;
+  isDocenteMode?: boolean;
+  forceVisible?: boolean;
 }
 
 /**
- * Reemplaza los marcadores cloze {{c1::palabra}} y [...] por espacios en blanco para el alumno.
+ * Sanitiza textos de solución eliminando secuencias corruptas de asteriscos y comillas.
  */
-function formatClozeForStudent(text: string): string {
+function sanitizeSolutionText(text: string): string {
   if (!text) return '';
   return text
-    .replace(/\{\{c\d+::(.*?)\}\}/g, '[  ____________________  ]')
-    .replace(/\[\.\.\.\]/g, '[  ____________________  ]');
+    .replace(/\*{1,3}/g, '')
+    .replace(/^"+|"+$/g, '')
+    .trim();
+}
+
+/**
+ * Limpia el texto de justificación eliminando prefijos redundantes ("Explicación:", "Justificación:")
+ * y frases mecánicas de inicio para un diseño fluido y profesional.
+ */
+function sanitizeExplanationText(raw: string): string {
+  if (!raw) return '';
+  let text = raw
+    .replace(/VEREDICTO_EXACTO\s*[:=]\s*[^\r\n]+/gi, '')
+    .replace(/^\s*(?:explicaci[oó]n|justificaci[oó]n|fundamento|raz[oó]n)\s*:\s*/i, '')
+    .replace(/^\s*(?:seg[uú]n\s+(?:el\s+cuadro|la\s+tabla|el\s+gr[aá]fico|la\s+figura)\s+[^,.:]+[,.:]\s*)/i, '')
+    .replace(/^\s*(?:el\s+texto\s+establece\s+expl[ií]citamente\s+que\s+)/i, '')
+    .replace(/^\s*la\s+pregunta\s+de\s+repaso(?:\s+n[uú]mero)?\s+\d+\s+(?:identifica|vincula|senala|indica|establece|describe|explica)\s+(?:que\s+)?/i, '')
+    .replace(/\*{3,}/g, '')
+    .trim();
+
+  // Asegura que comience siempre en mayúscula
+  text = text.replace(/^([a-záéíóúñ])/i, (m) => m.toUpperCase());
+  return text;
+}
+
+/**
+ * Reemplaza los marcadores cloze {{c1::palabra}}, [...] y huecos vacíos por un elemento HTML indivisible
+ * que jamás se parte al final de línea ni cuela caracteres residuales.
+ */
+function renderClozeStudentContent(text: string): React.ReactNode {
+  if (!text) return '';
+  // Limpiar numeración de lista inicial que duplique el índice de la pregunta (ej. "1. ")
+  let cleanText = text.replace(/^\s*\d+[\.\)\-]\s+/, '').trim();
+
+  // Pre-normalización universal de huecos defectuosos a marcador canónico [...]
+  // 1. Huecos con casilla Unicode o guiones con casilla (_☐, ☐, [☐])
+  cleanText = cleanText.replace(/_*\u2610_*|\[\s*\u2610\s*\]/g, '[...]');
+  // 2. Corchetes abiertos con guiones bajos sin cerrar ([______ seguidos de espacio, signo de puntuación o fin de línea)
+  cleanText = cleanText.replace(/\[\s*_{2,}(?!\s*\])/g, '[...]');
+  // 3. Guiones bajos sueltos de cierre (_{2,}\s*\d*\s*\])
+  cleanText = cleanText.replace(/(?<!\[)\s*_{2,}\s*\d*\s*\]/g, '[...]');
+  // 4. Secuencias de corchetes con guiones/puntos o 3 o más guiones bajos sueltos (____)
+  cleanText = cleanText.replace(/\[\s*[_.\-\u2026\s\d]*\]|_{3,}/g, '[...]');
+  // 5. Limpiar corchetes huérfanos duplicados como [...]\s*\[\s*\]
+  cleanText = cleanText.replace(/\[\.\.\.\]\s*\[\s*\]/g, '[...]');
+
+  // Tamaño adaptable del hueco: compacto (10 guiones) si hay 2 o más huecos; estándar (16 guiones) si es 1
+  const gapMatches = cleanText.match(/(\{\{c\d+::.*?\}\}|\[\.\.\.\])/g);
+  const gapCount = gapMatches ? gapMatches.length : 0;
+  const gapText = gapCount >= 2 ? '[__________]' : '[________________]';
+
+  const splitRegex = /(\{\{c\d+::.*?\}\}|\[\.\.\.\])/g;
+  const matchRegex = /^(\{\{c\d+::.*?\}\}|\[\.\.\.\])$/;
+  const parts = cleanText.split(splitRegex);
+
+  return parts.map((part, i) => {
+    if (matchRegex.test(part)) {
+      return (
+        <span
+          key={`cloze-gap-${i}`}
+          className="inline-block whitespace-nowrap font-mono font-bold text-neutral-800 px-1 mx-1"
+          style={{ whiteSpace: 'nowrap', display: 'inline-block' }}
+        >
+          {gapText}
+        </span>
+      );
+    }
+    return part;
+  });
 }
 
 /**
@@ -38,10 +109,17 @@ function formatClozeForStudent(text: string): string {
 function formatClozeForTeacher(text: string): { highlighted: string; hiddenWords: string[] } {
   if (!text) return { highlighted: '', hiddenWords: [] };
   const hiddenWords: string[] = [];
-  const highlighted = text.replace(/\{\{c\d+::(.*?)\}\}/g, (_, word) => {
+  let highlighted = text.replace(/\{\{c\d+::(.*?)\}\}/g, (_, word) => {
     hiddenWords.push(word);
     return `[${word}]`;
   });
+  highlighted = highlighted
+    .replace(/_*\u2610_*|\[\s*\u2610\s*\]/g, '[...]')
+    .replace(/\[\s*_{2,}(?!\s*\])/g, '[...]')
+    .replace(/(?<!\[)\s*_{2,}\s*\d*\s*\]/g, '[...]')
+    .replace(/\[\s*[_.\-\u2026\s\d]*\]|_{3,}/g, '[...]')
+    .replace(/\[\s*\]/g, '')
+    .trim();
   return { highlighted, hiddenWords };
 }
 
@@ -56,93 +134,143 @@ function resolveMultipleChoiceSolution(
 ): { letter: string; text: string; explanation: string } {
   const parsedFront = parseMultipleChoice(front);
   const parsedBack = parseBackContent(back, 'multiple_choice');
-  const verdictRaw = parsedBack.verdict || back;
 
-  // Extraer letra si existe viñeta formal
-  const letterMatch = verdictRaw.match(/^\s*(?:\*\*)?\(?([a-dA-D])\s*[\)\.\-\]\:]/i);
+  // Limpiar explanation eliminando etiquetas internas de veredicto
+  const cleanExplanation = (parsedBack.explanation || '')
+    .replace(/VEREDICTO_EXACTO\s*[:=]\s*[^\r\n]+/gi, '')
+    .trim();
+
+  // 1. Aislar estrictamente la primera línea del veredicto descartando cualquier bloque explicativo
+  const rawVerdictLine = (parsedBack.verdict || back || '')
+    .split(/(?:\r?\n+|Explicación:|Justificación:|Fundamento:|Razón:)/i)[0]
+    .replace(/VEREDICTO_EXACTO\s*[:=]\s*[^\r\n]+/gi, '')
+    .trim();
+
+  // 2. Extraer letra si existe viñeta formal (ej: 'a)', 'b.', '(c)')
+  const letterMatch = rawVerdictLine.match(/^\s*(?:\*\*)?\(?([a-dA-D])\s*[\)\.\-\]\:]/i);
   const detectedLetter = letterMatch ? letterMatch[1].toLowerCase() : null;
 
-  // Limpiar texto de la respuesta en el veredicto (eliminando la viñeta si la tuviese y puntuación periférica)
-  const cleanAnswerText = verdictRaw.replace(/^\s*(?:\*\*)?\(?[a-dA-D]\s*[\)\.\-\]\:]\s*/i, '').trim();
-  const cleanAns = cleanAnswerText.toLowerCase().replace(/^[.,;:¿?¡!]+|[.,;:¿?¡!]+$/g, '').trim();
+  // INVERSIÓN DE JERARQUÍA (BLINDAJE DETERMINISTA):
+  // Si existe una letra formal detectada en el reverso, resolver DIRECTAMENTE la opción del examen
+  if (detectedLetter) {
+    const letterOpt = parsedFront.options.find(
+      (o) => o.key.toLowerCase() === detectedLetter
+    );
+    if (letterOpt) {
+      return {
+        letter: letterOpt.key.toLowerCase(),
+        text: letterOpt.text,
+        explanation: cleanExplanation,
+      };
+    }
+  }
 
-  // Buscar coincidencia en parsedFront.options por contenido de texto
+  // 3. Si no hay letra formal, buscar por veredicto explícito o texto aislado de la opción
+  const explicitMatch = back.match(
+    /(?:VEREDICTO_EXACTO|VEREDICTO|RESPUESTA_CANONICA|RESPUESTA_CANÓNICA|RESPUESTA_CORRECTA)\s*[:=]\s*([^\r\n]+)/i
+  );
+  const candidateText = (
+    explicitMatch
+      ? explicitMatch[1]
+      : rawVerdictLine.replace(/^\s*(?:\*\*)?\(?[a-dA-D]\s*[\)\.\-\]\:]\s*/i, '')
+  ).trim();
+
+  const cleanAns = candidateText
+    .toLowerCase()
+    .replace(/^[.,;:¿?¡!]+|[.,;:¿?¡!]+$/g, '')
+    .trim();
+
+  // Buscar coincidencia rigurosa en parsedFront.options (ELIMINADO: cleanAns.includes(cleanOpt))
   const matchedOpt = parsedFront.options.find((opt) => {
     if (!cleanAns) return false;
-    const cleanOpt = opt.text.toLowerCase().replace(/^[.,;:¿?¡!]+|[.,;:¿?¡!]+$/g, '').trim();
+    const cleanOpt = opt.text
+      .toLowerCase()
+      .replace(/^[.,;:¿?¡!]+|[.,;:¿?¡!]+$/g, '')
+      .trim();
     if (!cleanOpt) return false;
 
     // 1. Coincidencia exacta
     if (cleanOpt === cleanAns) return true;
 
-    // 2. Contención directa (con longitud mínima de seguridad)
+    // 2. Contención unidireccional: la opción completa del examen contiene el veredicto aislado
     if (cleanAns.length >= 3 && cleanOpt.includes(cleanAns)) return true;
-    if (cleanOpt.length >= 3 && cleanAns.includes(cleanOpt)) return true;
 
-    // 3. Rescate específico para mutilación de primera letra en tarjetas legacy (ej: 'ctúan' vs 'actúan')
-    if (cleanOpt.length > 3 && cleanAns.includes(cleanOpt.slice(1))) return true;
-    if (cleanAns.length > 3 && cleanOpt.includes(cleanAns.slice(0, Math.min(cleanAns.length, 12)))) return true;
+    // 3. Prefijo común idéntico
+    if (cleanOpt.length >= 4 && cleanAns.length >= 4) {
+      if (cleanOpt.startsWith(cleanAns) || cleanAns.startsWith(cleanOpt)) return true;
+    }
 
     return false;
   });
 
   if (matchedOpt) {
-    // Si encontramos la opción por texto, la letra canónica es la de esa opción en el examen
     return {
       letter: matchedOpt.key.toLowerCase(),
       text: matchedOpt.text,
-      explanation: parsedBack.explanation,
-    };
-  }
-
-  // Fallback si coincide por letra directa en el examen
-  const letterOpt = detectedLetter ? parsedFront.options.find((o) => o.key.toLowerCase() === detectedLetter) : null;
-  if (letterOpt) {
-    return {
-      letter: letterOpt.key.toLowerCase(),
-      text: letterOpt.text,
-      explanation: parsedBack.explanation,
+      explanation: cleanExplanation,
     };
   }
 
   return {
-    letter: detectedLetter || 'a',
-    text: cleanAnswerText || verdictRaw,
-    explanation: parsedBack.explanation,
+    letter: detectedLetter || (parsedFront.options[0]?.key.toLowerCase() ?? 'a'),
+    text: candidateText || rawVerdictLine,
+    explanation: cleanExplanation,
   };
 }
 
 export function PrintExamSheet({
-  deckTitle = 'Examen de Evaluación',
+  deckTitle = 'Cuaderno de Repaso',
   deckDescription,
   cards,
+  pedagogicalMode,
+  isDocenteMode,
+  forceVisible = false,
 }: PrintExamSheetProps) {
   const { language, t } = useLanguageStore();
   const isEn = language === 'en';
+
+  // Detección estricta: Modo Docente vs Modo Estudio
+  const isDocente =
+    isDocenteMode !== undefined
+      ? Boolean(isDocenteMode)
+      : pedagogicalMode !== undefined
+      ? pedagogicalMode === 'didactic'
+      : Boolean(
+          deckDescription?.toLowerCase().includes('docente') ||
+          deckDescription?.toLowerCase().includes('didactic') ||
+          deckTitle?.toLowerCase().includes('modo docente')
+        );
 
   if (!cards || cards.length === 0) {
     return null;
   }
 
   return (
-    <div className="hidden print:block print-exam-root w-full bg-white text-black font-sans leading-tight">
+    <div
+      className={`print-exam-root w-full bg-white text-black font-sans leading-tight pt-1 ${
+        forceVisible ? 'block' : 'hidden print:block'
+      }`}
+    >
       {/* =========================================================================
-          SECCIÓN 1: CUESTIONARIO DE EVALUACIÓN (PARA EL ALUMNADO)
-          Diseño continuo, ultra-compacto, sin respuestas ni pistas.
+          SECCIÓN 1: CUESTIONARIO / HOJA DE ESTUDIO
+          Diseño continuo, sin respuestas ni pistas, con cortes limpios de página.
          ========================================================================= */}
       <section className="print-student-section space-y-3">
-        {/* Cabecera Formal de Examen */}
-        <header className="border-b-2 border-black pb-2.5 space-y-2">
+        {/* Cabecera Formal: Bifurcada según Modo Docente vs Modo Estudio */}
+        <header className="border-b-2 border-black pb-2.5 space-y-2 mb-3">
           <div className="flex items-start justify-between gap-4">
             <div>
               <h1 className="text-lg font-black uppercase tracking-tight leading-tight">
-                {deckTitle}
+                {isDocente
+                  ? deckTitle
+                  : (isEn ? 'STUDY & SELF-ASSESSMENT WORKBOOK' : 'CUADERNO DE REPASO Y AUTOEVALUACIÓN')}
               </h1>
-              {deckDescription && (
-                <p className="text-[9pt] text-neutral-700 italic mt-0.5 leading-snug">
-                  {deckDescription}
-                </p>
-              )}
+              <p className="text-[9.5pt] text-neutral-800 font-semibold mt-0.5 leading-snug">
+                {isDocente ? deckDescription : deckTitle}
+                {!isDocente && deckDescription && (
+                  <span className="font-normal italic text-neutral-600"> • {deckDescription}</span>
+                )}
+              </p>
             </div>
             <div className="text-right shrink-0">
               <span className="inline-block border border-black px-2 py-0.5 text-[9pt] font-mono font-bold uppercase">
@@ -151,48 +279,61 @@ export function PrintExamSheet({
             </div>
           </div>
 
-          {/* Fila de Metadatos del Alumno */}
-          <div className="grid grid-cols-12 gap-2 text-[9.5pt] pt-1">
-            <div className="col-span-6 border-b border-black pb-0.5">
-              <span className="font-bold">{t('deck_detail.print_student_label', isEn ? 'Student:' : 'Alumno/a:')} </span>
+          {/* Fila de Metadatos del Alumno (ÚNICAMENTE EN MODO DOCENTE) */}
+          {isDocente && (
+            <div className="grid grid-cols-12 gap-2 text-[9.5pt] pt-1">
+              <div className="col-span-6 border-b border-black pb-0.5">
+                <span className="font-bold">{t('deck_detail.print_student_label', isEn ? 'Student:' : 'Alumno/a:')} </span>
+              </div>
+              <div className="col-span-3 border-b border-black pb-0.5">
+                <span className="font-bold">{t('deck_detail.print_date_label', isEn ? 'Date:' : 'Fecha:')} </span>
+              </div>
+              <div className="col-span-3 border-b border-black pb-0.5">
+                <span className="font-bold">{t('deck_detail.print_score_label', isEn ? 'Score:' : 'Nota / Calificación:')} </span>
+              </div>
             </div>
-            <div className="col-span-3 border-b border-black pb-0.5">
-              <span className="font-bold">{t('deck_detail.print_date_label', isEn ? 'Date:' : 'Fecha:')} </span>
-            </div>
-            <div className="col-span-3 border-b border-black pb-0.5">
-              <span className="font-bold">{t('deck_detail.print_score_label', isEn ? 'Score:' : 'Nota / Calificación:')} </span>
-            </div>
-          </div>
+          )}
 
-          {/* Instrucciones Breves */}
-          <p className="text-[8.5pt] text-neutral-600 italic leading-snug">
-            {t(
-              'deck_detail.print_instructions',
-              isEn
-                ? 'Instructions: Read each question carefully. Mark the correct answer with an X or complete your answer in the designated space.'
-                : 'Instrucciones: Lea atentamente cada enunciado. Marque con una X la opción correcta o desarrolle su respuesta en el espacio asignado.'
-            )}
+          {/* Instrucciones al usuario: bifurcadas */}
+          <p className="text-[8.5pt] text-neutral-600 italic leading-snug pt-0.5">
+            {isDocente
+              ? t(
+                  'deck_detail.print_instructions',
+                  isEn
+                    ? 'Instructions: Read each question carefully. Mark the correct answer with an X or complete your answer in the designated space.'
+                    : 'Instrucciones: Lea atentamente cada enunciado. Marque con una X la opción correcta o desarrolle su respuesta en el espacio asignado.'
+                )
+              : (isEn
+                  ? 'Instructions: Read each question carefully to test your conceptual understanding. Check the reasoned solutions at the end of the document.'
+                  : 'Instrucciones: Lea cada cuestión y compruebe su nivel de asimilación conceptual. Consulte las soluciones razonadas al final del documento.')}
           </p>
         </header>
 
         {/* Lista Continua de Preguntas */}
         <div className="space-y-3 pt-1">
           {cards.map((card, index) => {
-            const fmt = (
+            const isClozePattern = /(\{\{c\d+::.*?\}\}|\[\s*(?:\.{2,}|\u2026+|_{2,}|\d+)?\s*\])/.test(card.front || '');
+            let fmt = (
               card.cardFormat ||
               card.card_format ||
               (card.card_type === 'cloze' ? 'cloze' : 'basic')
             ) as CardFormat;
 
+            if (fmt === 'basic' && isClozePattern) {
+              fmt = 'cloze';
+            }
+
+            const cleanFront = sanitizeCardFrontText(card.front);
+
             return (
               <article
                 key={card.id || `print-q-${index}`}
-                className="print-question-item break-inside-avoid text-[10pt] leading-snug"
+                className="print-question-item break-inside-avoid text-[10pt] leading-snug py-1.5"
                 style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}
               >
                 {/* 1. Opción Múltiple (Test) */}
                 {fmt === 'multiple_choice' && (() => {
-                  const parsed = parseMultipleChoice(card.front);
+                  const parsed = parseMultipleChoice(cleanFront);
                   const isShortOptions =
                     parsed.options.length > 0 &&
                     parsed.options.every((opt) => opt.text.length <= 48);
@@ -202,7 +343,7 @@ export function PrintExamSheet({
                       <div className="flex items-start gap-1.5">
                         <span className="font-bold shrink-0">{index + 1}.</span>
                         <p className="font-medium text-black">
-                          {parsed.question || card.front}
+                          {sanitizeCardFrontText(parsed.question) || cleanFront}
                         </p>
                       </div>
 
@@ -224,7 +365,7 @@ export function PrintExamSheet({
                                 <strong className="font-bold uppercase">
                                   {opt.key})
                                 </strong>{' '}
-                                {opt.text}
+                                {stripOptionPrefix(opt.text)}
                               </span>
                             </div>
                           ))}
@@ -232,7 +373,7 @@ export function PrintExamSheet({
                       ) : (
                         <div className="pl-5 pt-1 text-[9pt] italic text-neutral-500">
                           {/* Fallback si el texto no separó opciones */}
-                          {card.front}
+                          {cleanFront}
                         </div>
                       )}
                     </div>
@@ -244,7 +385,7 @@ export function PrintExamSheet({
                   <div className="space-y-1">
                     <div className="flex items-start gap-1.5">
                       <span className="font-bold shrink-0">{index + 1}.</span>
-                      <p className="font-medium text-black">{card.front}</p>
+                      <p className="font-medium text-black">{cleanFront}</p>
                     </div>
                     <div className="flex items-center gap-6 pl-5 pt-0.5 text-[9.5pt]">
                       <span className="flex items-center gap-1.5">
@@ -268,9 +409,9 @@ export function PrintExamSheet({
                   <div className="space-y-1">
                     <div className="flex items-start gap-1.5">
                       <span className="font-bold shrink-0">{index + 1}.</span>
-                      <p className="font-medium text-black leading-relaxed">
-                        {formatClozeForStudent(card.front)}
-                      </p>
+                      <div className="font-medium text-black leading-relaxed">
+                        {renderClozeStudentContent(cleanFront)}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -280,7 +421,7 @@ export function PrintExamSheet({
                   <div className="space-y-1">
                     <div className="flex items-start gap-1.5">
                       <span className="font-bold shrink-0">{index + 1}.</span>
-                      <p className="font-medium text-black">{card.front}</p>
+                      <p className="font-medium text-black">{cleanFront}</p>
                     </div>
                     {/* Líneas pautadas compactas para responder */}
                     <div className="pl-5 pt-1 space-y-2">
@@ -304,32 +445,37 @@ export function PrintExamSheet({
         className="print-teacher-section break-before-page pt-4 space-y-3"
         style={{ breakBefore: 'page', pageBreakBefore: 'always' }}
       >
-        {/* Cabecera del Solucionario */}
+        {/* Cabecera del Solucionario: Modo Docente vs Modo Estudio */}
         <header className="border-b-2 border-black pb-2 space-y-1">
           <div className="flex items-center justify-between gap-4">
             <h2 className="text-base font-black uppercase tracking-tight">
-              {t(
-                'deck_detail.print_answer_key_title',
-                isEn
-                  ? 'Answer Key & Grading Criteria'
-                  : 'Hoja de Respuestas y Criterios de Corrección'
-              )}
+              {isDocente
+                ? t(
+                    'deck_detail.print_answer_key_title',
+                    isEn
+                      ? 'Answer Key & Grading Criteria'
+                      : 'Hoja de Respuestas y Criterios de Corrección'
+                  )
+                : (isEn ? 'ANSWER KEYS & SELF-ASSESSMENT' : 'CLAVES DE RESPUESTA Y AUTOEVALUACIÓN')}
             </h2>
-            <span className="bg-black text-white px-2 py-0.5 text-[8pt] font-mono font-bold uppercase tracking-wider shrink-0">
-              {t(
-                'deck_detail.print_answer_key_sub',
-                isEn
-                  ? 'Official Solution Sheet • Teacher Use Only'
-                  : 'Solucionario Oficial • Uso Exclusivo del Docente'
-              )}
+            <span className={`${isDocente ? 'bg-black text-white' : 'bg-neutral-800 text-white'} px-2 py-0.5 text-[8pt] font-mono font-bold uppercase tracking-wider shrink-0`}>
+              {isDocente
+                ? t(
+                    'deck_detail.print_answer_key_sub',
+                    isEn
+                      ? 'Official Solution Sheet • Teacher Use Only'
+                      : 'Solucionario Oficial • Uso Exclusivo del Docente'
+                  )
+                : (isEn ? 'STUDY SOLUTION SHEET' : 'SOLUCIONARIO DE REPASO')}
             </span>
           </div>
           <div className="flex items-center justify-between text-[9pt] text-neutral-700">
             <span>
-              Materia / Examen: <strong className="text-black">{deckTitle}</strong>
+              {isDocente ? 'Materia / Examen:' : 'Mazo / Temario:'}{' '}
+              <strong className="text-black">{deckTitle}</strong>
             </span>
             <span>
-              Total: <strong>{cards.length} preguntas</strong>
+              Total: <strong>{cards.length} {isEn ? 'questions' : 'preguntas'}</strong>
             </span>
           </div>
         </header>
@@ -360,72 +506,85 @@ export function PrintExamSheet({
             return (
               <article
                 key={`print-sol-${card.id || index}`}
-                className="print-solution-item break-inside-avoid text-[9.5pt] border-b border-neutral-200 pb-1.5"
+                className="print-solution-item break-inside-avoid text-[9.5pt] border-b border-neutral-200 py-2.5"
                 style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}
               >
-                <div className="flex items-baseline gap-2">
-                  <span className="font-bold text-black shrink-0">
-                    {index + 1}.
-                  </span>
-                  <span className="text-[8pt] font-mono font-bold uppercase px-1 py-0.2 bg-neutral-200 text-neutral-800 rounded-xs shrink-0">
-                    {formatLabel}
-                  </span>
-                  <div className="flex-1 space-y-0.5">
-                    {/* Veredicto / Solución Principal */}
+                <div className="flex items-start gap-2.5">
+                  <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
+                    <span className="font-bold text-black text-[10.5pt]">
+                      {index + 1}.
+                    </span>
+                    {formatLabel && formatLabel.toLowerCase() !== "test" && (
+                      <span className="text-[7.5pt] font-mono font-medium text-neutral-500 shrink-0">
+                        [{formatLabel}]
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    {/* Veredicto / Solución Principal Destacada con Píldora Visual */}
                     {fmt === 'cloze' ? (
                       <div>
-                        <span className="font-bold text-black">
-                          {t('deck_detail.print_solution_label', isEn ? 'Solution:' : 'Solución:')}{' '}
-                        </span>
-                        <span className="font-mono font-bold text-neutral-900">
-                          {clozeTeacher?.hiddenWords.length
-                            ? clozeTeacher.hiddenWords.join(', ')
-                            : parsedBack.verdict || card.back}
+                        <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-md px-2.5 py-1 font-semibold text-sm inline-block">
+                          <span className="text-emerald-700 font-bold mr-1">
+                            {t('deck_detail.print_solution_label', isEn ? 'Solution:' : 'Solución:')}
+                          </span>
+                          {sanitizeSolutionText(
+                            clozeTeacher?.hiddenWords.length
+                              ? clozeTeacher.hiddenWords.join(', ')
+                              : parsedBack.verdict || card.back
+                          )}
                         </span>
                         {clozeTeacher?.highlighted && (
-                          <p className="text-[8.5pt] text-neutral-600 mt-0.5 italic">
+                          <p className="text-[8.5pt] text-neutral-600 mt-1 italic leading-snug">
                             &ldquo;{clozeTeacher.highlighted}&rdquo;
                           </p>
                         )}
                       </div>
                     ) : fmt === 'multiple_choice' && mcResolution ? (
                       <div>
-                        <span className="font-bold text-black">
-                          {t('deck_detail.print_solution_label', isEn ? 'Solution:' : 'Solución:')}{' '}
-                        </span>
-                        <span className="font-semibold text-neutral-900">
-                          {mcResolution.letter.toUpperCase()}) {mcResolution.text}
+                        <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-md px-2.5 py-1 font-semibold text-sm inline-block">
+                          <strong className="font-bold uppercase mr-1">
+                            {mcResolution.letter.toUpperCase()})
+                          </strong>{' '}
+                          {stripOptionPrefix(sanitizeSolutionText(mcResolution.text))}
                         </span>
                       </div>
                     ) : (
                       <div>
-                        <span className="font-bold text-black">
-                          {t('deck_detail.print_solution_label', isEn ? 'Solution:' : 'Solución:')}{' '}
-                        </span>
-                        <span className="font-semibold text-neutral-900">
-                          {parsedBack.verdict || card.back}
+                        <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-md px-2.5 py-1 font-semibold text-sm inline-block">
+                          <span className="text-emerald-700 font-bold mr-1">
+                            {t('deck_detail.print_solution_label', isEn ? 'Solution:' : 'Solución:')}
+                          </span>
+                          {sanitizeSolutionText(parsedBack.verdict || card.back)}
                         </span>
                       </div>
                     )}
 
-                    {/* Justificación o Rúbrica */}
+                    {/* Bloque de Justificación / Criterios de Evaluación con Espaciado Nítido */}
                     {(mcResolution ? mcResolution.explanation : parsedBack.explanation) && (
-                      <p className="text-[8.5pt] text-neutral-700 leading-snug">
-                        <strong className="text-black font-semibold">
-                          {t(
-                            'deck_detail.print_justification_label',
-                            isEn
-                              ? 'Justification / Rubric:'
-                              : 'Justificación / Criterios:'
-                          )}{' '}
-                        </strong>
-                        {mcResolution ? mcResolution.explanation : parsedBack.explanation}
-                      </p>
+                      <div className="mt-2 text-[8.5pt] text-neutral-700 leading-relaxed bg-neutral-50 rounded-md p-2 border-l-2 border-emerald-400">
+                        <p>
+                          <strong className="text-black font-semibold mr-1">
+                            {isDocente
+                              ? t(
+                                  'deck_detail.print_justification_label',
+                                  isEn
+                                    ? 'Justification / Evaluation Criteria:'
+                                    : 'Justificación / Criterios de Evaluación:'
+                                )
+                              : (isEn
+                                  ? 'Reasoned Explanation:'
+                                  : 'Justificación Razonada:')}
+                          </strong>
+                          {sanitizeExplanationText(mcResolution ? mcResolution.explanation : parsedBack.explanation)}
+                        </p>
+                      </div>
                     )}
 
                     {/* Notas adicionales del docente */}
                     {card.notes && (
-                      <p className="text-[8pt] text-neutral-500 italic">
+                      <p className="text-[8pt] text-neutral-500 italic mt-1.5">
                         Nota: {card.notes}
                       </p>
                     )}

@@ -10,6 +10,7 @@ export interface UserLimitsResult {
   bonusCredits: number;
   welcomeGenerations: number;
   tutorConsultationsCount: number;
+  tutorAdCredits: number;
   tutorAdsUsed: number;
   adsUsedInCycle: number;
   remainingAds: number;
@@ -18,9 +19,9 @@ export interface UserLimitsResult {
 
 /**
  * Server Action que consulta de forma fidedigna y autorizada (bypass RLS con service_role)
- * los límites de generación del usuario en Supabase (`api_limits`), calculando el cupo
- * mensual real de anuncios disponibles (base 45) unificando generaciones con IA y
- * consultas al tutor socrático que exceden la base gratuita (3).
+ * los límites de generación del usuario en Supabase (`api_limits`):
+ * - Mazos de Estudio Free: 5 bienvenida + 25 anuncios = 30 generaciones máximas/mes.
+ * - Profesor Socrático Free: 3 consultas gratis/mes y a partir de la 4.ª ILIMITADO con 1 anuncio/consulta.
  */
 export async function getUserLimitsAction(
   userId?: string,
@@ -69,9 +70,10 @@ export async function getUserLimitsAction(
       bonusCredits: 0,
       welcomeGenerations: 0,
       tutorConsultationsCount: 0,
+      tutorAdCredits: 0,
       tutorAdsUsed: 0,
       adsUsedInCycle: 0,
-      remainingAds: 45,
+      remainingAds: 25,
       error: 'AUTH_REQUIRED',
     };
   }
@@ -104,7 +106,7 @@ export async function getUserLimitsAction(
   try {
     const { data, error } = await client
       .from('api_limits')
-      .select('tier, generations_count, last_generation_date, bonus_credits, welcome_generations, tutor_consultations_count, last_tutor_date')
+      .select('tier, generations_count, last_generation_date, bonus_credits, welcome_generations, tutor_consultations_count, last_tutor_date, tutor_ad_credits')
       .eq('user_id', targetUserId)
       .maybeSingle();
 
@@ -117,9 +119,10 @@ export async function getUserLimitsAction(
         bonusCredits: 0,
         welcomeGenerations: 0,
         tutorConsultationsCount: 0,
+        tutorAdCredits: 0,
         tutorAdsUsed: 0,
         adsUsedInCycle: 0,
-        remainingAds: 45,
+        remainingAds: 25,
         error: error.message,
       };
     }
@@ -132,9 +135,10 @@ export async function getUserLimitsAction(
         bonusCredits: 0,
         welcomeGenerations: 0,
         tutorConsultationsCount: 0,
+        tutorAdCredits: 0,
         tutorAdsUsed: 0,
         adsUsedInCycle: 0,
-        remainingAds: 45,
+        remainingAds: 25,
       };
     }
 
@@ -154,14 +158,15 @@ export async function getUserLimitsAction(
       : null;
     const isSameTutorMonth = lastTutorMonth === currentMonth;
     const tutorConsultationsCount = isSameTutorMonth ? (data.tutor_consultations_count || 0) : 0;
+    const tutorAdCredits = typeof data.tutor_ad_credits === 'number' ? data.tutor_ad_credits : 0;
 
-    // Unificación de consumo publicitario:
-    // 1. Generaciones consumidas con anuncios (generations_count)
-    // 2. Saldo de bonificación activo pendiente de gasto (bonus_credits)
-    // 3. Consultas al tutor socrático que superan la base gratuita de 3 (tutorAdsUsed)
+    // Desacoplamiento contable:
+    // 1. Generaciones de mazos con anuncios (base 25 anuncios para mazos):
+    const adsUsedInCycle = count + bonusCredits;
+    const remainingAds = Math.max(0, 25 - adsUsedInCycle);
+
+    // 2. Profesor Socrático: 3 gratis y a partir de la 4.ª ilimitado con 1 anuncio/consulta
     const tutorAdsUsed = Math.max(0, tutorConsultationsCount - 3);
-    const adsUsedInCycle = count + bonusCredits + tutorAdsUsed;
-    const remainingAds = Math.max(0, 45 - adsUsedInCycle);
 
     return {
       success: true,
@@ -170,6 +175,7 @@ export async function getUserLimitsAction(
       bonusCredits,
       welcomeGenerations,
       tutorConsultationsCount,
+      tutorAdCredits,
       tutorAdsUsed,
       adsUsedInCycle,
       remainingAds,
@@ -183,9 +189,10 @@ export async function getUserLimitsAction(
       bonusCredits: 0,
       welcomeGenerations: 0,
       tutorConsultationsCount: 0,
+      tutorAdCredits: 0,
       tutorAdsUsed: 0,
       adsUsedInCycle: 0,
-      remainingAds: 45,
+      remainingAds: 25,
       error: 'SERVER_ERROR',
     };
   }

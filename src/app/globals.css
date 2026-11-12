@@ -61,17 +61,27 @@ input::-ms-clear {
    ========================================================================== */
 @page {
   size: A4 portrait;
-  margin: 1cm;
+  margin: 15mm 12mm;
 }
 
 @media print {
+  @page {
+    size: A4 portrait;
+    margin: 15mm 12mm;
+  }
+
   /* Ocultar interfaz web, barras de navegación, modales y sidebars */
   aside,
-  header,
   nav,
   footer,
   .no-print,
   [data-no-print="true"] {
+    display: none !important;
+  }
+
+  /* Ocultar únicamente encabezados fuera del contenedor de examen */
+  body > header,
+  header:not(.print-exam-root header) {
     display: none !important;
   }
 
@@ -81,12 +91,18 @@ input::-ms-clear {
     background: #ffffff !important;
     color: #000000 !important;
     font-size: 10pt !important;
-    line-height: 1.3 !important;
+    line-height: 1.35 !important;
     margin: 0 !important;
     padding: 0 !important;
     height: auto !important;
     min-height: auto !important;
     overflow: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Garantizar fidelidad de colores e insignias de fondo en PDF e impresión */
+  * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
@@ -108,15 +124,27 @@ input::-ms-clear {
     width: 100% !important;
   }
 
-  /* Control estricto de saltos de página */
-  .break-before-page {
+  /* Visibilidad explícita para la hoja de examen y sus encabezados */
+  .print-exam-root,
+  .print-exam-root header,
+  .print-student-section header,
+  .print-teacher-section header {
+    display: block !important;
+  }
+
+  /* Control estricto de saltos de página (Zero Orphan Blocks) */
+  .break-before-page,
+  .print-teacher-section {
     break-before: page !important;
     page-break-before: always !important;
   }
 
-  .break-inside-avoid {
+  .break-inside-avoid,
+  .print-question-item,
+  .print-solution-item {
     break-inside: avoid !important;
     page-break-inside: avoid !important;
+    display: block !important;
   }
 
   .break-after-page {
@@ -124,4 +152,37 @@ input::-ms-clear {
     page-break-after: always !important;
   }
 }
+
+/* ==========================================================================
+   BLINDAJE DE IMPRESIÓN Y SALTO DE PÁGINA (FLASHMENTE A4)
+   ========================================================================== */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm 10mm;
+  }
+  
+  .print-question-item {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    display: block !important;
+    position: relative !important;
+    float: none !important;
+    margin-bottom: 0.65rem !important;
+  }
+
+  /* Evitar que flex/grid internos rompan la fragmentación de Chromium */
+  .print-question-item > div {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  
+  .print-solution-item {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    display: block !important;
+    margin-bottom: 0.75rem !important;
+  }
+}
+
 

@@ -25,6 +25,7 @@ import {
 } from '@/app/actions/generateDeckSummary';
 import { showAdMobRewardedAd, preloadRewardedAd } from '@/lib/admob';
 import { claimAdRewardAction } from '@/app/actions/claimAdReward';
+import { usePlatform } from '@/lib/platform';
 
 interface QuickStudyGuideModalProps {
   isOpen: boolean;
@@ -42,6 +43,7 @@ export function QuickStudyGuideModal({
   const { t, language } = useLanguageStore();
   const { user } = useAuthStore();
   const { openProModal } = useProModalStore();
+  const platform = usePlatform();
 
   const [guide, setGuide] = useState<DeckSummaryGuide | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -755,13 +757,15 @@ export function QuickStudyGuideModal({
                         )}
 
                         <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5 pt-1">
-                          <button
-                            type="button"
-                            onClick={() => openProModal(true)}
-                            className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-bold text-xs transition shadow-lg shadow-amber-500/20 active:scale-95 cursor-pointer"
-                          >
-                            {t('quick_guide.upgrade_pro_btn', '👑 Desbloquear con PRO')}
-                          </button>
+                          {!platform.isNativeIOS && (
+                            <button
+                              type="button"
+                              onClick={() => openProModal(true)}
+                              className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-bold text-xs transition shadow-lg shadow-amber-500/20 active:scale-95 cursor-pointer"
+                            >
+                              {t('quick_guide.upgrade_pro_btn', '👑 Desbloquear con PRO')}
+                            </button>
+                          )}
 
                           <button
                             type="button"
