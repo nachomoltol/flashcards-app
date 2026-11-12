@@ -171,7 +171,7 @@ export async function getTutorQuotaStatusAction(
       const isSameMonth = lastMonth === currentMonth;
       const count = isSameMonth ? (record.tutor_consultations_count || 0) : 0;
       const bonusCredits = record.bonus_credits || 0;
-      const tutorAdCredits = typeof (record as any).tutor_ad_credits === 'number' ? (record as any).tutor_ad_credits : 0;
+      const tutorAdCredits = typeof record.tutor_ad_credits === 'number' ? record.tutor_ad_credits : 0;
       const remainingFree = isPro ? 9999 : Math.max(0, 3 - count);
 
       return {

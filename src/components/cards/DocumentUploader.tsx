@@ -662,12 +662,12 @@ export function DocumentUploader({
       }
 
       // Validar si el rango ya fue completado de forma limpia (ej. fin de documento en páginas de repaso)
-      if ((result as any).rangeCompleted === true) {
+      if (result.rangeCompleted === true) {
         setStatus('idle');
         setErrorMessage(null);
         setNextCursorPage(null);
         setMaterialExhaustedNotice(null);
-        alert((result as any).message || '¡Rango completado! Se ha llegado al final de las páginas seleccionadas.');
+        alert(result.message || '¡Rango completado! Se ha llegado al final de las páginas seleccionadas.');
         return;
       }
 
