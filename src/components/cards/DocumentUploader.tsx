@@ -355,12 +355,21 @@ export function DocumentUploader({
     const isVideo = ext === '.mp4' || ext === '.mov' || ext === '.webm' || file.type.startsWith('video/');
     const isAudio = ext === '.mp3' || ext === '.wav' || ext === '.m4a' || file.type.startsWith('audio/');
     if ((isAudio || isVideo) && !isPro) {
-      setErrorMessage(
-        isEn
-          ? `${isVideo ? 'Video' : 'Audio'} processing is exclusive to PRO members. Upgrade to PRO to generate flashcards from multimedia files.`
-          : `El procesamiento de archivos de ${isVideo ? 'Vídeo' : 'Audio'} y Grabaciones es exclusivo para miembros PRO. Actualiza tu cuenta para generar tarjetas desde archivos multimedia.`
-      );
-      openProModal(false, isVideo ? 'video' : 'audio');
+      const isIOS = detectPlatform().isNativeIOS;
+      if (isIOS) {
+        setErrorMessage(
+          isEn
+            ? `Audio and video file processing is available for synchronized accounts on Flashmente Web.`
+            : `El procesamiento de archivos de ${isVideo ? 'Vídeo' : 'Audio'} está disponible para cuentas sincronizadas en la versión web de Flashmente.`
+        );
+      } else {
+        setErrorMessage(
+          isEn
+            ? `${isVideo ? 'Video' : 'Audio'} processing is exclusive to PRO members. Upgrade to PRO to generate flashcards from multimedia files.`
+            : `El procesamiento de archivos de ${isVideo ? 'Vídeo' : 'Audio'} y Grabaciones es exclusivo para miembros PRO. Actualiza tu cuenta para generar tarjetas desde archivos multimedia.`
+        );
+        openProModal(false, isVideo ? 'video' : 'audio');
+      }
       return;
     }
 

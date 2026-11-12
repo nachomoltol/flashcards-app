@@ -33,6 +33,7 @@ import { StreakBadge } from '@/components/ui/StreakBadge';
 import { NewMenuDropdown } from '@/components/ui/NewMenuDropdown';
 import { useProModalStore } from '@/stores/useProModalStore';
 import { useFeedbackModalStore } from '@/stores/useFeedbackModalStore';
+import { usePlatform } from '@/lib/platform';
 
 interface NavItem {
   name: string;
@@ -102,6 +103,7 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const platform = usePlatform();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isMobileUserMenuOpen, setIsMobileUserMenuOpen] = useState(false);
@@ -365,23 +367,25 @@ export default function DashboardLayout({
                 </button>
 
                 {/* 3. Suscripción (PRO) */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsMobileUserMenuOpen(false);
-                    openProModal();
-                  }}
-                  className="w-full flex items-center justify-between px-2.5 py-2 text-xs font-medium rounded-xl text-neutral-700 dark:text-neutral-200 hover:text-neutral-950 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer select-none group text-left active:scale-[0.98]"
-                  role="menuitem"
-                >
-                  <span className="flex items-center gap-2.5">
-                    <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400 group-hover:text-purple-700 dark:group-hover:text-purple-300 transition-colors shrink-0" />
-                    <span className="font-medium text-neutral-700 dark:text-neutral-200 group-hover:text-neutral-950 dark:group-hover:text-white transition-colors">{t('nav.subscription', 'Suscripción')}</span>
-                  </span>
-                  <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 bg-purple-500/10 dark:bg-purple-500/20 border border-purple-500/20 dark:border-purple-500/30 px-2 py-0.5 rounded-full">
-                    PRO
-                  </span>
-                </button>
+                {!platform.isNativeIOS && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMobileUserMenuOpen(false);
+                      openProModal();
+                    }}
+                    className="w-full flex items-center justify-between px-2.5 py-2 text-xs font-medium rounded-xl text-neutral-700 dark:text-neutral-200 hover:text-neutral-950 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer select-none group text-left active:scale-[0.98]"
+                    role="menuitem"
+                  >
+                    <span className="flex items-center gap-2.5">
+                      <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400 group-hover:text-purple-700 dark:group-hover:text-purple-300 transition-colors shrink-0" />
+                      <span className="font-medium text-neutral-700 dark:text-neutral-200 group-hover:text-neutral-950 dark:group-hover:text-white transition-colors">{t('nav.subscription', 'Suscripción')}</span>
+                    </span>
+                    <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 bg-purple-500/10 dark:bg-purple-500/20 border border-purple-500/20 dark:border-purple-500/30 px-2 py-0.5 rounded-full">
+                      PRO
+                    </span>
+                  </button>
+                )}
 
                 {/* 4. Soporte y Feedback */}
                 <button
@@ -556,23 +560,25 @@ export default function DashboardLayout({
             </button>
 
             {/* 3. Suscripción (PRO) */}
-            <button
-              type="button"
-              onClick={() => {
-                setMobileMenuOpen(false);
-                openProModal();
-              }}
-              className="w-full flex items-center justify-between px-2.5 py-2 text-xs font-medium rounded-xl text-neutral-700 dark:text-neutral-200 hover:text-neutral-950 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer select-none group text-left active:scale-[0.98]"
-              role="menuitem"
-            >
-              <span className="flex items-center gap-2.5">
-                <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400 group-hover:text-purple-700 dark:group-hover:text-purple-300 transition-colors shrink-0" />
-                <span className="font-medium text-neutral-700 dark:text-neutral-200 group-hover:text-neutral-950 dark:group-hover:text-white transition-colors">{t('nav.subscription', 'Suscripción')}</span>
-              </span>
-              <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 bg-purple-500/10 dark:bg-purple-500/20 border border-purple-500/20 dark:border-purple-500/30 px-2 py-0.5 rounded-full">
-                PRO
-              </span>
-            </button>
+            {!platform.isNativeIOS && (
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  openProModal();
+                }}
+                className="w-full flex items-center justify-between px-2.5 py-2 text-xs font-medium rounded-xl text-neutral-700 dark:text-neutral-200 hover:text-neutral-950 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer select-none group text-left active:scale-[0.98]"
+                role="menuitem"
+              >
+                <span className="flex items-center gap-2.5">
+                  <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400 group-hover:text-purple-700 dark:group-hover:text-purple-300 transition-colors shrink-0" />
+                  <span className="font-medium text-neutral-700 dark:text-neutral-200 group-hover:text-neutral-950 dark:group-hover:text-white transition-colors">{t('nav.subscription', 'Suscripción')}</span>
+                </span>
+                <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 bg-purple-500/10 dark:bg-purple-500/20 border border-purple-500/20 dark:border-purple-500/30 px-2 py-0.5 rounded-full">
+                  PRO
+                </span>
+              </button>
+            )}
 
             {/* 4. Soporte y Feedback */}
             <button
@@ -763,23 +769,25 @@ export default function DashboardLayout({
               </button>
 
               {/* 3. Suscripción (PRO) */}
-              <button
-                type="button"
-                onClick={() => {
-                  setIsUserMenuOpen(false);
-                  openProModal();
-                }}
-                className="w-full flex items-center justify-between px-2.5 py-2 text-xs font-medium rounded-xl text-neutral-700 dark:text-neutral-200 hover:text-neutral-950 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer select-none group text-left active:scale-[0.98]"
-                role="menuitem"
-              >
-                <span className="flex items-center gap-2.5">
-                  <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400 group-hover:text-purple-700 dark:group-hover:text-purple-300 transition-colors shrink-0" />
-                  <span className="font-medium text-neutral-700 dark:text-neutral-200 group-hover:text-neutral-950 dark:group-hover:text-white transition-colors">{t('nav.subscription', 'Suscripción')}</span>
-                </span>
-                <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 bg-purple-500/10 dark:bg-purple-500/20 border border-purple-500/20 dark:border-purple-500/30 px-2 py-0.5 rounded-full">
-                  PRO
-                </span>
-              </button>
+              {!platform.isNativeIOS && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsUserMenuOpen(false);
+                    openProModal();
+                  }}
+                  className="w-full flex items-center justify-between px-2.5 py-2 text-xs font-medium rounded-xl text-neutral-700 dark:text-neutral-200 hover:text-neutral-950 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer select-none group text-left active:scale-[0.98]"
+                  role="menuitem"
+                >
+                  <span className="flex items-center gap-2.5">
+                    <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400 group-hover:text-purple-700 dark:group-hover:text-purple-300 transition-colors shrink-0" />
+                    <span className="font-medium text-neutral-700 dark:text-neutral-200 group-hover:text-neutral-950 dark:group-hover:text-white transition-colors">{t('nav.subscription', 'Suscripción')}</span>
+                  </span>
+                  <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 bg-purple-500/10 dark:bg-purple-500/20 border border-purple-500/20 dark:border-purple-500/30 px-2 py-0.5 rounded-full">
+                    PRO
+                  </span>
+                </button>
+              )}
 
               {/* 4. Soporte y Feedback */}
               <button

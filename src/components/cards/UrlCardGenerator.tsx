@@ -7,6 +7,7 @@ import { generateCardsFromUrlAction } from '@/app/actions/generateCards';
 import { checkUserGenerationQuota } from '@/lib/quotaGuard';
 import type { CardFormat, GeneratedCard } from '@/types/cards';
 import { FormattedCardView } from './FormattedCardView';
+import { usePlatform } from '@/lib/platform';
 
 interface UrlCardGeneratorProps {
   deckId: string;
@@ -28,6 +29,7 @@ export function UrlCardGenerator({
   const { fetchDeckById } = useDeckStore();
   const { openProModal } = useProModalStore();
   const { language, t } = useLanguageStore();
+  const platform = usePlatform();
 
   const [url, setUrl] = useState('');
   const [cardFormat, setCardFormat] = useState<CardFormat>('multiple_choice');
@@ -107,12 +109,20 @@ export function UrlCardGenerator({
     }
 
     if (isYouTube && !isPro) {
-      setErrorMessage(
-        language === 'en'
-          ? 'Generating flashcards from YouTube videos is exclusive to PRO members. Upgrade to PRO to unlock video learning.'
-          : 'La generación de tarjetas a partir de vídeos de YouTube es exclusiva para miembros PRO. Actualiza tu cuenta para procesar vídeos.'
-      );
-      openProModal(false, 'youtube');
+      if (platform.isNativeIOS) {
+        setErrorMessage(
+          language === 'en'
+            ? 'YouTube video processing is available for synchronized accounts on Flashmente Web.'
+            : 'El procesamiento de vídeos de YouTube está disponible para cuentas sincronizadas en la versión web de Flashmente.'
+        );
+      } else {
+        setErrorMessage(
+          language === 'en'
+            ? 'Generating flashcards from YouTube videos is exclusive to PRO members. Upgrade to PRO to unlock video learning.'
+            : 'La generación de tarjetas a partir de vídeos de YouTube es exclusiva para miembros PRO. Actualiza tu cuenta para procesar vídeos.'
+        );
+        openProModal(false, 'youtube');
+      }
       return;
     }
 
@@ -424,7 +434,7 @@ export function UrlCardGenerator({
                   <span className="font-bold text-rose-600 dark:text-rose-400 text-xs">▶ YouTube</span>
                   <span>{t('url_generator.youtube_detected', 'Vídeo detectado: Gemini analizará el contenido del vídeo directamente en la nube de Google para generar las tarjetas.')}</span>
                 </div>
-                {!isPro && (
+                {!isPro && !platform.isNativeIOS && (
                   <button
                     type="button"
                     onClick={() => openProModal(false, 'youtube')}
