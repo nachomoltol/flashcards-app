@@ -65,8 +65,9 @@ export interface FSRSReviewLog {
 
 // Instancia global con configuración predeterminada de FSRS y curva de espaciado optimizada
 export const initialFSRSWeights: number[] = [...default_w];
-initialFSRSWeights[2] = 1.2; // Correcto (1 a 2 días)
-initialFSRSWeights[3] = 3.0; // Fácil (3 a 4 días)
+initialFSRSWeights[1] = 1.0; // Difícil: base monotónica de 1 día tras paso inicial
+initialFSRSWeights[2] = 2.3; // Correcto: al menos 2 días de estabilidad inicial en tarjetas nuevas
+initialFSRSWeights[3] = 4.5; // Fácil: 4 a 5 días de estabilidad inicial
 
 export const defaultFSRSParams = generatorParameters({
   enable_fuzz: true,
@@ -75,6 +76,59 @@ export const defaultFSRSParams = generatorParameters({
   w: initialFSRSWeights,
 });
 export const f = fsrs(defaultFSRSParams);
+
+/**
+ * Normaliza los intervalos de transición en estados de corto plazo (New / Learning / Relearning)
+ * para evitar el bucle de 15m en 'Hard' y garantizar que la tarjeta progrese hacia intervalos en días.
+ */
+function applyShortTermGraduationSafeguards(
+  fsrsCard: Card,
+  result: RecordLogItem,
+  rating: FSRSRating,
+  now: Date
+): void {
+  const isNewCard = fsrsCard.state === State.New || fsrsCard.reps === 0;
+  const isShortTermState =
+    fsrsCard.state === State.Learning || fsrsCard.state === State.Relearning;
+
+  if (rating === 2) {
+    if (isNewCard) {
+      // Tarjeta nueva en 'Difícil': primer repaso a las 3 horas
+      const due3h = new Date(now.getTime() + 3 * 60 * 60 * 1000);
+      result.card.due = due3h;
+      result.log.due = due3h;
+    } else if (isShortTermState) {
+      // Tarjeta en Learning (1) o Relearning (3) calificada como 'Difícil':
+      // graduación segura a 1 día (24h) para romper el bucle de 15 minutos de ts-fsrs
+      const due1d = new Date(now.getTime() + 1 * 24 * 60 * 60 * 1000);
+      result.card.due = due1d;
+      result.card.state = State.Review;
+      result.card.scheduled_days = 1;
+      result.card.stability = Math.max(result.card.stability, 1.0);
+      result.log.due = due1d;
+      result.log.state = State.Review;
+      result.log.scheduled_days = 1;
+      result.log.stability = result.card.stability;
+    }
+  } else if (isShortTermState && rating === 3) {
+    // Si sale de Learning/Relearning en el mismo día con 'Good' tras un fallo previo,
+    // asegurar estabilidad mínima saludable para no estancarse en 0.24d en días sucesivos
+    const minGoodStability = fsrsCard.state === State.Learning ? 2.0 : 1.5;
+    if (result.card.stability < minGoodStability) {
+      result.card.stability = minGoodStability;
+      result.log.stability = minGoodStability;
+    }
+    const minGoodDays = fsrsCard.state === State.Learning ? 2 : 1;
+    const minDueTime = now.getTime() + minGoodDays * 24 * 60 * 60 * 1000;
+    if (result.card.due.getTime() < minDueTime) {
+      const safeDue = new Date(minDueTime);
+      result.card.due = safeDue;
+      result.card.scheduled_days = minGoodDays;
+      result.log.due = safeDue;
+      result.log.scheduled_days = minGoodDays;
+    }
+  }
+}
 
 /**
  * Convierte los campos de Supabase o entrada genérica a la estructura Card de ts-fsrs.
@@ -144,11 +198,7 @@ export function scheduleReview(
 
   const result = engine.next(fsrsCard, now, rating as Grade);
 
-  // Curva de espaciado específica para tarjetas Nuevas en calificación 'Difícil' (3 horas)
-  const isNewCard = fsrsCard.state === State.New || fsrsCard.reps === 0;
-  if (isNewCard && rating === 2) {
-    result.card.due = new Date(now.getTime() + 3 * 60 * 60 * 1000);
-  }
+  applyShortTermGraduationSafeguards(fsrsCard, result, rating, now);
 
   return {
     due: result.card.due.toISOString(),
@@ -184,12 +234,7 @@ export function scheduleReviewWithLog(
 
   const result = engine.next(fsrsCard, now, rating as Grade);
 
-  // Curva de espaciado específica para tarjetas Nuevas en calificación 'Difícil' (3 horas)
-  const isNewCard = fsrsCard.state === State.New || fsrsCard.reps === 0;
-  if (isNewCard && rating === 2) {
-    result.card.due = new Date(now.getTime() + 3 * 60 * 60 * 1000);
-    result.log.due = result.card.due;
-  }
+  applyShortTermGraduationSafeguards(fsrsCard, result, rating, now);
 
   const updatedCard: FSRSUpdatedCard = {
     due: result.card.due.toISOString(),

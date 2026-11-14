@@ -129,10 +129,12 @@ export default function StudyPage({ params }: StudyPageProps) {
     fetchDeckById(deckId);
     fetchTodayReviewsCount();
     fetchCardsByDeck(deckId).then((loaded) => {
-      // Ordenar: primero las pendientes (due <= now()), o todas si no hay vencidas
+      // Cargar únicamente las tarjetas pendientes (due <= now()), ordenadas por mayor urgencia de vencimiento
       const now = new Date();
-      const dueCards = loaded.filter((c) => new Date(c.due) <= now);
-      const studyQueue = dueCards.length > 0 ? dueCards : loaded;
+      const dueCards = loaded
+        .filter((c) => new Date(c.due) <= now)
+        .sort((a, b) => new Date(a.due).getTime() - new Date(b.due).getTime());
+      const studyQueue = dueCards;
       setQueue(studyQueue);
       setIsInitialized(true);
     });

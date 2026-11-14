@@ -38,6 +38,54 @@ export interface QueueOptions {
   includeFuture?: boolean;
 }
 
+/**
+ * Entrelaza cíclicamente (Round-Robin) una colección de tarjetas agrupándolas por su mazo de origen.
+ * Dentro de cada mazo se preserva el orden interno de prioridad previamente establecido.
+ */
+function interleaveCardsByDeck<T extends CardQueueItem>(
+  cardsToInterleave: T[],
+  deckOrder?: string[]
+): T[] {
+  if (!cardsToInterleave || cardsToInterleave.length === 0) return [];
+
+  const deckGroups = new Map<string, T[]>();
+
+  for (const card of cardsToInterleave) {
+    const dId = card.deck_id || card.deckId || 'unknown';
+    if (!deckGroups.has(dId)) {
+      deckGroups.set(dId, []);
+    }
+    deckGroups.get(dId)!.push(card);
+  }
+
+  // Respetar el orden en que el usuario seleccionó los mazos si se proporciona
+  const distinctDecks =
+    deckOrder && deckOrder.length > 0
+      ? Array.from(new Set([...deckOrder, ...Array.from(deckGroups.keys())])).filter((id) =>
+          deckGroups.has(id)
+        )
+      : Array.from(deckGroups.keys());
+
+  let maxGroupLength = 0;
+  for (const group of deckGroups.values()) {
+    if (group.length > maxGroupLength) {
+      maxGroupLength = group.length;
+    }
+  }
+
+  const interleaved: T[] = [];
+  for (let round = 0; round < maxGroupLength; round++) {
+    for (const dId of distinctDecks) {
+      const group = deckGroups.get(dId);
+      if (group && round < group.length) {
+        interleaved.push(group[round]);
+      }
+    }
+  }
+
+  return interleaved;
+}
+
 export function buildInterleavedCombinedQueue<T extends CardQueueItem>(
   cards: T[],
   deckOrder?: string[],
@@ -47,8 +95,9 @@ export function buildInterleavedCombinedQueue<T extends CardQueueItem>(
 
   const nowTime = Date.now();
 
-  // 1. Clasificar entre tarjetas con historial FSRS y tarjetas nuevas
-  const reviewCards: T[] = [];
+  // 1. Clasificar entre tarjetas con historial FSRS (vencidas vs futuras) y tarjetas nuevas
+  const dueReviewCards: T[] = [];
+  const futureReviewCards: T[] = [];
   const newCards: T[] = [];
 
   for (const card of cards) {
@@ -59,76 +108,36 @@ export function buildInterleavedCombinedQueue<T extends CardQueueItem>(
     if (isNew) {
       newCards.push(card);
     } else {
-      reviewCards.push(card);
-    }
-  }
-
-  // 2. Ordenamiento FSRS estricto para tarjetas de repaso / aprendizaje
-  reviewCards.sort((a, b) => {
-    const timeA = new Date(a.due).getTime();
-    const timeB = new Date(b.due).getTime();
-    const aIsDue = timeA <= nowTime;
-    const bIsDue = timeB <= nowTime;
-
-    // Tarjetas vencidas siempre antes que tarjetas futuras
-    if (aIsDue && !bIsDue) return -1;
-    if (!aIsDue && bIsDue) return 1;
-
-    // Dentro del mismo grupo, la más antigua / mayor vencimiento primero
-    return timeA - timeB;
-  });
-
-  // 3. Algoritmo Round-Robin para tarjetas nuevas
-  const interleavedNewCards: T[] = [];
-
-  if (newCards.length > 0) {
-    const deckGroups = new Map<string, T[]>();
-
-    for (const card of newCards) {
-      const dId = card.deck_id || card.deckId || 'unknown';
-      if (!deckGroups.has(dId)) {
-        deckGroups.set(dId, []);
-      }
-      deckGroups.get(dId)!.push(card);
-    }
-
-    // Respetar el orden en que el usuario seleccionó los mazos si se proporciona
-    const distinctDecks =
-      deckOrder && deckOrder.length > 0
-        ? Array.from(new Set([...deckOrder, ...Array.from(deckGroups.keys())])).filter((id) =>
-            deckGroups.has(id)
-          )
-        : Array.from(deckGroups.keys());
-
-    // Calcular el número máximo de tarjetas en cualquier mazo
-    let maxGroupLength = 0;
-    for (const group of deckGroups.values()) {
-      if (group.length > maxGroupLength) {
-        maxGroupLength = group.length;
-      }
-    }
-
-    // Entrelazar cíclicamente (A1, B1, C1, A2, B2, C2...)
-    for (let round = 0; round < maxGroupLength; round++) {
-      for (const dId of distinctDecks) {
-        const group = deckGroups.get(dId);
-        if (group && round < group.length) {
-          interleavedNewCards.push(group[round]);
-        }
+      const dueTime = new Date(card.due).getTime();
+      if (dueTime <= nowTime) {
+        dueReviewCards.push(card);
+      } else {
+        futureReviewCards.push(card);
       }
     }
   }
 
-  // 4. Composición de la Cola Final:
-  // [Repasos FSRS Vencidos] -> [Nuevas Intercaladas Round-Robin]
-  // Salvo que se solicite includeFuture: true explícitamente, se descartan futureReviews
-  const dueReviews = reviewCards.filter((c) => new Date(c.due).getTime() <= nowTime);
-  const futureReviews = reviewCards.filter((c) => new Date(c.due).getTime() > nowTime);
+  // 2. Ordenar internamente los repasos por urgencia de vencimiento (mayor retraso primero)
+  //    antes de agruparlos y repartirlos en Round-Robin por mazo de origen
+  dueReviewCards.sort((a, b) => new Date(a.due).getTime() - new Date(b.due).getTime());
+  futureReviewCards.sort((a, b) => new Date(a.due).getTime() - new Date(b.due).getTime());
 
-  if (options.includeFuture) {
-    return [...dueReviews, ...interleavedNewCards, ...futureReviews];
+  // 3. Construir la cola activa por mazo (dentro de cada mazo: primero sus repasos vencidos y luego sus nuevas)
+  //    y aplicar Round-Robin estricto entre todos los mazos seleccionados para garantizar interleaving real
+  //    tanto entre mazos con repasos como entre mazos con tarjetas nuevas.
+  const interleavedDueReviews = interleaveCardsByDeck(dueReviewCards, deckOrder);
+  const interleavedNewCards = interleaveCardsByDeck(newCards, deckOrder);
+
+  // Combinar por mazo para que cada turno de Round-Robin tome 1 tarjeta activa (repaso vencido o nueva)
+  // de cada mazo seleccionado, evitando que un mazo con muchos repasos bloquee a otro mazo.
+  const activeCardsByDeckPriority = [...interleavedDueReviews, ...interleavedNewCards];
+  const interleavedActiveQueue = interleaveCardsByDeck(activeCardsByDeckPriority, deckOrder);
+
+  if (options.includeFuture && futureReviewCards.length > 0) {
+    const interleavedFutureReviews = interleaveCardsByDeck(futureReviewCards, deckOrder);
+    return [...interleavedActiveQueue, ...interleavedFutureReviews];
   }
 
-  return [...dueReviews, ...interleavedNewCards];
+  return interleavedActiveQueue;
 }
 
