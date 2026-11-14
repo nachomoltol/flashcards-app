@@ -58,6 +58,15 @@ function sanitizeExplanationText(raw: string): string {
 }
 
 /**
+ * Expresión regular ampliada de casillas Unicode (☐, ☑, ☒, □, ◻, ◼, ▢, ⬜, ▫, ▯)
+ */
+const UNICODE_CHECKBOX_CHARS_REGEX = /[\u2610\u2611\u2612\u25A1\u25FB\u25FC\u25A2\u2B1C\u25AB\u25AF]+/g;
+const UNICODE_CHECKBOX_GAP_REGEX =
+  /_*[\u2610\u2611\u2612\u25A1\u25FB\u25FC\u25A2\u2B1C\u25AB\u25AF]+_*|\[\s*[\u2610\u2611\u2612\u25A1\u25FB\u25FC\u25A2\u2B1C\u25AB\u25AF]+\s*\]/g;
+const CLOZE_FORMAT_TAG_REGEX =
+  /^\[\s*(?:cloze|huecos?|true[_\s/-]?false|verdadero\s*(?:o|\/)\s*falso|v\/f|multiple[_\s/-]?choice|test|basic|desarrollo)\s*\]$/i;
+
+/**
  * Reemplaza los marcadores cloze {{c1::palabra}}, [...] y huecos vacíos por un elemento HTML indivisible
  * que jamás se parte al final de línea ni cuela caracteres residuales.
  */
@@ -67,16 +76,42 @@ function renderClozeStudentContent(text: string): React.ReactNode {
   let cleanText = text.replace(/^\s*\d+[\.\)\-]\s+/, '').trim();
 
   // Pre-normalización universal de huecos defectuosos a marcador canónico [...]
-  // 1. Huecos con casilla Unicode o guiones con casilla (_☐, ☐, [☐])
-  cleanText = cleanText.replace(/_*\u2610_*|\[\s*\u2610\s*\]/g, '[...]');
-  // 2. Corchetes abiertos con guiones bajos sin cerrar ([______ seguidos de espacio, signo de puntuación o fin de línea)
+  // 1. Corchetes abiertos con guiones bajos sin cerrar ([______ seguidos de espacio, signo de puntuación o fin de línea)
   cleanText = cleanText.replace(/\[\s*_{2,}(?!\s*\])/g, '[...]');
-  // 3. Guiones bajos sueltos de cierre (_{2,}\s*\d*\s*\])
+  // 2. Guiones bajos sueltos de cierre (_{2,}\s*\d*\s*\])
   cleanText = cleanText.replace(/(?<!\[)\s*_{2,}\s*\d*\s*\]/g, '[...]');
-  // 4. Secuencias de corchetes con guiones/puntos o 3 o más guiones bajos sueltos (____)
-  cleanText = cleanText.replace(/\[\s*[_.\-\u2026\s\d]*\]|_{3,}/g, '[...]');
-  // 5. Limpiar corchetes huérfanos duplicados como [...]\s*\[\s*\]
-  cleanText = cleanText.replace(/\[\.\.\.\]\s*\[\s*\]/g, '[...]');
+  // 3. Secuencias de corchetes con guiones/puntos/casillas o 3 o más guiones bajos sueltos (____)
+  cleanText = cleanText.replace(
+    /\[\s*[_.\-\u2026\s\d\u2610\u2611\u2612\u25A1\u25FB\u25FC\u25A2\u2B1C\u25AB\u25AF]*\]|_{3,}/g,
+    '[...]'
+  );
+  // 4. Si ya existe un hueco [...] o {{c1::...}}, eliminar casillas Unicode adyacentes o sueltas;
+  //    si la casilla Unicode era el único marcador de hueco en la frase, convertirla a [...]
+  if (/(\{\{c\d+::.*?\}\}|\[\.\.\.\])/.test(cleanText)) {
+    cleanText = cleanText
+      .replace(/_*[\u2610\u2611\u2612\u25A1\u25FB\u25FC\u25A2\u2B1C\u25AB\u25AF]+_*/g, '')
+      .replace(UNICODE_CHECKBOX_CHARS_REGEX, '');
+  } else {
+    cleanText = cleanText
+      .replace(UNICODE_CHECKBOX_GAP_REGEX, '[...]')
+      .replace(UNICODE_CHECKBOX_CHARS_REGEX, '');
+  }
+  // 5. Fallback para tarjetas Cloze donde la IA escribió [término oculto] en vez de [...]:
+  //    si tras normalizar no hay [...] ni {{c1::...}}, tratar [palabra o frase] como hueco
+  if (!/(\{\{c\d+::.*?\}\}|\[\.\.\.\])/.test(cleanText)) {
+    cleanText = cleanText.replace(/\[[^\]\r\n]{1,80}\]/g, (match) => {
+      if (CLOZE_FORMAT_TAG_REGEX.test(match.trim())) {
+        return '';
+      }
+      return '[...]';
+    });
+  }
+  // 6. Limpiar huecos o corchetes huérfanos duplicados adyacentes como [...]\s*\[\s*\] o [...]\s*[...]
+  cleanText = cleanText
+    .replace(/\[\.\.\.\]\s*\[\s*\]/g, '[...]')
+    .replace(/\[\.\.\.\](?:\s*\[\.\.\.\])+/g, '[...]')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
 
   // Tamaño adaptable del hueco: compacto (10 guiones) si hay 2 o más huecos; estándar (16 guiones) si es 1
   const gapMatches = cleanText.match(/(\{\{c\d+::.*?\}\}|\[\.\.\.\])/g);
@@ -114,11 +149,37 @@ function formatClozeForTeacher(text: string): { highlighted: string; hiddenWords
     return `[${word}]`;
   });
   highlighted = highlighted
-    .replace(/_*\u2610_*|\[\s*\u2610\s*\]/g, '[...]')
     .replace(/\[\s*_{2,}(?!\s*\])/g, '[...]')
     .replace(/(?<!\[)\s*_{2,}\s*\d*\s*\]/g, '[...]')
-    .replace(/\[\s*[_.\-\u2026\s\d]*\]|_{3,}/g, '[...]')
+    .replace(/\[\s*[_.\-\u2026\s\d\u2610\u2611\u2612\u25A1\u25FB\u25FC\u25A2\u2B1C\u25AB\u25AF]*\]|_{3,}/g, '[...]');
+
+  if (/(\{\{c\d+::.*?\}\}|\[\.\.\.\])/.test(highlighted)) {
+    highlighted = highlighted
+      .replace(/_*[\u2610\u2611\u2612\u25A1\u25FB\u25FC\u25A2\u2B1C\u25AB\u25AF]+_*/g, '')
+      .replace(UNICODE_CHECKBOX_CHARS_REGEX, '');
+  } else {
+    highlighted = highlighted
+      .replace(UNICODE_CHECKBOX_GAP_REGEX, '[...]')
+      .replace(UNICODE_CHECKBOX_CHARS_REGEX, '');
+  }
+
+  // Si no había {{c1::...}} ni [...], extraer posibles términos entre corchetes [palabra]
+  if (hiddenWords.length === 0 && !/\[\.\.\.\]/.test(highlighted)) {
+    const bracketMatches = highlighted.match(/\[([^\]\r\n]{1,80})\]/g);
+    if (bracketMatches) {
+      for (const m of bracketMatches) {
+        if (!CLOZE_FORMAT_TAG_REGEX.test(m.trim())) {
+          const inner = m.slice(1, -1).trim();
+          if (inner) hiddenWords.push(inner);
+        }
+      }
+    }
+  }
+
+  highlighted = highlighted
+    .replace(/\[\.\.\.\]\s*\[\s*\]/g, '[...]')
     .replace(/\[\s*\]/g, '')
+    .replace(/\s{2,}/g, ' ')
     .trim();
   return { highlighted, hiddenWords };
 }
@@ -312,18 +373,21 @@ export function PrintExamSheet({
         {/* Lista Continua de Preguntas */}
         <div className="space-y-3 pt-1">
           {cards.map((card, index) => {
-            const isClozePattern = /(\{\{c\d+::.*?\}\}|\[\s*(?:\.{2,}|\u2026+|_{2,}|\d+)?\s*\])/.test(card.front || '');
+            const cleanFront = sanitizeCardFrontText(card.front);
+            const hasFourMcOptions = parseMultipleChoice(cleanFront).options.length >= 4;
+            const isClozePattern =
+              /(\{\{c\d+::.*?\}\}|\[\s*(?:\.{2,}|\u2026+|_{2,}|\d+|[\u2610\u2611\u2612\u25A1\u25FB\u25FC\u25A2\u2B1C\u25AB\u25AF])?\s*\]|_{3,})/.test(
+                card.front || ''
+              );
             let fmt = (
               card.cardFormat ||
               card.card_format ||
               (card.card_type === 'cloze' ? 'cloze' : 'basic')
             ) as CardFormat;
 
-            if (fmt === 'basic' && isClozePattern) {
+            if ((fmt === 'cloze' || card.card_type === 'cloze' || isClozePattern) && !hasFourMcOptions) {
               fmt = 'cloze';
             }
-
-            const cleanFront = sanitizeCardFrontText(card.front);
 
             return (
               <article
@@ -483,11 +547,21 @@ export function PrintExamSheet({
         {/* Lista Continua de Soluciones (Optimizada para espacio) */}
         <div className="space-y-2 pt-1">
           {cards.map((card, index) => {
-            const fmt = (
+            const cleanFrontForSol = sanitizeCardFrontText(card.front);
+            const hasFourMcOptionsSol = parseMultipleChoice(cleanFrontForSol).options.length >= 4;
+            const isClozePatternSol =
+              /(\{\{c\d+::.*?\}\}|\[\s*(?:\.{2,}|\u2026+|_{2,}|\d+|[\u2610\u2611\u2612\u25A1\u25FB\u25FC\u25A2\u2B1C\u25AB\u25AF])?\s*\]|_{3,})/.test(
+                card.front || ''
+              );
+            let fmt = (
               card.cardFormat ||
               card.card_format ||
               (card.card_type === 'cloze' ? 'cloze' : 'basic')
             ) as CardFormat;
+
+            if ((fmt === 'cloze' || card.card_type === 'cloze' || isClozePatternSol) && !hasFourMcOptionsSol) {
+              fmt = 'cloze';
+            }
 
             const formatLabel =
               fmt === 'multiple_choice'

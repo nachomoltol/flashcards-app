@@ -399,7 +399,8 @@ ${UNIVERSAL_BLOOM_PROPORTION_DIRECTIVE}`;
     case 'cloze':
       formatInstruction = `📋 FORMATO DE EVALUACIÓN EXCLUSIVO: SOLO TEXTO CON HUECOS / CLOZE (FORMATO "cloze"):
 - TODAS las tarjetas DEBEN ser formuladas estrictamente en formato "cloze".
-- En "front" presenta una oración o párrafo contextualizado donde los conceptos clave a evaluar estén encerrados entre corchetes [como este].
+- En "front" presenta una oración o párrafo contextualizado ocultando el término clave exactamente con el marcador [...] (PROHIBIDO escribir la respuesta dentro de los corchetes en 'front' o 'question' y PROHIBIDO incluir símbolos de casilla ☐/□; escribe únicamente [...] donde deba ir el hueco y pon el término oculto en 'back').
+- Cada hueco [...] debe ocultar un término o concepto concreto (de 1 a 4 palabras máximo), nunca una lista de varias oraciones.
 - En "back" incluye los términos ocultos con una explicación concisa. Queda terminantemente PROHIBIDO devolver tarjetas en otro formato.`;
       break;
     case 'basic':
@@ -420,10 +421,11 @@ ${UNIVERSAL_BLOOM_PROPORTION_DIRECTIVE}`;
     default:
       formatInstruction = `📝 FORMATO DE EVALUACIÓN: TEST VARIADO / MIXTO (LIBERTAD COMPLETA DE FORMATOS):
 - TIENES ABSOLUTA LIBERTAD para alternar dinámicamente entre los 4 formatos disponibles ("multiple_choice", "basic", "cloze", "true_false") según lo que mejor evalúe cada concepto y nivel taxonómico de Bloom:
-  * "multiple_choice": Para discriminación de conceptos, reglas y opciones excluyentes (4 alternativas en array options).
-  * "cloze": Para fijar definiciones exactas, vocabulario o términos técnicos entre corchetes [...].
-  * "true_false": Para evaluar afirmaciones críticas y contrastar errores comunes.
-  * "basic": Para conceptos clave o explicaciones breves.
+  * "multiple_choice": Para discriminación de conceptos, reglas y opciones excluyentes. En "question" pon el enunciado limpio sin opciones; en "options" incluye exactamente 4 alternativas plausibles [0, 1, 2, 3]; en "correct_option_index" indica el índice entero (0 a 3); en "front" coloca la pregunta con sus 4 opciones a-d y en "back" la opción ganadora seguida de su justificación.
+  * "cloze": Para fijar definiciones exactas, vocabulario o términos técnicos. En "front" (y en "question") escribe la oración o párrafo contextualizado completo ocultando el término clave exactamente con el marcador [...] (PROHIBIDO escribir la respuesta dentro de los corchetes en 'front' o 'question' y PROHIBIDO incluir símbolos de casilla ☐/□; escribe únicamente [...] donde deba ir el hueco y pon el término oculto en 'back'). Cada hueco [...] debe ocultar un término o concepto concreto (de 1 a 4 palabras máximo), nunca una lista de varias oraciones; deja "options" vacío [].
+  * "true_false": Para evaluar afirmaciones críticas y contrastar errores comunes. En "front" (y en "question") escribe la afirmación completa y categórica a evaluar; en "back" indica obligatoriamente "Verdadero" o "Falso" seguido de su justificación rigurosa; deja "options" vacío [].
+  * "basic": Para conceptos clave o explicaciones breves. En "front" (y en "question") escribe la pregunta directa completa; en "back" redacta la respuesta directa y sintetizada; deja "options" vacío [].
+- 🚨 REGLA CRÍTICA DE CAMPOS EN FORMATO VARIADO: PROHIBIDO escribir el nombre del formato ("cloze", "true_false", "basic") dentro del campo "front". Tanto en "question" como en "front" debes escribir SIEMPRE el enunciado completo de la pregunta, la frase con [...] o la afirmación de Verdadero/Falso. El identificador del formato va EXCLUSIVAMENTE en la propiedad "cardFormat".
 - Diseña un conjunto variado y equilibrado de formatos respetando las cuotas de Bloom (30% básico, 40% intermedio, 30% avanzado).`;
       break;
   }
