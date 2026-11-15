@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/types/database';
+import { sanitizeRequestRetention } from '@/lib/fsrs';
 import { useProfileStore } from './useProfileStore';
 
 export type ProfileRow = Database['public']['Tables']['profiles']['Row'];
@@ -100,11 +101,21 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         return initialProfile;
       }
 
+      const rawRetention =
+        typeof data.request_retention === 'number'
+          ? data.request_retention
+          : Number(data.request_retention) || DEFAULT_FSRS_SETTINGS.request_retention;
+      const sanitizedRetention = sanitizeRequestRetention(rawRetention);
+
+      if (rawRetention !== sanitizedRetention) {
+        await supabase
+          .from('profiles')
+          .update({ request_retention: sanitizedRetention, updated_at: new Date().toISOString() })
+          .eq('id', user.id);
+      }
+
       const loadedSettings: FSRSSettings = {
-        request_retention:
-          typeof data.request_retention === 'number'
-            ? data.request_retention
-            : Number(data.request_retention) || DEFAULT_FSRS_SETTINGS.request_retention,
+        request_retention: sanitizedRetention,
         maximum_interval: data.maximum_interval ?? DEFAULT_FSRS_SETTINGS.maximum_interval,
         enable_fuzz: data.enable_fuzz ?? DEFAULT_FSRS_SETTINGS.enable_fuzz,
         full_name: data.full_name || '',
@@ -141,6 +152,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         ...get().settings,
         ...newSettings,
       };
+      merged.request_retention = sanitizeRequestRetention(merged.request_retention);
 
       const fullNameVal = merged.full_name !== undefined ? merged.full_name.trim() : null;
       const usernameVal = merged.username !== undefined && merged.username.trim() !== '' ? merged.username.trim() : null;

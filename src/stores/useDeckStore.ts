@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/types/database';
+import { isCardDueForStudy } from '@/lib/fsrs';
 import { ensureQuickGuideDeck } from '@/lib/onboarding/seedGuideDeck';
 import { useTutorialStore } from './useTutorialStore';
 
@@ -44,7 +45,7 @@ interface DeckState {
 }
 
 interface DeckWithCardsQuery extends DeckRow {
-  cards: { id: string; due: string }[];
+  cards: { id: string; due: string; state?: number; reps?: number }[];
 }
 
 export const useDeckStore = create<DeckState>((set, get) => ({
@@ -99,7 +100,7 @@ export const useDeckStore = create<DeckState>((set, get) => ({
 
       const { data, error } = await supabase
         .from('decks')
-        .select('*, cards(id, due)')
+        .select('*, cards(id, due, state, reps)')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
@@ -111,7 +112,7 @@ export const useDeckStore = create<DeckState>((set, get) => ({
       const decksWithStats: DeckWithStats[] = rawDecks.map((deck) => {
         const cardsList = Array.isArray(deck.cards) ? deck.cards : [];
         const cardsCount = cardsList.length;
-        const dueCount = cardsList.filter((c) => new Date(c.due) <= now).length;
+        const dueCount = cardsList.filter((c) => isCardDueForStudy(c, now)).length;
         // Calcular la cantidad de elementos hijos que tiene si es carpeta o si otros mazos la referencian
         const childrenCount = rawDecks.filter((d) => d.parent_id === deck.id).length;
         const deckCopy = { ...deck } as Record<string, unknown>;
@@ -147,7 +148,7 @@ export const useDeckStore = create<DeckState>((set, get) => ({
     try {
       const { data, error } = await supabase
         .from('decks')
-        .select('*, cards(id, due)')
+        .select('*, cards(id, due, state, reps)')
         .eq('id', id.trim())
         .single();
 
@@ -157,7 +158,7 @@ export const useDeckStore = create<DeckState>((set, get) => ({
       const rawDeck = data as unknown as DeckWithCardsQuery;
       const cardsList = Array.isArray(rawDeck.cards) ? rawDeck.cards : [];
       const cardsCount = cardsList.length;
-      const dueCount = cardsList.filter((c) => new Date(c.due) <= now).length;
+      const dueCount = cardsList.filter((c) => isCardDueForStudy(c, now)).length;
       const deckCopy = { ...rawDeck } as Record<string, unknown>;
       delete deckCopy.cards;
 

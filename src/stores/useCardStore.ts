@@ -4,6 +4,7 @@ import {
   createInitialCardValues,
   scheduleReviewWithLog,
   buildInterleavedCombinedQueue,
+  getEndOfLocalDay,
   type FSRSRating,
 } from '@/lib/fsrs';
 import type { Database, CardFormat } from '@/types/database';
@@ -102,17 +103,17 @@ export const useCardStore = create<CardState>((set) => ({
 
     set({ isLoading: true, error: null });
     try {
-      const nowIso = new Date().toISOString();
+      const endOfTodayIso = getEndOfLocalDay(new Date()).toISOString();
       let query = supabase
         .from('cards')
         .select('*, decks(id, title, color)')
         .in('deck_id', deckIds);
 
       if (onlyDue) {
-        query = query.lte('due', nowIso);
+        query = query.lte('due', endOfTodayIso);
       }
 
-      const { data, error } = await query;
+      const { data, error } = await query.order('due', { ascending: true });
 
       if (error) throw error;
 

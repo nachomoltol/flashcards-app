@@ -22,6 +22,8 @@
  *    - Finalmente, repasos futuros si la sesión se solicita por adelantado.
  */
 
+import { isCardDueForStudy } from './scheduler';
+
 export interface CardQueueItem {
   id?: string;
   deck_id?: string;
@@ -93,9 +95,9 @@ export function buildInterleavedCombinedQueue<T extends CardQueueItem>(
 ): T[] {
   if (!cards || cards.length === 0) return [];
 
-  const nowTime = Date.now();
+  const now = new Date();
 
-  // 1. Clasificar entre tarjetas con historial FSRS (vencidas vs futuras) y tarjetas nuevas
+  // 1. Clasificar entre tarjetas con historial FSRS (vencidas hoy vs futuras) y tarjetas nuevas
   const dueReviewCards: T[] = [];
   const futureReviewCards: T[] = [];
   const newCards: T[] = [];
@@ -107,13 +109,10 @@ export function buildInterleavedCombinedQueue<T extends CardQueueItem>(
 
     if (isNew) {
       newCards.push(card);
+    } else if (isCardDueForStudy(card, now)) {
+      dueReviewCards.push(card);
     } else {
-      const dueTime = new Date(card.due).getTime();
-      if (dueTime <= nowTime) {
-        dueReviewCards.push(card);
-      } else {
-        futureReviewCards.push(card);
-      }
+      futureReviewCards.push(card);
     }
   }
 
@@ -121,17 +120,18 @@ export function buildInterleavedCombinedQueue<T extends CardQueueItem>(
   //    antes de agruparlos y repartirlos en Round-Robin por mazo de origen
   dueReviewCards.sort((a, b) => new Date(a.due).getTime() - new Date(b.due).getTime());
   futureReviewCards.sort((a, b) => new Date(a.due).getTime() - new Date(b.due).getTime());
+  newCards.sort(
+    (a, b) =>
+      new Date(a.created_at || a.due).getTime() - new Date(b.created_at || b.due).getTime()
+  );
 
-  // 3. Construir la cola activa por mazo (dentro de cada mazo: primero sus repasos vencidos y luego sus nuevas)
-  //    y aplicar Round-Robin estricto entre todos los mazos seleccionados para garantizar interleaving real
-  //    tanto entre mazos con repasos como entre mazos con tarjetas nuevas.
+  // 3. Aplicar Round-Robin estricto dentro de los repasos vencidos entre mazos
+  //    y después dentro de las tarjetas nuevas entre mazos, garantizando que TODOS los repasos
+  //    vencidos salgan siempre antes que cualquier tarjeta nueva.
   const interleavedDueReviews = interleaveCardsByDeck(dueReviewCards, deckOrder);
   const interleavedNewCards = interleaveCardsByDeck(newCards, deckOrder);
 
-  // Combinar por mazo para que cada turno de Round-Robin tome 1 tarjeta activa (repaso vencido o nueva)
-  // de cada mazo seleccionado, evitando que un mazo con muchos repasos bloquee a otro mazo.
-  const activeCardsByDeckPriority = [...interleavedDueReviews, ...interleavedNewCards];
-  const interleavedActiveQueue = interleaveCardsByDeck(activeCardsByDeckPriority, deckOrder);
+  const interleavedActiveQueue = [...interleavedDueReviews, ...interleavedNewCards];
 
   if (options.includeFuture && futureReviewCards.length > 0) {
     const interleavedFutureReviews = interleaveCardsByDeck(futureReviewCards, deckOrder);

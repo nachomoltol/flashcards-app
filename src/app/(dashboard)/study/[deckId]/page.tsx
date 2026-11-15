@@ -8,6 +8,7 @@ import { useDeckStore, useCardStore, useSettingsStore, useLanguageStore, useStre
 import { toLocalDateString } from '@/lib/stats/streak';
 import {
   previewNextIntervals,
+  sortStudyQueuePrioritizingReviews,
   type FSRSRating,
 } from '@/lib/fsrs';
 import { FormattedCardView, parseMultipleChoice } from '@/components/cards';
@@ -129,12 +130,8 @@ export default function StudyPage({ params }: StudyPageProps) {
     fetchDeckById(deckId);
     fetchTodayReviewsCount();
     fetchCardsByDeck(deckId).then((loaded) => {
-      // Cargar únicamente las tarjetas pendientes (due <= now()), ordenadas por mayor urgencia de vencimiento
-      const now = new Date();
-      const dueCards = loaded
-        .filter((c) => new Date(c.due) <= now)
-        .sort((a, b) => new Date(a.due).getTime() - new Date(b.due).getTime());
-      const studyQueue = dueCards;
+      // Cargar las tarjetas elegibles hoy priorizando siempre Repaso/Aprendizaje vencido antes que Nuevas
+      const studyQueue = sortStudyQueuePrioritizingReviews(loaded, new Date());
       setQueue(studyQueue);
       setIsInitialized(true);
     });

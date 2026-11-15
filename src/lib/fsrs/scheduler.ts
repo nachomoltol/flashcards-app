@@ -78,6 +78,124 @@ export const defaultFSRSParams = generatorParameters({
 export const f = fsrs(defaultFSRSParams);
 
 /**
+ * Normaliza request_retention a un rango saludable [0.75, 0.94/0.95].
+ * Si un perfil tiene > 0.95 (ej. 0.99) o < 0.75, lo restablece a 0.90 para evitar
+ * que la función exponencial de ts-fsrs comprima todos los intervalos a 1 día.
+ */
+export function sanitizeRequestRetention(retention?: number): number {
+  if (typeof retention !== 'number' || Number.isNaN(retention) || retention > 0.95 || retention < 0.75) {
+    return 0.90;
+  }
+  return retention;
+}
+
+/**
+ * Obtiene una instancia configurada de FSRS aplicando saneamiento sobre request_retention.
+ */
+export function getFSRSInstance(customParams?: Partial<FSRSParameters>) {
+  if (!customParams) return f;
+  const sanitizedRetention = sanitizeRequestRetention(customParams.request_retention);
+  return fsrs(
+    generatorParameters({
+      ...defaultFSRSParams,
+      ...customParams,
+      request_retention: sanitizedRetention,
+    })
+  );
+}
+
+/**
+ * Devuelve el final del día natural en hora local (23:59:59.999) para la fecha dada.
+ */
+export function getEndOfLocalDay(now: Date = new Date()): Date {
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+}
+
+/**
+ * Determina de forma canónica si una tarjeta es elegible para estudiarse hoy:
+ * - Nueva (state === 0 && reps === 0): siempre true.
+ * - Aprendizaje / Reaprendizaje intradía (state === 1 || state === 3): compara contra el instante actual (due <= now)
+ *   para respetar los pasos cortos de 10m y 3h.
+ * - Repaso en días (state === 2 o reps > 0): compara contra el final del día natural local de hoy (23:59:59.999),
+ *   de modo que toda tarjeta de repaso que vence hoy esté disponible desde primera hora de la mañana.
+ */
+export function isCardDueForStudy(card: FSRSCardInput, now: Date = new Date()): boolean {
+  const state = card.state ?? 0;
+  const reps = card.reps ?? 0;
+
+  if (state === State.New && reps === 0) {
+    return true;
+  }
+
+  if (!card.due) {
+    return true;
+  }
+
+  const dueTime = (card.due instanceof Date ? card.due : new Date(card.due)).getTime();
+  if (Number.isNaN(dueTime)) {
+    return true;
+  }
+
+  if (state === State.Learning || state === State.Relearning) {
+    return dueTime <= now.getTime();
+  }
+
+  const endOfTodayTime = getEndOfLocalDay(now).getTime();
+  return dueTime <= endOfTodayTime;
+}
+
+/**
+ * Devuelve true únicamente si la tarjeta NO es nueva (tiene historial o state !== 0)
+ * y está vencida para repasar hoy según isCardDueForStudy.
+ */
+export function isReviewCardDueToday(card: FSRSCardInput, now: Date = new Date()): boolean {
+  const state = card.state ?? 0;
+  const reps = card.reps ?? 0;
+  const isNew = state === State.New && reps === 0;
+  if (isNew) return false;
+  return isCardDueForStudy(card, now);
+}
+
+/**
+ * Filtra las tarjetas elegibles hoy y las ordena garantizando prioridad absoluta
+ * de los Repasos/Aprendizaje vencidos (state !== 0 || reps > 0) antes que las Nuevas (state === 0 && reps === 0).
+ */
+export function sortStudyQueuePrioritizingReviews<
+  T extends FSRSCardInput & { created_at?: string }
+>(cards: T[], now: Date = new Date()): T[] {
+  if (!cards || cards.length === 0) return [];
+
+  const eligible = cards.filter((c) => isCardDueForStudy(c, now));
+  const dueReviewCards: T[] = [];
+  const newCards: T[] = [];
+
+  for (const card of eligible) {
+    const isNew = (card.state === 0 || card.state === undefined) && (card.reps ?? 0) === 0;
+    if (isNew) {
+      newCards.push(card);
+    } else {
+      dueReviewCards.push(card);
+    }
+  }
+
+  dueReviewCards.sort((a, b) => {
+    const aTime = a.due ? new Date(a.due).getTime() : 0;
+    const bTime = b.due ? new Date(b.due).getTime() : 0;
+    return aTime - bTime;
+  });
+
+  newCards.sort((a, b) => {
+    const aSource = a.created_at || a.due;
+    const bSource = b.created_at || b.due;
+    const aTime = aSource ? new Date(aSource).getTime() : 0;
+    const bTime = bSource ? new Date(bSource).getTime() : 0;
+    return aTime - bTime;
+  });
+
+  return [...dueReviewCards, ...newCards];
+}
+
+/**
  * Normaliza los intervalos de transición en estados de corto plazo (New / Learning / Relearning)
  * para evitar el bucle de 15m en 'Hard' y garantizar que la tarjeta progrese hacia intervalos en días.
  */
@@ -110,22 +228,60 @@ function applyShortTermGraduationSafeguards(
       result.log.scheduled_days = 1;
       result.log.stability = result.card.stability;
     }
-  } else if (isShortTermState && rating === 3) {
-    // Si sale de Learning/Relearning en el mismo día con 'Good' tras un fallo previo,
-    // asegurar estabilidad mínima saludable para no estancarse en 0.24d en días sucesivos
-    const minGoodStability = fsrsCard.state === State.Learning ? 2.0 : 1.5;
-    if (result.card.stability < minGoodStability) {
-      result.card.stability = minGoodStability;
-      result.log.stability = minGoodStability;
+  } else if (rating === 3) {
+    if (isNewCard) {
+      // Tarjeta nueva calificada como 'Good (3)': garantizar mínimo 2 días
+      const minDays = 2;
+      const minStability = 2.3;
+      if (result.card.stability < minStability) {
+        result.card.stability = minStability;
+        result.log.stability = minStability;
+      }
+      const minDueTime = now.getTime() + minDays * 24 * 60 * 60 * 1000;
+      if (result.card.due.getTime() < minDueTime || result.card.scheduled_days < minDays) {
+        const safeDue = new Date(minDueTime);
+        result.card.due = safeDue;
+        result.card.state = State.Review;
+        result.card.scheduled_days = Math.max(result.card.scheduled_days, minDays);
+        result.log.due = safeDue;
+        result.log.state = State.Review;
+        result.log.scheduled_days = result.card.scheduled_days;
+      }
+    } else if (isShortTermState) {
+      // Si sale de Learning/Relearning en el mismo día con 'Good' tras un fallo previo,
+      // asegurar estabilidad mínima saludable para no estancarse en 0.24d en días sucesivos
+      const minGoodStability = fsrsCard.state === State.Learning ? 2.0 : 1.5;
+      if (result.card.stability < minGoodStability) {
+        result.card.stability = minGoodStability;
+        result.log.stability = minGoodStability;
+      }
+      const minGoodDays = fsrsCard.state === State.Learning ? 2 : 1;
+      const minDueTime = now.getTime() + minGoodDays * 24 * 60 * 60 * 1000;
+      if (result.card.due.getTime() < minDueTime) {
+        const safeDue = new Date(minDueTime);
+        result.card.due = safeDue;
+        result.card.scheduled_days = minGoodDays;
+        result.log.due = safeDue;
+        result.log.scheduled_days = minGoodDays;
+      }
     }
-    const minGoodDays = fsrsCard.state === State.Learning ? 2 : 1;
-    const minDueTime = now.getTime() + minGoodDays * 24 * 60 * 60 * 1000;
-    if (result.card.due.getTime() < minDueTime) {
+  } else if (rating === 4 && (isNewCard || isShortTermState)) {
+    // Tarjeta nueva o en aprendizaje calificada como 'Easy (4)': garantizar mínimo 4 días
+    const minEasyDays = 4;
+    const minEasyStability = 4.5;
+    if (result.card.stability < minEasyStability) {
+      result.card.stability = minEasyStability;
+      result.log.stability = minEasyStability;
+    }
+    const minDueTime = now.getTime() + minEasyDays * 24 * 60 * 60 * 1000;
+    if (result.card.due.getTime() < minDueTime || result.card.scheduled_days < minEasyDays) {
       const safeDue = new Date(minDueTime);
       result.card.due = safeDue;
-      result.card.scheduled_days = minGoodDays;
+      result.card.state = State.Review;
+      result.card.scheduled_days = Math.max(result.card.scheduled_days, minEasyDays);
       result.log.due = safeDue;
-      result.log.scheduled_days = minGoodDays;
+      result.log.state = State.Review;
+      result.log.scheduled_days = result.card.scheduled_days;
     }
   }
 }
@@ -190,9 +346,7 @@ export function scheduleReview(
     );
   }
 
-  const engine = customParams
-    ? fsrs(generatorParameters({ ...defaultFSRSParams, ...customParams }))
-    : f;
+  const engine = getFSRSInstance(customParams);
   const fsrsCard = toFSRSCard(card);
   const now = reviewDate instanceof Date ? reviewDate : new Date(reviewDate);
 
@@ -226,9 +380,7 @@ export function scheduleReviewWithLog(
     );
   }
 
-  const engine = customParams
-    ? fsrs(generatorParameters({ ...defaultFSRSParams, ...customParams }))
-    : f;
+  const engine = getFSRSInstance(customParams);
   const fsrsCard = toFSRSCard(card);
   const now = reviewDate instanceof Date ? reviewDate : new Date(reviewDate);
 
