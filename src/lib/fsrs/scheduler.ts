@@ -157,8 +157,73 @@ export function isReviewCardDueToday(card: FSRSCardInput, now: Date = new Date()
 }
 
 /**
- * Filtra las tarjetas elegibles hoy y las ordena garantizando prioridad absoluta
- * de los Repasos/Aprendizaje vencidos (state !== 0 || reps > 0) antes que las Nuevas (state === 0 && reps === 0).
+ * Ordena dos tarjetas de repaso vencidas dando prioridad a las del ciclo actual
+ * (estudiadas ayer/hoy o con vencimiento entre ayer y hoy) antes que al remanente antiguo,
+ * y dentro de cada grupo por fecha de vencimiento ascendente.
+ */
+export function compareDueReviewsFreshFirst(
+  a: FSRSCardInput,
+  b: FSRSCardInput,
+  now: Date = new Date()
+): number {
+  const yesterdayStart = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate() - 1,
+    0,
+    0,
+    0,
+    0
+  ).getTime();
+
+  const aDue = a.due ? new Date(a.due).getTime() : 0;
+  const bDue = b.due ? new Date(b.due).getTime() : 0;
+  const aLast = a.last_review ? new Date(a.last_review).getTime() : 0;
+  const bLast = b.last_review ? new Date(b.last_review).getTime() : 0;
+
+  const aIsFresh = aLast >= yesterdayStart || aDue >= yesterdayStart;
+  const bIsFresh = bLast >= yesterdayStart || bDue >= yesterdayStart;
+
+  if (aIsFresh !== bIsFresh) {
+    return aIsFresh ? -1 : 1;
+  }
+
+  return aDue - bDue;
+}
+
+/**
+ * Intercala tarjetas de Repaso vencidas y tarjetas Nuevas siguiendo una proporción equilibrada
+ * (por defecto 3 de Repaso por cada 1 Nueva: patrón 3:1).
+ * Cuando una de las dos listas se agota, añade el resto de la otra lista.
+ */
+export function mixReviewsAndNewCards<T>(
+  dueReviewCards: T[],
+  newCards: T[],
+  reviewsPerNew: number = 3
+): T[] {
+  if (dueReviewCards.length === 0) return [...newCards];
+  if (newCards.length === 0) return [...dueReviewCards];
+
+  const mixed: T[] = [];
+  const ratio = Math.max(1, reviewsPerNew);
+  let rIdx = 0;
+  let nIdx = 0;
+
+  while (rIdx < dueReviewCards.length || nIdx < newCards.length) {
+    for (let i = 0; i < ratio && rIdx < dueReviewCards.length; i++) {
+      mixed.push(dueReviewCards[rIdx++]);
+    }
+    if (nIdx < newCards.length) {
+      mixed.push(newCards[nIdx++]);
+    }
+  }
+
+  return mixed;
+}
+
+/**
+ * Filtra las tarjetas elegibles hoy, prioriza los repasos frescos del ciclo actual (hoy/ayer)
+ * y construye una cola equilibrada 3:1 (3 Repasos vencidos por cada 1 tarjeta Nueva).
  */
 export function sortStudyQueuePrioritizingReviews<
   T extends FSRSCardInput & { created_at?: string }
@@ -178,11 +243,7 @@ export function sortStudyQueuePrioritizingReviews<
     }
   }
 
-  dueReviewCards.sort((a, b) => {
-    const aTime = a.due ? new Date(a.due).getTime() : 0;
-    const bTime = b.due ? new Date(b.due).getTime() : 0;
-    return aTime - bTime;
-  });
+  dueReviewCards.sort((a, b) => compareDueReviewsFreshFirst(a, b, now));
 
   newCards.sort((a, b) => {
     const aSource = a.created_at || a.due;
@@ -192,7 +253,7 @@ export function sortStudyQueuePrioritizingReviews<
     return aTime - bTime;
   });
 
-  return [...dueReviewCards, ...newCards];
+  return mixReviewsAndNewCards(dueReviewCards, newCards, 3);
 }
 
 /**
@@ -288,94 +349,97 @@ function applyShortTermGraduationSafeguards(
     }
   }
 
-  // Escalera progresiva de intervalos máximos y mínimos para State.Review (rating 2, 3 o 4):
-  // Impide que tarjetas atrasadas con elapsed_days alto den un salto brusco a 30-60 días ("2 meses")
+  // Escalera progresiva estricta de intervalos para State.Review (rating 2, 3 o 4):
+  // Impide saltos de 30-60 días ("2 meses") por acumulación de elapsed_days y fija un tope absoluto de 21 días.
   if (result.card.state === State.Review && rating >= 2) {
     const nextReps = Math.max(1, result.card.reps || 1);
     let minAllowedDays = 1;
-    let maxAllowedDays = 60;
+    let maxAllowedDays = 21;
 
     if (nextReps <= 1) {
+      // 1.ª vez graduada: Hard = 1d, Good = 2d, Easy = 4d
       if (rating === 2) {
         minAllowedDays = 1;
         maxAllowedDays = 1;
       } else if (rating === 3) {
         minAllowedDays = 2;
-        maxAllowedDays = 3;
+        maxAllowedDays = 2;
       } else if (rating === 4) {
         minAllowedDays = 4;
-        maxAllowedDays = 5;
+        maxAllowedDays = 4;
       }
     } else if (nextReps === 2) {
+      // 2.ª vez: Hard = 2d, Good = 3-4d (máx 4d), Easy = 5-7d (máx 7d)
       if (rating === 2) {
-        minAllowedDays = 1;
+        minAllowedDays = 2;
         maxAllowedDays = 2;
       } else if (rating === 3) {
         minAllowedDays = 3;
-        maxAllowedDays = 6;
+        maxAllowedDays = 4;
       } else if (rating === 4) {
-        minAllowedDays = 6;
-        maxAllowedDays = 10;
+        minAllowedDays = 5;
+        maxAllowedDays = 7;
       }
     } else if (nextReps === 3) {
-      if (rating === 2) {
-        minAllowedDays = 2;
-        maxAllowedDays = 4;
-      } else if (rating === 3) {
-        minAllowedDays = 5;
-        maxAllowedDays = 12;
-      } else if (rating === 4) {
-        minAllowedDays = 10;
-        maxAllowedDays = 18;
-      }
-    } else if (nextReps === 4) {
+      // 3.ª vez: Hard = 3d, Good = 6-8d (máx 8d), Easy = 9-12d (máx 12d)
       if (rating === 2) {
         minAllowedDays = 3;
-        maxAllowedDays = 7;
+        maxAllowedDays = 3;
       } else if (rating === 3) {
-        minAllowedDays = 7;
-        maxAllowedDays = 21;
+        minAllowedDays = 6;
+        maxAllowedDays = 8;
       } else if (rating === 4) {
-        minAllowedDays = 14;
-        maxAllowedDays = 30;
+        minAllowedDays = 9;
+        maxAllowedDays = 12;
+      }
+    } else if (nextReps === 4) {
+      // 4.ª vez: Hard = 5d, Good = 10-14d (máx 14d), Easy = 15-18d (máx 18d)
+      if (rating === 2) {
+        minAllowedDays = 5;
+        maxAllowedDays = 5;
+      } else if (rating === 3) {
+        minAllowedDays = 10;
+        maxAllowedDays = 14;
+      } else if (rating === 4) {
+        minAllowedDays = 15;
+        maxAllowedDays = 18;
       }
     } else {
-      // nextReps >= 5: ningún salto individual multiplica por más de 2.5x la estabilidad/intervalo previo, con tope de 60 días
-      const prevBaseDays = Math.max(
-        4,
-        Math.round(fsrsCard.scheduled_days || fsrsCard.stability || 10)
-      );
-      const userMax =
-        customParams?.maximum_interval && customParams.maximum_interval > 0
-          ? customParams.maximum_interval
-          : 60;
-      const globalCap = Math.min(60, userMax);
-      const stepFactor = rating === 2 ? 1.3 : rating === 3 ? 2.0 : 2.5;
-      maxAllowedDays = Math.min(globalCap, Math.max(10, Math.round(prevBaseDays * stepFactor)));
-      minAllowedDays = rating === 2 ? 3 : rating === 3 ? 7 : 14;
+      // 5.ª vez o más (nextReps >= 5): Hard máx 7d, Good máx 18d, Easy tope absoluto de 21 días
+      if (rating === 2) {
+        minAllowedDays = 5;
+        maxAllowedDays = 7;
+      } else if (rating === 3) {
+        minAllowedDays = 12;
+        maxAllowedDays = 18;
+      } else {
+        minAllowedDays = 16;
+        maxAllowedDays = 21;
+      }
+    }
+
+    if (customParams?.maximum_interval && customParams.maximum_interval > 0) {
+      maxAllowedDays = Math.min(maxAllowedDays, customParams.maximum_interval);
+      minAllowedDays = Math.min(minAllowedDays, maxAllowedDays);
     }
 
     const MS_PER_DAY = 24 * 60 * 60 * 1000;
     const rawDiffDays = Math.round((result.card.due.getTime() - now.getTime()) / MS_PER_DAY);
     const currentDays = Math.max(result.card.scheduled_days || 0, rawDiffDays);
+    const targetDays = Math.min(maxAllowedDays, Math.max(minAllowedDays, currentDays));
 
-    if (currentDays > maxAllowedDays) {
-      const cappedDue = new Date(now.getTime() + maxAllowedDays * MS_PER_DAY);
-      result.card.scheduled_days = maxAllowedDays;
-      result.card.stability = Math.min(result.card.stability, maxAllowedDays);
-      result.card.due = cappedDue;
-      result.log.scheduled_days = maxAllowedDays;
-      result.log.stability = result.card.stability;
-      result.log.due = cappedDue;
-    } else if (currentDays < minAllowedDays) {
-      const flooredDue = new Date(now.getTime() + minAllowedDays * MS_PER_DAY);
-      result.card.scheduled_days = minAllowedDays;
-      result.card.stability = Math.max(result.card.stability, minAllowedDays);
-      result.card.due = flooredDue;
-      result.log.scheduled_days = minAllowedDays;
-      result.log.stability = result.card.stability;
-      result.log.due = flooredDue;
-    }
+    const adjustedDue = new Date(now.getTime() + targetDays * MS_PER_DAY);
+    const clampedStability = Math.min(
+      maxAllowedDays,
+      Math.max(minAllowedDays, result.card.stability || targetDays)
+    );
+
+    result.card.scheduled_days = targetDays;
+    result.card.stability = clampedStability;
+    result.card.due = adjustedDue;
+    result.log.scheduled_days = targetDays;
+    result.log.stability = clampedStability;
+    result.log.due = adjustedDue;
   }
 }
 
@@ -395,26 +459,32 @@ export function toFSRSCard(input?: FSRSCardInput, referenceNow: Date = new Date(
       : new Date(input.last_review)
     : undefined;
 
-  const stability = Number(input.stability) || 0;
+  const rawState = typeof input.state === 'number' ? input.state : State.New;
+  const rawStability = Number(input.stability) || 0;
+  const rawDifficulty = Number(input.difficulty) || 0;
+  const stability = rawState === State.New ? 0 : rawStability > 0 ? rawStability : 0;
+  const difficulty = stability > 0 ? rawDifficulty : 0;
+  const state = stability === 0 && rawState !== State.New ? State.New : rawState;
+
   let elapsed_days = 0;
-  if (last_review) {
+  if (last_review && stability > 0) {
     const diffMs = Math.max(0, now.getTime() - last_review.getTime());
     const rawElapsed = Math.floor(diffMs / (1000 * 60 * 60 * 24));
     // Limitar el elapsed_days efectivo para evitar que el overdue bonus exponencial de ts-fsrs
     // dispare la estabilidad cuando una tarjeta lleva semanas acumulada sin repasarse
-    const maxEffectiveElapsed = stability > 0 ? Math.max(2, Math.ceil(stability * 2)) : 2;
+    const maxEffectiveElapsed = Math.max(2, Math.ceil(stability * 2));
     elapsed_days = Math.min(rawElapsed, maxEffectiveElapsed);
   }
 
   return {
     due,
     stability,
-    difficulty: Number(input.difficulty) || 0,
+    difficulty,
     elapsed_days,
     scheduled_days: Math.max(0, Math.round(stability)),
     reps: Number(input.reps) || 0,
     lapses: Number(input.lapses) || 0,
-    state: typeof input.state === 'number' ? input.state : State.New,
+    state,
     last_review,
     learning_steps: 0,
   };

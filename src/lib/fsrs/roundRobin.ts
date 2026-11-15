@@ -22,7 +22,11 @@
  *    - Finalmente, repasos futuros si la sesión se solicita por adelantado.
  */
 
-import { isCardDueForStudy } from './scheduler';
+import {
+  isCardDueForStudy,
+  compareDueReviewsFreshFirst,
+  mixReviewsAndNewCards,
+} from './scheduler';
 
 export interface CardQueueItem {
   id?: string;
@@ -116,22 +120,25 @@ export function buildInterleavedCombinedQueue<T extends CardQueueItem>(
     }
   }
 
-  // 2. Ordenar internamente los repasos por urgencia de vencimiento (mayor retraso primero)
-  //    antes de agruparlos y repartirlos en Round-Robin por mazo de origen
-  dueReviewCards.sort((a, b) => new Date(a.due).getTime() - new Date(b.due).getTime());
+  // 2. Ordenar internamente los repasos dando prioridad a las tarjetas frescas del ciclo actual
+  //    (estudiadas ayer/hoy) antes de repartirlas en Round-Robin por mazo de origen
+  dueReviewCards.sort((a, b) => compareDueReviewsFreshFirst(a, b, now));
   futureReviewCards.sort((a, b) => new Date(a.due).getTime() - new Date(b.due).getTime());
   newCards.sort(
     (a, b) =>
       new Date(a.created_at || a.due).getTime() - new Date(b.created_at || b.due).getTime()
   );
 
-  // 3. Aplicar Round-Robin estricto dentro de los repasos vencidos entre mazos
-  //    y después dentro de las tarjetas nuevas entre mazos, garantizando que TODOS los repasos
-  //    vencidos salgan siempre antes que cualquier tarjeta nueva.
+  // 3. Aplicar Round-Robin entre mazos tanto para repasos vencidos como para tarjetas nuevas,
+  //    e intercalarlos en proporción saludable 3:1 (3 de Repaso por cada 1 Nueva).
   const interleavedDueReviews = interleaveCardsByDeck(dueReviewCards, deckOrder);
   const interleavedNewCards = interleaveCardsByDeck(newCards, deckOrder);
 
-  const interleavedActiveQueue = [...interleavedDueReviews, ...interleavedNewCards];
+  const interleavedActiveQueue = mixReviewsAndNewCards(
+    interleavedDueReviews,
+    interleavedNewCards,
+    3
+  );
 
   if (options.includeFuture && futureReviewCards.length > 0) {
     const interleavedFutureReviews = interleaveCardsByDeck(futureReviewCards, deckOrder);
