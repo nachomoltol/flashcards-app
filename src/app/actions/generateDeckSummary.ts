@@ -126,20 +126,20 @@ const deckSummarySchema = {
     },
     critical_data: {
       type: Type.ARRAY,
-      description: 'Cifras, dosis, fechas, plazos, porcentajes o umbrales indispensables para memorizar (de 4 a 8 datos)',
+      description: 'Cifras, dosis, fechas, plazos, porcentajes, umbrales legales/médicos/técnicos o fórmulas indispensables para memorizar (de 0 a 8 datos; puede ser array vacío [] si la materia es puramente conceptual)',
       items: {
         type: Type.OBJECT,
         properties: {
           label: { type: Type.STRING, description: 'Nombre de la variable o dato crítico' },
           value: { type: Type.STRING, description: 'Cifra exacta, valor numérico o umbral legal/médico/técnico' },
-          context: { type: Type.STRING, description: 'Contexto de aplicación o relevancia' },
+          context: { type: Type.STRING, description: 'Contexto de aplicación o relevancia para examen' },
         },
         required: ['label', 'value', 'context'],
       },
     },
     mnemonics: {
       type: Type.ARRAY,
-      description: 'Reglas mnemotécnicas, acrónimos o frases ingeniosas para fijar datos difíciles (de 2 a 4 mnemotecnias)',
+      description: 'Reglas mnemotécnicas, acrónimos o frases ingeniosas para fijar datos difíciles (de 0 a 4 mnemotecnias; puede ser array vacío [] si no aplica de forma natural)',
       items: {
         type: Type.OBJECT,
         properties: {
@@ -162,7 +162,8 @@ export async function getOrGenerateDeckSummaryAction(
   deckId: string,
   userIdOrLocale?: string,
   localeOrForce?: 'es' | 'en' | boolean,
-  forceRegenerate: boolean = false
+  forceRegenerate: boolean = false,
+  accessToken?: string
 ): Promise<GenerateDeckSummaryResult> {
   const cleanDeckId = deckId?.trim();
   if (!cleanDeckId) {
@@ -170,15 +171,16 @@ export async function getOrGenerateDeckSummaryAction(
     return { success: false, error: 'DECK_ID_REQUIRED' };
   }
 
-  // Resolver argumentos flexibles (permite signature con o sin userId)
+  // Resolver argumentos flexibles (permite signature con o sin userId y con accessToken)
   const isSecondArgLocale = userIdOrLocale === 'es' || userIdOrLocale === 'en';
   const resolvedUserId = isSecondArgLocale ? undefined : userIdOrLocale?.trim();
   const resolvedLocale: 'es' | 'en' = isSecondArgLocale
     ? (userIdOrLocale as 'es' | 'en')
     : (localeOrForce === 'es' || localeOrForce === 'en' ? localeOrForce : 'es');
   const resolvedForce = typeof localeOrForce === 'boolean' ? localeOrForce : forceRegenerate;
+  const resolvedToken = typeof accessToken === 'string' && accessToken.trim() ? accessToken.trim() : undefined;
 
-  console.log(`[generateDeckSummary] Solicitando guía para mazo: ${cleanDeckId} (userId: ${resolvedUserId || 'N/A'}, locale: ${resolvedLocale}, force: ${resolvedForce})`);
+  console.log(`[generateDeckSummary] Solicitando guía para mazo: ${cleanDeckId} (userId: ${resolvedUserId || 'N/A'}, locale: ${resolvedLocale}, force: ${resolvedForce}, hasToken: ${Boolean(resolvedToken)})`);
 
   try {
     const db = getServerSupabaseClient();
@@ -218,28 +220,68 @@ export async function getOrGenerateDeckSummaryAction(
       }
     }
 
-    // 2. Blindaje de Seguridad y Cuota IA: Verificar sesión activa y propiedad del mazo antes de llamar a Gemini
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser();
+    // 2. Blindaje de Seguridad y Autenticación Resiliente:
+    let authenticatedUserId: string | null = null;
 
-    if (!authUser?.id) {
-      console.warn(`[generateDeckSummary] Intento de generar guía sin sesión activa para mazo: ${cleanDeckId}`);
-      return { success: false, error: 'AUTH_REQUIRED' };
+    // Vía A: Token JWT de acceso (Capacitor Mobile WebView / SPA con session.access_token)
+    if (resolvedToken) {
+      try {
+        const {
+          data: { user: tokenUser },
+          error: tokenErr,
+        } = await supabase.auth.getUser(resolvedToken);
+
+        if (!tokenErr && tokenUser?.id) {
+          authenticatedUserId = tokenUser.id;
+        } else if (tokenErr) {
+          console.warn('[generateDeckSummary] Token de acceso no válido o expirado:', tokenErr.message);
+        }
+      } catch (tokenEx) {
+        console.warn('[generateDeckSummary] Error al validar accessToken:', tokenEx);
+      }
     }
 
-    if (deck.user_id !== authUser.id) {
-      console.warn(`[generateDeckSummary] Acceso denegado: el usuario ${authUser.id} no es propietario del mazo ${cleanDeckId}`);
+    // Vía B: Sesión por cookies en servidor
+    if (!authenticatedUserId) {
+      try {
+        const {
+          data: { user: cookieUser },
+        } = await supabase.auth.getUser();
+
+        if (cookieUser?.id) {
+          authenticatedUserId = cookieUser.id;
+        }
+      } catch (cookieEx) {
+        console.warn('[generateDeckSummary] Error al verificar sesión por cookies:', cookieEx);
+      }
+    }
+
+    // Vía C: Fallback para cliente verificado por resolvedUserId si coincide con el propietario del mazo
+    if (!authenticatedUserId && resolvedUserId && resolvedUserId === deck.user_id) {
+      authenticatedUserId = resolvedUserId;
+    }
+
+    // Validación de permisos de acceso al mazo:
+    // Se permite el acceso si el mazo es público o compartido, o si el usuario autenticado es el propietario
+    const isOwner = Boolean(authenticatedUserId && authenticatedUserId === deck.user_id);
+    const isPublicDeck = Boolean(deck.is_public);
+
+    if (!isOwner && !isPublicDeck) {
+      if (!authenticatedUserId) {
+        console.warn(`[generateDeckSummary] Intento de generar guía sin sesión activa para mazo: ${cleanDeckId}`);
+        return { success: false, error: 'AUTH_REQUIRED' };
+      }
+      console.warn(`[generateDeckSummary] Acceso denegado: el usuario ${authenticatedUserId} no es propietario del mazo ${cleanDeckId}`);
       return { success: false, error: 'UNAUTHORIZED' };
     }
 
-    // 3. Obtener las tarjetas del mazo para alimentar la síntesis de Gemini
+    // 3. Obtener las tarjetas del mazo para alimentar la síntesis de Gemini (ampliado a 250 tarjetas)
     const { data: cards, error: cardsErr } = await db
       .from('cards')
       .select('front, back, card_format, notes')
       .eq('deck_id', cleanDeckId)
       .order('created_at', { ascending: true })
-      .limit(100);
+      .limit(250);
 
     if (cardsErr) {
       console.error('[generateDeckSummary] Error al consultar tarjetas con deck_id:', cardsErr);
@@ -281,26 +323,26 @@ export async function getOrGenerateDeckSummaryAction(
     const isEnglish = resolvedLocale === 'en';
 
     const systemInstruction = isEnglish
-      ? `You are an elite academic synthesizer and cognitive architect for Flashmente.
-Your task is to analyze the flashcards of the deck "${deckTitle}" and create an ultra-structured, high-yield Quick Study Guide (Cheat Sheet).
-MANDATORY RULES:
+      ? `You are a distinguished Doctor of Educational Sciences and elite cognitive strategist specializing in competitive examinations and high-yield study frameworks for Flashmente.
+Your mission is to analyze the flashcards from the deck "${deckTitle}" and generate a masterful, ultra-structured Quick Study Guide (High-Yield Exam Cheat Sheet).
+MANDATORY ACADEMIC RULES:
 1. Respond EXCLUSIVELY in English.
-2. Structure the output into 4 core sections:
-   - key_concepts: 3 to 6 foundational principles or core theoretical mechanisms (clear explanation + key takeaway).
-   - contrast_tables: 1 to 3 comparative tables contrasting easily confused concepts, differential diagnoses, or conflicting criteria.
-   - critical_data: 4 to 8 indispensable numbers, thresholds, deadlines, formulas, or categorical facts to memorize.
-   - mnemonics: 2 to 4 memorable acronyms, association rules, or witty rhymes anchoring tough facts.
-3. Be academically rigorous, highly structured, direct, and pedagogical. Eliminate filler words.`
-      : `Eres un sintetizador académico de élite y arquitecto cognitivo para Flashmente.
-Tu misión es analizar las tarjetas de estudio del mazo "${deckTitle}" y generar una Guía de Repaso Rápido de Alto Rendimiento (Cheat Sheet estructurado).
-REGLAS OBLIGATORIAS:
+2. Structure the synthesis into 4 adaptive core blocks:
+   - Block 1 (Foundations / 80-20 Rule - key_concepts): 3 to 6 foundational concepts. Each concept MUST include a rigorous, schematic explanation and a precise "keyTakeaway" highlighting the exact exam trap or golden test rule.
+   - Block 2 (Confusion Matrix / Traps - contrast_tables): 1 to 3 comparative tables contrasting concepts, criteria, or classifications commonly confused in multiple-choice exams.
+   - Block 3 (Critical Metrics / Data - critical_data): Essential figures, statutory deadlines, percentages, thresholds, or formulas. If the deck is purely theoretical/conceptual with no quantitative data, return an empty array [].
+   - Block 4 (Ingenious Mnemonics - mnemonics): 1 to 4 practical, memorable acronyms, rhymes, or association rules anchoring hard-to-recall facts. If no suitable mnemonics exist, return an empty array [].
+3. Maintain highest pedagogical precision, eliminate all conversational filler, and maximize density of useful knowledge per square centimeter.`
+      : `Eres un distinguido Doctor en Ciencias de la Educación y estratega cognitivo de élite especializado en oposiciones y exámenes de alto rendimiento para Flashmente.
+Tu misión es analizar las tarjetas de estudio del mazo "${deckTitle}" y generar una Guía de Repaso Rápido de Alto Rendimiento magistral (Cheat Sheet de Estudio para Examen).
+REGLAS ACADÉMICAS OBLIGATORIAS:
 1. Responde OBLIGATORIAMENTE en Español.
-2. Estructura el contenido en 4 secciones clave:
-   - key_concepts: 3 a 6 ideas fuerza o principios troncales (explicación clara + conclusión/takeaway indispensable).
-   - contrast_tables: 1 a 3 tablas comparativas que enfrenten conceptos comúnmente confundidos, diagnósticos diferenciales o clasificaciones enfrentadas.
-   - critical_data: 4 a 8 cifras indispensables, dosis, umbrales legales/médicos, plazos, porcentajes o fórmulas a memorizar.
-   - mnemonics: 2 a 4 reglas mnemotécnicas, acrónimos o trucos de asociación ingeniosos para afianzar datos complejos.
-3. Sé académicamente riguroso, directo, pedagógico y sintético. Elimina texto de relleno.`;
+2. Estructura la síntesis en 4 bloques adaptativos:
+   - Bloque 1 (Fundamentos / Regla 80-20 - key_concepts): 3 a 6 conceptos troncales. Cada concepto DEBE incluir una explicación esquemática y rigurosa junto a un "keyTakeaway" (conclusión de oro / clave de examen para responder preguntas test).
+   - Bloque 2 (Matriz de Confusión / Trampas de Examen - contrast_tables): 1 a 3 tablas comparativas que enfrenten conceptos, criterios o clasificaciones que suelen provocar dudas o errores en preguntas tipo test.
+   - Bloque 3 (Datos Críticos / Cifras - critical_data): Cifras, plazos legales, porcentajes, dosis o umbrales indispensables para memorizar. Si la materia es puramente teórica/conceptual sin datos numéricos, devuelve un array vacío [].
+   - Bloque 4 (Mnemotecnias Ingeniosas - mnemonics): 1 a 4 reglas mnemotécnicas, acrónimos o trucos de asociación naturales y prácticos para fijar datos difíciles. Si el tema no se presta a mnemotecnias naturales, devuelve un array vacío [].
+3. Mantén máxima rigurosidad académica, elimina todo texto de relleno conversacional y maximiza la densidad de conocimiento útil por centímetro cuadrado.`;
 
     const userPrompt = isEnglish
       ? `DECK TITLE: ${deckTitle}

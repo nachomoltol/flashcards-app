@@ -6,13 +6,11 @@ import {
   FileText,
   Printer,
   Sparkles,
-  Lock,
   Crown,
   PlayCircle,
   RefreshCw,
   Loader2,
   AlertCircle,
-  CheckCircle2,
   Table,
   Hash,
   Lightbulb,
@@ -41,7 +39,7 @@ export function QuickStudyGuideModal({
   deckTitle,
 }: QuickStudyGuideModalProps) {
   const { t, language } = useLanguageStore();
-  const { user } = useAuthStore();
+  const { user, session } = useAuthStore();
   const { openProModal } = useProModalStore();
   const platform = usePlatform();
 
@@ -92,13 +90,18 @@ export function QuickStudyGuideModal({
           deckId,
           user?.id,
           language === 'en' ? 'en' : 'es',
-          force
+          force,
+          session?.access_token
         );
 
         if (res.success && res.summary) {
           setGuide(res.summary);
         } else {
-          setErrorMsg(res.error || t('quick_guide.error_generic', 'No se pudo generar la guía.'));
+          const formattedError =
+            res.error === 'AUTH_REQUIRED'
+              ? t('quick_guide.error_auth_required', 'Inicia sesión para generar la guía de repaso.')
+              : res.error || t('quick_guide.error_generic', 'No se pudo generar la guía.');
+          setErrorMsg(formattedError);
         }
       } catch (err) {
         console.error('Error al obtener guía de repaso rápido:', err);
@@ -108,7 +111,7 @@ export function QuickStudyGuideModal({
         setIsRegenerating(false);
       }
     },
-    [deckId, user?.id, language, t]
+    [deckId, user?.id, session?.access_token, language, t]
   );
 
   useEffect(() => {
