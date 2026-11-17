@@ -12,7 +12,7 @@ import {
   Loader2,
   AlertCircle,
   Table,
-  Hash,
+  Target,
   Lightbulb,
   BookOpen,
   ListTree,
@@ -248,7 +248,7 @@ export function QuickStudyGuideModal({
           <style>
             @page {
               size: A4;
-              margin: 10mm 12mm;
+              margin: 0;
             }
             body {
               background-color: #ffffff !important;
@@ -258,6 +258,9 @@ export function QuickStudyGuideModal({
               print-color-adjust: exact;
               font-size: 11px !important;
               line-height: 1.35 !important;
+              margin: 0 !important;
+              padding: 14mm 12mm 16mm 12mm !important;
+              box-sizing: border-box !important;
             }
             .break-inside-avoid {
               break-inside: avoid !important;
@@ -294,6 +297,37 @@ export function QuickStudyGuideModal({
               padding: 4px 6px !important;
               font-size: 10px !important;
               line-height: 1.3 !important;
+            }
+            .print-footer {
+              position: fixed !important;
+              bottom: 5mm !important;
+              left: 12mm !important;
+              right: 12mm !important;
+              display: flex !important;
+              justify-content: space-between !important;
+              align-items: center !important;
+              border-top: 1px solid #e5e7eb !important;
+              padding-top: 3px !important;
+              font-size: 9px !important;
+              font-family: ui-sans-serif, system-ui, sans-serif !important;
+              color: #6b7280 !important;
+              z-index: 9999 !important;
+            }
+            .print-watermark {
+              position: fixed !important;
+              top: 45% !important;
+              left: 50% !important;
+              transform: translate(-50%, -50%) rotate(-30deg) !important;
+              font-size: 55pt !important;
+              font-weight: 900 !important;
+              font-family: ui-sans-serif, system-ui, sans-serif !important;
+              color: #000000 !important;
+              opacity: 0.035 !important;
+              pointer-events: none !important;
+              z-index: 0 !important;
+              letter-spacing: 0.15em !important;
+              user-select: none !important;
+              text-align: center !important;
             }
             .bg-neutral-950,
             .bg-neutral-950\\/60,
@@ -339,14 +373,12 @@ export function QuickStudyGuideModal({
             }
           </style>
         </head>
-        <body class="p-2 sm:p-4 bg-white text-neutral-900">
-          <header class="border-b border-neutral-300 pb-2 mb-3 flex items-center justify-between">
-            <div>
-              <h1 class="text-base font-bold text-neutral-900">${guide?.title || deckTitle}</h1>
-              ${guide?.subtitle ? `<p class="text-xs text-neutral-600 mt-0.5">${guide.subtitle}</p>` : ''}
-            </div>
-            <span class="text-[10px] text-neutral-500 font-mono">Flashmente</span>
-          </header>
+        <body class="bg-white text-neutral-900">
+          <div class="print-watermark">FLASHMENTE</div>
+          <div class="print-footer">
+            <span>Flashmente · Resumen de Estudio</span>
+            <span>flashmente.com</span>
+          </div>
           <main>
             ${printContent.innerHTML}
           </main>
@@ -374,7 +406,7 @@ export function QuickStudyGuideModal({
         @media print {
           @page {
             size: A4;
-            margin: 10mm 12mm;
+            margin: 0;
           }
 
           html, body {
@@ -382,6 +414,8 @@ export function QuickStudyGuideModal({
             overflow: visible !important;
             background: #ffffff !important;
             color: #000000 !important;
+            margin: 0 !important;
+            padding: 0 !important;
           }
 
           body * {
@@ -400,11 +434,12 @@ export function QuickStudyGuideModal({
             max-height: none !important;
             overflow: visible !important;
             margin: 0 !important;
-            padding: 0 !important;
+            padding: 14mm 12mm 16mm 12mm !important;
             background: #ffffff !important;
             color: #111827 !important;
             font-size: 11px !important;
             line-height: 1.35 !important;
+            box-sizing: border-box !important;
           }
 
           .no-print,
@@ -473,6 +508,45 @@ export function QuickStudyGuideModal({
             line-height: 1.3 !important;
           }
 
+          .print-footer {
+            position: fixed !important;
+            bottom: 5mm !important;
+            left: 12mm !important;
+            right: 12mm !important;
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            border-top: 1px solid #e5e7eb !important;
+            padding-top: 3px !important;
+            font-size: 9px !important;
+            font-family: ui-sans-serif, system-ui, sans-serif !important;
+            color: #6b7280 !important;
+            z-index: 9999 !important;
+            visibility: visible !important;
+          }
+
+          .print-footer * {
+            visibility: visible !important;
+          }
+
+          .print-watermark {
+            position: fixed !important;
+            top: 45% !important;
+            left: 50% !important;
+            transform: translate(-50%, -50%) rotate(-30deg) !important;
+            font-size: 55pt !important;
+            font-weight: 900 !important;
+            font-family: ui-sans-serif, system-ui, sans-serif !important;
+            color: #000000 !important;
+            opacity: 0.035 !important;
+            pointer-events: none !important;
+            z-index: 0 !important;
+            letter-spacing: 0.15em !important;
+            user-select: none !important;
+            text-align: center !important;
+            visibility: visible !important;
+          }
+
           .bg-neutral-900,
           .bg-neutral-900\\/50,
           .bg-neutral-900\\/60,
@@ -527,7 +601,7 @@ export function QuickStudyGuideModal({
           aria-modal="true"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Cabecera del Modal */}
+          {/* Cabecera del Modal (Solo visual en pantalla, no imprime) */}
           <div className="flex items-center justify-between p-4 sm:p-5 border-b border-neutral-800 bg-neutral-900/90 gap-3 no-print">
             <div className="flex items-center gap-3 min-w-0">
               <div className="p-2.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 shrink-0">
@@ -597,9 +671,16 @@ export function QuickStudyGuideModal({
           {/* Cuerpo del Modal (Contenedor Imprimible y Desplazable) */}
           <div
             id="quick-study-guide-printable"
-            className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 print:space-y-3 text-left"
+            className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 print:space-y-3 text-left relative"
           >
-            {/* Cabecera compacta visible únicamente al imprimir (@media print) */}
+            {/* Marca de agua sutil y Pie de página fijos para impresión (@media print) */}
+            <div className="print-watermark hidden print:block">FLASHMENTE</div>
+            <div className="print-footer hidden print:flex">
+              <span>Flashmente · Resumen de Estudio</span>
+              <span>flashmente.com</span>
+            </div>
+
+            {/* Cabecera compacta visible únicamente al imprimir en Página 1 */}
             {guide && (
               <div className="hidden print:block border-b border-neutral-300 pb-2 mb-3">
                 <div className="flex items-center justify-between">
@@ -745,7 +826,7 @@ export function QuickStudyGuideModal({
                           {isWatchingAd ? (
                             <>
                               <Loader2 className="w-4 h-4 animate-spin text-amber-400 shrink-0" />
-                              <span>{t('quick_guide.preparing_ad', 'Preparando anuncio...')}</span>
+                              <span>{t('quick_guide.preparing_ad', 'Preparing ad...')}</span>
                             </>
                           ) : (
                             <>
@@ -1017,11 +1098,11 @@ export function QuickStudyGuideModal({
                     </section>
                   )}
 
-                  {/* 5. SECCIÓN: CIFRAS CRÍTICAS Y DOSIS OFICIALES (Sin truncamiento, rejilla compacta de 2-3 col) */}
+                  {/* 5. SECCIÓN: CIFRAS CRÍTICAS Y DOSIS OFICIALES (Sin almohadilla literal, sin truncamiento) */}
                   {guide.critical_data && guide.critical_data.length > 0 && (
                     <section className="space-y-2">
                       <div className="flex items-center gap-2 border-b border-neutral-800 pb-1.5 print:border-neutral-300">
-                        <Hash className="w-4 h-4 text-emerald-400 shrink-0 print:text-neutral-800" />
+                        <Target className="w-4 h-4 text-emerald-400 shrink-0 print:text-neutral-800" />
                         <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-emerald-400 print:text-neutral-900 print:text-xs">
                           {t('quick_guide.section_critical_data', '🎯 Cifras Críticas y Dosis Oficiales')}
                         </h4>
