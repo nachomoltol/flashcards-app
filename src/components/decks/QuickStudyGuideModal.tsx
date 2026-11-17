@@ -238,6 +238,13 @@ export function QuickStudyGuideModal({
       return;
     }
 
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const logoUrl = `${origin}/icons/icon-192x192.png`;
+
+    const clone = printContent.cloneNode(true) as HTMLElement;
+    clone.querySelectorAll('.direct-print-footer').forEach(el => el.remove());
+    const cleanInnerHtml = clone.innerHTML;
+
     const html = `
       <!DOCTYPE html>
       <html lang="${language === 'en' ? 'en' : 'es'}">
@@ -248,12 +255,21 @@ export function QuickStudyGuideModal({
           <style>
             @page {
               size: A4;
-              margin: 15mm 15mm 20mm 15mm;
+              margin: 12mm 12mm 16mm 12mm;
+              @top-left { content: none; }
+              @top-center { content: none; }
+              @top-right { content: none; }
+              @bottom-left { content: none; }
+              @bottom-center { content: none; }
+              @bottom-right {
+                content: "Pág. " counter(page) " de " counter(pages);
+                font-size: 8.5pt;
+                font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                color: #6b7280;
+                font-weight: 500;
+              }
             }
             html, body {
-              counter-reset: page;
-            }
-            body {
               background-color: #ffffff !important;
               color: #111827 !important;
               font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -301,25 +317,28 @@ export function QuickStudyGuideModal({
               font-size: 10px !important;
               line-height: 1.3 !important;
             }
-            .print-footer {
-              position: fixed !important;
-              bottom: 5mm !important;
-              left: 0 !important;
-              right: 0 !important;
-              display: flex !important;
-              justify-content: space-between !important;
-              align-items: center !important;
-              padding: 0 15mm !important;
-              box-sizing: border-box !important;
-              font-size: 9px !important;
-              font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
-              color: #6b7280 !important;
-              border-top: 0.5px solid #e5e7eb !important;
-              padding-top: 4px !important;
-              z-index: 9999 !important;
+            .print-layout-table {
+              width: 100% !important;
+              border-collapse: collapse !important;
             }
-            .print-page-number::after {
-              content: "Pág. " counter(page);
+            .print-layout-table td {
+              padding: 0 !important;
+              border: none !important;
+            }
+            .print-page-footer {
+              display: table-footer-group !important;
+            }
+            .print-footer-container {
+              height: 10mm !important;
+              background-color: #ffffff !important;
+              display: flex !important;
+              align-items: center !important;
+              justify-content: flex-start !important;
+              border-top: 0.5px solid #e5e7eb !important;
+              padding: 0 1mm !important;
+              font-size: 8.5pt !important;
+              color: #6b7280 !important;
+              font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
             }
             .bg-neutral-950,
             .bg-neutral-950\\/60,
@@ -366,9 +385,61 @@ export function QuickStudyGuideModal({
           </style>
         </head>
         <body class="bg-white text-neutral-900">
-          <main>
-            ${printContent.innerHTML}
-          </main>
+          <table class="print-layout-table">
+            <tbody>
+              <tr>
+                <td>
+                  <main>
+                    ${cleanInnerHtml}
+                  </main>
+                </td>
+              </tr>
+            </tbody>
+            <tfoot class="print-page-footer">
+              <tr>
+                <td>
+                  <div class="print-footer-container">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <img
+                        id="print-app-logo"
+                        src="${logoUrl}"
+                        alt="Flashmente"
+                        style="width: 14px; height: 14px; border-radius: 3px; object-fit: contain; display: inline-block; vertical-align: middle;"
+                      />
+                      <span style="font-weight: 600; color: #4b5563; font-size: 8.5pt; line-height: 1;">flashmente.com</span>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+          <script>
+            function triggerPrint() {
+              setTimeout(function() {
+                window.focus();
+                window.print();
+                window.close();
+              }, 200);
+            }
+            function checkLogo() {
+              var logo = document.getElementById('print-app-logo');
+              if (logo) {
+                if (logo.complete && logo.naturalHeight !== 0) {
+                  setTimeout(triggerPrint, 150);
+                } else {
+                  logo.onload = function() { setTimeout(triggerPrint, 150); };
+                  logo.onerror = function() { setTimeout(triggerPrint, 150); };
+                }
+              } else {
+                setTimeout(triggerPrint, 150);
+              }
+            }
+            if (document.readyState === 'complete') {
+              checkLogo();
+            } else {
+              window.addEventListener('load', checkLogo);
+            }
+          </script>
         </body>
       </html>
     `;
@@ -377,11 +448,19 @@ export function QuickStudyGuideModal({
     printWindow.document.write(html);
     printWindow.document.close();
 
-    printWindow.focus();
-    setTimeout(() => {
-      printWindow.print();
-      printWindow.close();
-    }, 350);
+    // Fallback de seguridad si el script interno de la ventana emergente tarda en disparar
+    const fallbackTimer = setTimeout(() => {
+      try {
+        if (!printWindow.closed) {
+          printWindow.focus();
+          printWindow.print();
+          printWindow.close();
+        }
+      } catch {
+        // Ignorar si ya se cerró
+      }
+    }, 2500);
+    printWindow.onbeforeunload = () => clearTimeout(fallbackTimer);
   };
 
   if (!isOpen) return null;
@@ -393,7 +472,19 @@ export function QuickStudyGuideModal({
         @media print {
           @page {
             size: A4;
-            margin: 15mm 15mm 20mm 15mm;
+            margin: 12mm 12mm 16mm 12mm;
+            @top-left { content: none; }
+            @top-center { content: none; }
+            @top-right { content: none; }
+            @bottom-left { content: none; }
+            @bottom-center { content: none; }
+            @bottom-right {
+              content: "Pág. " counter(page) " de " counter(pages);
+              font-size: 8.5pt;
+              font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+              color: #6b7280;
+              font-weight: 500;
+            }
           }
 
           html, body {
@@ -403,7 +494,6 @@ export function QuickStudyGuideModal({
             color: #000000 !important;
             margin: 0 !important;
             padding: 0 !important;
-            counter-reset: page;
           }
 
           body * {
@@ -496,32 +586,6 @@ export function QuickStudyGuideModal({
             line-height: 1.3 !important;
           }
 
-          .print-footer {
-            position: fixed !important;
-            bottom: 5mm !important;
-            left: 0 !important;
-            right: 0 !important;
-            display: flex !important;
-            justify-content: space-between !important;
-            align-items: center !important;
-            padding: 0 15mm !important;
-            box-sizing: border-box !important;
-            font-size: 9px !important;
-            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
-            color: #6b7280 !important;
-            border-top: 0.5px solid #e5e7eb !important;
-            padding-top: 4px !important;
-            z-index: 9999 !important;
-            visibility: visible !important;
-          }
-
-          .print-footer * {
-            visibility: visible !important;
-          }
-
-          .print-page-number::after {
-            content: "Pág. " counter(page);
-          }
 
           .bg-neutral-900,
           .bg-neutral-900\\/50,
@@ -649,11 +713,6 @@ export function QuickStudyGuideModal({
             id="quick-study-guide-printable"
             className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 print:space-y-3 text-left relative"
           >
-            {/* Pie de página profesional fijo para impresión (@media print) */}
-            <div className="print-footer hidden print:flex">
-              <span className="font-medium">Flashmente · flashmente.com</span>
-              <span className="print-page-number"></span>
-            </div>
 
             {/* Cabecera compacta visible únicamente al imprimir en Página 1 */}
             {guide && (
@@ -1137,6 +1196,16 @@ export function QuickStudyGuideModal({
                       </div>
                     </section>
                   )}
+
+                  {/* Pie de página para impresión directa (@media print fallback) */}
+                  <div className="direct-print-footer hidden print:flex items-center justify-start gap-1.5 pt-2 mt-4 border-t border-neutral-300 text-[8.5pt] text-neutral-500 font-sans">
+                    <img
+                      src="/icons/icon-192x192.png"
+                      alt="Flashmente"
+                      className="w-3.5 h-3.5 rounded-[3px] object-contain inline-block"
+                    />
+                    <span className="font-semibold text-neutral-600">flashmente.com</span>
+                  </div>
                 </div>
               </div>
             )}
