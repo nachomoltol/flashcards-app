@@ -239,7 +239,7 @@ export function QuickStudyGuideModal({
     }
 
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    const logoUrl = `${origin}/icons/icon-192x192.png`;
+    const logoUrl = `${origin}/icons/android-chrome-192x192.png`;
 
     const clone = printContent.cloneNode(true) as HTMLElement;
     clone.querySelectorAll('.direct-print-footer').forEach(el => el.remove());
@@ -250,23 +250,23 @@ export function QuickStudyGuideModal({
       <html lang="${language === 'en' ? 'en' : 'es'}">
         <head>
           <meta charset="utf-8" />
-          <title>Flashmente - Guía de Repaso: ${deckTitle}</title>
+          <title>&nbsp;</title>
           <script src="https://cdn.tailwindcss.com"></script>
           <style>
             @page {
               size: A4;
-              margin: 12mm 12mm 16mm 12mm;
-              @top-left { content: none; }
-              @top-center { content: none; }
-              @top-right { content: none; }
-              @bottom-left { content: none; }
-              @bottom-center { content: none; }
+              margin: 10mm 10mm 15mm 10mm;
+              @top-left { content: "" !important; }
+              @top-center { content: "" !important; }
+              @top-right { content: "" !important; }
+              @bottom-left { content: "" !important; }
+              @bottom-center { content: "" !important; }
               @bottom-right {
-                content: "Pág. " counter(page) " de " counter(pages);
-                font-size: 8.5pt;
-                font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-                color: #6b7280;
-                font-weight: 500;
+                content: "Pág. " counter(page) " de " counter(pages) !important;
+                font-size: 8.5pt !important;
+                font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+                color: #6b7280 !important;
+                font-weight: 500 !important;
               }
             }
             html, body {
@@ -329,16 +329,17 @@ export function QuickStudyGuideModal({
               display: table-footer-group !important;
             }
             .print-footer-container {
-              height: 10mm !important;
+              height: 12mm !important;
               background-color: #ffffff !important;
               display: flex !important;
               align-items: center !important;
-              justify-content: flex-start !important;
+              justify-content: space-between !important;
               border-top: 0.5px solid #e5e7eb !important;
               padding: 0 1mm !important;
-              font-size: 8.5pt !important;
-              color: #6b7280 !important;
+              font-size: 9pt !important;
+              color: #4b5563 !important;
               font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+              box-sizing: border-box !important;
             }
             .bg-neutral-950,
             .bg-neutral-950\\/60,
@@ -399,14 +400,14 @@ export function QuickStudyGuideModal({
               <tr>
                 <td>
                   <div class="print-footer-container">
-                    <div style="display: flex; align-items: center; gap: 6px;">
+                    <div style="display: flex; align-items: center;">
                       <img
                         id="print-app-logo"
                         src="${logoUrl}"
                         alt="Flashmente"
-                        style="width: 14px; height: 14px; border-radius: 3px; object-fit: contain; display: inline-block; vertical-align: middle;"
+                        style="width: 16px; height: 16px; border-radius: 4px; vertical-align: middle; margin-right: 6px; object-fit: contain; display: inline-block;"
                       />
-                      <span style="font-weight: 600; color: #4b5563; font-size: 8.5pt; line-height: 1;">flashmente.com</span>
+                      <span style="font-size: 9pt; color: #4b5563; font-weight: 500;">flashmente.com</span>
                     </div>
                   </div>
                 </td>
@@ -447,6 +448,11 @@ export function QuickStudyGuideModal({
     printWindow.document.open();
     printWindow.document.write(html);
     printWindow.document.close();
+    try {
+      printWindow.document.title = '\u00A0';
+    } catch {
+      // Ignorar si el navegador restringe el acceso al título
+    }
 
     // Fallback de seguridad si el script interno de la ventana emergente tarda en disparar
     const fallbackTimer = setTimeout(() => {
@@ -472,18 +478,18 @@ export function QuickStudyGuideModal({
         @media print {
           @page {
             size: A4;
-            margin: 12mm 12mm 16mm 12mm;
-            @top-left { content: none; }
-            @top-center { content: none; }
-            @top-right { content: none; }
-            @bottom-left { content: none; }
-            @bottom-center { content: none; }
+            margin: 10mm 10mm 15mm 10mm;
+            @top-left { content: "" !important; }
+            @top-center { content: "" !important; }
+            @top-right { content: "" !important; }
+            @bottom-left { content: "" !important; }
+            @bottom-center { content: "" !important; }
             @bottom-right {
-              content: "Pág. " counter(page) " de " counter(pages);
-              font-size: 8.5pt;
-              font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-              color: #6b7280;
-              font-weight: 500;
+              content: "Pág. " counter(page) " de " counter(pages) !important;
+              font-size: 8.5pt !important;
+              font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+              color: #6b7280 !important;
+              font-weight: 500 !important;
             }
           }
 
@@ -1198,13 +1204,13 @@ export function QuickStudyGuideModal({
                   )}
 
                   {/* Pie de página para impresión directa (@media print fallback) */}
-                  <div className="direct-print-footer hidden print:flex items-center justify-start gap-1.5 pt-2 mt-4 border-t border-neutral-300 text-[8.5pt] text-neutral-500 font-sans">
+                  <div className="direct-print-footer hidden print:flex items-center justify-start gap-1.5 pt-2 mt-4 border-t border-neutral-300 text-[9pt] text-[#4b5563] font-sans">
                     <img
-                      src="/icons/icon-192x192.png"
+                      src="/icons/android-chrome-192x192.png"
                       alt="Flashmente"
-                      className="w-3.5 h-3.5 rounded-[3px] object-contain inline-block"
+                      className="w-4 h-4 rounded-[4px] object-contain inline-block mr-1.5"
                     />
-                    <span className="font-semibold text-neutral-600">flashmente.com</span>
+                    <span className="font-medium text-[#4b5563]">flashmente.com</span>
                   </div>
                 </div>
               </div>
