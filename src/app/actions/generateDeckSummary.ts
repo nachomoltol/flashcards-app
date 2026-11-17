@@ -122,29 +122,29 @@ function resolveGeminiApiKey(): string | null {
 const exhaustiveDeckSummarySchema = {
   type: Type.OBJECT,
   description:
-    'Documento estructurado de Resumen Completo y Exhaustivo de Capítulo para estudio universitario y oposiciones (Full Chapter Blueprint)',
+    'Documento estructurado de Resumen Proporcional de Capítulo para estudio (Full Chapter Blueprint adaptable a nivel escolar, bachillerato, universidad u oposiciones)',
   properties: {
     title: {
       type: Type.STRING,
-      description: 'Título académico principal y riguroso del capítulo',
+      description: 'Título académico principal del capítulo',
     },
     subtitle: {
       type: Type.STRING,
-      description: 'Subtítulo descriptivo del capítulo y alcance temático',
+      description: 'Subtítulo descriptivo y alcance temático',
     },
     overview: {
       type: Type.OBJECT,
-      description: 'Bloque 1: Síntesis panorámica del capítulo y objetivos de aprendizaje',
+      description: 'Bloque 1: Visión panorámica ejecutiva y objetivos docentes',
       properties: {
         summary: {
           type: Type.STRING,
           description:
-            'Síntesis narrativa global del capítulo (2 a 3 párrafos densos, rigurosos y sin relleno que expliquen la arquitectura general del tema).',
+            'Síntesis ejecutiva de exactamente 1 párrafo conciso (3 a 5 líneas) con la idea fuerza y arquitectura general del tema.',
         },
         learningObjectives: {
           type: Type.ARRAY,
           description:
-            'Lista completa de objetivos docentes y competencias nucleares que el estudiante debe dominar.',
+            'Lista de 3 a 6 objetivos docentes y competencias nucleares esenciales.',
           items: { type: Type.STRING },
         },
       },
@@ -153,22 +153,22 @@ const exhaustiveDeckSummarySchema = {
     taxonomy_tree: {
       type: Type.ARRAY,
       description:
-        'Bloque 2: Esquema jerárquico y clasificaciones completas. Debe enumerar el 100% de los elementos de cada categoría sin omitir ninguno.',
+        'Bloque 2: Esquema jerárquico o clasificación completa de las categorías o ramas del tema.',
       items: {
         type: Type.OBJECT,
         properties: {
           category: {
             type: Type.STRING,
-            description: 'Nombre de la rama, categoría o grupo (ej. Macrominerales, Oligoelementos, Nutrientes Orgánicos)',
+            description: 'Nombre de la rama, categoría o grupo taxonómico',
           },
           elements: {
             type: Type.ARRAY,
-            description: 'Lista exhaustiva de TODOS y cada uno de los elementos pertenecientes a esta categoría.',
+            description: 'Lista de elementos pertenecientes a esta categoría.',
             items: { type: Type.STRING },
           },
           description: {
             type: Type.STRING,
-            description: 'Criterio taxonómico o principio fisiológico/técnico que define a esta categoría.',
+            description: 'Criterio taxonómico o principio que define a esta categoría en 1 frase.',
           },
         },
         required: ['category', 'elements', 'description'],
@@ -177,34 +177,34 @@ const exhaustiveDeckSummarySchema = {
     item_breakdown: {
       type: Type.ARRAY,
       description:
-        'Bloque 3: Ficha individual detallada de CADA elemento, concepto o epígrafe tratado en el mazo o documento sin límite de cantidad.',
+        'Bloque 3: Ficha individual telegráfica y concisa de cada elemento, regla o concepto clave (1 frase directa por campo). Si un campo no aplica o no figura en el material, déjalo vacío ("" o []); PROHIBIDO escribir textos de relleno como "No especificado", "N/A" o "No aplica".',
       items: {
         type: Type.OBJECT,
         properties: {
           name: {
             type: Type.STRING,
-            description: 'Nombre del elemento, mineral, vitamina, principio o concepto',
+            description: 'Nombre del elemento, concepto, regla o principio',
           },
           role: {
             type: Type.STRING,
-            description: 'Función fisiológica principal, mecanismo de acción o definición técnica exacta',
+            description: 'Función principal, definición técnica o regla en 1 frase directa',
           },
           dietarySources: {
             type: Type.ARRAY,
-            description: 'Fuentes dietéticas primarias, ejemplos prácticos o aplicaciones reales',
+            description: 'Ejemplos prácticos, fuentes primarias o supuestos de aplicación (array vacío [] si no aplica)',
             items: { type: Type.STRING },
           },
           deficiency: {
             type: Type.STRING,
-            description: 'Patología, signo clínico o consecuencia derivada de su déficit o carencia',
+            description: 'Efecto del déficit, consecuencias de error o fallo típico (cadena vacía "" si no aplica)',
           },
           toxicity: {
             type: Type.STRING,
-            description: 'Efectos de sobredosis, toxicidad, contraindicaciones o excepciones',
+            description: 'Excepciones, casos irregulares, contraindicaciones o riesgos (cadena vacía "" si no aplica)',
           },
           keyFact: {
             type: Type.STRING,
-            description: 'Dato de oro o trampa recurrente de examen imprescindible para no fallar preguntas test',
+            description: 'Dato de oro o trampa de examen indispensable en 1 frase directa',
           },
         },
         required: ['name', 'role', 'keyFact'],
@@ -212,21 +212,21 @@ const exhaustiveDeckSummarySchema = {
     },
     contrast_tables: {
       type: Type.ARRAY,
-      description: 'Bloque 4: Tablas comparativas cara a cara para desarmar confusiones y trampas de examen',
+      description: 'Bloque 4: De 1 a 4 tablas comparativas cara a cara para desarmar confusiones y trampas de examen (1 tabla en temas cortos; hasta 4 en capítulos largos).',
       items: {
         type: Type.OBJECT,
         properties: {
           title: {
             type: Type.STRING,
-            description: 'Título de la tabla comparativa (ej. "Macrominerales vs Oligoelementos" o "Diagnóstico Diferencial")',
+            description: 'Título de la tabla comparativa (ej. "Present Simple vs Continuous" o "Macrominerales vs Oligoelementos")',
           },
           description: {
             type: Type.STRING,
-            description: 'Contexto del contraste y motivo pedagógico de la comparación',
+            description: 'Contexto del contraste en 1 frase',
           },
           headers: {
             type: Type.ARRAY,
-            description: 'Encabezados de columnas (ej. ["Criterio", "Concepto A", "Concepto B"])',
+            description: 'Encabezados de columnas',
             items: { type: Type.STRING },
           },
           rows: {
@@ -244,13 +244,13 @@ const exhaustiveDeckSummarySchema = {
     critical_data: {
       type: Type.ARRAY,
       description:
-        'Bloque 5: Cifras críticas, rangos, plazos y dosis oficiales con verificación estricta de unidades (mg vs µg vs g).',
+        'Bloque 5: De 0 a 10 cifras críticas, fechas, plazos, dosis o fórmulas oficiales con verificación estricta de unidades (devolver array vacío [] si el tema no tiene datos cuantitativos ni fechas).',
       items: {
         type: Type.OBJECT,
         properties: {
-          label: { type: Type.STRING, description: 'Nombre del parámetro, umbral o variable' },
-          value: { type: Type.STRING, description: 'Cifra y unidad rigurosamente verificada (ej. 100 mg/día, 900 µg/día, 1300 mg)' },
-          context: { type: Type.STRING, description: 'Contexto de aplicación, población diana o relevancia para examen' },
+          label: { type: Type.STRING, description: 'Nombre del parámetro, variable o fecha clave' },
+          value: { type: Type.STRING, description: 'Cifra, plazo o unidad verificada (ej. 100 mg/día, 900 µg/día, 15 días)' },
+          context: { type: Type.STRING, description: 'Contexto o relevancia para el examen en 1 frase concisa' },
         },
         required: ['label', 'value', 'context'],
       },
@@ -258,13 +258,13 @@ const exhaustiveDeckSummarySchema = {
     mnemonics: {
       type: Type.ARRAY,
       description:
-        'Bloque 6: Reglas mnemotécnicas, acrónimos o frases nemotécnicas para memorización acelerada (puede ser array vacío [] si no aplica).',
+        'Bloque 6: De 0 a 4 reglas mnemotécnicas naturales y útiles para memorización acelerada (devolver array vacío [] si no aportan valor real).',
       items: {
         type: Type.OBJECT,
         properties: {
-          concept: { type: Type.STRING, description: 'Concepto complejo o lista a recordar' },
+          concept: { type: Type.STRING, description: 'Concepto o lista a recordar' },
           rule: { type: Type.STRING, description: 'Acrónimo, frase o truco mnemotécnico' },
-          explanation: { type: Type.STRING, description: 'Desglose detallado de cada letra o elemento de la regla' },
+          explanation: { type: Type.STRING, description: 'Desglose breve del truco' },
         },
         required: ['concept', 'rule', 'explanation'],
       },
@@ -302,6 +302,16 @@ interface RawGuidePayload {
   key_concepts?: KeyConceptItem[];
 }
 
+function cleanFillerString(val?: string): string | undefined {
+  if (!val) return undefined;
+  const trimmed = val.trim();
+  if (!trimmed) return undefined;
+  if (/^(no\s*especificad[oa]|no\s*aplica|n\/?a|ningun[oa]|none|not\s*specified|-)$/i.test(trimmed)) {
+    return undefined;
+  }
+  return trimmed;
+}
+
 function normalizeToExhaustiveGuide(
   raw: unknown,
   deckTitle: string,
@@ -334,6 +344,21 @@ function normalizeToExhaustiveGuide(
     };
   }
 
+  const cleanedBreakdown = Array.isArray(parsed.item_breakdown)
+    ? parsed.item_breakdown.map((item: ItemBreakdownEntry) => ({
+        name: item.name || '',
+        role: item.role || '',
+        dietarySources: Array.isArray(item.dietarySources)
+          ? item.dietarySources
+              .map(s => s?.trim())
+              .filter((s): s is string => Boolean(s && !/^(no\s*especificad[oa]|no\s*aplica|n\/?a|ningun[oa]|none|not\s*specified|-)$/i.test(s)))
+          : [],
+        deficiency: cleanFillerString(item.deficiency),
+        toxicity: cleanFillerString(item.toxicity),
+        keyFact: item.keyFact || '',
+      }))
+    : [];
+
   return {
     title: parsed.title || `Guía de Repaso: ${deckTitle}`,
     subtitle: parsed.subtitle || 'Resumen Integral de Alto Rendimiento',
@@ -342,7 +367,7 @@ function normalizeToExhaustiveGuide(
     cardCount: parsed.cardCount || cardCount,
     overview,
     taxonomy_tree: Array.isArray(parsed.taxonomy_tree) ? parsed.taxonomy_tree : [],
-    item_breakdown: Array.isArray(parsed.item_breakdown) ? parsed.item_breakdown : [],
+    item_breakdown: cleanedBreakdown,
     contrast_tables: Array.isArray(parsed.contrast_tables) ? parsed.contrast_tables : [],
     critical_data: Array.isArray(parsed.critical_data) ? parsed.critical_data : [],
     mnemonics: Array.isArray(parsed.mnemonics) ? parsed.mnemonics : [],
@@ -439,34 +464,46 @@ function buildExhaustivePrompts(deckTitle: string, corpusText: string, locale: '
   const isEnglish = locale === 'en';
 
   const systemInstruction = isEnglish
-    ? `You are an elite Professor of Educational Sciences and Chief Medical/Academic Examiner for Flashmente PRO.
-Your mission is to construct an EXHAUSTIVE, MASTERFUL Full-Chapter Study Guide from the provided material.
-MANDATORY ACADEMIC RULES:
-1. Respond EXCLUSIVELY in English adhering to the JSON schema.
-2. ZERO ARBITRARY LIMITS: Do NOT limit yourself to 3 or 4 items. If the source material covers 14 minerals, 20 drugs, or 18 laws, list and analyze EVERY SINGLE ONE of them without omission.
-3. SIX COMPREHENSIVE BLOCKS:
-   - Block 1 (overview): 2 to 3 dense, rigorous paragraphs synthesizing the core mechanisms and learning objectives.
-   - Block 2 (taxonomy_tree): Complete taxonomic tree classifying 100% of all entities into categories.
-   - Block 3 (item_breakdown): In-depth individual profile for EVERY relevant item (name, physiological/technical role, dietary sources/examples, deficiency consequences, toxicity/exceptions, and key exam takeaway).
-   - Block 4 (contrast_tables): Side-by-side matrices specifically contrasting items that examiners use to create confusing test questions.
-   - Block 5 (critical_data): Exact official thresholds, clinical ranges, and statutory deadlines with STRICT UNIT VERIFICATION:
-     * CRITICAL: Strictly distinguish between milligrams (mg), micrograms (µg), and grams (g). Never confuse micrograms with milligrams for trace elements (e.g. Copper DRI is 900 µg / 0.9 mg, NEVER 900 mg).
-   - Block 6 (mnemonics): Natural, practical mnemonics (empty array [] if not applicable).
-4. Eliminate conversational pleasantries. Deliver maximum pedagogical density per square centimeter.`
-    : `Eres un Catedrático Distinguido en Ciencias de la Educación y Estratega Jefe de Exámenes de Oposiciones para Flashmente PRO.
-Tu misión es construir un RESUMEN COMPLETO Y EXHAUSTIVO DE CAPÍTULO a partir del material docente proporcionado.
-REGLAS ACADÉMICAS OBLIGATORIAS:
-1. Responde OBLIGATORIAMENTE en Español ajustándote al esquema JSON.
-2. CERO LÍMITES ARTIFICIALES: PROHIBIDO recortar a 3 o 4 conceptos. Si el tema trata 14 minerales, 20 fármacos o 15 principios jurídicos, debes enumerar y analizar EL 100% DE ELLOS sin omitir ninguno.
-3. SEIS BLOQUES PEDAGÓGICOS EXHAUSTIVOS:
-   - Bloque 1 (overview): 2 a 3 párrafos densos, técnicos y rigurosos que sinteticen la arquitectura general del capítulo junto a sus objetivos docentes clave.
-   - Bloque 2 (taxonomy_tree): Árbol taxonómico y clasificaciones jerárquicas completas enumerando todos los miembros de cada grupo (ej. Macrominerales vs Oligoelementos).
-   - Bloque 3 (item_breakdown): Ficha exhaustiva individual de CADA elemento o concepto del capítulo (nombre, función fisiológica/mecanismo, fuentes dietéticas o ejemplos prácticos, patología por déficit, toxicidad/contraindicaciones y dato clave de examen).
-   - Bloque 4 (contrast_tables): Tablas comparativas cara a cara para desmontar las preguntas trampa más habituales de los tribunales de examen.
-   - Bloque 5 (critical_data): Cifras oficiales, umbrales y dosis con VERIFICACIÓN ESTRICTA DE UNIDADES:
-     * OBLIGATORIO: Distingue rigurosamente entre miligramos (mg), microgramos (µg) y gramos (g). Bajo ningún concepto confundas microgramos con miligramos en oligoelementos (ej. el Cobre tiene un DRI de 900 µg / 0.9 mg, NUNCA 900 mg; el Yodo 150 µg, etc.).
-   - Bloque 6 (mnemonics): Mnemotecnias ingeniosas y naturales en español (devuelve array vacío [] si el tema no lo requiere).
-4. Suprime cualquier texto conversacional de cortesía. Maximiza la densidad de conocimiento útil por centímetro cuadrado.`;
+    ? `You are an elite Educational Curriculum Specialist and Lead Academic Examiner for Flashmente.
+Your mission is to construct a HIGH-YIELD, UNIVERSAL Study Guide strictly proportional to the educational level and real depth of the provided material.
+
+MANDATORY PEDAGOGICAL & PROPORTIONALITY RULES:
+1. DETECT EDUCATIONAL LEVEL & DEPTH AUTOMATICALLY:
+   - Primary / Middle / High School: Use clear, engaging, pedagogically accessible explanations with real-world examples.
+   - University / Competitive Exams / Medical / Legal: Maintain rigorous technical accuracy and exact professional terminology.
+   - STRICT PROPORTIONALITY (ZERO FLUFF): If the material is short (e.g. 2-3 pages of grammar or vocabulary), deliver a concise 1-2 page synthesis without artificial bloat. If the topic is a large 20+ page chapter, cover 100% of essential elements using a high-density, telegraphic style designed to fit within 4-6 printed pages.
+2. DISCIPLINE-AGNOSTIC ADAPTATION:
+   - Works universally across ALL subjects (Sciences, Languages, Humanities, Law, Medicine, Mathematics, History).
+   - In item_breakdown: Adapt 'role' to the subject (grammatical rule, legal principle, physiological function, historical role). Adapt 'dietarySources' to examples/use cases. Adapt 'deficiency' to typical mistakes or failure consequences. Adapt 'toxicity' to exceptions or contraindications.
+   - CLEAN OMISSION: If a secondary field (sources, deficiency, toxicity) does not apply or is not in the material, leave it empty ("" or []). NEVER write filler like "Not specified", "N/A", or "Does not apply".
+3. THE 6 SYSTEMATIC BLOCKS:
+   - Block 1 (overview): EXACTLY 1 concise executive paragraph (3-5 lines) capturing the core theme + 3 to 6 focused learning objectives.
+   - Block 2 (taxonomy_tree): Clean classification tree grouping the entities/categories of the topic.
+   - Block 3 (item_breakdown): Compact, telegraphic cards for EVERY relevant item or concept. 1 direct, punchy sentence per field. No duplicated narrative from tables.
+   - Block 4 (contrast_tables): 1 to 4 high-yield comparative tables targeting common exam confusions (1 table for short topics, up to 4 for large chapters).
+   - Block 5 (critical_data): 0 to 10 crucial figures, dates, formulas, or official thresholds. Return [] if the subject has no quantitative/date data. ALWAYS verify units strictly (mg vs µg vs g).
+   - Block 6 (mnemonics): 0 to 4 practical, natural mnemonics. Return [] if not genuinely helpful.
+4. Eliminate conversational pleasantries. Maximise pedagogical density and brevity.`
+    : `Eres un Catedrático Especialista en Ciencias de la Educación y Estratega Jefe de Exámenes para Flashmente.
+Tu misión es construir una GUÍA DE ESTUDIO UNIVERSAL Y DE ALTO RENDIMIENTO, estrictamente proporcional al nivel educativo y a la extensión real del material docente.
+
+REGLAS PEDAGÓGICAS Y DE PROPORCIONALIDAD OBLIGATORIAS:
+1. DETECCIÓN AUTOMÁTICA DE NIVEL EDUCATIVO Y DENSIDAD:
+   - Primaria / ESO / Bachillerato: Explicaciones claras, didácticas, directas y con ejemplos prácticos acordes a la edad.
+   - Universidad / Oposiciones / Formación Profesional técnica: Rigor técnico, exactitud terminológica y precisión conceptual absoluta.
+   - PROPORCIONALIDAD ESTRICTA (CERO RELLENO): Si el tema es breve (ej. 2-3 páginas de inglés, 15 tarjetas de vocabulario o reglas), sintetiza con precisión quirúrgica en 1-2 páginas sin inventar complejidad artificial. Si el capítulo es extenso (ej. 20+ páginas, 100 tarjetas de minerales o medicina), cubre el 100% de los elementos esenciales con estilo telegráfico de alta densidad para ocupar 4-6 páginas impresas máximo.
+2. ADAPTACIÓN UNIVERSAL A CUALQUIER ASIGNATURA:
+   - Válido para TODAS las materias (Ciencias, Idiomas, Humanidades, Derecho, Medicina, Matemáticas, Historia).
+   - En item_breakdown: Adapta 'role' a la materia (regla gramatical, principio jurídico, función fisiológica, hito histórico). Adapta 'dietarySources' a ejemplos de uso o supuestos prácticos. Adapta 'deficiency' a errores frecuentes o consecuencias de incumplimiento. Adapta 'toxicity' a excepciones, contraindicaciones o irregularidades.
+   - OMISIÓN LIMPIA DE CAMPOS INAPLICABLES: Si un campo secundario no aplica o no figura en el texto, déjalo vacío ("" o []). PROHIBIDO escribir textos de relleno como "No especificado", "No aplica", "N/A" o "Ninguno".
+3. ESTRUCTURA DE LOS 6 BLOQUES:
+   - Bloque 1 (overview): EXACTAMENTE 1 párrafo ejecutivo conciso (3-5 líneas) con la idea fuerza del capítulo + 3 a 6 objetivos de aprendizaje directos.
+   - Bloque 2 (taxonomy_tree): Esquema o árbol clasificatorio completo de las categorías del tema.
+   - Bloque 3 (item_breakdown): Ficha telegráfica de CADA elemento o concepto clave. 1 frase directa y contundente por campo, sin párrafos redundantes que ya figuren en tablas.
+   - Bloque 4 (contrast_tables): De 1 a 4 tablas comparativas cara a cara para preguntas trampa (1 tabla en temas cortos; máximo 4 en capítulos largos).
+   - Bloque 5 (critical_data): De 0 a 10 cifras críticas, fechas, plazos, dosis o fórmulas oficiales. Si el tema no tiene datos numéricos ni fechas, devuelve [] limpiamente. VERIFICACIÓN ESTRICTA DE UNIDADES (mg vs µg vs g; nunca confundas µg con mg).
+   - Bloque 6 (mnemonics): De 0 a 4 reglas mnemotécnicas naturales y útiles. Si no aportan valor real, devuelve [] limpiamente.
+4. Suprime cualquier saludo o cortesía conversacional. Entrega máxima densidad y síntesis pedagógica por centímetro cuadrado.`;
 
   const userPrompt = isEnglish
     ? `CHAPTER / DECK TITLE: ${deckTitle}
@@ -474,13 +511,13 @@ REGLAS ACADÉMICAS OBLIGATORIAS:
 SOURCE MATERIAL:
 ${corpusText}
 
-Generate the exhaustive, full-chapter master study guide now:`
+Generate the proportional, high-yield study guide now:`
     : `TÍTULO DEL CAPÍTULO / MAZO: ${deckTitle}
 
 MATERIAL DOCENTE FUENTE:
 ${corpusText}
 
-Genera el resumen completo y exhaustivo de capítulo ahora:`;
+Genera la guía de estudio universal, proporcional y de alto rendimiento ahora:`;
 
   return { systemInstruction, userPrompt };
 }

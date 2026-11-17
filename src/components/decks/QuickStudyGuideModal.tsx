@@ -40,6 +40,13 @@ interface QuickStudyGuideModalProps {
   deckTitle: string;
 }
 
+function isFillerText(text?: string | null): boolean {
+  if (!text) return true;
+  const trimmed = text.trim();
+  if (!trimmed) return true;
+  return /^(no\s*especificad[oa]|no\s*aplica|n\/?a|ningun[oa]|none|not\s*specified|-)$/i.test(trimmed);
+}
+
 export function QuickStudyGuideModal({
   isOpen,
   onClose,
@@ -241,7 +248,7 @@ export function QuickStudyGuideModal({
           <style>
             @page {
               size: A4;
-              margin: 12mm 15mm;
+              margin: 10mm 12mm;
             }
             body {
               background-color: #ffffff !important;
@@ -249,6 +256,8 @@ export function QuickStudyGuideModal({
               font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
               -webkit-print-color-adjust: exact;
               print-color-adjust: exact;
+              font-size: 11px !important;
+              line-height: 1.35 !important;
             }
             .break-inside-avoid {
               break-inside: avoid !important;
@@ -258,28 +267,33 @@ export function QuickStudyGuideModal({
               background-color: #ffffff !important;
               color: #111827 !important;
               border: 1px solid #d1d5db !important;
-              border-radius: 12px;
+              border-radius: 8px !important;
               break-inside: avoid !important;
               page-break-inside: avoid !important;
-              margin-bottom: 12px;
+              margin-bottom: 8px !important;
+              padding: 8px 10px !important;
             }
             .print-table {
               width: 100% !important;
               border-collapse: collapse !important;
               break-inside: avoid !important;
+              margin-bottom: 8px !important;
             }
             .print-table th {
               background-color: #f3f4f6 !important;
               color: #111827 !important;
               border: 1px solid #9ca3af !important;
-              padding: 6px 10px !important;
+              padding: 4px 6px !important;
               font-weight: 700 !important;
+              font-size: 10px !important;
             }
             .print-table td {
               background-color: #ffffff !important;
               color: #111827 !important;
               border: 1px solid #d1d5db !important;
-              padding: 6px 10px !important;
+              padding: 4px 6px !important;
+              font-size: 10px !important;
+              line-height: 1.3 !important;
             }
             .bg-neutral-950,
             .bg-neutral-950\\/60,
@@ -325,13 +339,13 @@ export function QuickStudyGuideModal({
             }
           </style>
         </head>
-        <body class="p-4 bg-white text-neutral-900">
-          <header class="border-b border-neutral-300 pb-3 mb-6">
-            <div class="flex items-center justify-between">
-              <h1 class="text-xl font-bold text-neutral-900">Flashmente • Resumen Completo de Capítulo</h1>
-              <span class="text-xs text-neutral-500 font-mono">FSRS Spaced Repetition</span>
+        <body class="p-2 sm:p-4 bg-white text-neutral-900">
+          <header class="border-b border-neutral-300 pb-2 mb-3 flex items-center justify-between">
+            <div>
+              <h1 class="text-base font-bold text-neutral-900">${guide?.title || deckTitle}</h1>
+              ${guide?.subtitle ? `<p class="text-xs text-neutral-600 mt-0.5">${guide.subtitle}</p>` : ''}
             </div>
-            <p class="text-sm font-semibold text-neutral-700 mt-1">${deckTitle}</p>
+            <span class="text-[10px] text-neutral-500 font-mono">Flashmente</span>
           </header>
           <main>
             ${printContent.innerHTML}
@@ -358,6 +372,11 @@ export function QuickStudyGuideModal({
       {/* Estilos para impresión limpia de alta definición (@media print) */}
       <style>{`
         @media print {
+          @page {
+            size: A4;
+            margin: 10mm 12mm;
+          }
+
           html, body {
             height: auto !important;
             overflow: visible !important;
@@ -375,17 +394,17 @@ export function QuickStudyGuideModal({
           }
 
           #quick-study-guide-printable {
-            position: absolute;
-            left: 0;
-            top: 0;
+            position: static !important;
             width: 100% !important;
             height: auto !important;
             max-height: none !important;
             overflow: visible !important;
             margin: 0 !important;
-            padding: 12mm 15mm !important;
+            padding: 0 !important;
             background: #ffffff !important;
             color: #111827 !important;
+            font-size: 11px !important;
+            line-height: 1.35 !important;
           }
 
           .no-print,
@@ -409,6 +428,49 @@ export function QuickStudyGuideModal({
             padding: 0 !important;
             margin: 0 !important;
             display: block !important;
+          }
+
+          .print-card {
+            background-color: #ffffff !important;
+            color: #111827 !important;
+            border: 1px solid #d1d5db !important;
+            box-shadow: none !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            margin-bottom: 8px !important;
+            padding: 8px 10px !important;
+            border-radius: 8px !important;
+          }
+
+          p, h1, h2, h3, h4, h5, h6, span, tr, td, th, li {
+            page-break-inside: auto !important;
+            break-inside: auto !important;
+          }
+
+          .print-table {
+            width: 100% !important;
+            border-collapse: collapse !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            margin-bottom: 8px !important;
+          }
+
+          .print-table th {
+            background-color: #f3f4f6 !important;
+            color: #111827 !important;
+            border: 1px solid #9ca3af !important;
+            padding: 4px 6px !important;
+            font-size: 10px !important;
+            font-weight: 700 !important;
+          }
+
+          .print-table td {
+            background-color: #ffffff !important;
+            color: #111827 !important;
+            border: 1px solid #d1d5db !important;
+            padding: 4px 6px !important;
+            font-size: 10px !important;
+            line-height: 1.3 !important;
           }
 
           .bg-neutral-900,
@@ -437,46 +499,6 @@ export function QuickStudyGuideModal({
             color: #374151 !important;
           }
 
-          .grid {
-            display: grid !important;
-          }
-
-          .print-card {
-            background-color: #ffffff !important;
-            color: #111827 !important;
-            border: 1px solid #d1d5db !important;
-            box-shadow: none !important;
-            page-break-inside: avoid !important;
-            break-inside: avoid !important;
-            margin-bottom: 12px;
-          }
-
-          p, h1, h2, h3, h4, h5, h6, span, tr, td, th, li {
-            page-break-inside: auto !important;
-            break-inside: auto !important;
-          }
-
-          .print-table {
-            width: 100% !important;
-            border-collapse: collapse !important;
-            break-inside: avoid !important;
-          }
-
-          .print-table th {
-            background-color: #f3f4f6 !important;
-            color: #111827 !important;
-            border: 1px solid #9ca3af !important;
-            padding: 6px 10px !important;
-            font-weight: 700 !important;
-          }
-
-          .print-table td {
-            background-color: #ffffff !important;
-            color: #111827 !important;
-            border: 1px solid #d1d5db !important;
-            padding: 6px 10px !important;
-          }
-
           .bg-amber-500\\/10,
           .bg-amber-500\\/15,
           .bg-emerald-500\\/10,
@@ -495,11 +517,6 @@ export function QuickStudyGuideModal({
           .text-indigo-400 { color: #3730a3 !important; }
           .text-violet-200, .text-violet-300, .text-violet-400 { color: #5b21b6 !important; }
           .text-rose-200, .text-rose-300, .text-rose-400 { color: #991b1b !important; }
-
-          @page {
-            size: A4;
-            margin: 12mm;
-          }
         }
       `}</style>
 
@@ -580,8 +597,23 @@ export function QuickStudyGuideModal({
           {/* Cuerpo del Modal (Contenedor Imprimible y Desplazable) */}
           <div
             id="quick-study-guide-printable"
-            className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 text-left"
+            className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 print:space-y-3 text-left"
           >
+            {/* Cabecera compacta visible únicamente al imprimir (@media print) */}
+            {guide && (
+              <div className="hidden print:block border-b border-neutral-300 pb-2 mb-3">
+                <div className="flex items-center justify-between">
+                  <h1 className="text-base font-bold text-neutral-900">
+                    {guide.title || `${t('quick_guide.modal_title', 'Guía de Repaso')}: ${deckTitle}`}
+                  </h1>
+                  <span className="text-[10px] text-neutral-500 font-mono">Flashmente</span>
+                </div>
+                {guide.subtitle && (
+                  <p className="text-xs text-neutral-600 mt-0.5">{guide.subtitle}</p>
+                )}
+              </div>
+            )}
+
             {/* Estado: Cargando generación inicial */}
             {isLoading && (
               <div className="py-16 flex flex-col items-center justify-center text-center space-y-4">
@@ -619,36 +651,36 @@ export function QuickStudyGuideModal({
 
             {/* Contenido Completo de la Guía */}
             {guide && !isLoading && (
-              <div className="space-y-6">
+              <div className="space-y-5 print:space-y-3">
                 {/* 1. SECCIÓN: VISIÓN PANORÁMICA Y OBJETIVOS (Visible siempre para todos) */}
-                <section className="space-y-3">
-                  <div className="flex items-center gap-2 border-b border-neutral-800 pb-2">
-                    <BookOpen className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-emerald-400">
+                <section className="space-y-2">
+                  <div className="flex items-center gap-2 border-b border-neutral-800 pb-1.5 print:border-neutral-300">
+                    <BookOpen className="w-4 h-4 text-emerald-400 shrink-0 print:text-neutral-800" />
+                    <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-emerald-400 print:text-neutral-900 print:text-xs">
                       {t('quick_guide.section_overview', '📖 Visión Panorámica y Objetivos')}
                     </h4>
                   </div>
 
-                  <div className="print-card p-4 sm:p-5 rounded-2xl bg-neutral-950/60 border border-neutral-800/80 space-y-4">
+                  <div className="print-card p-3.5 sm:p-4 rounded-2xl bg-neutral-950/60 border border-neutral-800/80 space-y-3 print:p-2.5">
                     {/* Resumen Global */}
-                    <p className="text-xs sm:text-sm text-neutral-200 leading-relaxed">
+                    <p className="text-xs sm:text-sm text-neutral-200 leading-relaxed print:text-[11px] print:text-neutral-800 print:leading-snug">
                       {guide.overview?.summary || `Resumen integral del capítulo ${deckTitle}.`}
                     </p>
 
                     {/* Objetivos de Aprendizaje */}
                     {guide.overview?.learningObjectives && guide.overview.learningObjectives.length > 0 && (
-                      <div className="pt-2 border-t border-neutral-800/80 space-y-2">
-                        <div className="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                      <div className="pt-2 border-t border-neutral-800/80 print:border-neutral-200 space-y-1.5">
+                        <div className="text-xs font-bold text-emerald-300 print:text-neutral-900 print:text-[11px] flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 print:text-neutral-700" />
                           <span>{t('quick_guide.learning_objectives', 'Objetivos de Aprendizaje:')}</span>
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 print:grid-cols-2 gap-1.5">
                           {guide.overview.learningObjectives.map((obj, oIdx) => (
                             <div
                               key={`obj-${oIdx}`}
-                              className="p-2.5 rounded-xl bg-neutral-900/60 border border-neutral-800 flex items-start gap-2 text-xs text-neutral-300"
+                              className="p-2 rounded-xl bg-neutral-900/60 border border-neutral-800 flex items-start gap-1.5 text-xs text-neutral-300 print:bg-neutral-50 print:border-neutral-200 print:text-[10px] print:text-neutral-800 print:p-1.5"
                             >
-                              <span className="text-emerald-400 font-bold shrink-0">✓</span>
+                              <span className="text-emerald-400 font-bold shrink-0 print:text-neutral-700">✓</span>
                               <span className="leading-snug">{obj}</span>
                             </div>
                           ))}
@@ -740,7 +772,7 @@ export function QuickStudyGuideModal({
 
                 {/* BLOQUES 2 AL 6 (Visibles al desbloquear o con teaser blur si Free) */}
                 <div
-                  className={`space-y-6 transition-all duration-300 ${
+                  className={`space-y-5 print:space-y-3 transition-all duration-300 ${
                     !isUnlocked
                       ? 'filter blur-[5px] select-none pointer-events-none opacity-30 max-h-[380px] overflow-hidden no-print'
                       : ''
@@ -748,39 +780,39 @@ export function QuickStudyGuideModal({
                 >
                   {/* 2. SECCIÓN: ESQUEMA Y CLASIFICACIÓN COMPLETA (Taxonomy Tree) */}
                   {guide.taxonomy_tree && guide.taxonomy_tree.length > 0 && (
-                    <section className="space-y-3">
-                      <div className="flex items-center gap-2 border-b border-neutral-800 pb-2">
-                        <ListTree className="w-4 h-4 text-emerald-400 shrink-0" />
-                        <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-emerald-400">
+                    <section className="space-y-2">
+                      <div className="flex items-center gap-2 border-b border-neutral-800 pb-1.5 print:border-neutral-300">
+                        <ListTree className="w-4 h-4 text-emerald-400 shrink-0 print:text-neutral-800" />
+                        <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-emerald-400 print:text-neutral-900 print:text-xs">
                           {t('quick_guide.section_taxonomy', '🌳 Esquema y Clasificación Completa')}
                         </h4>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-2.5 sm:gap-3 print:gap-2">
                         {guide.taxonomy_tree.map((group, gIdx) => (
                           <div
                             key={`tax-${gIdx}`}
-                            className="print-card p-4 rounded-2xl bg-neutral-950/60 border border-neutral-800/80 space-y-3"
+                            className="print-card p-3 sm:p-3.5 rounded-2xl bg-neutral-950/60 border border-neutral-800/80 space-y-2 print:p-2.5"
                           >
-                            <div className="flex items-center justify-between gap-2 border-b border-neutral-800/60 pb-2">
-                              <h5 className="text-sm font-bold text-white flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                            <div className="flex items-center justify-between gap-2 border-b border-neutral-800/60 print:border-neutral-200 pb-1.5">
+                              <h5 className="text-xs sm:text-sm font-bold text-white print:text-xs print:text-neutral-900 flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-emerald-400 print:bg-neutral-800" />
                                 {group.category}
                               </h5>
-                              <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-neutral-800 text-neutral-300 border border-neutral-700">
+                              <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-neutral-800 text-neutral-300 border border-neutral-700 print:bg-neutral-100 print:text-neutral-700 print:border-neutral-300">
                                 {group.elements?.length || 0} elementos
                               </span>
                             </div>
                             {group.description && (
-                              <p className="text-xs text-neutral-400 leading-relaxed">
+                              <p className="text-xs text-neutral-400 print:text-[10px] print:text-neutral-600 leading-snug">
                                 {group.description}
                               </p>
                             )}
-                            <div className="flex flex-wrap gap-1.5 pt-1">
+                            <div className="flex flex-wrap gap-1 pt-0.5">
                               {group.elements?.map((el, elIdx) => (
                                 <span
                                   key={`el-${gIdx}-${elIdx}`}
-                                  className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/25"
+                                  className="px-2 py-0.5 rounded-md text-[11px] print:text-[10px] font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/25 print:bg-neutral-50 print:text-neutral-800 print:border-neutral-300"
                                 >
                                   {el}
                                 </span>
@@ -792,89 +824,103 @@ export function QuickStudyGuideModal({
                     </section>
                   )}
 
-                  {/* 3. SECCIÓN: DESARROLLO DETALLADO POR ELEMENTO / CONCEPTO */}
+                  {/* 3. SECCIÓN: DESARROLLO DETALLADO POR ELEMENTO / CONCEPTO (Rejilla Compacta de 2 Columnas) */}
                   {guide.item_breakdown && guide.item_breakdown.length > 0 && (
-                    <section className="space-y-3">
-                      <div className="flex items-center gap-2 border-b border-neutral-800 pb-2">
-                        <Layers className="w-4 h-4 text-cyan-400 shrink-0" />
-                        <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-cyan-400">
+                    <section className="space-y-2">
+                      <div className="flex items-center gap-2 border-b border-neutral-800 pb-1.5 print:border-neutral-300">
+                        <Layers className="w-4 h-4 text-cyan-400 shrink-0 print:text-neutral-800" />
+                        <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-cyan-400 print:text-neutral-900 print:text-xs">
                           {t('quick_guide.section_breakdown', '🔬 Desarrollo Detallado por Elemento / Concepto')}
                         </h4>
                       </div>
 
-                      <div className="space-y-4">
-                        {guide.item_breakdown.map((item, iIdx) => (
-                          <div
-                            key={`item-${iIdx}`}
-                            className="print-card p-4 sm:p-5 rounded-2xl bg-neutral-950/60 border border-neutral-800/80 space-y-3"
-                          >
-                            {/* Cabecera del Elemento */}
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-neutral-800 pb-2.5">
-                              <h5 className="text-base font-bold text-white flex items-center gap-2">
-                                <span className="text-emerald-400 font-mono text-sm">#{iIdx + 1}</span>
-                                <span>{item.name}</span>
-                              </h5>
-                              <span className="text-xs font-medium px-2.5 py-1 rounded-lg bg-neutral-800 text-neutral-300 border border-neutral-700 w-fit">
-                                {item.role}
-                              </span>
-                            </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-2.5 sm:gap-3 print:gap-2">
+                        {guide.item_breakdown.map((item, iIdx) => {
+                          const validSources = Array.isArray(item.dietarySources)
+                            ? item.dietarySources.filter((s) => !isFillerText(s))
+                            : [];
+                          const hasSources = validSources.length > 0;
+                          const hasDeficiency = !isFillerText(item.deficiency);
+                          const hasToxicity = !isFillerText(item.toxicity);
+                          const hasKeyFact = !isFillerText(item.keyFact);
 
-                            {/* Fuentes Dietéticas / Ejemplos */}
-                            {item.dietarySources && item.dietarySources.length > 0 && (
+                          return (
+                            <div
+                              key={`item-${iIdx}`}
+                              className="print-card p-3 sm:p-3.5 rounded-2xl bg-neutral-950/60 border border-neutral-800/80 space-y-2 flex flex-col justify-between print:p-2.5 print:text-[11px] print:leading-snug"
+                            >
                               <div className="space-y-1.5">
-                                <div className="flex items-center gap-1.5 text-xs text-neutral-400 font-semibold">
-                                  <Utensils className="w-3.5 h-3.5 text-emerald-400" />
-                                  <span>{t('quick_guide.dietary_sources', 'Fuentes / Ejemplos:')}</span>
-                                </div>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {item.dietarySources.map((source, sIdx) => (
-                                    <span
-                                      key={`source-${iIdx}-${sIdx}`}
-                                      className="px-2 py-0.5 rounded-md text-[11px] bg-neutral-900 border border-neutral-700/80 text-neutral-300"
-                                    >
-                                      {source}
+                                {/* Cabecera del Elemento */}
+                                <div className="flex items-start justify-between gap-1.5 border-b border-neutral-800/70 print:border-neutral-200 pb-1.5">
+                                  <h5 className="text-sm font-bold text-white print:text-xs print:text-neutral-950 flex items-center gap-1.5">
+                                    <span className="text-emerald-400 font-mono text-xs print:text-neutral-700">#{iIdx + 1}</span>
+                                    <span>{item.name}</span>
+                                  </h5>
+                                  {item.role && (
+                                    <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-neutral-800 text-neutral-300 border border-neutral-700 shrink-0 print:bg-neutral-100 print:text-neutral-800 print:border-neutral-300">
+                                      {item.role}
                                     </span>
-                                  ))}
+                                  )}
                                 </div>
-                              </div>
-                            )}
 
-                            {/* Déficit y Toxicidad */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-1">
-                              {item.deficiency && (
-                                <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-xs text-amber-200 space-y-1">
-                                  <div className="flex items-center gap-1.5 font-bold text-amber-300">
-                                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                                    <span>{t('quick_guide.deficiency', 'Déficit / Carencia:')}</span>
+                                {/* Fuentes Dietéticas / Ejemplos Prácticos */}
+                                {hasSources && (
+                                  <div className="flex flex-wrap items-center gap-1 text-[11px] print:text-[10px]">
+                                    <span className="text-neutral-400 font-semibold print:text-neutral-600 flex items-center gap-1">
+                                      <Utensils className="w-3 h-3 text-emerald-400 print:text-neutral-600" />
+                                      <span>Ej./Fuentes:</span>
+                                    </span>
+                                    {validSources.map((source, sIdx) => (
+                                      <span
+                                        key={`source-${iIdx}-${sIdx}`}
+                                        className="px-1.5 py-0.5 rounded bg-neutral-900 border border-neutral-700/80 text-neutral-300 print:bg-neutral-50 print:text-neutral-800 print:border-neutral-200"
+                                      >
+                                        {source}
+                                      </span>
+                                    ))}
                                   </div>
-                                  <p className="leading-relaxed text-amber-200/90">{item.deficiency}</p>
-                                </div>
-                              )}
-                              {item.toxicity && (
-                                <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/25 text-xs text-rose-200 space-y-1">
-                                  <div className="flex items-center gap-1.5 font-bold text-rose-300">
-                                    <Flame className="w-3.5 h-3.5 shrink-0" />
-                                    <span>{t('quick_guide.toxicity', 'Toxicidad / Sobredosis:')}</span>
+                                )}
+
+                                {/* Déficit y Toxicidad / Excepciones (Ocultación limpia si no aplican) */}
+                                {(hasDeficiency || hasToxicity) && (
+                                  <div className="grid grid-cols-1 gap-1.5 pt-0.5">
+                                    {hasDeficiency && (
+                                      <div className="p-1.5 sm:p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-200 print:bg-neutral-50 print:border-neutral-300 print:text-neutral-800 print:text-[10px] leading-tight">
+                                        <div className="flex items-center gap-1 font-bold text-amber-300 print:text-neutral-900 mb-0.5">
+                                          <AlertTriangle className="w-3 h-3 shrink-0" />
+                                          <span>Déficit / Carencia:</span>
+                                        </div>
+                                        <p className="leading-snug text-amber-200/90 print:text-neutral-800">{item.deficiency}</p>
+                                      </div>
+                                    )}
+                                    {hasToxicity && (
+                                      <div className="p-1.5 sm:p-2 rounded-xl bg-rose-500/10 border border-rose-500/20 text-[11px] text-rose-200 print:bg-neutral-50 print:border-neutral-300 print:text-neutral-800 print:text-[10px] leading-tight">
+                                        <div className="flex items-center gap-1 font-bold text-rose-300 print:text-neutral-900 mb-0.5">
+                                          <Flame className="w-3 h-3 shrink-0" />
+                                          <span>Toxicidad / Riesgo:</span>
+                                        </div>
+                                        <p className="leading-snug text-rose-200/90 print:text-neutral-800">{item.toxicity}</p>
+                                      </div>
+                                    )}
                                   </div>
-                                  <p className="leading-relaxed text-rose-200/90">{item.toxicity}</p>
+                                )}
+                              </div>
+
+                              {/* Dato Clave de Examen */}
+                              {hasKeyFact && (
+                                <div className="mt-1 p-2 rounded-xl bg-gradient-to-r from-amber-500/15 to-amber-600/10 border border-amber-500/30 text-[11px] text-amber-200 print:bg-neutral-100 print:border-neutral-300 print:text-neutral-900 print:text-[10px] leading-tight font-medium flex items-start gap-1.5 shadow-sm">
+                                  <ShieldCheck className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5 print:text-neutral-800" />
+                                  <div className="leading-tight">
+                                    <strong className="text-amber-300 mr-1 print:text-neutral-950">
+                                      {t('quick_guide.key_fact', 'Clave Examen:')}
+                                    </strong>
+                                    <span>{item.keyFact}</span>
+                                  </div>
                                 </div>
                               )}
                             </div>
-
-                            {/* Dato Clave de Examen */}
-                            {item.keyFact && (
-                              <div className="p-3 rounded-xl bg-gradient-to-r from-amber-500/15 to-amber-600/10 border border-amber-500/35 text-xs text-amber-200 flex items-start gap-2 shadow-sm">
-                                <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                                <div className="leading-relaxed">
-                                  <strong className="text-amber-300 mr-1.5">
-                                    {t('quick_guide.key_fact', 'Dato Clave de Examen:')}
-                                  </strong>
-                                  <span>{item.keyFact}</span>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </section>
                   )}
@@ -883,25 +929,29 @@ export function QuickStudyGuideModal({
                   {(!guide.item_breakdown || guide.item_breakdown.length === 0) &&
                     guide.key_concepts &&
                     guide.key_concepts.length > 0 && (
-                      <section className="space-y-3">
-                        <div className="flex items-center gap-2 border-b border-neutral-800 pb-2">
-                          <Lightbulb className="w-4 h-4 text-amber-400 shrink-0" />
-                          <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-amber-400">
+                      <section className="space-y-2">
+                        <div className="flex items-center gap-2 border-b border-neutral-800 pb-1.5 print:border-neutral-300">
+                          <Lightbulb className="w-4 h-4 text-amber-400 shrink-0 print:text-neutral-800" />
+                          <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-amber-400 print:text-neutral-900 print:text-xs">
                             {t('quick_guide.section_key_concepts', '💡 Conceptos Clave y Fundamentos')}
                           </h4>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-2.5 sm:gap-3 print:gap-2">
                           {guide.key_concepts.map((concept, idx) => (
                             <div
                               key={`concept-${idx}`}
-                              className="print-card p-3.5 sm:p-4 rounded-2xl bg-neutral-950/60 border border-neutral-800/80 space-y-2 flex flex-col justify-between"
+                              className="print-card p-3 sm:p-3.5 rounded-2xl bg-neutral-950/60 border border-neutral-800/80 space-y-2 flex flex-col justify-between print:p-2.5"
                             >
                               <div>
-                                <h5 className="text-sm font-bold text-white mb-1">{concept.title}</h5>
-                                <p className="text-xs text-neutral-300 leading-relaxed">{concept.description}</p>
+                                <h5 className="text-xs sm:text-sm font-bold text-white print:text-xs print:text-neutral-900 mb-1">
+                                  {concept.title}
+                                </h5>
+                                <p className="text-xs text-neutral-300 print:text-[10px] print:text-neutral-700 leading-snug">
+                                  {concept.description}
+                                </p>
                               </div>
-                              <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300 flex items-start gap-1.5 font-medium">
+                              <div className="p-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300 print:bg-neutral-50 print:border-neutral-200 print:text-[10px] print:text-neutral-900 flex items-start gap-1 font-medium">
                                 <span className="font-bold shrink-0">{t('quick_guide.takeaway', 'Clave:')}</span>
                                 <span>{concept.keyTakeaway}</span>
                               </div>
@@ -911,44 +961,48 @@ export function QuickStudyGuideModal({
                       </section>
                     )}
 
-                  {/* 4. SECCIÓN: TABLAS COMPARATIVAS Y TRAMPAS DE EXAMEN */}
+                  {/* 4. SECCIÓN: TABLAS COMPARATIVAS Y TRAMPAS DE EXAMEN (Ocultación limpia si []) */}
                   {guide.contrast_tables && guide.contrast_tables.length > 0 && (
-                    <section className="space-y-3">
-                      <div className="flex items-center gap-2 border-b border-neutral-800 pb-2">
-                        <Table className="w-4 h-4 text-indigo-400 shrink-0" />
-                        <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-indigo-400">
+                    <section className="space-y-2">
+                      <div className="flex items-center gap-2 border-b border-neutral-800 pb-1.5 print:border-neutral-300">
+                        <Table className="w-4 h-4 text-indigo-400 shrink-0 print:text-neutral-800" />
+                        <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-indigo-400 print:text-neutral-900 print:text-xs">
                           {t('quick_guide.section_contrast_tables', '⚖️ Tablas Comparativas y Trampas')}
                         </h4>
                       </div>
 
-                      <div className="space-y-4">
+                      <div className="space-y-3">
                         {guide.contrast_tables.map((table, tIdx) => (
                           <div
                             key={`table-${tIdx}`}
                             className="print-card rounded-2xl border border-neutral-800/80 bg-neutral-950/60 overflow-hidden"
                           >
-                            <div className="p-3 bg-neutral-900/60 border-b border-neutral-800">
-                              <h5 className="text-xs sm:text-sm font-bold text-white">{table.title}</h5>
+                            <div className="p-2.5 bg-neutral-900/60 border-b border-neutral-800 print:bg-neutral-100 print:border-neutral-200">
+                              <h5 className="text-xs sm:text-sm font-bold text-white print:text-xs print:text-neutral-900">
+                                {table.title}
+                              </h5>
                               {table.description && (
-                                <p className="text-[11px] text-neutral-400 mt-0.5">{table.description}</p>
+                                <p className="text-[11px] text-neutral-400 print:text-[10px] print:text-neutral-600 mt-0.5">
+                                  {table.description}
+                                </p>
                               )}
                             </div>
                             <div className="overflow-x-auto">
                               <table className="print-table w-full text-left text-xs">
-                                <thead className="bg-neutral-900/80 text-neutral-300 font-semibold border-b border-neutral-800">
+                                <thead className="bg-neutral-900/80 text-neutral-300 font-semibold border-b border-neutral-800 print:bg-neutral-100 print:text-neutral-900 print:border-neutral-300">
                                   <tr>
                                     {table.headers.map((h, hIdx) => (
-                                      <th key={`th-${hIdx}`} className="p-2.5 sm:p-3 font-semibold">
+                                      <th key={`th-${hIdx}`} className="p-2 sm:p-2.5 font-semibold">
                                         {h}
                                       </th>
                                     ))}
                                   </tr>
                                 </thead>
-                                <tbody className="divide-y divide-neutral-800/60 text-neutral-300">
+                                <tbody className="divide-y divide-neutral-800/60 text-neutral-300 print:divide-neutral-200 print:text-neutral-800">
                                   {table.rows.map((row, rIdx) => (
-                                    <tr key={`tr-${rIdx}`} className="hover:bg-neutral-900/30">
+                                    <tr key={`tr-${rIdx}`} className="hover:bg-neutral-900/30 print:hover:bg-transparent">
                                       {row.map((cell, cIdx) => (
-                                        <td key={`td-${cIdx}`} className="p-2.5 sm:p-3 align-top leading-relaxed">
+                                        <td key={`td-${cIdx}`} className="p-2 sm:p-2.5 align-top leading-snug">
                                           {cell}
                                         </td>
                                       ))}
@@ -963,59 +1017,65 @@ export function QuickStudyGuideModal({
                     </section>
                   )}
 
-                  {/* 5. SECCIÓN: CIFRAS CRÍTICAS Y DOSIS OFICIALES */}
+                  {/* 5. SECCIÓN: CIFRAS CRÍTICAS Y DOSIS OFICIALES (Sin truncamiento, rejilla compacta de 2-3 col) */}
                   {guide.critical_data && guide.critical_data.length > 0 && (
-                    <section className="space-y-3">
-                      <div className="flex items-center gap-2 border-b border-neutral-800 pb-2">
-                        <Hash className="w-4 h-4 text-emerald-400 shrink-0" />
-                        <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-emerald-400">
+                    <section className="space-y-2">
+                      <div className="flex items-center gap-2 border-b border-neutral-800 pb-1.5 print:border-neutral-300">
+                        <Hash className="w-4 h-4 text-emerald-400 shrink-0 print:text-neutral-800" />
+                        <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-emerald-400 print:text-neutral-900 print:text-xs">
                           {t('quick_guide.section_critical_data', '🎯 Cifras Críticas y Dosis Oficiales')}
                         </h4>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 print:grid-cols-3 gap-2.5 print:gap-2">
                         {guide.critical_data.map((data, dIdx) => (
                           <div
                             key={`data-${dIdx}`}
-                            className="print-card p-3.5 rounded-2xl bg-neutral-950/60 border border-neutral-800/80 space-y-1.5 flex flex-col justify-between"
+                            className="print-card p-2.5 sm:p-3 rounded-2xl bg-neutral-950/60 border border-neutral-800/80 space-y-1 flex flex-col justify-between print:p-2"
                           >
-                            <div className="text-xs font-semibold text-neutral-400 truncate">{data.label}</div>
-                            <div className="text-lg sm:text-xl font-black text-emerald-400 font-mono tracking-tight">
+                            <div className="text-xs font-semibold text-neutral-300 print:text-neutral-900 break-words leading-tight">
+                              {data.label}
+                            </div>
+                            <div className="text-base sm:text-lg font-bold text-emerald-400 font-mono tracking-tight print:text-sm print:text-neutral-950">
                               {data.value}
                             </div>
-                            <p className="text-[11px] text-neutral-300 leading-relaxed">{data.context}</p>
+                            <p className="text-[11px] text-neutral-400 print:text-[10px] print:text-neutral-700 leading-tight">
+                              {data.context}
+                            </p>
                           </div>
                         ))}
                       </div>
                     </section>
                   )}
 
-                  {/* 6. SECCIÓN: REGLAS MNEMOTÉCNICAS */}
+                  {/* 6. SECCIÓN: REGLAS MNEMOTÉCNICAS (Ocultación limpia si []) */}
                   {guide.mnemonics && guide.mnemonics.length > 0 && (
-                    <section className="space-y-3">
-                      <div className="flex items-center gap-2 border-b border-neutral-800 pb-2">
-                        <Sparkles className="w-4 h-4 text-violet-400 shrink-0" />
-                        <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-violet-400">
+                    <section className="space-y-2">
+                      <div className="flex items-center gap-2 border-b border-neutral-800 pb-1.5 print:border-neutral-300">
+                        <Sparkles className="w-4 h-4 text-violet-400 shrink-0 print:text-neutral-800" />
+                        <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-violet-400 print:text-neutral-900 print:text-xs">
                           {t('quick_guide.section_mnemonics', '🧠 Reglas Mnemotécnicas')}
                         </h4>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 print:grid-cols-2 gap-2.5 sm:gap-3 print:gap-2">
                         {guide.mnemonics.map((mnem, mIdx) => (
                           <div
                             key={`mnem-${mIdx}`}
-                            className="print-card p-4 rounded-2xl bg-neutral-950/60 border border-violet-500/25 space-y-2 flex flex-col justify-between"
+                            className="print-card p-3 sm:p-3.5 rounded-2xl bg-neutral-950/60 border border-violet-500/25 space-y-1.5 flex flex-col justify-between print:p-2.5"
                           >
-                            <div className="flex items-center justify-between gap-2">
-                              <h5 className="text-xs font-bold text-neutral-200">{mnem.concept}</h5>
-                              <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-violet-500/20 text-violet-300 border border-violet-500/30">
+                            <div className="flex items-center justify-between gap-1.5">
+                              <h5 className="text-xs font-bold text-neutral-200 print:text-neutral-900">{mnem.concept}</h5>
+                              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300 border border-violet-500/30 print:bg-neutral-100 print:text-neutral-800 print:border-neutral-300">
                                 Mnemotecnia
                               </span>
                             </div>
-                            <div className="p-2.5 rounded-xl bg-violet-500/10 border border-violet-500/30 font-mono font-bold text-sm text-violet-200">
+                            <div className="p-2 rounded-xl bg-violet-500/10 border border-violet-500/30 font-mono font-bold text-xs text-violet-200 print:bg-neutral-50 print:border-neutral-300 print:text-neutral-950">
                               {mnem.rule}
                             </div>
-                            <p className="text-xs text-neutral-300 leading-relaxed">{mnem.explanation}</p>
+                            <p className="text-xs text-neutral-300 print:text-[10px] print:text-neutral-700 leading-snug">
+                              {mnem.explanation}
+                            </p>
                           </div>
                         ))}
                       </div>
