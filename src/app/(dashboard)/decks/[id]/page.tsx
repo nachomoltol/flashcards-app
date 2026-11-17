@@ -7,6 +7,7 @@ import { useDeckStore, useCardStore, useProModalStore, useAuthStore, useLanguage
 import { CardEditor, DocumentUploader, FormattedCardView, UrlCardGenerator, HandwrittenNotesUploader, InfoTooltip } from '@/components/cards';
 import { ShareDeckModal, QuickStudyGuideModal, StudyModesHelpModal, PrintExamSheet } from '@/components/decks';
 import { generateCardsAction } from '@/app/actions/generateCards';
+import { generateExhaustiveSummaryFromRawText } from '@/app/actions/generateDeckSummary';
 import { checkUserGenerationQuota } from '@/lib/quotaGuard';
 import { getDeckColorStyles } from '@/lib/colors';
 import { detectPlatform } from '@/lib/platform';
@@ -142,6 +143,18 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
     setIsGenerating(true);
     setAiError(null);
     setAiSuccessMessage(null);
+
+    // Pre-generación en segundo plano no bloqueante del Resumen Completo si se introdujo texto largo / apuntes
+    if (user?.id && id && aiTopic.trim().length >= 100) {
+      void generateExhaustiveSummaryFromRawText(
+        id,
+        user.id,
+        aiTopic.trim(),
+        language === 'en' ? 'en' : 'es'
+      ).catch((guideErr) => {
+        console.warn('[DeckDetailPage] Advertencia en pre-generación de guía por texto:', guideErr);
+      });
+    }
 
     const existingFronts = cards && cards.length > 0 ? cards.map((c) => c.front) : [];
     const result = await generateCardsAction(

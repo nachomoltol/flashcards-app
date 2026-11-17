@@ -29,6 +29,8 @@ export type Database = {
           welcome_generations: number
           current_period_end?: string | null
           subscription_status?: string | null
+          guides_unlocked_this_month?: number
+          guides_reset_at?: string
           created_at: string
           updated_at: string
         }
@@ -46,6 +48,8 @@ export type Database = {
           welcome_generations?: number
           current_period_end?: string | null
           subscription_status?: string | null
+          guides_unlocked_this_month?: number
+          guides_reset_at?: string
           created_at?: string
           updated_at?: string
         }
@@ -63,6 +67,8 @@ export type Database = {
           welcome_generations?: number
           current_period_end?: string | null
           subscription_status?: string | null
+          guides_unlocked_this_month?: number
+          guides_reset_at?: string
           created_at?: string
           updated_at?: string
         }

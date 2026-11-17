@@ -869,7 +869,19 @@
     "regenerate_btn": "Regenerate synthesis",
     "ad_failed": "You must complete the ad to unlock.",
     "error_generic": "Could not generate quick study guide.",
-    "preparing_ad": "Preparing ad..."
+    "preparing_ad": "Preparing ad...",
+    "section_overview": "📖 Panoramic Overview & Objectives",
+    "section_taxonomy": "🌳 Complete Taxonomy & Classification",
+    "section_breakdown": "🔬 Detailed Element & Concept Breakdown",
+    "learning_objectives": "Learning Objectives:",
+    "dietary_sources": "Sources / Examples:",
+    "deficiency": "Deficiency / Lack:",
+    "toxicity": "Toxicity / Overdose:",
+    "key_fact": "Key Exam Takeaway:",
+    "free_quota_remaining": "You have {count} of 3 free guides left this month",
+    "free_quota_exhausted": "You have reached your limit of 3 free guides this month",
+    "unlock_with_ad_btn": "🎬 Unlock Full Guide by watching a video",
+    "unlock_with_pro_btn": "👑 Unlock Unlimited Guides with PRO (€3.50/mo)"
   },
   "study_modes_help": {
     "button_title": "How do study modes work?",

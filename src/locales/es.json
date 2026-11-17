@@ -868,7 +868,19 @@
     "regenerate_btn": "Regenerar síntesis",
     "ad_failed": "Debes completar el anuncio para desbloquear.",
     "error_generic": "No se pudo generar la guía de repaso rápido.",
-    "preparing_ad": "Preparando anuncio..."
+    "preparing_ad": "Preparando anuncio...",
+    "section_overview": "📖 Visión Panorámica y Objetivos",
+    "section_taxonomy": "🌳 Esquema y Clasificación Completa",
+    "section_breakdown": "🔬 Desarrollo Detallado por Elemento / Concepto",
+    "learning_objectives": "Objetivos de Aprendizaje:",
+    "dietary_sources": "Fuentes / Ejemplos:",
+    "deficiency": "Déficit / Carencia:",
+    "toxicity": "Toxicidad / Sobredosis:",
+    "key_fact": "Dato Clave de Examen:",
+    "free_quota_remaining": "Te quedan {count} de 3 guías gratuitas este mes",
+    "free_quota_exhausted": "Has alcanzado el límite de 3 guías gratuitas este mes",
+    "unlock_with_ad_btn": "🎬 Desbloquear Guía Completa viendo un vídeo",
+    "unlock_with_pro_btn": "👑 Desbloquear Guías Ilimitadas con PRO (3,50 €/mes)"
   },
   "study_modes_help": {
     "button_title": "¿Cómo funcionan los modos de estudio?",

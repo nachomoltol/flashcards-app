@@ -6,6 +6,7 @@ import { parseDocxIntoVirtualPages } from '@/lib/docxPagination';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore, useCardStore, useDeckStore, useProModalStore, useLanguageStore } from '@/stores';
 import { generateCardsFromDocumentAction } from '@/app/actions/generateCards';
+import { generateExhaustiveSummaryFromRawText } from '@/app/actions/generateDeckSummary';
 import { checkUserGenerationQuota } from '@/lib/quotaGuard';
 import type { CardFormat, GeneratedCard, DocenteFormat, TargetAudience } from '@/types/cards';
 import { FormattedCardView } from './FormattedCardView';
@@ -117,6 +118,36 @@ function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/**
+ * Extrae de forma segura el texto íntegro en memoria para documentos DOCX, TXT o texto sin bloquear.
+ */
+async function extractDocumentTextInMemory(file: File): Promise<string> {
+  try {
+    const ext = '.' + (file.name.split('.').pop()?.toLowerCase() || '');
+
+    // 1. Archivo de texto plano (.txt)
+    if (ext === '.txt' || file.type === 'text/plain') {
+      return await file.text();
+    }
+
+    // 2. Documento Word (.docx / .doc)
+    if (
+      ext === '.docx' ||
+      ext === '.doc' ||
+      file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+      file.type === 'application/msword'
+    ) {
+      const arrayBuffer = await file.arrayBuffer();
+      const virtualPages = await parseDocxIntoVirtualPages(arrayBuffer);
+      return virtualPages.map((p) => p.text).join('\n\n');
+    }
+  } catch (err) {
+    console.warn('[DocumentUploader] No se pudo extraer texto del archivo en memoria:', err);
+  }
+
+  return '';
 }
 
 function validateFile(file: File): string | null {
@@ -505,6 +536,30 @@ export function DocumentUploader({
 
     try {
       setErrorMessage(null);
+
+      // 0. Disparo en paralelo universal no bloqueante del Resumen Completo del Capítulo si hay texto extraíble en memoria
+      if (user?.id && deckId && selectedFile) {
+        void (async () => {
+          try {
+            const extractedFullText = await extractDocumentTextInMemory(selectedFile);
+            if (extractedFullText && extractedFullText.trim().length > 50) {
+              console.log(
+                `[DocumentUploader] Disparando pre-generación en paralelo de la guía de estudio (${extractedFullText.length} caracteres)...`
+              );
+              void generateExhaustiveSummaryFromRawText(
+                deckId,
+                user.id,
+                extractedFullText,
+                language === 'en' ? 'en' : 'es'
+              ).catch((guideErr) => {
+                console.warn('[DocumentUploader] Advertencia en generación en paralelo de la guía:', guideErr);
+              });
+            }
+          } catch (extractErr) {
+            console.warn('[DocumentUploader] Advertencia al extraer texto para guía:', extractErr);
+          }
+        })();
+      }
 
       const fileInfo = getFileTypeInfo(selectedFile);
       const fileKey = `${selectedFile.name}-${selectedFile.size}`;

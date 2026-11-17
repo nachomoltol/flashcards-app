@@ -14,15 +14,23 @@ import {
   Table,
   Hash,
   Lightbulb,
+  BookOpen,
+  ListTree,
+  Layers,
+  CheckCircle2,
+  AlertTriangle,
+  ShieldCheck,
+  Utensils,
+  Flame,
 } from 'lucide-react';
 import { useLanguageStore, useAuthStore, useProModalStore } from '@/stores';
 import { supabase } from '@/lib/supabase';
 import {
   getOrGenerateDeckSummaryAction,
-  type DeckSummaryGuide,
+  unlockDeckSummaryWithAdAction,
+  type ExhaustiveDeckSummaryGuide,
 } from '@/app/actions/generateDeckSummary';
 import { showAdMobRewardedAd, preloadRewardedAd } from '@/lib/admob';
-import { claimAdRewardAction } from '@/app/actions/claimAdReward';
 import { usePlatform } from '@/lib/platform';
 
 interface QuickStudyGuideModalProps {
@@ -43,7 +51,7 @@ export function QuickStudyGuideModal({
   const { openProModal } = useProModalStore();
   const platform = usePlatform();
 
-  const [guide, setGuide] = useState<DeckSummaryGuide | null>(null);
+  const [guide, setGuide] = useState<ExhaustiveDeckSummaryGuide | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -51,8 +59,10 @@ export function QuickStudyGuideModal({
   const [isAdUnlocked, setIsAdUnlocked] = useState(false);
   const [isWatchingAd, setIsWatchingAd] = useState(false);
   const [adError, setAdError] = useState<string | null>(null);
+  const [guidesUnlockedThisMonth, setGuidesUnlockedThisMonth] = useState<number>(0);
+  const [maxFreeGuidesPerMonth, setMaxFreeGuidesPerMonth] = useState<number>(3);
 
-  // Comprobar suscripción PRO del usuario
+  // Comprobar suscripción PRO y cuota de guías del usuario
   useEffect(() => {
     if (!user?.id) return;
     const uid: string = user.id;
@@ -60,15 +70,20 @@ export function QuickStudyGuideModal({
       try {
         const { data } = await supabase
           .from('api_limits')
-          .select('tier')
+          .select('tier, guides_unlocked_this_month')
           .eq('user_id', uid)
           .maybeSingle();
 
-        if (data && (data.tier === 'pro' || data.tier === 'vip')) {
-          setIsPro(true);
+        if (data) {
+          if (data.tier === 'pro' || data.tier === 'vip') {
+            setIsPro(true);
+          }
+          if (typeof data.guides_unlocked_this_month === 'number') {
+            setGuidesUnlockedThisMonth(data.guides_unlocked_this_month);
+          }
         }
       } catch (err) {
-        console.warn('Error al verificar estatus PRO:', err);
+        console.warn('Error al verificar estatus PRO o límites de guías:', err);
       }
     }
     checkTier();
@@ -94,8 +109,23 @@ export function QuickStudyGuideModal({
           session?.access_token
         );
 
-        if (res.success && res.summary) {
-          setGuide(res.summary);
+        if (res.success) {
+          if (res.summary) {
+            setGuide(res.summary);
+          } else if (res.previewGuide) {
+            setGuide(res.previewGuide as ExhaustiveDeckSummaryGuide);
+          }
+          if (typeof res.isUnlocked === 'boolean') {
+            if (res.isUnlocked) {
+              setIsAdUnlocked(true);
+            }
+          }
+          if (typeof res.guidesUnlockedThisMonth === 'number') {
+            setGuidesUnlockedThisMonth(res.guidesUnlockedThisMonth);
+          }
+          if (typeof res.maxFreeGuidesPerMonth === 'number') {
+            setMaxFreeGuidesPerMonth(res.maxFreeGuidesPerMonth);
+          }
         } else {
           const formattedError =
             res.error === 'AUTH_REQUIRED'
@@ -104,7 +134,7 @@ export function QuickStudyGuideModal({
           setErrorMsg(formattedError);
         }
       } catch (err) {
-        console.error('Error al obtener guía de repaso rápido:', err);
+        console.error('Error al obtener guía de repaso exhaustivo:', err);
         setErrorMsg(t('quick_guide.error_generic', 'No se pudo generar la guía.'));
       } finally {
         setIsLoading(false);
@@ -137,7 +167,7 @@ export function QuickStudyGuideModal({
     }
   }, [isOpen]);
 
-  // Desbloqueo mediante anuncio bonificado AdMob
+  // Desbloqueo mediante anuncio bonificado AdMob (límite de 3 guías/mes para Free)
   const handleWatchAd = async () => {
     if (isWatchingAd) return;
     setAdError(null);
@@ -152,11 +182,24 @@ export function QuickStudyGuideModal({
         } catch (sessionErr) {
           console.warn('[QuickStudyGuideModal] No se pudo obtener el token de sesión:', sessionErr);
         }
-        const claim = await claimAdRewardAction(user?.id, accessToken);
-        if (claim.success) {
+        const claim = await unlockDeckSummaryWithAdAction(deckId, accessToken);
+        if (claim.success && claim.summary) {
+          setGuide(claim.summary);
           setIsAdUnlocked(true);
+          if (typeof claim.guidesUnlockedThisMonth === 'number') {
+            setGuidesUnlockedThisMonth(claim.guidesUnlockedThisMonth);
+          }
         } else {
-          setAdError(claim.message || t('quick_guide.ad_failed', 'Debes completar el anuncio para desbloquear.'));
+          if (claim.error === 'FREE_MONTHLY_LIMIT_REACHED') {
+            setAdError(
+              t(
+                'quick_guide.free_quota_exhausted',
+                'Has alcanzado el límite de 3 guías gratuitas este mes. Pásate a PRO para acceso ilimitado.'
+              )
+            );
+          } else {
+            setAdError(claim.error || t('quick_guide.ad_failed', 'Debes completar el anuncio para desbloquear.'));
+          }
         }
       } else {
         setAdError(adResult.error || t('quick_guide.ad_failed', 'Debes completar el anuncio para desbloquear.'));
@@ -170,6 +213,7 @@ export function QuickStudyGuideModal({
   };
 
   const isUnlocked = isPro || isAdUnlocked;
+  const freeRemaining = Math.max(0, maxFreeGuidesPerMonth - guidesUnlockedThisMonth);
 
   const handlePrintGuide = () => {
     if (!isUnlocked) {
@@ -180,7 +224,7 @@ export function QuickStudyGuideModal({
     const printContent = document.getElementById('quick-study-guide-printable');
     if (!printContent) return;
 
-    const printWindow = window.open('', '_blank', 'width=800,height=900');
+    const printWindow = window.open('', '_blank', 'width=850,height=950');
     if (!printWindow) {
       // Fallback si el bloqueador de popups actúa:
       window.print();
@@ -189,7 +233,7 @@ export function QuickStudyGuideModal({
 
     const html = `
       <!DOCTYPE html>
-      <html lang="es">
+      <html lang="${language === 'en' ? 'en' : 'es'}">
         <head>
           <meta charset="utf-8" />
           <title>Flashmente - Guía de Repaso: ${deckTitle}</title>
@@ -207,10 +251,36 @@ export function QuickStudyGuideModal({
               print-color-adjust: exact;
             }
             .break-inside-avoid {
-              break-inside: avoid;
-              page-break-inside: avoid;
+              break-inside: avoid !important;
+              page-break-inside: avoid !important;
             }
-            /* Adaptar las tarjetas del modal a impresión limpia con fondo blanco y bordes nítidos */
+            .print-card {
+              background-color: #ffffff !important;
+              color: #111827 !important;
+              border: 1px solid #d1d5db !important;
+              border-radius: 12px;
+              break-inside: avoid !important;
+              page-break-inside: avoid !important;
+              margin-bottom: 12px;
+            }
+            .print-table {
+              width: 100% !important;
+              border-collapse: collapse !important;
+              break-inside: avoid !important;
+            }
+            .print-table th {
+              background-color: #f3f4f6 !important;
+              color: #111827 !important;
+              border: 1px solid #9ca3af !important;
+              padding: 6px 10px !important;
+              font-weight: 700 !important;
+            }
+            .print-table td {
+              background-color: #ffffff !important;
+              color: #111827 !important;
+              border: 1px solid #d1d5db !important;
+              padding: 6px 10px !important;
+            }
             .bg-neutral-950,
             .bg-neutral-950\\/60,
             .bg-neutral-900,
@@ -233,47 +303,23 @@ export function QuickStudyGuideModal({
             .text-neutral-600 {
               color: #4b5563 !important;
             }
-            .print-card {
-              background-color: #ffffff !important;
-              color: #111827 !important;
-              border: 1px solid #e5e7eb !important;
-              border-radius: 12px;
-              break-inside: avoid;
-              page-break-inside: avoid;
-            }
-            p, h1, h2, h3, h4, h5, h6, span, tr, td, th, li {
-              break-inside: auto;
-              page-break-inside: auto;
-            }
-            .print-table {
-              width: 100% !important;
-              border-collapse: collapse !important;
-            }
-            .print-table th {
-              background-color: #f3f4f6 !important;
-              color: #111827 !important;
-              border: 1px solid #d1d5db !important;
-              padding: 6px 10px !important;
-              font-weight: 700 !important;
-            }
-            .print-table td {
-              background-color: #ffffff !important;
-              color: #111827 !important;
-              border: 1px solid #e5e7eb !important;
-              padding: 6px 10px !important;
-            }
             .bg-amber-500\\/10,
-            .bg-violet-500\\/10,
+            .bg-amber-500\\/15,
             .bg-emerald-500\\/10,
-            .bg-indigo-500\\/10 {
+            .bg-emerald-500\\/15,
+            .bg-indigo-500\\/10,
+            .bg-violet-500\\/10,
+            .bg-rose-500\\/10 {
               background-color: #f9fafb !important;
               border: 1px solid #e5e7eb !important;
               color: #111827 !important;
             }
-            .text-amber-300, .text-amber-400 { color: #92400e !important; }
-            .text-violet-200, .text-violet-300, .text-violet-400 { color: #5b21b6 !important; }
-            .text-emerald-400 { color: #065f46 !important; }
+            .text-amber-200, .text-amber-300, .text-amber-400 { color: #92400e !important; }
+            .text-emerald-300, .text-emerald-400 { color: #065f46 !important; }
+            .text-cyan-400 { color: #0e7490 !important; }
             .text-indigo-400 { color: #3730a3 !important; }
+            .text-violet-200, .text-violet-300, .text-violet-400 { color: #5b21b6 !important; }
+            .text-rose-200, .text-rose-300, .text-rose-400 { color: #991b1b !important; }
             .no-print {
               display: none !important;
             }
@@ -282,7 +328,7 @@ export function QuickStudyGuideModal({
         <body class="p-4 bg-white text-neutral-900">
           <header class="border-b border-neutral-300 pb-3 mb-6">
             <div class="flex items-center justify-between">
-              <h1 class="text-xl font-bold text-neutral-900">Flashmente - Guía de Repaso Rápido</h1>
+              <h1 class="text-xl font-bold text-neutral-900">Flashmente • Resumen Completo de Capítulo</h1>
               <span class="text-xs text-neutral-500 font-mono">FSRS Spaced Repetition</span>
             </div>
             <p class="text-sm font-semibold text-neutral-700 mt-1">${deckTitle}</p>
@@ -298,7 +344,6 @@ export function QuickStudyGuideModal({
     printWindow.document.write(html);
     printWindow.document.close();
 
-    // Esperar a que renderice y disparar impresión limpia
     printWindow.focus();
     setTimeout(() => {
       printWindow.print();
@@ -320,7 +365,6 @@ export function QuickStudyGuideModal({
             color: #000000 !important;
           }
 
-          /* Ocultar todo lo que no sea el contenido imprimible */
           body * {
             visibility: hidden;
           }
@@ -339,7 +383,7 @@ export function QuickStudyGuideModal({
             max-height: none !important;
             overflow: visible !important;
             margin: 0 !important;
-            padding: 15mm !important;
+            padding: 12mm 15mm !important;
             background: #ffffff !important;
             color: #111827 !important;
           }
@@ -350,7 +394,6 @@ export function QuickStudyGuideModal({
             visibility: hidden !important;
           }
 
-          /* Reset de contenedores del modal para flujo continuo sin fragmentación */
           .modal-backdrop-print-fix,
           .modal-dialog-print-fix {
             position: static !important;
@@ -368,7 +411,6 @@ export function QuickStudyGuideModal({
             display: block !important;
           }
 
-          /* Forzar fondos blancos y texto oscuro para ahorro de tinta y legibilidad */
           .bg-neutral-900,
           .bg-neutral-900\\/50,
           .bg-neutral-900\\/60,
@@ -382,7 +424,6 @@ export function QuickStudyGuideModal({
             border-color: #e5e7eb !important;
           }
 
-          /* Colores de texto legible en papel */
           .text-white,
           .text-neutral-100,
           .text-neutral-200,
@@ -396,12 +437,10 @@ export function QuickStudyGuideModal({
             color: #374151 !important;
           }
 
-          /* Grids adaptadas a documento A4 */
           .grid {
             display: grid !important;
           }
 
-          /* Aplica break-inside: avoid ÚNICAMENTE a los contenedores de tarjeta individuales */
           .print-card {
             background-color: #ffffff !important;
             color: #111827 !important;
@@ -409,18 +448,18 @@ export function QuickStudyGuideModal({
             box-shadow: none !important;
             page-break-inside: avoid !important;
             break-inside: avoid !important;
+            margin-bottom: 12px;
           }
 
-          /* Eliminar break-inside en elementos pequeños para flujo continuo y compacto */
           p, h1, h2, h3, h4, h5, h6, span, tr, td, th, li {
             page-break-inside: auto !important;
             break-inside: auto !important;
           }
 
-          /* Tablas comparativas limpias */
           .print-table {
             width: 100% !important;
             border-collapse: collapse !important;
+            break-inside: avoid !important;
           }
 
           .print-table th {
@@ -438,36 +477,25 @@ export function QuickStudyGuideModal({
             padding: 6px 10px !important;
           }
 
-          /* Indicadores sutiles */
           .bg-amber-500\\/10,
-          .bg-violet-500\\/10,
+          .bg-amber-500\\/15,
           .bg-emerald-500\\/10,
-          .bg-indigo-500\\/10 {
+          .bg-emerald-500\\/15,
+          .bg-indigo-500\\/10,
+          .bg-violet-500\\/10,
+          .bg-rose-500\\/10 {
             background-color: #f9fafb !important;
             border: 1px solid #e5e7eb !important;
             color: #111827 !important;
           }
 
-          .text-amber-300,
-          .text-amber-400 {
-            color: #92400e !important;
-          }
+          .text-amber-200, .text-amber-300, .text-amber-400 { color: #92400e !important; }
+          .text-emerald-300, .text-emerald-400 { color: #065f46 !important; }
+          .text-cyan-400 { color: #0e7490 !important; }
+          .text-indigo-400 { color: #3730a3 !important; }
+          .text-violet-200, .text-violet-300, .text-violet-400 { color: #5b21b6 !important; }
+          .text-rose-200, .text-rose-300, .text-rose-400 { color: #991b1b !important; }
 
-          .text-violet-200,
-          .text-violet-300,
-          .text-violet-400 {
-            color: #5b21b6 !important;
-          }
-
-          .text-emerald-400 {
-            color: #065f46 !important;
-          }
-
-          .text-indigo-400 {
-            color: #3730a3 !important;
-          }
-
-          /* Ajustar tamaño de página A4 con márgenes limpios */
           @page {
             size: A4;
             margin: 12mm;
@@ -477,7 +505,7 @@ export function QuickStudyGuideModal({
 
       <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200 modal-backdrop-print-fix">
         <div
-          className="w-full max-w-4xl max-h-[92vh] flex flex-col rounded-3xl bg-neutral-900 border border-neutral-700/80 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 modal-dialog-print-fix"
+          className="w-full max-w-5xl max-h-[92vh] flex flex-col rounded-3xl bg-neutral-900 border border-neutral-700/80 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 modal-dialog-print-fix"
           role="dialog"
           aria-modal="true"
           onClick={(e) => e.stopPropagation()}
@@ -491,11 +519,16 @@ export function QuickStudyGuideModal({
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="text-base sm:text-lg font-bold text-white truncate">
-                    {guide?.title || `${t('quick_guide.modal_title', 'Guía de Repaso Rápido')}: ${deckTitle}`}
+                    {guide?.title || `${t('quick_guide.modal_title', 'Guía de Repaso')}: ${deckTitle}`}
                   </h3>
                   {isPro && (
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-500/20 to-amber-600/20 border border-amber-500/40 text-amber-300 shrink-0">
                       👑 PRO
+                    </span>
+                  )}
+                  {!isPro && isUnlocked && (
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 shrink-0">
+                      ✨ Desbloqueado este mes
                     </span>
                   )}
                 </div>
@@ -557,10 +590,10 @@ export function QuickStudyGuideModal({
                 </div>
                 <div>
                   <h4 className="text-base font-bold text-white">
-                    {t('quick_guide.loading', 'Sintetizando tarjetas del mazo con IA...')}
+                    {t('quick_guide.loading', 'Sintetizando capítulo y tarjetas con IA...')}
                   </h4>
                   <p className="text-xs text-neutral-400 mt-1 max-w-sm">
-                    Extrayendo ideas fuerza, tablas comparativas, métricas críticas y mnemotecnias.
+                    Estructurando visión panorámica, taxonomía exhaustiva, desarrollo por elementos, tablas y mnemotecnias.
                   </p>
                 </div>
               </div>
@@ -587,210 +620,406 @@ export function QuickStudyGuideModal({
             {/* Contenido Completo de la Guía */}
             {guide && !isLoading && (
               <div className="space-y-6">
-                {/* 1. SECCIÓN: CONCEPTOS CLAVE Y FUNDAMENTOS (Visible siempre para todos) */}
+                {/* 1. SECCIÓN: VISIÓN PANORÁMICA Y OBJETIVOS (Visible siempre para todos) */}
                 <section className="space-y-3">
                   <div className="flex items-center gap-2 border-b border-neutral-800 pb-2">
-                    <Lightbulb className="w-4 h-4 text-amber-400 shrink-0" />
-                    <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-amber-400">
-                      {t('quick_guide.section_key_concepts', '💡 Conceptos Clave y Fundamentos')}
+                    <BookOpen className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-emerald-400">
+                      {t('quick_guide.section_overview', '📖 Visión Panorámica y Objetivos')}
                     </h4>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-                    {guide.key_concepts.map((concept, idx) => (
-                      <div
-                        key={`concept-${idx}`}
-                        className="print-card p-3.5 sm:p-4 rounded-2xl bg-neutral-950/60 border border-neutral-800/80 space-y-2 flex flex-col justify-between"
-                      >
-                        <div>
-                          <h5 className="text-sm font-bold text-white mb-1">{concept.title}</h5>
-                          <p className="text-xs text-neutral-300 leading-relaxed">{concept.description}</p>
+                  <div className="print-card p-4 sm:p-5 rounded-2xl bg-neutral-950/60 border border-neutral-800/80 space-y-4">
+                    {/* Resumen Global */}
+                    <p className="text-xs sm:text-sm text-neutral-200 leading-relaxed">
+                      {guide.overview?.summary || `Resumen integral del capítulo ${deckTitle}.`}
+                    </p>
+
+                    {/* Objetivos de Aprendizaje */}
+                    {guide.overview?.learningObjectives && guide.overview.learningObjectives.length > 0 && (
+                      <div className="pt-2 border-t border-neutral-800/80 space-y-2">
+                        <div className="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>{t('quick_guide.learning_objectives', 'Objetivos de Aprendizaje:')}</span>
                         </div>
-                        <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300 flex items-start gap-1.5 font-medium">
-                          <span className="font-bold shrink-0">{t('quick_guide.takeaway', 'Clave:')}</span>
-                          <span>{concept.keyTakeaway}</span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {guide.overview.learningObjectives.map((obj, oIdx) => (
+                            <div
+                              key={`obj-${oIdx}`}
+                              className="p-2.5 rounded-xl bg-neutral-900/60 border border-neutral-800 flex items-start gap-2 text-xs text-neutral-300"
+                            >
+                              <span className="text-emerald-400 font-bold shrink-0">✓</span>
+                              <span className="leading-snug">{obj}</span>
+                            </div>
+                          ))}
                         </div>
                       </div>
-                    ))}
+                    )}
                   </div>
                 </section>
 
-                {/* BLOQUE GATED / TEASER (Secciones 2, 3 y 4 con efecto blur para Free) */}
-                <div className="relative mt-6">
-                  <div
-                    className={`space-y-6 transition-all duration-300 ${
-                      !isUnlocked ? 'filter blur-[4px] select-none pointer-events-none opacity-40 max-h-[460px] overflow-hidden' : ''
-                    }`}
-                  >
-                    {/* 2. SECCIÓN: TABLAS COMPARATIVAS Y TRAMPAS */}
-                    {guide.contrast_tables && guide.contrast_tables.length > 0 && (
+                {/* OVERLAY CONVERSIÓN PRO / REWARDED AD PARA USUARIOS FREE */}
+                {!isUnlocked && (
+                  <div className="my-6 p-6 sm:p-7 rounded-3xl bg-neutral-900/95 border-2 border-amber-500/40 shadow-2xl backdrop-blur-xl space-y-4 no-print text-center">
+                    <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-amber-500/20 to-amber-600/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shadow-lg">
+                      <Crown className="w-7 h-7" />
+                    </div>
+                    <div className="max-w-lg mx-auto">
+                      <h4 className="text-base sm:text-lg font-bold text-white">
+                        {t('quick_guide.pro_locked_title', 'Desbloquea la Guía Completa de este Capítulo')}
+                      </h4>
+                      <p className="text-xs text-neutral-300 mt-1.5 leading-relaxed">
+                        {t(
+                          'quick_guide.pro_locked_desc',
+                          'Accede a la taxonomía completa, fichas detalladas por elemento, tablas comparativas, cifras y dosis oficiales y descarga en PDF.'
+                        )}
+                      </p>
+                    </div>
+
+                    {/* Contador de guías mensuales */}
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-neutral-800 border border-neutral-700 text-neutral-200">
+                      {freeRemaining > 0 ? (
+                        <>
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                          <span>
+                            {t('quick_guide.free_quota_remaining', { count: freeRemaining })}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="w-2 h-2 rounded-full bg-rose-400" />
+                          <span className="text-rose-300">
+                            {t('quick_guide.free_quota_exhausted', 'Has alcanzado el límite de 3 guías gratuitas este mes')}
+                          </span>
+                        </>
+                      )}
+                    </div>
+
+                    {adError && (
+                      <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs max-w-md mx-auto">
+                        {adError}
+                      </div>
+                    )}
+
+                    {/* Botones de acción */}
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+                      {freeRemaining > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleWatchAd}
+                          disabled={isWatchingAd}
+                          className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-neutral-800 hover:bg-neutral-700 text-neutral-100 border border-neutral-600 text-xs font-semibold transition active:scale-95 cursor-pointer disabled:opacity-75 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-md"
+                        >
+                          {isWatchingAd ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin text-amber-400 shrink-0" />
+                              <span>{t('quick_guide.preparing_ad', 'Preparando anuncio...')}</span>
+                            </>
+                          ) : (
+                            <>
+                              <PlayCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                              <span>{t('quick_guide.unlock_with_ad_btn', '🎬 Desbloquear Guía Completa viendo un vídeo')}</span>
+                            </>
+                          )}
+                        </button>
+                      )}
+
+                      {!platform.isNativeIOS && (
+                        <button
+                          type="button"
+                          onClick={() => openProModal(true)}
+                          className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-bold text-xs transition shadow-lg shadow-amber-500/20 active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
+                        >
+                          <Crown className="w-4 h-4 shrink-0" />
+                          <span>{t('quick_guide.unlock_with_pro_btn', '👑 Desbloquear Guías Ilimitadas con PRO (3,50 €/mes)')}</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* BLOQUES 2 AL 6 (Visibles al desbloquear o con teaser blur si Free) */}
+                <div
+                  className={`space-y-6 transition-all duration-300 ${
+                    !isUnlocked
+                      ? 'filter blur-[5px] select-none pointer-events-none opacity-30 max-h-[380px] overflow-hidden no-print'
+                      : ''
+                  }`}
+                >
+                  {/* 2. SECCIÓN: ESQUEMA Y CLASIFICACIÓN COMPLETA (Taxonomy Tree) */}
+                  {guide.taxonomy_tree && guide.taxonomy_tree.length > 0 && (
+                    <section className="space-y-3">
+                      <div className="flex items-center gap-2 border-b border-neutral-800 pb-2">
+                        <ListTree className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-emerald-400">
+                          {t('quick_guide.section_taxonomy', '🌳 Esquema y Clasificación Completa')}
+                        </h4>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                        {guide.taxonomy_tree.map((group, gIdx) => (
+                          <div
+                            key={`tax-${gIdx}`}
+                            className="print-card p-4 rounded-2xl bg-neutral-950/60 border border-neutral-800/80 space-y-3"
+                          >
+                            <div className="flex items-center justify-between gap-2 border-b border-neutral-800/60 pb-2">
+                              <h5 className="text-sm font-bold text-white flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                                {group.category}
+                              </h5>
+                              <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-neutral-800 text-neutral-300 border border-neutral-700">
+                                {group.elements?.length || 0} elementos
+                              </span>
+                            </div>
+                            {group.description && (
+                              <p className="text-xs text-neutral-400 leading-relaxed">
+                                {group.description}
+                              </p>
+                            )}
+                            <div className="flex flex-wrap gap-1.5 pt-1">
+                              {group.elements?.map((el, elIdx) => (
+                                <span
+                                  key={`el-${gIdx}-${elIdx}`}
+                                  className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/25"
+                                >
+                                  {el}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  )}
+
+                  {/* 3. SECCIÓN: DESARROLLO DETALLADO POR ELEMENTO / CONCEPTO */}
+                  {guide.item_breakdown && guide.item_breakdown.length > 0 && (
+                    <section className="space-y-3">
+                      <div className="flex items-center gap-2 border-b border-neutral-800 pb-2">
+                        <Layers className="w-4 h-4 text-cyan-400 shrink-0" />
+                        <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-cyan-400">
+                          {t('quick_guide.section_breakdown', '🔬 Desarrollo Detallado por Elemento / Concepto')}
+                        </h4>
+                      </div>
+
+                      <div className="space-y-4">
+                        {guide.item_breakdown.map((item, iIdx) => (
+                          <div
+                            key={`item-${iIdx}`}
+                            className="print-card p-4 sm:p-5 rounded-2xl bg-neutral-950/60 border border-neutral-800/80 space-y-3"
+                          >
+                            {/* Cabecera del Elemento */}
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-neutral-800 pb-2.5">
+                              <h5 className="text-base font-bold text-white flex items-center gap-2">
+                                <span className="text-emerald-400 font-mono text-sm">#{iIdx + 1}</span>
+                                <span>{item.name}</span>
+                              </h5>
+                              <span className="text-xs font-medium px-2.5 py-1 rounded-lg bg-neutral-800 text-neutral-300 border border-neutral-700 w-fit">
+                                {item.role}
+                              </span>
+                            </div>
+
+                            {/* Fuentes Dietéticas / Ejemplos */}
+                            {item.dietarySources && item.dietarySources.length > 0 && (
+                              <div className="space-y-1.5">
+                                <div className="flex items-center gap-1.5 text-xs text-neutral-400 font-semibold">
+                                  <Utensils className="w-3.5 h-3.5 text-emerald-400" />
+                                  <span>{t('quick_guide.dietary_sources', 'Fuentes / Ejemplos:')}</span>
+                                </div>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {item.dietarySources.map((source, sIdx) => (
+                                    <span
+                                      key={`source-${iIdx}-${sIdx}`}
+                                      className="px-2 py-0.5 rounded-md text-[11px] bg-neutral-900 border border-neutral-700/80 text-neutral-300"
+                                    >
+                                      {source}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Déficit y Toxicidad */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-1">
+                              {item.deficiency && (
+                                <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-xs text-amber-200 space-y-1">
+                                  <div className="flex items-center gap-1.5 font-bold text-amber-300">
+                                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                                    <span>{t('quick_guide.deficiency', 'Déficit / Carencia:')}</span>
+                                  </div>
+                                  <p className="leading-relaxed text-amber-200/90">{item.deficiency}</p>
+                                </div>
+                              )}
+                              {item.toxicity && (
+                                <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/25 text-xs text-rose-200 space-y-1">
+                                  <div className="flex items-center gap-1.5 font-bold text-rose-300">
+                                    <Flame className="w-3.5 h-3.5 shrink-0" />
+                                    <span>{t('quick_guide.toxicity', 'Toxicidad / Sobredosis:')}</span>
+                                  </div>
+                                  <p className="leading-relaxed text-rose-200/90">{item.toxicity}</p>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Dato Clave de Examen */}
+                            {item.keyFact && (
+                              <div className="p-3 rounded-xl bg-gradient-to-r from-amber-500/15 to-amber-600/10 border border-amber-500/35 text-xs text-amber-200 flex items-start gap-2 shadow-sm">
+                                <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                                <div className="leading-relaxed">
+                                  <strong className="text-amber-300 mr-1.5">
+                                    {t('quick_guide.key_fact', 'Dato Clave de Examen:')}
+                                  </strong>
+                                  <span>{item.keyFact}</span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  )}
+
+                  {/* RETROCOMPATIBILIDAD CON GUÍAS V1 (Si no hay item_breakdown pero sí key_concepts) */}
+                  {(!guide.item_breakdown || guide.item_breakdown.length === 0) &&
+                    guide.key_concepts &&
+                    guide.key_concepts.length > 0 && (
                       <section className="space-y-3">
                         <div className="flex items-center gap-2 border-b border-neutral-800 pb-2">
-                          <Table className="w-4 h-4 text-indigo-400 shrink-0" />
-                          <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-indigo-400">
-                            {t('quick_guide.section_contrast_tables', '⚖️ Tablas Comparativas y Trampas')}
+                          <Lightbulb className="w-4 h-4 text-amber-400 shrink-0" />
+                          <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-amber-400">
+                            {t('quick_guide.section_key_concepts', '💡 Conceptos Clave y Fundamentos')}
                           </h4>
                         </div>
 
-                        <div className="space-y-4">
-                          {guide.contrast_tables.map((table, tIdx) => (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                          {guide.key_concepts.map((concept, idx) => (
                             <div
-                              key={`table-${tIdx}`}
-                              className="print-card rounded-2xl border border-neutral-800/80 bg-neutral-950/60 overflow-hidden"
+                              key={`concept-${idx}`}
+                              className="print-card p-3.5 sm:p-4 rounded-2xl bg-neutral-950/60 border border-neutral-800/80 space-y-2 flex flex-col justify-between"
                             >
-                              <div className="p-3 bg-neutral-900/60 border-b border-neutral-800">
-                                <h5 className="text-xs sm:text-sm font-bold text-white">{table.title}</h5>
-                                {table.description && (
-                                  <p className="text-[11px] text-neutral-400 mt-0.5">{table.description}</p>
-                                )}
+                              <div>
+                                <h5 className="text-sm font-bold text-white mb-1">{concept.title}</h5>
+                                <p className="text-xs text-neutral-300 leading-relaxed">{concept.description}</p>
                               </div>
-                              <div className="overflow-x-auto">
-                                <table className="print-table w-full text-left text-xs">
-                                  <thead className="bg-neutral-900/80 text-neutral-300 font-semibold border-b border-neutral-800">
-                                    <tr>
-                                      {table.headers.map((h, hIdx) => (
-                                        <th key={`th-${hIdx}`} className="p-2.5 sm:p-3 font-semibold">
-                                          {h}
-                                        </th>
+                              <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300 flex items-start gap-1.5 font-medium">
+                                <span className="font-bold shrink-0">{t('quick_guide.takeaway', 'Clave:')}</span>
+                                <span>{concept.keyTakeaway}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </section>
+                    )}
+
+                  {/* 4. SECCIÓN: TABLAS COMPARATIVAS Y TRAMPAS DE EXAMEN */}
+                  {guide.contrast_tables && guide.contrast_tables.length > 0 && (
+                    <section className="space-y-3">
+                      <div className="flex items-center gap-2 border-b border-neutral-800 pb-2">
+                        <Table className="w-4 h-4 text-indigo-400 shrink-0" />
+                        <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-indigo-400">
+                          {t('quick_guide.section_contrast_tables', '⚖️ Tablas Comparativas y Trampas')}
+                        </h4>
+                      </div>
+
+                      <div className="space-y-4">
+                        {guide.contrast_tables.map((table, tIdx) => (
+                          <div
+                            key={`table-${tIdx}`}
+                            className="print-card rounded-2xl border border-neutral-800/80 bg-neutral-950/60 overflow-hidden"
+                          >
+                            <div className="p-3 bg-neutral-900/60 border-b border-neutral-800">
+                              <h5 className="text-xs sm:text-sm font-bold text-white">{table.title}</h5>
+                              {table.description && (
+                                <p className="text-[11px] text-neutral-400 mt-0.5">{table.description}</p>
+                              )}
+                            </div>
+                            <div className="overflow-x-auto">
+                              <table className="print-table w-full text-left text-xs">
+                                <thead className="bg-neutral-900/80 text-neutral-300 font-semibold border-b border-neutral-800">
+                                  <tr>
+                                    {table.headers.map((h, hIdx) => (
+                                      <th key={`th-${hIdx}`} className="p-2.5 sm:p-3 font-semibold">
+                                        {h}
+                                      </th>
+                                    ))}
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-neutral-800/60 text-neutral-300">
+                                  {table.rows.map((row, rIdx) => (
+                                    <tr key={`tr-${rIdx}`} className="hover:bg-neutral-900/30">
+                                      {row.map((cell, cIdx) => (
+                                        <td key={`td-${cIdx}`} className="p-2.5 sm:p-3 align-top leading-relaxed">
+                                          {cell}
+                                        </td>
                                       ))}
                                     </tr>
-                                  </thead>
-                                  <tbody className="divide-y divide-neutral-800/60 text-neutral-300">
-                                    {table.rows.map((row, rIdx) => (
-                                      <tr key={`tr-${rIdx}`} className="hover:bg-neutral-900/30">
-                                        {row.map((cell, cIdx) => (
-                                          <td key={`td-${cIdx}`} className="p-2.5 sm:p-3 align-top leading-relaxed">
-                                            {cell}
-                                          </td>
-                                        ))}
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
+                                  ))}
+                                </tbody>
+                              </table>
                             </div>
-                          ))}
-                        </div>
-                      </section>
-                    )}
-
-                    {/* 3. SECCIÓN: CIFRAS Y DATOS CRÍTICOS */}
-                    {guide.critical_data && guide.critical_data.length > 0 && (
-                      <section className="space-y-3">
-                        <div className="flex items-center gap-2 border-b border-neutral-800 pb-2">
-                          <Hash className="w-4 h-4 text-emerald-400 shrink-0" />
-                          <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-emerald-400">
-                            {t('quick_guide.section_critical_data', '🎯 Cifras y Datos Indispensables')}
-                          </h4>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                          {guide.critical_data.map((data, dIdx) => (
-                            <div
-                              key={`data-${dIdx}`}
-                              className="print-card p-3 rounded-2xl bg-neutral-950/60 border border-neutral-800/80 space-y-1"
-                            >
-                              <div className="text-xs font-semibold text-neutral-400 truncate">{data.label}</div>
-                              <div className="text-base sm:text-lg font-black text-emerald-400 font-mono">
-                                {data.value}
-                              </div>
-                              <p className="text-[11px] text-neutral-300 leading-tight">{data.context}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </section>
-                    )}
-
-                    {/* 4. SECCIÓN: REGLAS MNEMOTÉCNICAS */}
-                    {guide.mnemonics && guide.mnemonics.length > 0 && (
-                      <section className="space-y-3">
-                        <div className="flex items-center gap-2 border-b border-neutral-800 pb-2">
-                          <Sparkles className="w-4 h-4 text-violet-400 shrink-0" />
-                          <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-violet-400">
-                            {t('quick_guide.section_mnemonics', '🧠 Reglas Mnemotécnicas')}
-                          </h4>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                          {guide.mnemonics.map((mnem, mIdx) => (
-                            <div
-                              key={`mnem-${mIdx}`}
-                              className="print-card p-4 rounded-2xl bg-neutral-950/60 border border-violet-500/20 space-y-2"
-                            >
-                              <div className="flex items-center justify-between gap-2">
-                                <h5 className="text-xs font-bold text-neutral-300">{mnem.concept}</h5>
-                                <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-violet-500/20 text-violet-300 border border-violet-500/30">
-                                  Mnemotecnia
-                                </span>
-                              </div>
-                              <div className="p-2.5 rounded-xl bg-violet-500/10 border border-violet-500/30 font-mono font-bold text-sm text-violet-200">
-                                {mnem.rule}
-                              </div>
-                              <p className="text-xs text-neutral-300 leading-relaxed">{mnem.explanation}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </section>
-                    )}
-                  </div>
-
-                  {/* OVERLAY CONVERSIÓN PRO / REWARDED AD PARA USUARIOS FREE */}
-                  {!isUnlocked && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center p-6 bg-gradient-to-t from-neutral-950 via-neutral-950/85 to-transparent text-center z-10 rounded-2xl no-print">
-                      <div className="max-w-md space-y-4 p-6 rounded-3xl bg-neutral-900/95 border border-amber-500/40 shadow-2xl backdrop-blur-xl">
-                        <div className="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-amber-500/20 to-amber-600/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shadow-lg">
-                          <Crown className="w-6 h-6" />
-                        </div>
-                        <div>
-                          <h4 className="text-base sm:text-lg font-bold text-white">
-                            {t('quick_guide.pro_locked_title', 'Desbloquea la Guía Completa')}
-                          </h4>
-                          <p className="text-xs text-neutral-300 mt-1.5 leading-relaxed">
-                            {t(
-                              'quick_guide.pro_locked_desc',
-                              'Accede a las tablas comparativas, datos críticos, mnemotecnias y exportación a PDF para todos tus mazos.'
-                            )}
-                          </p>
-                        </div>
-
-                        {adError && (
-                          <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs">
-                            {adError}
                           </div>
-                        )}
-
-                        <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5 pt-1">
-                          {!platform.isNativeIOS && (
-                            <button
-                              type="button"
-                              onClick={() => openProModal(true)}
-                              className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-bold text-xs transition shadow-lg shadow-amber-500/20 active:scale-95 cursor-pointer"
-                            >
-                              {t('quick_guide.upgrade_pro_btn', '👑 Desbloquear con PRO')}
-                            </button>
-                          )}
-
-                          <button
-                            type="button"
-                            onClick={handleWatchAd}
-                            disabled={isWatchingAd}
-                            className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 text-xs font-semibold transition active:scale-95 cursor-pointer disabled:opacity-75 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
-                          >
-                            {isWatchingAd ? (
-                              <>
-                                <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400 shrink-0" />
-                                <span>{t('quick_guide.preparing_ad', 'Preparando anuncio...')}</span>
-                              </>
-                            ) : (
-                              <>
-                                <PlayCircle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                                <span>{t('quick_guide.watch_ad_btn', '🎬 Ver anuncio (+1)')}</span>
-                              </>
-                            )}
-                          </button>
-                        </div>
+                        ))}
                       </div>
-                    </div>
+                    </section>
+                  )}
+
+                  {/* 5. SECCIÓN: CIFRAS CRÍTICAS Y DOSIS OFICIALES */}
+                  {guide.critical_data && guide.critical_data.length > 0 && (
+                    <section className="space-y-3">
+                      <div className="flex items-center gap-2 border-b border-neutral-800 pb-2">
+                        <Hash className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-emerald-400">
+                          {t('quick_guide.section_critical_data', '🎯 Cifras Críticas y Dosis Oficiales')}
+                        </h4>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                        {guide.critical_data.map((data, dIdx) => (
+                          <div
+                            key={`data-${dIdx}`}
+                            className="print-card p-3.5 rounded-2xl bg-neutral-950/60 border border-neutral-800/80 space-y-1.5 flex flex-col justify-between"
+                          >
+                            <div className="text-xs font-semibold text-neutral-400 truncate">{data.label}</div>
+                            <div className="text-lg sm:text-xl font-black text-emerald-400 font-mono tracking-tight">
+                              {data.value}
+                            </div>
+                            <p className="text-[11px] text-neutral-300 leading-relaxed">{data.context}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  )}
+
+                  {/* 6. SECCIÓN: REGLAS MNEMOTÉCNICAS */}
+                  {guide.mnemonics && guide.mnemonics.length > 0 && (
+                    <section className="space-y-3">
+                      <div className="flex items-center gap-2 border-b border-neutral-800 pb-2">
+                        <Sparkles className="w-4 h-4 text-violet-400 shrink-0" />
+                        <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-violet-400">
+                          {t('quick_guide.section_mnemonics', '🧠 Reglas Mnemotécnicas')}
+                        </h4>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                        {guide.mnemonics.map((mnem, mIdx) => (
+                          <div
+                            key={`mnem-${mIdx}`}
+                            className="print-card p-4 rounded-2xl bg-neutral-950/60 border border-violet-500/25 space-y-2 flex flex-col justify-between"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <h5 className="text-xs font-bold text-neutral-200">{mnem.concept}</h5>
+                              <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-violet-500/20 text-violet-300 border border-violet-500/30">
+                                Mnemotecnia
+                              </span>
+                            </div>
+                            <div className="p-2.5 rounded-xl bg-violet-500/10 border border-violet-500/30 font-mono font-bold text-sm text-violet-200">
+                              {mnem.rule}
+                            </div>
+                            <p className="text-xs text-neutral-300 leading-relaxed">{mnem.explanation}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
                   )}
                 </div>
               </div>

@@ -11,6 +11,7 @@ import { createClient } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { randomizeMultipleChoiceCard, stripOptionPrefix, sanitizeCardFrontText } from '@/lib/cardUtils';
 import { deduplicateCandidateCards } from '@/lib/cardDeduplication';
+import { generateExhaustiveSummaryFromRawText } from '@/app/actions/generateDeckSummary';
 import { GEMINI_DEFAULT_MODEL } from '@/lib/aiConfig';
 import {
   PRACTICAL_MODE_DIRECTIVE,
@@ -2205,6 +2206,37 @@ export async function generateCardsFromDocumentAction(
           error: `No se pudo extraer texto legible del documento de Word "${fileName || 'documento'}". Asegúrate de que contenga texto y no esté protegido por contraseña.`,
         };
       }
+
+      // Pre-generación en paralelo no bloqueante del Resumen Completo para documentos Word
+      if (extractedWordText && extractedWordText.trim().length > 50 && deckId && resolvedUserId) {
+        void generateExhaustiveSummaryFromRawText(
+          deckId,
+          resolvedUserId,
+          extractedWordText,
+          language === 'en' ? 'en' : 'es'
+        ).catch((guideErr) => {
+          console.warn('[generateCardsFromDocumentAction] Advertencia en pre-generación de guía Word:', guideErr);
+        });
+      }
+    }
+
+    // Identificar si es un documento de texto plano
+    if ((normalizedMime === 'text/plain' || (fileName && /\.txt$/i.test(fileName))) && deckId && resolvedUserId) {
+      try {
+        const txtContent = Buffer.from(fileArrayBuffer).toString('utf-8');
+        if (txtContent && txtContent.trim().length > 50) {
+          void generateExhaustiveSummaryFromRawText(
+            deckId,
+            resolvedUserId,
+            txtContent,
+            language === 'en' ? 'en' : 'es'
+          ).catch((guideErr) => {
+            console.warn('[generateCardsFromDocumentAction] Advertencia en pre-generación de guía TXT:', guideErr);
+          });
+        }
+      } catch (txtParseErr) {
+        console.warn('[generateCardsFromDocumentAction] No se pudo leer buffer como texto plano:', txtParseErr);
+      }
     }
 
     // Identificar si es un documento PDF
@@ -4276,6 +4308,18 @@ ${buildLanguageDirective(language)}`;
         extractedWebText.length > 80000
           ? extractedWebText.slice(0, 80000) + '... [contenido truncado]'
           : extractedWebText;
+
+      // Pre-generación en paralelo no bloqueante del Resumen Completo para artículos web
+      if (deckId && resolvedUserId && extractedWebText && extractedWebText.trim().length > 100) {
+        void generateExhaustiveSummaryFromRawText(
+          deckId,
+          resolvedUserId,
+          extractedWebText,
+          'es'
+        ).catch((guideErr) => {
+          console.warn('[generateCardsFromUrlAction] Advertencia en pre-generación de guía Web:', guideErr);
+        });
+      }
 
       const webResponse = await ai.models.generateContent({
         model: GEMINI_MODEL,
