@@ -278,7 +278,7 @@ export function QuickStudyGuideModal({
               font-size: 11px !important;
               line-height: 1.35 !important;
               margin: 0 !important;
-              padding: 0 !important;
+              padding: 0 0 12mm 0 !important;
               box-sizing: border-box !important;
             }
             .break-inside-avoid {
@@ -317,29 +317,19 @@ export function QuickStudyGuideModal({
               font-size: 10px !important;
               line-height: 1.3 !important;
             }
-            .print-layout-table {
-              width: 100% !important;
-              border-collapse: collapse !important;
-            }
-            .print-layout-table td {
-              padding: 0 !important;
-              border: none !important;
-            }
-            .print-page-footer {
-              display: table-footer-group !important;
-            }
-            .print-footer-container {
-              height: 12mm !important;
-              background-color: #ffffff !important;
+            .print-fixed-footer {
+              position: fixed !important;
+              bottom: 0 !important;
+              left: 0 !important;
+              right: 0 !important;
+              height: 8mm !important;
               display: flex !important;
               align-items: center !important;
-              justify-content: space-between !important;
+              justify-content: flex-start !important;
               border-top: 0.5px solid #e5e7eb !important;
-              padding: 0 1mm !important;
-              font-size: 9pt !important;
-              color: #4b5563 !important;
-              font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+              background-color: #ffffff !important;
               box-sizing: border-box !important;
+              z-index: 99999 !important;
             }
             .bg-neutral-950,
             .bg-neutral-950\\/60,
@@ -386,34 +376,20 @@ export function QuickStudyGuideModal({
           </style>
         </head>
         <body class="bg-white text-neutral-900">
-          <table class="print-layout-table">
-            <tbody>
-              <tr>
-                <td>
-                  <main>
-                    ${cleanInnerHtml}
-                  </main>
-                </td>
-              </tr>
-            </tbody>
-            <tfoot class="print-page-footer">
-              <tr>
-                <td>
-                  <div class="print-footer-container">
-                    <div style="display: flex; align-items: center;">
-                      <img
-                        id="print-app-logo"
-                        src="${logoUrl}"
-                        alt="Flashmente"
-                        style="width: 16px; height: 16px; border-radius: 4px; vertical-align: middle; margin-right: 6px; object-fit: contain; display: inline-block;"
-                      />
-                      <span style="font-size: 9pt; color: #4b5563; font-weight: 500;">flashmente.com</span>
-                    </div>
-                  </div>
-                </td>
-              </tr>
-            </tfoot>
-          </table>
+          <main>
+            ${cleanInnerHtml}
+          </main>
+          <footer class="print-fixed-footer">
+            <div style="display: flex; align-items: center;">
+              <img
+                id="print-app-logo"
+                src="${logoUrl}"
+                alt="Flashmente"
+                style="width: 14px; height: 14px; border-radius: 3px; vertical-align: middle; margin-right: 6px; object-fit: contain; display: inline-block;"
+              />
+              <span style="font-size: 8.5pt; color: #4b5563; font-weight: 500;">flashmente.com</span>
+            </div>
+          </footer>
           <script>
             function triggerPrint() {
               setTimeout(function() {
@@ -518,7 +494,7 @@ export function QuickStudyGuideModal({
             max-height: none !important;
             overflow: visible !important;
             margin: 0 !important;
-            padding: 0 !important;
+            padding: 0 0 12mm 0 !important;
             background: #ffffff !important;
             color: #111827 !important;
             font-size: 11px !important;
@@ -1204,11 +1180,11 @@ export function QuickStudyGuideModal({
                   )}
 
                   {/* Pie de página para impresión directa (@media print fallback) */}
-                  <div className="direct-print-footer hidden print:flex items-center justify-start gap-1.5 pt-2 mt-4 border-t border-neutral-300 text-[9pt] text-[#4b5563] font-sans">
+                  <div className="direct-print-footer hidden print:flex items-center justify-start gap-1.5 pt-2 mt-4 border-t border-neutral-300 text-[8.5pt] text-[#4b5563] font-sans">
                     <img
                       src="/icons/android-chrome-192x192.png"
                       alt="Flashmente"
-                      className="w-4 h-4 rounded-[4px] object-contain inline-block mr-1.5"
+                      className="w-3.5 h-3.5 rounded-[3px] object-contain inline-block mr-1.5"
                     />
                     <span className="font-medium text-[#4b5563]">flashmente.com</span>
                   </div>
