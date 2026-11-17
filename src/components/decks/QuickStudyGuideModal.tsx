@@ -248,7 +248,10 @@ export function QuickStudyGuideModal({
           <style>
             @page {
               size: A4;
-              margin: 0;
+              margin: 15mm 15mm 20mm 15mm;
+            }
+            html, body {
+              counter-reset: page;
             }
             body {
               background-color: #ffffff !important;
@@ -259,7 +262,7 @@ export function QuickStudyGuideModal({
               font-size: 11px !important;
               line-height: 1.35 !important;
               margin: 0 !important;
-              padding: 14mm 12mm 16mm 12mm !important;
+              padding: 0 !important;
               box-sizing: border-box !important;
             }
             .break-inside-avoid {
@@ -301,33 +304,22 @@ export function QuickStudyGuideModal({
             .print-footer {
               position: fixed !important;
               bottom: 5mm !important;
-              left: 12mm !important;
-              right: 12mm !important;
+              left: 0 !important;
+              right: 0 !important;
               display: flex !important;
               justify-content: space-between !important;
               align-items: center !important;
-              border-top: 1px solid #e5e7eb !important;
-              padding-top: 3px !important;
+              padding: 0 15mm !important;
+              box-sizing: border-box !important;
               font-size: 9px !important;
-              font-family: ui-sans-serif, system-ui, sans-serif !important;
+              font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
               color: #6b7280 !important;
+              border-top: 0.5px solid #e5e7eb !important;
+              padding-top: 4px !important;
               z-index: 9999 !important;
             }
-            .print-watermark {
-              position: fixed !important;
-              top: 45% !important;
-              left: 50% !important;
-              transform: translate(-50%, -50%) rotate(-30deg) !important;
-              font-size: 55pt !important;
-              font-weight: 900 !important;
-              font-family: ui-sans-serif, system-ui, sans-serif !important;
-              color: #000000 !important;
-              opacity: 0.035 !important;
-              pointer-events: none !important;
-              z-index: 0 !important;
-              letter-spacing: 0.15em !important;
-              user-select: none !important;
-              text-align: center !important;
+            .print-page-number::after {
+              content: "Pág. " counter(page);
             }
             .bg-neutral-950,
             .bg-neutral-950\\/60,
@@ -374,11 +366,6 @@ export function QuickStudyGuideModal({
           </style>
         </head>
         <body class="bg-white text-neutral-900">
-          <div class="print-watermark">FLASHMENTE</div>
-          <div class="print-footer">
-            <span>Flashmente · Resumen de Estudio</span>
-            <span>flashmente.com</span>
-          </div>
           <main>
             ${printContent.innerHTML}
           </main>
@@ -406,7 +393,7 @@ export function QuickStudyGuideModal({
         @media print {
           @page {
             size: A4;
-            margin: 0;
+            margin: 15mm 15mm 20mm 15mm;
           }
 
           html, body {
@@ -416,6 +403,7 @@ export function QuickStudyGuideModal({
             color: #000000 !important;
             margin: 0 !important;
             padding: 0 !important;
+            counter-reset: page;
           }
 
           body * {
@@ -434,7 +422,7 @@ export function QuickStudyGuideModal({
             max-height: none !important;
             overflow: visible !important;
             margin: 0 !important;
-            padding: 14mm 12mm 16mm 12mm !important;
+            padding: 0 !important;
             background: #ffffff !important;
             color: #111827 !important;
             font-size: 11px !important;
@@ -511,16 +499,18 @@ export function QuickStudyGuideModal({
           .print-footer {
             position: fixed !important;
             bottom: 5mm !important;
-            left: 12mm !important;
-            right: 12mm !important;
+            left: 0 !important;
+            right: 0 !important;
             display: flex !important;
             justify-content: space-between !important;
             align-items: center !important;
-            border-top: 1px solid #e5e7eb !important;
-            padding-top: 3px !important;
+            padding: 0 15mm !important;
+            box-sizing: border-box !important;
             font-size: 9px !important;
-            font-family: ui-sans-serif, system-ui, sans-serif !important;
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
             color: #6b7280 !important;
+            border-top: 0.5px solid #e5e7eb !important;
+            padding-top: 4px !important;
             z-index: 9999 !important;
             visibility: visible !important;
           }
@@ -529,22 +519,8 @@ export function QuickStudyGuideModal({
             visibility: visible !important;
           }
 
-          .print-watermark {
-            position: fixed !important;
-            top: 45% !important;
-            left: 50% !important;
-            transform: translate(-50%, -50%) rotate(-30deg) !important;
-            font-size: 55pt !important;
-            font-weight: 900 !important;
-            font-family: ui-sans-serif, system-ui, sans-serif !important;
-            color: #000000 !important;
-            opacity: 0.035 !important;
-            pointer-events: none !important;
-            z-index: 0 !important;
-            letter-spacing: 0.15em !important;
-            user-select: none !important;
-            text-align: center !important;
-            visibility: visible !important;
+          .print-page-number::after {
+            content: "Pág. " counter(page);
           }
 
           .bg-neutral-900,
@@ -673,11 +649,10 @@ export function QuickStudyGuideModal({
             id="quick-study-guide-printable"
             className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 print:space-y-3 text-left relative"
           >
-            {/* Marca de agua sutil y Pie de página fijos para impresión (@media print) */}
-            <div className="print-watermark hidden print:block">FLASHMENTE</div>
+            {/* Pie de página profesional fijo para impresión (@media print) */}
             <div className="print-footer hidden print:flex">
-              <span>Flashmente · Resumen de Estudio</span>
-              <span>flashmente.com</span>
+              <span className="font-medium">Flashmente · flashmente.com</span>
+              <span className="print-page-number"></span>
             </div>
 
             {/* Cabecera compacta visible únicamente al imprimir en Página 1 */}
