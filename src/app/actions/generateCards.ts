@@ -13,6 +13,7 @@ import { randomizeMultipleChoiceCard, stripOptionPrefix, sanitizeCardFrontText }
 import { deduplicateCandidateCards } from '@/lib/cardDeduplication';
 import { generateExhaustiveSummaryFromRawText } from '@/app/actions/generateDeckSummary';
 import { GEMINI_DEFAULT_MODEL } from '@/lib/aiConfig';
+import { isAdminEmail, isTestDevice } from '@/lib/config/whitelist';
 import {
   PRACTICAL_MODE_DIRECTIVE,
   EXHAUSTIVE_MODE_MANDATE,
@@ -1373,28 +1374,33 @@ async function resolveUserId(deckId?: string, explicitUserId?: string): Promise<
 
 interface ApiLimitCheck {
   allowed: boolean;
-  tier: 'free' | 'pro' | 'vip';
+  tier: 'free' | 'pro' | 'vip' | 'admin';
   currentCount: number;
   bonusCredits?: number;
   welcomeGenerations?: number;
-  phase?: 'welcome' | 'ads';
+  phase?: 'welcome' | 'ads' | 'pro' | 'admin';
   userId: string;
+  deviceId?: string;
+  isAdmin?: boolean;
 }
 
 /**
- * Valida la cuota de generación del usuario en api_limits antes de llamar a Gemini según el modelo Freemium (5/50/120):
- * 1. TIER 'pro' o 'vip': Límite de 120 mensuales. Si generations_count >= 120 -> { error: 'LIMIT_REACHED' }.
+ * Valida la cuota de generación del usuario en api_limits antes de llamar a Gemini según el modelo Freemium (5/25/120)
+ * y el escudo físico por dispositivo en device_limits:
+ * 0. Administradores (UNLIMITED_ADMIN_EMAILS): Barra libre total sin consumo ni límites.
+ * 1. TIER 'pro' o 'vip': Límite de 120 mensuales. Ignora device_limits.
  * 2. TIER 'free':
- *    - Fase Bienvenida: Si welcome_generations < 5 -> Permite directamente sin ads.
- *    - Fase Ads (Mensual, welcome_generations >= 5):
- *      - Si generations_count >= 50 -> { error: 'LIMIT_REACHED' } (Límite mensual gratis superado).
- *      - Si generations_count < 50:
- *        - Si bonus_credits <= 0 -> { error: 'AD_REQUIRED' }.
- *        - Si bonus_credits > 0 -> Permite la generación.
+ *    - Valida límite por dispositivo (máx 30/mes entre cuentas Free en el mismo hardware).
+ *    - Si el dispositivo ya consumió 5 generaciones de bienvenida, no concede bienvenida gratuita a cuentas nuevas.
+ *    - Valida cuenta (5 bienvenida + hasta 25 con anuncios = 30 mensuales totales).
  */
 async function enforceApiLimit(
-  userId: string
-): Promise<{ check: ApiLimitCheck } | { error: 'LIMIT_REACHED' | 'AD_REQUIRED' | 'AUTH_REQUIRED' }> {
+  userId: string,
+  deviceId?: string
+): Promise<
+  | { check: ApiLimitCheck }
+  | { error: 'LIMIT_REACHED' | 'AD_REQUIRED' | 'AUTH_REQUIRED' | 'DEVICE_LIMIT_REACHED'; message?: string }
+> {
   try {
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || 'https://placeholder.supabase.co';
@@ -1404,30 +1410,60 @@ async function enforceApiLimit(
         })
       : supabase;
 
-    // Consultar y validar cuota atómicamente mediante RPC SECURITY DEFINER
+    let userEmail: string | undefined;
+    try {
+      const { data: profile } = await dbClient
+        .from('profiles')
+        .select('email')
+        .eq('id', userId)
+        .maybeSingle();
+      if (profile?.email) {
+        userEmail = profile.email;
+      }
+    } catch {
+      // Silencioso
+    }
+
+    const isUserAdmin = isAdminEmail(userEmail);
+    const isDeviceTest = isTestDevice(deviceId);
+
+    // Consultar y validar cuota atómicamente mediante RPC SECURITY DEFINER con soporte de device_limits
     const { data: rpcData, error: rpcError } = await dbClient.rpc('check_api_limit', {
       p_user_id: userId,
+      p_device_id: deviceId || null,
+      p_is_admin_email: isUserAdmin,
+      p_is_test_device: isDeviceTest,
     });
 
     if (!rpcError && rpcData) {
       const res = rpcData as {
         allowed?: boolean;
-        tier?: 'free' | 'pro' | 'vip';
+        tier?: 'free' | 'pro' | 'vip' | 'admin';
         count?: number;
         bonus_credits?: number;
         welcome_generations?: number;
-        phase?: 'welcome' | 'ads';
-        error?: 'LIMIT_REACHED' | 'AD_REQUIRED' | 'AUTH_REQUIRED';
+        phase?: 'welcome' | 'ads' | 'pro' | 'admin';
+        error?: 'LIMIT_REACHED' | 'AD_REQUIRED' | 'AUTH_REQUIRED' | 'DEVICE_LIMIT_REACHED';
+        message?: string;
+        is_admin?: boolean;
       };
 
       if (res.allowed === false) {
+        if (res.error === 'DEVICE_LIMIT_REACHED') {
+          return {
+            error: 'DEVICE_LIMIT_REACHED',
+            message:
+              res.message ||
+              'Este dispositivo ha alcanzado el límite mensual gratuito (30 generaciones). Pasa a PRO (3,50 €/mes) para continuar sin límites.',
+          };
+        }
         if (res.error === 'AD_REQUIRED') {
           return { error: 'AD_REQUIRED' };
         }
         if (res.error === 'AUTH_REQUIRED') {
           return { error: 'AUTH_REQUIRED' };
         }
-        return { error: 'LIMIT_REACHED' };
+        return { error: 'LIMIT_REACHED', message: res.message };
       }
 
       return {
@@ -1439,6 +1475,8 @@ async function enforceApiLimit(
           welcomeGenerations: typeof res.welcome_generations === 'number' ? res.welcome_generations : 0,
           phase: res.phase,
           userId,
+          deviceId,
+          isAdmin: res.is_admin,
         },
       };
     }
@@ -1561,7 +1599,7 @@ async function enforceApiLimit(
  * - TIER 'free' Fase Bienvenida (< 5): suma 1 a welcome_generations y NO altera generations_count.
  * - TIER 'free' Fase Ads (>= 5): resta 1 a bonus_credits y suma 1 a generations_count.
  */
-async function recordApiUsage(userId: string) {
+async function recordApiUsage(userId: string, deviceId?: string) {
   try {
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || 'https://placeholder.supabase.co';
@@ -1571,8 +1609,28 @@ async function recordApiUsage(userId: string) {
         })
       : supabase;
 
+    let userEmail: string | undefined;
+    try {
+      const { data: profile } = await dbClient
+        .from('profiles')
+        .select('email')
+        .eq('id', userId)
+        .maybeSingle();
+      if (profile?.email) {
+        userEmail = profile.email;
+      }
+    } catch {
+      // Silencioso
+    }
+
+    const isUserAdmin = isAdminEmail(userEmail);
+    const isDeviceTest = isTestDevice(deviceId);
+
     const { error: rpcErr } = await dbClient.rpc('increment_api_generation', {
       p_user_id: userId,
+      p_device_id: deviceId || null,
+      p_is_admin_email: isUserAdmin,
+      p_is_test_device: isDeviceTest,
     });
 
     if (rpcErr) {
@@ -1644,7 +1702,8 @@ export async function generateCardsAction(
   pedagogicalMode: 'academic' | 'didactic' = 'academic',
   docenteFormat: DocenteFormat = 'mixed_test',
   targetAudience: TargetAudience = 'auto',
-  isPracticalMode: boolean = false
+  isPracticalMode: boolean = false,
+  deviceId?: string
 ): Promise<GenerateCardsResult> {
   const cleanTopic = topic.trim();
   if (!cleanTopic) {
@@ -1667,9 +1726,13 @@ export async function generateCardsAction(
     return { success: false, error: 'AUTH_REQUIRED' };
   }
 
-  const checkResult = await enforceApiLimit(resolvedUserId);
+  const checkResult = await enforceApiLimit(resolvedUserId, deviceId);
   if ('error' in checkResult) {
-    return { success: false, error: checkResult.error };
+    return {
+      success: false,
+      error: checkResult.error,
+      message: 'message' in checkResult ? checkResult.message : undefined,
+    };
   }
   const apiCheck = checkResult.check;
 
@@ -1924,7 +1987,7 @@ ${languageDirective}`;
 
     // Registrar uso en api_limits tras generación exitosa (nunca se regalan créditos)
     if (apiCheck) {
-      await recordApiUsage(apiCheck.userId);
+      await recordApiUsage(apiCheck.userId, apiCheck.deviceId);
     }
 
     // Procesar y garantizar 4 opciones con aleatorización Fisher-Yates
@@ -2069,9 +2132,13 @@ export async function generateCardsFromDocumentAction(
     return { success: false, error: 'AUTH_REQUIRED' };
   }
 
-  const checkResult = await enforceApiLimit(resolvedUserId);
+  const checkResult = await enforceApiLimit(resolvedUserId, input.deviceId);
   if ('error' in checkResult) {
-    return { success: false, error: checkResult.error };
+    return {
+      success: false,
+      error: checkResult.error,
+      message: 'message' in checkResult ? checkResult.message : undefined,
+    };
   }
   const apiCheck = checkResult.check;
 
@@ -2925,7 +2992,7 @@ META DE EXTRACCIÓN ('standard_content'): Entre 20 y 25 tarjetas sustanciales po
 
       // Registrar uso en api_limits (1 crédito gastado por tirada exitosa)
       if (apiCheck) {
-        await recordApiUsage(apiCheck.userId);
+        await recordApiUsage(apiCheck.userId, apiCheck.deviceId);
       }
 
       const hasReachedEnd = lastProcessedPage >= finalPage;
@@ -3642,7 +3709,7 @@ ${currentPageText}`;
       );
 
       if (apiCheck) {
-        await recordApiUsage(apiCheck.userId);
+        await recordApiUsage(apiCheck.userId, apiCheck.deviceId);
       }
 
       const hasReachedEnd = lastProcessedPage >= finalPage;
@@ -3989,7 +4056,7 @@ ${buildLanguageDirective(language)}`;
 
     // Registrar uso en api_limits tras generación exitosa (siempre se cobra cuota, protegiendo la rentabilidad del SaaS)
     if (apiCheck) {
-      await recordApiUsage(apiCheck.userId);
+      await recordApiUsage(apiCheck.userId, apiCheck.deviceId);
     }
 
     // Procesar y garantizar 4 opciones con aleatorización Fisher-Yates
@@ -4107,9 +4174,13 @@ export async function generateCardsFromUrlAction(
     return { success: false, error: 'AUTH_REQUIRED' };
   }
 
-  const checkResult = await enforceApiLimit(resolvedUserId);
+  const checkResult = await enforceApiLimit(resolvedUserId, input.deviceId);
   if ('error' in checkResult) {
-    return { success: false, error: checkResult.error };
+    return {
+      success: false,
+      error: checkResult.error,
+      message: 'message' in checkResult ? checkResult.message : undefined,
+    };
   }
   const apiCheck = checkResult.check;
 
@@ -4430,7 +4501,7 @@ ${buildLanguageDirective(language)}`;
 
     // Registrar uso en api_limits tras generación exitosa (siempre se cobra cuota, protegiendo la rentabilidad del SaaS)
     if (apiCheck) {
-      await recordApiUsage(apiCheck.userId);
+      await recordApiUsage(apiCheck.userId, apiCheck.deviceId);
     }
 
     // Procesar y garantizar 4 opciones con aleatorización Fisher-Yates

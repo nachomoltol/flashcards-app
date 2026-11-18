@@ -124,6 +124,7 @@ export async function verifyStripeCheckoutSessionAction(
       .from('api_limits')
       .update({
         tier: 'pro',
+        generations_count: 0,
         stripe_customer_id: customerId || null,
         stripe_subscription_id: subscriptionId || null,
         current_period_end: currentPeriodEnd,

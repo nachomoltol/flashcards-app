@@ -15,6 +15,7 @@ import { cleanupUploadedDocument } from '@/lib/storageCleanup';
 import { purgeExpiredDocumentsAction } from '@/app/actions/storageCleanup';
 import { InfoTooltip } from './InfoTooltip';
 import { detectPlatform } from '@/lib/platform';
+import { getClientDeviceId } from '@/lib/deviceId';
 
 interface DocumentUploaderProps {
   deckId: string;
@@ -689,6 +690,7 @@ export function DocumentUploader({
 
       let result: Awaited<ReturnType<typeof generateCardsFromDocumentAction>>;
       try {
+        const clientDeviceId = await getClientDeviceId();
         result = await generateCardsFromDocumentAction({
           deckId,
           userId: user?.id,
@@ -711,6 +713,7 @@ export function DocumentUploader({
           docenteFormat,
           targetAudience,
           isPracticalMode: Boolean(isPracticalMode),
+          deviceId: clientDeviceId,
         });
       } catch (actionErr: unknown) {
         const actionErrMsg =
@@ -737,7 +740,11 @@ export function DocumentUploader({
 
       // Validar resultado de la IA sin lanzar errores fatales
       if (!result.success || !result.cards || result.cards.length === 0) {
-        if (result.error === 'LIMIT_REACHED' || result.error === 'AD_REQUIRED') {
+        if (
+          result.error === 'LIMIT_REACHED' ||
+          result.error === 'AD_REQUIRED' ||
+          result.error === 'DEVICE_LIMIT_REACHED'
+        ) {
           setStatus('idle');
           openProModal(true, null, () => handleProcessDocument(startPageForRun));
           return;

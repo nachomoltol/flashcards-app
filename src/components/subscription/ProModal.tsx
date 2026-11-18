@@ -34,6 +34,7 @@ import { claimAdRewardAction } from '@/app/actions/claimAdReward';
 import { getUserLimitsAction } from '@/app/actions/getUserLimits';
 import { usePlatform } from '@/lib/platform';
 import { showAdMobRewardedAd, preloadRewardedAd } from '@/lib/admob';
+import { getClientDeviceId } from '@/lib/deviceId';
 
 interface ProModalProps {
   isOpen?: boolean;
@@ -130,7 +131,8 @@ export function ProModal({
         console.warn('[ProModal] No se pudo obtener el token de sesión:', sessionErr);
       }
 
-      const res = await getUserLimitsAction(user.id, accessToken);
+      const clientDeviceId = await getClientDeviceId();
+      const res = await getUserLimitsAction(user.id, accessToken, clientDeviceId);
       if (res.success) {
         setUserLimits({
           tier: res.tier,
@@ -247,7 +249,8 @@ export function ProModal({
         console.warn('[ProModal] No se pudo obtener el token de sesión:', sessionErr);
       }
 
-      const res = await getUserLimitsAction(user.id, accessToken);
+      const clientDeviceId = await getClientDeviceId();
+      const res = await getUserLimitsAction(user.id, accessToken, clientDeviceId);
       if (res.success) {
         setUserLimits({
           tier: res.tier,
@@ -366,7 +369,13 @@ export function ProModal({
           console.warn('[ProModal] No se pudo obtener el token de sesión:', sessionErr);
         }
         const isTutorReward = featureName === 'tutor';
-        const claim = await claimAdRewardAction(user?.id, accessToken, isTutorReward ? 'tutor' : 'deck');
+        const clientDeviceId = await getClientDeviceId();
+        const claim = await claimAdRewardAction(
+          user?.id,
+          accessToken,
+          isTutorReward ? 'tutor' : 'deck',
+          clientDeviceId
+        );
 
         if (claim.success) {
           if (isTutorReward) {

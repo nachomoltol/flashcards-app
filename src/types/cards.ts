@@ -60,6 +60,7 @@ export interface MultimodalDocumentInput {
   pedagogicalMode?: 'academic' | 'didactic';
   docenteFormat?: DocenteFormat;
   targetAudience?: TargetAudience;
+  deviceId?: string;
 }
 
 export interface UrlCardInput {
@@ -77,6 +78,7 @@ export interface UrlCardInput {
   pedagogicalMode?: 'academic' | 'didactic';
   docenteFormat?: DocenteFormat;
   targetAudience?: TargetAudience;
+  deviceId?: string;
 }
 
 export interface NoteImageInput {

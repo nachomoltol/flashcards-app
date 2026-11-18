@@ -8,6 +8,7 @@ import { checkUserGenerationQuota } from '@/lib/quotaGuard';
 import type { CardFormat, GeneratedCard } from '@/types/cards';
 import { FormattedCardView } from './FormattedCardView';
 import { usePlatform } from '@/lib/platform';
+import { getClientDeviceId } from '@/lib/deviceId';
 
 interface UrlCardGeneratorProps {
   deckId: string;
@@ -142,8 +143,9 @@ export function UrlCardGenerator({
 
       // Consultar historial de tarjetas existentes para Memoria Anti-Duplicados
       const existingCardsInDeck = cards.map((c) => c.front);
+      const clientDeviceId = await getClientDeviceId();
 
-      // Llamar al Server Action con el idioma activo
+      // Llamar al Server Action con el idioma activo y deviceId
       const result = await generateCardsFromUrlAction({
         url: url.trim(),
         deckId,
@@ -153,10 +155,15 @@ export function UrlCardGenerator({
         existingQuestions: existingCardsInDeck,
         language,
         coreExhaustedPrevious: coreExhausted || isMeticulousPhase,
+        deviceId: clientDeviceId,
       });
 
       if (!result.success || !result.cards) {
-        if (result.error === 'LIMIT_REACHED' || result.error === 'AD_REQUIRED') {
+        if (
+          result.error === 'LIMIT_REACHED' ||
+          result.error === 'AD_REQUIRED' ||
+          result.error === 'DEVICE_LIMIT_REACHED'
+        ) {
           setStatus('idle');
           openProModal(true, null, () => handleGenerate());
           return;

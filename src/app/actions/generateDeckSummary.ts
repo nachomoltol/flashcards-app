@@ -4,6 +4,7 @@ import { GoogleGenAI, Type } from '@google/genai';
 import { createClient } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { GEMINI_DEFAULT_MODEL } from '@/lib/aiConfig';
+import { isAdminEmail, isTestDevice } from '@/lib/config/whitelist';
 import type { Database, Json } from '@/types/database';
 
 // ---------------------------------------------------------------------------
@@ -88,6 +89,7 @@ export interface GenerateDeckSummaryResult {
   maxFreeGuidesPerMonth?: number;
   cached?: boolean;
   error?: string;
+  message?: string;
 }
 
 const GEMINI_MODEL = GEMINI_DEFAULT_MODEL;
@@ -977,7 +979,8 @@ export interface AdPlatformProof {
 export async function unlockDeckSummaryWithAdAction(
   deckId: string,
   accessToken?: string,
-  platformProof?: AdPlatformProof
+  platformProof?: AdPlatformProof,
+  deviceId?: string
 ): Promise<GenerateDeckSummaryResult> {
   const cleanDeckId = deckId?.trim();
   if (!cleanDeckId) {
@@ -991,12 +994,17 @@ export async function unlockDeckSummaryWithAdAction(
 
     // 1. Resolver usuario autenticado de forma estricta (VULN-05)
     let authenticatedUserId: string | null = null;
+    let authenticatedUserEmail: string | undefined;
+
     if (resolvedToken) {
       try {
         const {
           data: { user: tokenUser },
         } = await supabase.auth.getUser(resolvedToken);
-        if (tokenUser?.id) authenticatedUserId = tokenUser.id;
+        if (tokenUser?.id) {
+          authenticatedUserId = tokenUser.id;
+          authenticatedUserEmail = tokenUser.email;
+        }
       } catch {
         // Silencioso
       }
@@ -1007,7 +1015,10 @@ export async function unlockDeckSummaryWithAdAction(
         const {
           data: { user: cookieUser },
         } = await supabase.auth.getUser();
-        if (cookieUser?.id) authenticatedUserId = cookieUser.id;
+        if (cookieUser?.id) {
+          authenticatedUserId = cookieUser.id;
+          authenticatedUserEmail = cookieUser.email;
+        }
       } catch {
         // Silencioso
       }
@@ -1026,10 +1037,31 @@ export async function unlockDeckSummaryWithAdAction(
       };
     }
 
-    // 3. Invocar la función RPC atómica con bloqueo pesimista FOR UPDATE (VULN-03)
+    if (!authenticatedUserEmail) {
+      try {
+        const { data: profile } = await db
+          .from('profiles')
+          .select('email')
+          .eq('id', authenticatedUserId)
+          .maybeSingle();
+        if (profile?.email) {
+          authenticatedUserEmail = profile.email;
+        }
+      } catch {
+        // Silencioso
+      }
+    }
+
+    const isUserAdmin = isAdminEmail(authenticatedUserEmail);
+    const isDeviceTest = isTestDevice(deviceId);
+
+    // 3. Invocar la función RPC atómica con bloqueo pesimista FOR UPDATE y escudo de device_limits
     const { data: rpcRes, error: rpcErr } = await db.rpc('unlock_deck_summary_with_ad', {
       p_user_id: authenticatedUserId,
       p_deck_id: cleanDeckId,
+      p_device_id: deviceId || null,
+      p_is_admin_email: isUserAdmin,
+      p_is_test_device: isDeviceTest,
     });
 
     if (rpcErr) {
@@ -1051,6 +1083,7 @@ export async function unlockDeckSummaryWithAdAction(
       return {
         success: false,
         error: claimData?.error || 'CLAIM_FAILED',
+        message: claimData?.message,
         guidesUnlockedThisMonth: claimData?.guides_unlocked_this_month ?? 3,
         maxFreeGuidesPerMonth: 3,
       };

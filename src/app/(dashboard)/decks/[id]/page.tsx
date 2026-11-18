@@ -11,6 +11,7 @@ import { generateExhaustiveSummaryFromRawText } from '@/app/actions/generateDeck
 import { checkUserGenerationQuota } from '@/lib/quotaGuard';
 import { getDeckColorStyles } from '@/lib/colors';
 import { detectPlatform } from '@/lib/platform';
+import { getClientDeviceId } from '@/lib/deviceId';
 import type { CardFormat } from '@/types/database';
 
 interface DeckPageProps {
@@ -157,6 +158,7 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
     }
 
     const existingFronts = cards && cards.length > 0 ? cards.map((c) => c.front) : [];
+    const clientDeviceId = await getClientDeviceId();
     const result = await generateCardsAction(
       aiTopic.trim(),
       aiCardFormat,
@@ -169,11 +171,16 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
       'academic',
       'mixed_test',
       'auto',
-      aiIsPracticalMode
+      aiIsPracticalMode,
+      clientDeviceId
     );
 
     if (!result.success || !result.cards) {
-      if (result.error === 'LIMIT_REACHED' || result.error === 'AD_REQUIRED') {
+      if (
+        result.error === 'LIMIT_REACHED' ||
+        result.error === 'AD_REQUIRED' ||
+        result.error === 'DEVICE_LIMIT_REACHED'
+      ) {
         setIsGenerating(false);
         openProModal(true, null, () => handleGenerateCardsByTopic());
         return;

@@ -2,6 +2,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import { isAdminEmail, isTestDevice } from '@/lib/config/whitelist';
 
 export interface ClaimRewardResult {
   success: boolean;
@@ -24,7 +25,8 @@ export interface ClaimRewardResult {
 export async function claimAdRewardAction(
   userId?: string,
   accessToken?: string,
-  rewardType: 'deck' | 'tutor' = 'deck'
+  rewardType: 'deck' | 'tutor' = 'deck',
+  deviceId?: string
 ): Promise<ClaimRewardResult> {
   // 1. Resolver usuario autenticado de forma estricta: cookies o token JWT de Capacitor
   let targetUserId: string | undefined;
@@ -131,9 +133,29 @@ export async function claimAdRewardAction(
     }
 
     // Flujo para Mazos de Estudio (rewardType === 'deck', máximo 25 al mes)
+    let userEmail: string | undefined;
+    try {
+      const { data: profile } = await rpcClient
+        .from('profiles')
+        .select('email')
+        .eq('id', targetUserId)
+        .maybeSingle();
+      if (profile?.email) {
+        userEmail = profile.email;
+      }
+    } catch {
+      // Silencioso
+    }
+
+    const isUserAdmin = isAdminEmail(userEmail);
+    const isDeviceTest = isTestDevice(deviceId);
+
     const { data, error } = await rpcClient.rpc('add_bonus_credit', {
       p_user_id: targetUserId,
       p_amount: 1,
+      p_device_id: deviceId || null,
+      p_is_admin_email: isUserAdmin,
+      p_is_test_device: isDeviceTest,
     });
 
     if (error) {

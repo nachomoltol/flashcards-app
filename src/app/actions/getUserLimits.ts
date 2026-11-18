@@ -2,6 +2,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import { isAdminEmail, isTestDevice } from '@/lib/config/whitelist';
 
 export interface UserLimitsResult {
   success: boolean;
@@ -14,6 +15,8 @@ export interface UserLimitsResult {
   tutorAdsUsed: number;
   adsUsedInCycle: number;
   remainingAds: number;
+  deviceGenerationsCount?: number;
+  deviceLimitReached?: boolean;
   error?: string;
 }
 
@@ -25,7 +28,8 @@ export interface UserLimitsResult {
  */
 export async function getUserLimitsAction(
   userId?: string,
-  accessToken?: string
+  accessToken?: string,
+  deviceId?: string
 ): Promise<UserLimitsResult> {
   let targetUserId: string | undefined;
 
@@ -205,6 +209,46 @@ export async function getUserLimitsAction(
     // 2. Profesor Socrático: 3 gratis y a partir de la 4.ª ilimitado con 1 anuncio/consulta
     const tutorAdsUsed = Math.max(0, tutorConsultationsCount - 3);
 
+    // Comprobar si el usuario es administrador por lista blanca de Vercel
+    try {
+      const { data: profile } = await client
+        .from('profiles')
+        .select('email')
+        .eq('id', targetUserId)
+        .maybeSingle();
+      if (profile?.email && isAdminEmail(profile.email)) {
+        tier = 'pro';
+      }
+    } catch {
+      // Silencioso
+    }
+
+    // Comprobar límites de dispositivo si el usuario es Free y no es dispositivo de prueba
+    let deviceGenerationsCount: number | undefined;
+    let deviceLimitReached: boolean | undefined;
+
+    if (tier === 'free' && deviceId && !isTestDevice(deviceId)) {
+      try {
+        const { data: devData } = await client
+          .from('device_limits')
+          .select('generations_count, reset_at')
+          .eq('device_id', deviceId.trim())
+          .maybeSingle();
+
+        if (devData) {
+          const rawDev = devData as { generations_count?: number; reset_at?: string };
+          const isDevExpired = rawDev.reset_at ? new Date(rawDev.reset_at) <= new Date() : false;
+          const currentDevCount = isDevExpired ? 0 : (rawDev.generations_count || 0);
+          deviceGenerationsCount = currentDevCount;
+          if (currentDevCount >= 30) {
+            deviceLimitReached = true;
+          }
+        }
+      } catch {
+        // Silencioso
+      }
+    }
+
     return {
       success: true,
       tier,
@@ -216,6 +260,8 @@ export async function getUserLimitsAction(
       tutorAdsUsed,
       adsUsedInCycle,
       remainingAds,
+      deviceGenerationsCount,
+      deviceLimitReached,
     };
   } catch (err: unknown) {
     console.error('[getUserLimitsAction] Error inesperado:', err);

@@ -32,6 +32,7 @@ import {
 } from '@/app/actions/generateDeckSummary';
 import { showAdMobRewardedAd, preloadRewardedAd } from '@/lib/admob';
 import { usePlatform } from '@/lib/platform';
+import { getClientDeviceId } from '@/lib/deviceId';
 
 interface QuickStudyGuideModalProps {
   isOpen: boolean;
@@ -189,10 +190,16 @@ export function QuickStudyGuideModal({
         } catch (sessionErr) {
           console.warn('[QuickStudyGuideModal] No se pudo obtener el token de sesión:', sessionErr);
         }
-        const claim = await unlockDeckSummaryWithAdAction(deckId, accessToken, {
-          isNative: platform.isNativeApp,
-          platform: platform.isNativeAndroid ? 'android' : platform.isNativeIOS ? 'ios' : 'web',
-        });
+        const clientDeviceId = await getClientDeviceId();
+        const claim = await unlockDeckSummaryWithAdAction(
+          deckId,
+          accessToken,
+          {
+            isNative: platform.isNativeApp,
+            platform: platform.isNativeAndroid ? 'android' : platform.isNativeIOS ? 'ios' : 'web',
+          },
+          clientDeviceId
+        );
         if (claim.success && claim.summary) {
           setGuide(claim.summary);
           setIsAdUnlocked(true);
@@ -200,12 +207,13 @@ export function QuickStudyGuideModal({
             setGuidesUnlockedThisMonth(claim.guidesUnlockedThisMonth);
           }
         } else {
-          if (claim.error === 'FREE_MONTHLY_LIMIT_REACHED') {
+          if (claim.error === 'FREE_MONTHLY_LIMIT_REACHED' || claim.error === 'DEVICE_LIMIT_REACHED') {
             setAdError(
-              t(
-                'quick_guide.free_quota_exhausted',
-                'Has alcanzado el límite de 3 guías gratuitas este mes. Pásate a PRO para acceso ilimitado.'
-              )
+              claim.message ||
+                t(
+                  'quick_guide.free_quota_exhausted',
+                  'Has alcanzado el límite de 3 guías gratuitas este mes. Pásate a PRO para acceso ilimitado.'
+                )
             );
           } else {
             setAdError(claim.error || t('quick_guide.ad_failed', 'Debes completar el anuncio para desbloquear.'));

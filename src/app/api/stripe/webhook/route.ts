@@ -81,11 +81,12 @@ export async function POST(req: NextRequest) {
             console.error('Error al actualizar tier a "pro" en checkout.session.completed:', error);
           }
 
-          // Persistir columnas de vigencia y estado en api_limits
+          // Persistir columnas de vigencia y estado en api_limits (reinicio a 0 generaciones)
           await supabase
             .from('api_limits')
             .update({
               tier: 'pro',
+              generations_count: 0,
               stripe_customer_id: customerId || null,
               stripe_subscription_id: subscriptionId || null,
               current_period_end: currentPeriodEnd,
@@ -163,6 +164,7 @@ export async function POST(req: NextRequest) {
             .from('api_limits')
             .update({
               tier: 'pro',
+              generations_count: 0,
               stripe_customer_id: customerId || null,
               stripe_subscription_id: subscriptionId || null,
               current_period_end: currentPeriodEnd,

@@ -11,7 +11,13 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
+    const headerDeviceId = req.headers.get('x-device-id') || undefined;
+    const deviceId = (typeof body.deviceId === 'string' ? body.deviceId : undefined) || headerDeviceId;
+
     if (body.documentInput) {
+      if (!body.documentInput.deviceId && deviceId) {
+        body.documentInput.deviceId = deviceId;
+      }
       const result = await generateCardsFromDocumentAction(body.documentInput);
       return NextResponse.json(result);
     }
@@ -27,14 +33,16 @@ export async function POST(req: NextRequest) {
       body.topic,
       body.cardFormat,
       body.cardCount,
-      body.customPrompt,
+      body.deckId || body.customPrompt,
       body.existingQuestions,
+      body.userId,
       body.language,
       body.coreExhaustedPrevious,
-      body.isExhaustiveMode,
       body.pedagogicalMode,
       body.docenteFormat,
-      body.targetAudience
+      body.targetAudience,
+      body.isPracticalMode || false,
+      deviceId
     );
 
     return NextResponse.json(result);

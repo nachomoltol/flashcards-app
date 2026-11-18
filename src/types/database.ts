@@ -184,6 +184,54 @@ export type Database = {
           },
         ]
       }
+      device_limits: {
+        Row: {
+          device_id: string
+          welcome_generations_used: number
+          generations_count: number
+          guides_unlocked_this_month: number
+          reset_at: string
+          last_seen_user_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          device_id: string
+          welcome_generations_used?: number
+          generations_count?: number
+          guides_unlocked_this_month?: number
+          reset_at?: string
+          last_seen_user_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          device_id?: string
+          welcome_generations_used?: number
+          generations_count?: number
+          guides_unlocked_this_month?: number
+          reset_at?: string
+          last_seen_user_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_devices: {
+        Row: {
+          user_id: string
+          device_id: string
+          last_seen_at: string
+        }
+        Insert: {
+          user_id: string
+          device_id: string
+          last_seen_at?: string
+        }
+        Update: {
+          user_id?: string
+          device_id?: string
+          last_seen_at?: string
+        }
+        Relationships: []
+      }
       decks: {
         Row: {
           color: string | null
