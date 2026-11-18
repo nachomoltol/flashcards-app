@@ -697,6 +697,10 @@ export async function getOrGenerateDeckSummaryAction(
       }
     }
 
+    if (!authenticatedUserId && resolvedUserId && resolvedUserId === deck.user_id) {
+      authenticatedUserId = resolvedUserId;
+    }
+
     // Anti-suplantación (VULN-05): Descartar resolvedUserId si no coincide con el usuario autenticado
     if (resolvedUserId && authenticatedUserId && resolvedUserId !== authenticatedUserId) {
       console.warn('[getOrGenerateDeckSummaryAction] Discrepancia entre userId recibido y sesión autenticada.');

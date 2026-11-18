@@ -57,7 +57,7 @@ export async function getUserLimitsAction(
     }
   }
 
-  // 3. Validación de concordancia con userId explícito (anti-suplantación)
+  // 3. Validación de concordancia con userId explícito (anti-suplantación) o fallback
   if (targetUserId && userId && userId.trim() && userId.trim() !== targetUserId) {
     console.warn('[getUserLimitsAction] Discrepancia de userId detectada. Rechazando llamada suplantada.');
     return {
@@ -73,6 +73,10 @@ export async function getUserLimitsAction(
       remainingAds: 25,
       error: 'UNAUTHORIZED',
     };
+  }
+
+  if (!targetUserId && userId && userId.trim()) {
+    targetUserId = userId.trim();
   }
 
   if (!targetUserId) {

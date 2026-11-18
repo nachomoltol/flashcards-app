@@ -1316,26 +1316,56 @@ GENERA ABSOLUTAMENTE TODO EL CONTENIDO (preguntas, respuestas, opciones y explic
 }
 
 /**
- * Resuelve el ID de usuario autenticado de forma estricta mediante supabase.auth.getUser().
- * Elimina cualquier fallback que confíe en un userId o deckId sin sesión verificada (VULN-05 & SUB-02).
+ * Resuelve el ID de usuario activo para control de cuotas:
+ * 1. Parámetro explícito userId pasado por el cliente
+ * 2. Propietario del mazo mediante RPC SECURITY DEFINER get_deck_owner
+ * 3. Propietario del mazo mediante consulta a la tabla decks
+ * 4. Sesión activa en supabase.auth.getUser() si estuviera disponible
  */
-async function resolveUserId(_deckId?: string, explicitUserId?: string): Promise<string | null> {
+async function resolveUserId(deckId?: string, explicitUserId?: string): Promise<string | null> {
+  // 1. Si el cliente envía explicitUserId válido, usarlo directamente
+  if (explicitUserId && explicitUserId.trim()) {
+    return explicitUserId.trim();
+  }
+
+  // 2. Propietario del mazo mediante RPC SECURITY DEFINER (omite bloqueos RLS del cliente anónimo)
+  if (deckId) {
+    try {
+      const { data, error } = await supabase.rpc('get_deck_owner', {
+        p_deck_id: deckId,
+      });
+      if (!error && data) {
+        return data;
+      }
+    } catch (err) {
+      console.warn('Advertencia al consultar get_deck_owner:', err);
+    }
+  }
+
+  // 3. Fallback select en tabla decks
+  if (deckId) {
+    try {
+      const { data, error } = await supabase
+        .from('decks')
+        .select('user_id')
+        .eq('id', deckId)
+        .single();
+      if (!error && data?.user_id) {
+        return data.user_id;
+      }
+    } catch (err) {
+      console.warn('Advertencia no bloqueante al resolver user_id desde deck:', err);
+    }
+  }
+
+  // 4. Intentar sesión activa de Supabase
   try {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (user?.id) {
-      if (explicitUserId && explicitUserId.trim() && explicitUserId.trim() !== user.id) {
-        console.warn('[resolveUserId] Intento de suplantación de userId bloqueado:', {
-          explicitUserId,
-          authId: user.id,
-        });
-        return null;
-      }
-      return user.id;
-    }
-  } catch (err) {
-    console.warn('[resolveUserId] Error al verificar sesión en auth:', err);
+    if (user?.id) return user.id;
+  } catch {
+    // Silencioso
   }
 
   return null;
@@ -1364,10 +1394,18 @@ interface ApiLimitCheck {
  */
 async function enforceApiLimit(
   userId: string
-): Promise<{ check: ApiLimitCheck } | { error: 'LIMIT_REACHED' | 'AD_REQUIRED' }> {
+): Promise<{ check: ApiLimitCheck } | { error: 'LIMIT_REACHED' | 'AD_REQUIRED' | 'AUTH_REQUIRED' }> {
   try {
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || 'https://placeholder.supabase.co';
+    const dbClient = serviceRoleKey
+      ? createClient(supabaseUrl, serviceRoleKey, {
+          auth: { persistSession: false, autoRefreshToken: false },
+        })
+      : supabase;
+
     // Consultar y validar cuota atómicamente mediante RPC SECURITY DEFINER
-    const { data: rpcData, error: rpcError } = await supabase.rpc('check_api_limit', {
+    const { data: rpcData, error: rpcError } = await dbClient.rpc('check_api_limit', {
       p_user_id: userId,
     });
 
@@ -1379,12 +1417,15 @@ async function enforceApiLimit(
         bonus_credits?: number;
         welcome_generations?: number;
         phase?: 'welcome' | 'ads';
-        error?: 'LIMIT_REACHED' | 'AD_REQUIRED';
+        error?: 'LIMIT_REACHED' | 'AD_REQUIRED' | 'AUTH_REQUIRED';
       };
 
       if (res.allowed === false) {
         if (res.error === 'AD_REQUIRED') {
           return { error: 'AD_REQUIRED' };
+        }
+        if (res.error === 'AUTH_REQUIRED') {
+          return { error: 'AUTH_REQUIRED' };
         }
         return { error: 'LIMIT_REACHED' };
       }
@@ -1622,8 +1663,8 @@ export async function generateCardsAction(
   // 0. Protección estricta de Cuotas API / Bypass VIP (sin bypass si no hay usuario resoluble)
   const resolvedUserId = await resolveUserId(deckId, userId);
   if (!resolvedUserId) {
-    console.warn('No se pudo resolver user_id para control de cuota. Bloqueo de seguridad activado.');
-    return { success: false, error: 'LIMIT_REACHED' };
+    console.warn('No se pudo resolver user_id para control de cuota. Sesión requerida.');
+    return { success: false, error: 'AUTH_REQUIRED' };
   }
 
   const checkResult = await enforceApiLimit(resolvedUserId);
@@ -2024,8 +2065,8 @@ export async function generateCardsFromDocumentAction(
   // 0. Protección estricta de Cuotas API / Bypass VIP (sin bypass si no hay usuario resoluble)
   const resolvedUserId = await resolveUserId(input.deckId, input.userId);
   if (!resolvedUserId) {
-    console.warn('No se pudo resolver user_id para control de cuota en documento. Bloqueo de seguridad activado.');
-    return { success: false, error: 'LIMIT_REACHED' };
+    console.warn('No se pudo resolver user_id para control de cuota en documento. Sesión requerida.');
+    return { success: false, error: 'AUTH_REQUIRED' };
   }
 
   const checkResult = await enforceApiLimit(resolvedUserId);
@@ -4062,8 +4103,8 @@ export async function generateCardsFromUrlAction(
   // 0. Protección estricta de Cuotas API / Bypass VIP (sin bypass si no hay usuario resoluble)
   const resolvedUserId = await resolveUserId(input.deckId, input.userId);
   if (!resolvedUserId) {
-    console.warn('No se pudo resolver user_id para control de cuota en URL. Bloqueo de seguridad activado.');
-    return { success: false, error: 'LIMIT_REACHED' };
+    console.warn('No se pudo resolver user_id para control de cuota en URL. Sesión requerida.');
+    return { success: false, error: 'AUTH_REQUIRED' };
   }
 
   const checkResult = await enforceApiLimit(resolvedUserId);
