@@ -63,15 +63,45 @@ export const RewardAdPluginEvents = {
   AdImpression: 'onRewardedVideoAdImpression',
 } as const;
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let cachedAdMob: any = null;
+
 /**
- * Obtiene de forma segura el SDK de AdMob inyectado por Capacitor en la ventana global.
+ * Obtiene de forma segura el SDK de AdMob inyectado por Capacitor en la ventana global
+ * o a través del paquete @capacitor-community/admob.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function getAdMobPlugin(): Promise<any> {
+  if (typeof window === 'undefined') return null;
+  if (cachedAdMob) return cachedAdMob;
+
+  // 1. Intentar desde window.Capacitor.Plugins.AdMob
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const windowPlugin = (window as any).Capacitor?.Plugins?.AdMob;
+  if (windowPlugin) {
+    cachedAdMob = windowPlugin;
+    return cachedAdMob;
+  }
+
+  // 2. Fallback con importación dinámica
+  try {
+    const mod = await import('@capacitor-community/admob');
+    cachedAdMob = mod.AdMob || null;
+    return cachedAdMob;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Obtiene de forma síncrona el SDK de AdMob inyectado por Capacitor en la ventana global o en caché.
  * Si no estamos en entorno nativo Capacitor, retorna null sin provocar errores de red.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function getCapacitorAdMobPlugin(): any {
   if (typeof window === 'undefined') return null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (window as any).Capacitor?.Plugins?.AdMob || null;
+  return cachedAdMob || (window as any).Capacitor?.Plugins?.AdMob || null;
 }
 
 let isAdMobInitialized = false;
@@ -169,7 +199,7 @@ async function requestConsent(): Promise<boolean> {
 
 /**
  * Inicializa el SDK de AdMob si se ejecuta dentro del entorno Capacitor nativo.
- * Solicita primero el consentimiento UMP (GDPR) obligatorio antes de inicializar el SDK.
+ * Solicita primero la autorización ATT en iOS y el consentimiento UMP (GDPR) obligatorio antes de inicializar el SDK.
  */
 export async function initializeAdMob(): Promise<boolean> {
   if (typeof window === 'undefined') return false;
@@ -181,7 +211,11 @@ export async function initializeAdMob(): Promise<boolean> {
     return true;
   }
 
-  const AdMob = getCapacitorAdMobPlugin();
+  let AdMob = getCapacitorAdMobPlugin();
+  if (!AdMob) {
+    AdMob = await getAdMobPlugin();
+  }
+
   if (AdMob) {
     try {
       // 0. iOS: solicitar autorización de App Tracking Transparency (ATT) antes de inicializar
@@ -199,6 +233,7 @@ export async function initializeAdMob(): Promise<boolean> {
         initializeForTesting: isDev,
       });
       isAdMobInitialized = true;
+      console.log('[AdMob] SDK inicializado con éxito.');
 
       // Iniciar precarga inmediata del anuncio en segundo plano tras inicialización
       preloadRewardedAd().catch((preloadErr) => {
@@ -217,20 +252,47 @@ export async function initializeAdMob(): Promise<boolean> {
 
 /**
  * iOS: Solicita la autorización de App Tracking Transparency (ATT) si el plugin la expone
- * y el estado aún no ha sido determinado. Nunca bloquea la inicialización si falla.
+ * y el estado aún no ha sido determinado. Cumple estrictamente con Guideline 2.1 de Apple.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function requestIOSTrackingAuthorization(AdMob: any): Promise<void> {
+export async function requestIOSTrackingAuthorization(AdMob?: any): Promise<void> {
   try {
-    if (typeof AdMob.trackingAuthorizationStatus === 'function') {
-      const { status } = (await AdMob.trackingAuthorizationStatus()) || {};
+    const plugin = AdMob || getCapacitorAdMobPlugin() || (await getAdMobPlugin());
+    if (!plugin) return;
+
+    if (typeof plugin.trackingAuthorizationStatus === 'function') {
+      const { status } = (await plugin.trackingAuthorizationStatus()) || {};
+      console.log('[AdMob ATT] Estado actual de autorización ATT:', status);
       if (status && status !== 'notDetermined') return;
     }
-    if (typeof AdMob.requestTrackingAuthorization === 'function') {
-      await AdMob.requestTrackingAuthorization();
+    if (typeof plugin.requestTrackingAuthorization === 'function') {
+      console.log('[AdMob ATT] Solicitando diálogo nativo ATTrackingManager...');
+      await plugin.requestTrackingAuthorization();
+      console.log('[AdMob ATT] Diálogo ATTrackingManager completado.');
     }
   } catch (err) {
     console.warn('[AdMob] No se pudo solicitar la autorización ATT en iOS:', err);
+  }
+}
+
+/**
+ * Inicializa AdMob en iOS nativo disparando explícitamente el prompt de App Tracking Transparency (ATT)
+ * tras un retardo seguro (~600ms) desde el montaje inicial de la app.
+ * Cumple con el Guideline 2.1 de Apple App Store.
+ */
+export async function initAdMobWithATT(delayMs = 600): Promise<void> {
+  if (typeof window === 'undefined') return;
+
+  const platform = detectPlatform();
+  if (!platform.isNativeIOS) return;
+
+  // Esperar a que la ventana y el ViewController de iOS estén completamente activos
+  await new Promise((resolve) => setTimeout(resolve, delayMs));
+
+  try {
+    await initializeAdMob();
+  } catch (err) {
+    console.warn('[AdMob] Error al inicializar AdMob con ATT en montaje nativo iOS:', err);
   }
 }
 

@@ -34,6 +34,7 @@ import { NewMenuDropdown } from '@/components/ui/NewMenuDropdown';
 import { useProModalStore } from '@/stores/useProModalStore';
 import { useFeedbackModalStore } from '@/stores/useFeedbackModalStore';
 import { usePlatform } from '@/lib/platform';
+import { initAdMobWithATT } from '@/lib/admob';
 
 interface NavItem {
   name: string;
@@ -138,6 +139,12 @@ export default function DashboardLayout({
     setIsMounted(true);
     initialize();
   }, [initialize]);
+
+  useEffect(() => {
+    if (platform.isNativeIOS) {
+      initAdMobWithATT(600);
+    }
+  }, [platform.isNativeIOS]);
 
   // Sincronizar perfil global al detectar usuario autenticado
   useEffect(() => {
