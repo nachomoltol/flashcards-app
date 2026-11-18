@@ -155,6 +155,35 @@ export type Database = {
           },
         ]
       }
+      deck_summaries: {
+        Row: {
+          deck_id: string
+          user_id: string
+          guide_data: Json
+          updated_at: string
+        }
+        Insert: {
+          deck_id: string
+          user_id: string
+          guide_data: Json
+          updated_at?: string
+        }
+        Update: {
+          deck_id?: string
+          user_id?: string
+          guide_data?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deck_summaries_deck_id_fkey"
+            columns: ["deck_id"]
+            isOneToOne: true
+            referencedRelation: "decks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       decks: {
         Row: {
           color: string | null
@@ -381,6 +410,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      unlock_deck_summary_with_ad: {
+        Args: {
+          p_user_id: string
+          p_deck_id: string
+        }
+        Returns: Json
+      }
       get_user_api_limits: {
         Args: {
           p_user_id: string

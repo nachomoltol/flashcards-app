@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { useDeckStore, useAuthStore, useStreakStore, useLanguageStore, useAtlasStore, useTutorialStore, type DeckWithStats } from '@/stores';
+import { verifyStripeCheckoutSessionAction } from '@/app/actions/verifyStripeCheckout';
 import { ShareDeckModal } from './ShareDeckModal';
 import { NewMenuDropdown } from '@/components/ui/NewMenuDropdown';
 import { getDeckColorStyles, COLOR_PALETTE } from '@/lib/colors';
@@ -104,7 +105,7 @@ function DecksViewContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
-  const { user, isLoading: authLoading } = useAuthStore();
+  const { user, session, isLoading: authLoading } = useAuthStore();
   const { decks, isLoading, error, fetchDecks, createDeck, deleteDeck, updateDeck, moveDeck } = useDeckStore();
   const { atlasItems, fetchAtlasItems } = useAtlasStore();
   const { streak, fetchStreak } = useStreakStore();
@@ -172,12 +173,18 @@ function DecksViewContent() {
 
   useEffect(() => {
     const status = searchParams.get('stripe_status');
+    const sessionId = searchParams.get('session_id');
     if (status === 'success') {
       setStripeBanner('success');
+      if (sessionId) {
+        verifyStripeCheckoutSessionAction(sessionId, session?.access_token).catch((err) => {
+          console.warn('[DecksView] Error en verificación síncrona de Stripe:', err);
+        });
+      }
     } else if (status === 'cancelled') {
       setStripeBanner('cancelled');
     }
-  }, [searchParams]);
+  }, [searchParams, session?.access_token]);
 
   useEffect(() => {
     setCurrentFolderId(searchParams.get('folder') || null);

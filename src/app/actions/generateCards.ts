@@ -1316,54 +1316,26 @@ GENERA ABSOLUTAMENTE TODO EL CONTENIDO (preguntas, respuestas, opciones y explic
 }
 
 /**
- * Intenta resolver el ID de usuario activo mediante varias vías robustas:
- * 1. Parámetro explícito userId pasado por el cliente
- * 2. ID del creador del mazo (consultando la tabla decks si se pasa deckId)
- * 3. Sesión activa en supabase.auth.getUser()
+ * Resuelve el ID de usuario autenticado de forma estricta mediante supabase.auth.getUser().
+ * Elimina cualquier fallback que confíe en un userId o deckId sin sesión verificada (VULN-05 & SUB-02).
  */
-async function resolveUserId(deckId?: string, explicitUserId?: string): Promise<string | null> {
-  if (explicitUserId && explicitUserId.trim()) {
-    return explicitUserId.trim();
-  }
-
-  // 1. Propietario del mazo mediante RPC SECURITY DEFINER (omite bloqueos RLS del cliente anónimo)
-  if (deckId) {
-    try {
-      const { data, error } = await supabase.rpc('get_deck_owner', {
-        p_deck_id: deckId,
-      });
-      if (!error && data) {
-        return data;
-      }
-    } catch (err) {
-      console.warn('Advertencia al consultar get_deck_owner:', err);
-    }
-  }
-
-  // 2. Intentar sesión activa de Supabase
+async function resolveUserId(_deckId?: string, explicitUserId?: string): Promise<string | null> {
   try {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (user?.id) return user.id;
-  } catch {
-    // Continuar con resolución por mazo
-  }
-
-  // 3. Fallback select en tabla decks
-  if (deckId) {
-    try {
-      const { data, error } = await supabase
-        .from('decks')
-        .select('user_id')
-        .eq('id', deckId)
-        .single();
-      if (!error && data?.user_id) {
-        return data.user_id;
+    if (user?.id) {
+      if (explicitUserId && explicitUserId.trim() && explicitUserId.trim() !== user.id) {
+        console.warn('[resolveUserId] Intento de suplantación de userId bloqueado:', {
+          explicitUserId,
+          authId: user.id,
+        });
+        return null;
       }
-    } catch (err) {
-      console.warn('Advertencia no bloqueante al resolver user_id desde deck:', err);
+      return user.id;
     }
+  } catch (err) {
+    console.warn('[resolveUserId] Error al verificar sesión en auth:', err);
   }
 
   return null;

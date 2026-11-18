@@ -394,7 +394,7 @@ export async function checkAndResetMonthlyGuideQuota(
 }> {
   const { data, error } = await dbClient
     .from('api_limits')
-    .select('tier, guides_unlocked_this_month, guides_reset_at')
+    .select('tier, guides_unlocked_this_month, guides_reset_at, current_period_end')
     .eq('user_id', userId)
     .maybeSingle();
 
@@ -422,7 +422,23 @@ export async function checkAndResetMonthlyGuideQuota(
     };
   }
 
-  const tier = (data.tier || 'free') as 'free' | 'pro' | 'vip';
+  let tier = (data.tier || 'free') as 'free' | 'pro' | 'vip';
+
+  // Lazy Expiration de suscripción PRO vencida (SUB-01)
+  if (tier === 'pro' && data.current_period_end) {
+    if (new Date(data.current_period_end).getTime() < now.getTime()) {
+      await dbClient
+        .from('api_limits')
+        .update({
+          tier: 'free',
+          subscription_status: 'expired',
+          updated_at: now.toISOString(),
+        })
+        .eq('user_id', userId);
+      tier = 'free';
+    }
+  }
+
   let unlockedCount = Number(data.guides_unlocked_this_month) || 0;
   const resetAtDate = data.guides_reset_at ? new Date(data.guides_reset_at) : new Date(0);
 
@@ -583,10 +599,19 @@ export async function generateExhaustiveSummaryFromRawText(
     const parsedJson = JSON.parse(responseText);
     const completeGuide = normalizeToExhaustiveGuide(parsedJson, deckTitle, 0);
 
+    // Guardar en la tabla segura aislada deck_summaries (VULN-01)
+    await db.from('deck_summaries').upsert({
+      deck_id: cleanDeckId,
+      user_id: userId,
+      guide_data: completeGuide as unknown as Json,
+      updated_at: new Date().toISOString(),
+    });
+
+    // Limpiar summary_guide en decks para evitar fuga PostgREST
     await db
       .from('decks')
       .update({
-        summary_guide: completeGuide as unknown as Json,
+        summary_guide: null,
         updated_at: new Date().toISOString(),
       })
       .eq('id', cleanDeckId);
@@ -672,8 +697,9 @@ export async function getOrGenerateDeckSummaryAction(
       }
     }
 
-    if (!authenticatedUserId && resolvedUserId && resolvedUserId === deck.user_id) {
-      authenticatedUserId = resolvedUserId;
+    // Anti-suplantación (VULN-05): Descartar resolvedUserId si no coincide con el usuario autenticado
+    if (resolvedUserId && authenticatedUserId && resolvedUserId !== authenticatedUserId) {
+      console.warn('[getOrGenerateDeckSummaryAction] Discrepancia entre userId recibido y sesión autenticada.');
     }
 
     const isOwner = Boolean(authenticatedUserId && authenticatedUserId === deck.user_id);
@@ -683,21 +709,141 @@ export async function getOrGenerateDeckSummaryAction(
       return { success: false, error: authenticatedUserId ? 'UNAUTHORIZED' : 'AUTH_REQUIRED' };
     }
 
-    // 3. Comprobar cuota mensual en api_limits
-    const targetUserId = authenticatedUserId || deck.user_id;
-    const quota = await checkAndResetMonthlyGuideQuota(db, targetUserId);
-    const isPro = quota.tier === 'pro' || quota.tier === 'vip';
+    // 3. Comprobar cuota mensual y nivel PRO del usuario solicitante (VULN-05 & SUB-02)
+    // En mazos públicos, evalúa exclusivamente al visitante autenticado; si es anónimo, nunca es PRO
+    let isPro = false;
+    let quota = {
+      tier: 'free' as 'free' | 'pro' | 'vip',
+      guidesUnlockedThisMonth: 0,
+      guidesResetAt: '',
+    };
 
-    // 4. Comprobar si ya existe guía en caché
+    if (authenticatedUserId) {
+      quota = await checkAndResetMonthlyGuideQuota(db, authenticatedUserId);
+      isPro = quota.tier === 'pro' || quota.tier === 'vip';
+    }
+
+    // 4. Cooldown y Protección Anti-Abuso en forceRegenerate (VULN-02)
+    if (resolvedForce) {
+      // Exige usuario autenticado propietario del mazo
+      if (!isOwner || !authenticatedUserId) {
+        return {
+          success: false,
+          error:
+            resolvedLocale === 'en'
+              ? 'Only the deck owner can regenerate the study guide.'
+              : 'Solo el creador del mazo puede regenerar la guía de estudio.',
+        };
+      }
+
+      // Cooldown obligatorio de 5 minutos entre regeneraciones del mismo mazo
+      const { data: existingSummaryRec } = await db
+        .from('deck_summaries')
+        .select('updated_at')
+        .eq('deck_id', cleanDeckId)
+        .maybeSingle();
+
+      if (existingSummaryRec?.updated_at) {
+        const lastUpdated = new Date(existingSummaryRec.updated_at).getTime();
+        const elapsed = Date.now() - lastUpdated;
+        const cooldownMs = 5 * 60 * 1000;
+        if (elapsed < cooldownMs) {
+          const waitMin = Math.ceil((cooldownMs - elapsed) / 60000);
+          return {
+            success: false,
+            error:
+              resolvedLocale === 'en'
+                ? `Please wait ${waitMin} min before regenerating this guide.`
+                : `Debes esperar ${waitMin} min antes de regenerar la guía de este mazo.`,
+          };
+        }
+      }
+
+      // Si es Free, requiere tener el mazo desbloqueado o descuenta 1 crédito de generación habitual
+      if (!isPro) {
+        if (quota.guidesUnlockedThisMonth === 0) {
+          const { data: userLimits } = await db
+            .from('api_limits')
+            .select('welcome_generations, bonus_credits, generations_count')
+            .eq('user_id', authenticatedUserId)
+            .maybeSingle();
+
+          const welcome = userLimits?.welcome_generations || 0;
+          const bonus = userLimits?.bonus_credits || 0;
+          const count = userLimits?.generations_count || 0;
+
+          if (welcome >= 5 && bonus <= 0) {
+            return {
+              success: false,
+              error:
+                resolvedLocale === 'en'
+                  ? 'You need an available generation credit to regenerate this guide.'
+                  : 'Necesitas un crédito de generación para regenerar la guía.',
+            };
+          }
+
+          const todayStr = new Date().toISOString().slice(0, 10);
+          if (welcome < 5) {
+            await db
+              .from('api_limits')
+              .update({
+                welcome_generations: welcome + 1,
+                last_generation_date: todayStr,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('user_id', authenticatedUserId);
+          } else {
+            await db
+              .from('api_limits')
+              .update({
+                bonus_credits: Math.max(0, bonus - 1),
+                generations_count: count + 1,
+                last_generation_date: todayStr,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('user_id', authenticatedUserId);
+          }
+        }
+      }
+    }
+
+    // 5. Comprobar si ya existe guía en caché (tabla aislada deck_summaries con fallback retrocompatible)
     let completeGuide: ExhaustiveDeckSummaryGuide | null = null;
     let isCached = false;
 
-    if (!resolvedForce && deck.summary_guide) {
-      completeGuide = normalizeToExhaustiveGuide(deck.summary_guide, deck.title, 0);
-      isCached = true;
+    if (!resolvedForce) {
+      const { data: summaryRec } = await db
+        .from('deck_summaries')
+        .select('guide_data, updated_at')
+        .eq('deck_id', cleanDeckId)
+        .maybeSingle();
+
+      if (summaryRec?.guide_data) {
+        completeGuide = normalizeToExhaustiveGuide(summaryRec.guide_data, deck.title, 0);
+        isCached = true;
+      } else if (deck.summary_guide) {
+        // Fallback de retrocompatibilidad y migración al vuelo
+        completeGuide = normalizeToExhaustiveGuide(deck.summary_guide, deck.title, 0);
+        isCached = true;
+
+        await db.from('deck_summaries').upsert({
+          deck_id: cleanDeckId,
+          user_id: deck.user_id,
+          guide_data: completeGuide as unknown as Json,
+          updated_at: new Date().toISOString(),
+        });
+
+        await db
+          .from('decks')
+          .update({
+            summary_guide: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', cleanDeckId);
+      }
     }
 
-    // 5. Si no existe o se fuerza regeneración, generar reconstruyendo sobre las tarjetas (hasta 400 tarjetas)
+    // 6. Si no existe o se fuerza regeneración, generar reconstruyendo sobre las tarjetas (hasta 400 tarjetas)
     if (!completeGuide) {
       const { data: cards, error: cardsErr } = await db
         .from('cards')
@@ -756,10 +902,19 @@ export async function getOrGenerateDeckSummaryAction(
       const parsedJson = JSON.parse(responseText);
       completeGuide = normalizeToExhaustiveGuide(parsedJson, deck.title, cards.length);
 
+      // Guardar en la tabla aislada y segura deck_summaries (VULN-01)
+      await db.from('deck_summaries').upsert({
+        deck_id: cleanDeckId,
+        user_id: deck.user_id,
+        guide_data: completeGuide as unknown as Json,
+        updated_at: new Date().toISOString(),
+      });
+
+      // Limpiar decks.summary_guide para cerrar la fuga PostgREST
       await db
         .from('decks')
         .update({
-          summary_guide: completeGuide as unknown as Json,
+          summary_guide: null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', cleanDeckId);
@@ -805,13 +960,20 @@ export async function getOrGenerateDeckSummaryAction(
 // DESBLOQUEO MENSUAL POR ANUNCIO RECOMPENSADO (MÁXIMO 3 GUÍAS AL MES)
 // ---------------------------------------------------------------------------
 
+export interface AdPlatformProof {
+  isNative?: boolean;
+  platform?: string;
+}
+
 /**
- * Server Action para desbloquear una Guía de Repaso Completa tras completar un anuncio bonificado.
- * Aplica un límite estricto e independiente de 3 guías al mes por usuario Free.
+ * Server Action para desbloquear una Guía de Repaso Completa tras completar un anuncio bonificado en App móvil.
+ * Aplica la RPC atómica `unlock_deck_summary_with_ad` con bloqueo pesimista FOR UPDATE (VULN-03).
+ * Exige validación de origen en entorno nativo móvil AdMob, rechazando llamadas web directas (VULN-04).
  */
 export async function unlockDeckSummaryWithAdAction(
   deckId: string,
-  accessToken?: string
+  accessToken?: string,
+  platformProof?: AdPlatformProof
 ): Promise<GenerateDeckSummaryResult> {
   const cleanDeckId = deckId?.trim();
   if (!cleanDeckId) {
@@ -823,7 +985,7 @@ export async function unlockDeckSummaryWithAdAction(
   try {
     const db = getServerSupabaseClient();
 
-    // 1. Resolver usuario autenticado
+    // 1. Resolver usuario autenticado de forma estricta (VULN-05)
     let authenticatedUserId: string | null = null;
     if (resolvedToken) {
       try {
@@ -851,60 +1013,56 @@ export async function unlockDeckSummaryWithAdAction(
       return { success: false, error: 'AUTH_REQUIRED' };
     }
 
-    // 2. Verificar existencia del mazo
-    const { data: deck } = await db
-      .from('decks')
-      .select('id, title, user_id, is_public, summary_guide')
-      .eq('id', cleanDeckId)
-      .maybeSingle();
-
-    if (!deck) {
-      return { success: false, error: 'DECK_NOT_FOUND' };
-    }
-
-    // 3. Comprobar cuota mensual independiente
-    const quota = await checkAndResetMonthlyGuideQuota(db, authenticatedUserId);
-    const isPro = quota.tier === 'pro' || quota.tier === 'vip';
-
-    // Si ya es PRO, no consume cupo de anuncio
-    if (isPro) {
-      const guide = deck.summary_guide
-        ? normalizeToExhaustiveGuide(deck.summary_guide, deck.title, 0)
-        : undefined;
-      return {
-        success: true,
-        isUnlocked: true,
-        summary: guide,
-        guidesUnlockedThisMonth: quota.guidesUnlockedThisMonth,
-        maxFreeGuidesPerMonth: 3,
-      };
-    }
-
-    // Límite mensual de 3 guías para usuarios Free
-    if (quota.guidesUnlockedThisMonth >= 3) {
+    // 2. Verificación estricta de entorno nativo móvil (VULN-04)
+    if (!platformProof?.isNative) {
       return {
         success: false,
-        error: 'FREE_MONTHLY_LIMIT_REACHED',
-        isUnlocked: false,
-        guidesUnlockedThisMonth: quota.guidesUnlockedThisMonth,
+        error:
+          'Los anuncios bonificados están disponibles exclusivamente en la App móvil (Android/iOS). Suscríbete a PRO (3,50 €/mes) para desbloquear guías ilimitadas en la web.',
+      };
+    }
+
+    // 3. Invocar la función RPC atómica con bloqueo pesimista FOR UPDATE (VULN-03)
+    const { data: rpcRes, error: rpcErr } = await db.rpc('unlock_deck_summary_with_ad', {
+      p_user_id: authenticatedUserId,
+      p_deck_id: cleanDeckId,
+    });
+
+    if (rpcErr) {
+      console.error('[unlockDeckSummaryWithAdAction] Error en RPC unlock_deck_summary_with_ad:', rpcErr);
+      return { success: false, error: 'DATABASE_ERROR' };
+    }
+
+    const claimData = rpcRes as {
+      success?: boolean;
+      allowed?: boolean;
+      is_pro?: boolean;
+      error?: string;
+      message?: string;
+      guides_unlocked_this_month?: number;
+      remaining_guides?: number;
+    } | null;
+
+    if (!claimData || !claimData.allowed) {
+      return {
+        success: false,
+        error: claimData?.error || 'CLAIM_FAILED',
+        guidesUnlockedThisMonth: claimData?.guides_unlocked_this_month ?? 3,
         maxFreeGuidesPerMonth: 3,
       };
     }
 
-    // Incrementar únicamente el contador de guías de este mes (sin tocar generaciones ni tutor)
-    const newCount = quota.guidesUnlockedThisMonth + 1;
-    await db
-      .from('api_limits')
-      .update({
-        guides_unlocked_this_month: newCount,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('user_id', authenticatedUserId);
+    // 4. Obtener la guía completa desde la tabla segura aislada deck_summaries (VULN-01)
+    let fullGuide: ExhaustiveDeckSummaryGuide | null = null;
+    const { data: summaryRec } = await db
+      .from('deck_summaries')
+      .select('guide_data')
+      .eq('deck_id', cleanDeckId)
+      .maybeSingle();
 
-    // Obtener la guía completa (de caché o generándola)
-    let fullGuide: ExhaustiveDeckSummaryGuide;
-    if (deck.summary_guide) {
-      fullGuide = normalizeToExhaustiveGuide(deck.summary_guide, deck.title, 0);
+    if (summaryRec?.guide_data) {
+      const { data: deck } = await db.from('decks').select('title').eq('id', cleanDeckId).maybeSingle();
+      fullGuide = normalizeToExhaustiveGuide(summaryRec.guide_data, deck?.title || '', 0);
     } else {
       const genRes = await getOrGenerateDeckSummaryAction(
         cleanDeckId,
@@ -927,7 +1085,7 @@ export async function unlockDeckSummaryWithAdAction(
       success: true,
       isUnlocked: true,
       summary: fullGuide,
-      guidesUnlockedThisMonth: newCount,
+      guidesUnlockedThisMonth: claimData.guides_unlocked_this_month,
       maxFreeGuidesPerMonth: 3,
     };
   } catch (err) {

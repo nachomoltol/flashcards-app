@@ -159,12 +159,15 @@ export async function getTutorQuotaStatusAction(
   try {
     const { data: record } = await supabase
       .from('api_limits')
-      .select('tier, tutor_consultations_count, last_tutor_date, bonus_credits, tutor_ad_credits')
+      .select('tier, tutor_consultations_count, last_tutor_date, bonus_credits, tutor_ad_credits, current_period_end')
       .eq('user_id', userId)
       .maybeSingle();
 
     if (record) {
-      const tier = (record.tier as 'free' | 'pro' | 'vip') || 'free';
+      let tier = (record.tier as 'free' | 'pro' | 'vip') || 'free';
+      if (tier === 'pro' && record.current_period_end && new Date(record.current_period_end).getTime() < Date.now()) {
+        tier = 'free';
+      }
       const isPro = tier === 'pro' || tier === 'vip';
       const currentMonth = new Date().toISOString().slice(0, 7);
       const lastMonth = record.last_tutor_date ? String(record.last_tutor_date).slice(0, 7) : null;

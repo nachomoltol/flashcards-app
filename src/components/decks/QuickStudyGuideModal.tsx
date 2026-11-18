@@ -189,7 +189,10 @@ export function QuickStudyGuideModal({
         } catch (sessionErr) {
           console.warn('[QuickStudyGuideModal] No se pudo obtener el token de sesión:', sessionErr);
         }
-        const claim = await unlockDeckSummaryWithAdAction(deckId, accessToken);
+        const claim = await unlockDeckSummaryWithAdAction(deckId, accessToken, {
+          isNative: platform.isNativeApp,
+          platform: platform.isNativeAndroid ? 'android' : platform.isNativeIOS ? 'ios' : 'web',
+        });
         if (claim.success && claim.summary) {
           setGuide(claim.summary);
           setIsAdUnlocked(true);

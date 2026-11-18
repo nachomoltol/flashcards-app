@@ -57,9 +57,22 @@ export async function getUserLimitsAction(
     }
   }
 
-  // 3. Fallback a userId verificado
-  if (!targetUserId && userId && userId.trim()) {
-    targetUserId = userId.trim();
+  // 3. Validación de concordancia con userId explícito (anti-suplantación)
+  if (targetUserId && userId && userId.trim() && userId.trim() !== targetUserId) {
+    console.warn('[getUserLimitsAction] Discrepancia de userId detectada. Rechazando llamada suplantada.');
+    return {
+      success: false,
+      tier: 'free',
+      count: 0,
+      bonusCredits: 0,
+      welcomeGenerations: 0,
+      tutorConsultationsCount: 0,
+      tutorAdCredits: 0,
+      tutorAdsUsed: 0,
+      adsUsedInCycle: 0,
+      remainingAds: 25,
+      error: 'UNAUTHORIZED',
+    };
   }
 
   if (!targetUserId) {
@@ -106,7 +119,7 @@ export async function getUserLimitsAction(
   try {
     const { data, error } = await client
       .from('api_limits')
-      .select('tier, generations_count, last_generation_date, bonus_credits, welcome_generations, tutor_consultations_count, last_tutor_date, tutor_ad_credits')
+      .select('tier, generations_count, last_generation_date, bonus_credits, welcome_generations, tutor_consultations_count, last_tutor_date, tutor_ad_credits, current_period_end')
       .eq('user_id', targetUserId)
       .maybeSingle();
 
@@ -151,7 +164,27 @@ export async function getUserLimitsAction(
     const count = isSameMonth ? (data.generations_count || 0) : 0;
     const bonusCredits = typeof data.bonus_credits === 'number' ? data.bonus_credits : 0;
     const welcomeGenerations = typeof data.welcome_generations === 'number' ? data.welcome_generations : 0;
-    const tier = (data.tier as 'free' | 'pro' | 'vip') || 'free';
+    let tier = (data.tier as 'free' | 'pro' | 'vip') || 'free';
+
+    // Lazy Expiration de suscripción PRO vencida
+    if (tier === 'pro' && data.current_period_end) {
+      const periodEnd = new Date(data.current_period_end).getTime();
+      if (periodEnd < Date.now()) {
+        try {
+          await client
+            .from('api_limits')
+            .update({
+              tier: 'free',
+              subscription_status: 'expired',
+              updated_at: new Date().toISOString(),
+            })
+            .eq('user_id', targetUserId);
+          tier = 'free';
+        } catch (downgradeErr) {
+          console.warn('[getUserLimitsAction] Error al aplicar lazy expiration:', downgradeErr);
+        }
+      }
+    }
 
     const lastTutorMonth = data.last_tutor_date
       ? String(data.last_tutor_date).slice(0, 7)
