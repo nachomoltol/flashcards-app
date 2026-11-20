@@ -72,7 +72,7 @@ const cardItemSchemaProperties = {
   justification: {
     type: Type.STRING,
     description:
-      'Micro-explicación directa de 2 frases (30-50 palabras máx.) ANTES de marcar la opción correcta: 1) fundamento/porqué causal sin repetir literalmente la opción ganadora; 2) contraste breve descartando el distractor principal o confusión habitual. Concluye obligatoriamente con "VEREDICTO_EXACTO: [texto exacto de la opción ganadora]".',
+      'Micro-explicación directa de 1-2 frases (30-50 palabras máx.) ANTES de marcar la opción correcta: 1) fundamento causal o, en preguntas directas/definiciones/escalas, matiz práctico o criterio de aplicación sin parafrasear la respuesta; 2) contraste breve descartando el distractor más cercano. Concluye obligatoriamente con "VEREDICTO_EXACTO: [texto exacto de la opción ganadora]".',
   },
   question: {
     type: Type.STRING,
@@ -219,13 +219,13 @@ function getFormatInstructions(format: CardFormat = 'multiple_choice'): string {
       return `FORMATO INNEGOCIABLE: multiple_choice (Opción Múltiple / Test Determinista con Chain of Thought):
 Cada tarjeta tipo test DEBE seguir rigurosamente este flujo cognitivo de 4 pasos obligatorios:
 
-1º "justification": Redacta PRIMERO una micro-explicación directa y concisa (2 frases, 30-50 palabras máximo, sin tono conversacional ni preguntas al alumno) basada en el documento:
-   - Frase 1 (Porqué causal): Explica el mecanismo, regla o motivo por el que la respuesta es correcta SIN repetir ni parafrasear literalmente el texto de la opción ganadora.
-   - Frase 2 (Contraste breve): Aclara en una línea por qué se descarta el distractor más cercano o qué confusión frecuente evitar (ej. "A diferencia de X, que...").
+1º "justification": Redacta PRIMERO una micro-explicación directa y concisa (1-2 frases, 30-50 palabras máximo, sin tono conversacional ni preguntas al alumno) basada en el documento:
+   - Frase 1 (Porqué causal o matiz práctico): Explica el mecanismo, regla o motivo por el que la respuesta es correcta SIN repetir ni parafrasear ampliadamente la opción ganadora. Si la pregunta es directa, de definición o sobre un ítem/dato de tabla o escala, aporta su contexto de aplicación, criterio interpretativo o matiz diferencial en vez de repetir lo obvio.
+   - Frase 2 (Contraste breve): Aclara en una línea por qué se descarta el distractor más cercano o qué error frecuente evitar (ej. "A diferencia de X, que...").
    - Última línea obligatoria:
      VEREDICTO_EXACTO: [texto exacto de la opción ganadora]
 2º "question": Escribe el enunciado limpio y directo de la pregunta de examen, sin incluir opciones ni letras a, b, c, d.
-3º "options": Proporciona un array con exactamente 4 alternativas [opción 0, opción 1, opción 2, opción 3]. Deben mantener equilibrio razonable de longitud, estructura gramatical paralela y nivel de detalle, originándose de las 4 fuentes taxonómicas permitidas (mecanismos cruzados afines, umbrales cuantitativos limítrofes, afirmaciones verídicas no pertinentes o inversión causa-efecto/falsos amigos). Queda terminantemente PROHIBIDO incluir opciones absurdas o fórmulas meta-referenciales dependientes del orden ("Todas las anteriores", "Ninguna de las anteriores", "A y B son ciertas").
+3º "options": Proporciona un array con exactamente 4 alternativas [opción 0, opción 1, opción 2, opción 3] con redacción ortográfica y gramatical impecable (verbos bien conjugados sin infinitivos fuera de lugar, puntuación cuidada y dígitos exactos sin confundir 'O' con '0'). Deben mantener equilibrio razonable de longitud, estructura gramatical paralela y nivel de detalle, originándose de las 4 fuentes taxonómicas permitidas (mecanismos cruzados afines, umbrales cuantitativos limítrofes, afirmaciones verídicas no pertinentes o inversión causa-efecto/falsos amigos). Queda terminantemente PROHIBIDO incluir opciones absurdas o fórmulas meta-referenciales dependientes del orden ("Todas las anteriores", "Ninguna de las anteriores", "A y B son ciertas").
 4º "correct_option_index": Asigna el número entero estricto (0, 1, 2 o 3) correspondiente a la opción verdadera justificada en "options".
 
 ESTRUCTURA DE COMPATIBILIDAD EN "front" Y "back":

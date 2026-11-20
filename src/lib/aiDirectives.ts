@@ -71,9 +71,9 @@ export const TEXT_DENSITY_ADAPTIVE_DISTRACTOR_DIRECTIVE = `🔬 RESONANCIA LÉXI
 export const ZERO_MISMATCH_DIRECTIVE = `⚖️ PROTOCOLO DE AUTO-AUDITORÍA LÓGICA (ZERO-MISMATCH / COHERENCIA INQUEBRANTABLE):
 Antes de emitir cada tarjeta en el JSON final, realiza obligatoriamente una verificación interna de consistencia lógica entre todos sus campos:
 1. COHERENCIA UNÍVOCA, MICRO-EXPLICACIÓN DE VALOR AÑADIDO Y ETIQUETA DE VEREDICTO EXPLÍCITO:
-   - En preguntas tipo test ("multiple_choice"), la propiedad "justification" DEBE ser una micro-explicación directa de 2 frases (30 a 50 palabras máximo, sin tono conversacional ni preguntas al alumno):
-     * Frase 1 (Fundamento causal): Explica brevemente el *porqué* conceptual, mecanismo o regla que fundamenta la respuesta correcta SIN limitarte a repetir o parafrasear literalmente el enunciado ni la opción ganadora.
-     * Frase 2 (Contraste breve): Aclara en una línea por qué se descarta el distractor más cercano o qué confusión habitual evitar (ej. "No confundir con [distractor], que...").
+   - En preguntas tipo test ("multiple_choice"), la propiedad "justification" DEBE ser una micro-explicación directa de 1-2 frases (30 a 50 palabras máximo, sin tono conversacional ni preguntas al alumno):
+     * Frase 1 (Fundamento o matiz útil): Explica brevemente el *porqué* conceptual, mecanismo o regla que fundamenta la respuesta correcta SIN limitarte a repetir o parafrasear ampliadamente el enunciado ni la opción ganadora. Si la pregunta es directa, de definición o sobre un ítem/dato de tabla o escala, aporta un matiz práctico, contexto de aplicación, criterio interpretativo o el papel específico de ese ítem/grado dentro de la escala.
+     * Frase 2 (Contraste breve): Aclara en una línea por qué se descarta el distractor más cercano o qué confusión habitual evitar (ej. "No confundir con [distractor/otro ítem], que...").
      * Última línea obligatoria:
        VEREDICTO_EXACTO: [texto exacto de la opción ganadora]
    - Para ahorrar tokens y evitar duplicación, el campo "back" en "multiple_choice" debe contener únicamente la opción ganadora con su letra:
@@ -88,7 +88,10 @@ Antes de emitir cada tarjeta en el JSON final, realiza obligatoriamente una veri
    - En tarjetas 'cloze', la palabra o fórmula revelada en el reverso DEBE encajar gramatical y conceptualmente con exactitud en el espacio marcado con [...] en el anverso.
 4. PROHIBICIÓN ESTRICTA DE RESPUESTAS TAUTOLÓGICAS:
    - La opción correcta JAMÁS debe repetir la misma afirmación de la pregunta con otras palabras sin aportar la causa o explicación real.
-   - Ejemplo erróneo prohibido: Si la pregunta dice '¿Por qué la celulosa carece de valor energético en la dieta humana?', la opción correcta NO PUEDE ser 'Porque no aporta energía al organismo' (tautología vacía), sino la causa biológica/funcional real: 'Porque el aparato digestivo humano carece de enzimas para hidrolizar sus enlaces beta-glucosídicos'.`;
+   - Ejemplo erróneo prohibido: Si la pregunta dice '¿Por qué la celulosa carece de valor energético en la dieta humana?', la opción correcta NO PUEDE ser 'Porque no aporta energía al organismo' (tautología vacía), sino la causa biológica/funcional real: 'Porque el aparato digestivo humano carece de enzimas para hidrolizar sus enlaces beta-glucosídicos'.
+5. PULCRITUD ORTOGRÁFICA, GRAMATICAL Y TIPOGRÁFICA (REVISIÓN FINAL):
+   - Revisa la corrección lingüística del enunciado, las 4 opciones y la justificación antes de emitir el JSON: corrige verbos mal conjugados o infinitivos sueltos donde corresponda un verbo conjugado, concordancias de género/número, tildes y puntuación descuidada.
+   - Evita confusiones tipográficas o de OCR entre letras y dígitos (NUNCA escribas la letra 'O' en lugar del número '0' en puntuaciones, escalas o cifras, ni 'l'/'I' por '1'), respetando fielmente la terminología técnica y los datos exactos del texto fuente.`;
 
 /**
  * LEY DE PROPORCIÓN COGNITIVA UNIVERSAL (TAXONOMÍA DE BLOOM 30/50/20):
