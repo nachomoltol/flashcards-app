@@ -72,7 +72,7 @@ const cardItemSchemaProperties = {
   justification: {
     type: Type.STRING,
     description:
-      'Razonamiento factual, cálculo o cita técnica extraída del documento que justifica con rigor absoluto la respuesta ANTES de marcar la opción correcta (Chain of Thought).',
+      'Micro-explicación directa de 2 frases (30-50 palabras máx.) ANTES de marcar la opción correcta: 1) fundamento/porqué causal sin repetir literalmente la opción ganadora; 2) contraste breve descartando el distractor principal o confusión habitual. Concluye obligatoriamente con "VEREDICTO_EXACTO: [texto exacto de la opción ganadora]".',
   },
   question: {
     type: Type.STRING,
@@ -100,7 +100,7 @@ const cardItemSchemaProperties = {
   back: {
     type: Type.STRING,
     description:
-      'Respuesta exacta seguida obligatoriamente de la explicación y justificación técnica basada en el documento.',
+      'En multiple_choice: únicamente "[letra]) [texto exacto de la opción ganadora]" (la explicación se toma automáticamente de justification para evitar duplicación). En basic, cloze y true_false: respuesta exacta seguida de una explicación breve del fundamento causal sin repetir literalmente la pregunta.',
   },
   cardFormat: {
     type: Type.STRING,
@@ -196,7 +196,7 @@ ${NO_EDITORIAL_REFERENCES_DIRECTIVE}`;
 function getFormatRule(format: CardFormat = 'multiple_choice'): string {
   switch (format) {
     case 'multiple_choice':
-      return 'FORMATO OBLIGATORIO: Múltiple opción con exactamente 4 alternativas en array "options" (0 a 3) y "correct_option_index" (0 a 3). Cada tarjeta DEBE incluir "justification" previa con el razonamiento del documento, "question", "options" y "correct_option_index". En "back" se incluye la opción correcta con su justificación técnica.';
+      return 'FORMATO OBLIGATORIO: Múltiple opción con exactamente 4 alternativas equilibradas en array "options" (0 a 3, prohibido "todas/ninguna de las anteriores") y "correct_option_index" (0 a 3). Cada tarjeta DEBE incluir "justification" previa con una micro-explicación breve (porqué causal sin parafrasear + contraste con el distractor principal) cerrada con "VEREDICTO_EXACTO: [texto]", "question", "options", "correct_option_index" y en "back" únicamente "[letra]) [texto de la opción correcta]".';
     case 'true_false':
       return `FORMATO OBLIGATORIO: Afirmación categórica. 
 - El campo 'front' DEBE contener la afirmación.
@@ -219,10 +219,13 @@ function getFormatInstructions(format: CardFormat = 'multiple_choice'): string {
       return `FORMATO INNEGOCIABLE: multiple_choice (Opción Múltiple / Test Determinista con Chain of Thought):
 Cada tarjeta tipo test DEBE seguir rigurosamente este flujo cognitivo de 4 pasos obligatorios:
 
-1º "justification": Redacta PRIMERO el razonamiento factual, cálculo u operación matemática exacta citando el documento ANTES de elegir o marcar la opción correcta (Chain of Thought), concluyendo OBLIGATORIAMENTE en su última línea con la etiqueta:
-   VEREDICTO_EXACTO: [texto exacto de la opción ganadora]
+1º "justification": Redacta PRIMERO una micro-explicación directa y concisa (2 frases, 30-50 palabras máximo, sin tono conversacional ni preguntas al alumno) basada en el documento:
+   - Frase 1 (Porqué causal): Explica el mecanismo, regla o motivo por el que la respuesta es correcta SIN repetir ni parafrasear literalmente el texto de la opción ganadora.
+   - Frase 2 (Contraste breve): Aclara en una línea por qué se descarta el distractor más cercano o qué confusión frecuente evitar (ej. "A diferencia de X, que...").
+   - Última línea obligatoria:
+     VEREDICTO_EXACTO: [texto exacto de la opción ganadora]
 2º "question": Escribe el enunciado limpio y directo de la pregunta de examen, sin incluir opciones ni letras a, b, c, d.
-3º "options": Proporciona un array con exactamente 4 alternativas [opción 0, opción 1, opción 2, opción 3] derivadas del texto. Deben cumplir SIMETRÍA ESTRUCTURAL (longitud visual similar y redacción paralela, erradicando la heurística de que 'la más larga es la correcta') y originarse de las 4 fuentes taxonómicas permitidas (mecanismos cruzados afines, umbrales cuantitativos limítrofes, afirmaciones verídicas no pertinentes o inversión causa-efecto/falsos amigos). Queda terminantemente PROHIBIDO incluir opciones absurdas o descartables por sentido común.
+3º "options": Proporciona un array con exactamente 4 alternativas [opción 0, opción 1, opción 2, opción 3]. Deben mantener equilibrio razonable de longitud, estructura gramatical paralela y nivel de detalle, originándose de las 4 fuentes taxonómicas permitidas (mecanismos cruzados afines, umbrales cuantitativos limítrofes, afirmaciones verídicas no pertinentes o inversión causa-efecto/falsos amigos). Queda terminantemente PROHIBIDO incluir opciones absurdas o fórmulas meta-referenciales dependientes del orden ("Todas las anteriores", "Ninguna de las anteriores", "A y B son ciertas").
 4º "correct_option_index": Asigna el número entero estricto (0, 1, 2 o 3) correspondiente a la opción verdadera justificada en "options".
 
 ESTRUCTURA DE COMPATIBILIDAD EN "front" Y "back":
@@ -231,11 +234,8 @@ ESTRUCTURA DE COMPATIBILIDAD EN "front" Y "back":
   b) [Texto opción 1]
   c) [Texto opción 2]
   d) [Texto opción 3]
-- "back": Debe comenzar obligatoriamente con la opción verdadera con su letra formal y su texto, seguida de la etiqueta de veredicto y la explicación técnica:
-  [letra]) [Texto opción 0]
-  VEREDICTO_EXACTO: [Texto opción ganadora]
-
-  Explicación: [Justificación técnica extraída del campo justification]
+- "back": Para optimizar tokens de salida, coloca únicamente la letra y texto exacto de la opción ganadora (el backend anexará automáticamente la explicación desde "justification"):
+  [letra]) [Texto opción ganadora]
 - "cardFormat": "multiple_choice"
 - ${EDITORIAL_ARTIFACTS_DIRECTIVE}
 
@@ -535,7 +535,7 @@ function getGlobalRules(
 1. REGLA DE ORO (Estilo NotebookLM): NO inventes información. Tu única fuente de verdad es el texto. Si un concepto, dato o respuesta no se puede deducir directa y explícitamente del texto proporcionado, DEBES omitirlo. No uses conocimiento previo externo.
 ${directiveRule}
 4. ${formatRule}
-5. PRECISIÓN Y GROUNDING: Toda pregunta, afirmación, distractor o respuesta debe estar basada estricta y textualmente en el texto fuente.
+5. PRECISIÓN Y GROUNDING: Toda pregunta, afirmación y respuesta correcta debe estar basada estricta y textualmente en el texto fuente. Para los distractores, prioriza elementos del propio texto; si una página breve desarrolla un único concepto sin alternativas suficientes, puedes emplear términos técnicos plausibles del mismo campo disciplinar exclusivamente como distractores falsos para no reducir el número de preguntas ni crear opciones absurdas.
 6. ACRÓNIMOS: Todo acrónimo debe ir acompañado obligatoriamente de su nombre completo si figura en la fuente (ejemplo: "ARN (Ácido Ribonucleico)", "TCP (Transmission Control Protocol)").
 7. INTEGRIDAD ESTRUCTURAL DEL JSON (PRIORIDAD ABSOLUTA): Debes devolver un objeto JSON válido con los campos "conceptos_identificados" (array de strings con conceptos clave no evaluados), "core_exhausted" (booleano) y "cards" (${cardRequirement}). Sé sintético y directo en el enunciado de las preguntas y opciones, y riguroso, explicativo y profundamente justificado en el reverso ("back"), incluyendo siempre la justificación técnica basada en la fuente.
 8. ${sweepDirective}
@@ -2756,13 +2756,17 @@ DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de este bloqu
           // Cortar EXACTAMENTE 1 PÁGINA
           const singlePageBase64 = await sliceSinglePdfPage(srcDoc, currentPage);
 
-          // Extraer lista de tópicos ya cubiertos (BD + páginas previas del lote) para evitar repeticiones a ciegas
-          const coveredTopics = extractUniqueTopicsList(accumulatedHistory);
+          // Extraer lista de tópicos ya cubiertos: en Modo Exhaustivo usamos ventana deslizante (últimas 18 tarjetas)
+          // para evitar que un historial gigante inhiba a Gemini en páginas intermedias/finales del documento.
+          // La deduplicación global completa sigue garantizada determinísticamente por deduplicateCandidateCards().
+          const promptHistorySource = isExhaustiveMode
+            ? accumulatedHistory.slice(-18)
+            : accumulatedHistory;
+          const coveredTopics = extractUniqueTopicsList(promptHistorySource);
           const historyDirective = coveredTopics
             ? isExhaustiveMode
-              ? `\n\nCONCEPTOS YA EVALUADOS EN ESTE MAZO O PÁGINAS PREVIAS: ${coveredTopics}.
-DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de esta página que aún NO hayan sido preguntados. No repitas la misma pregunta con ligeras variaciones de redacción.
-NOTA MODO EXHAUSTIVO: Aunque una entidad o tema general aparezca en la lista previa, si la página actual aporta NUEVOS datos, mecanismos, cifras, clasificaciones, funciones o filas de tablas sobre ese mismo tema que aún no han sido preguntados literalmente, DEBES generar todas las tarjetas correspondientes a estos nuevos datos.`
+              ? `\n\nÚLTIMOS CONCEPTOS RECIÉN EVALUADOS (VENTANA DE CONTEXTO): ${coveredTopics}.
+NOTA CRÍTICA MODO EXHAUSTIVO (PROHIBIDO FRENAR LA EXTRACCIÓN): Esta lista solo evita repetir exactamente el mismo dato literal recién preguntado. NO reduzcas el ritmo ni el volumen de extracción en páginas intermedias o finales: exprime al 100% cada nuevo dato, mecanismo, cifra, clasificación, excepción o fila de tabla de esta página (meta 20-25 tarjetas si la página es densa).`
               : `\n\nCONCEPTOS YA EVALUADOS EN ESTE MAZO O PÁGINAS PREVIAS: ${coveredTopics}.
 DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de esta página que aún NO hayan sido preguntados. No repitas la misma pregunta con ligeras variaciones de redacción.`
             : '';
@@ -3444,13 +3448,17 @@ ${rescueText}`;
             `[Bucle Acumulador Backend DOCX - Modo Estudio] Procesando Página Virtual ${currentPage} de ${finalPage}... (Acumuladas: ${tarjetasAcumuladas.length}/${targetCount}, Restan: ${remainingToTarget}, Imágenes: ${currentPageImages.length})`
           );
 
-          // Extraer lista de tópicos ya cubiertos (BD + páginas previas del lote) para evitar repeticiones a ciegas
-          const coveredTopics = extractUniqueTopicsList(accumulatedHistory);
+          // Extraer lista de tópicos ya cubiertos: en Modo Exhaustivo usamos ventana deslizante (últimas 18 tarjetas)
+          // para evitar que un historial gigante inhiba a Gemini en páginas intermedias/finales del documento.
+          // La deduplicación global completa sigue garantizada determinísticamente por deduplicateCandidateCards().
+          const promptHistorySource = isExhaustiveMode
+            ? accumulatedHistory.slice(-18)
+            : accumulatedHistory;
+          const coveredTopics = extractUniqueTopicsList(promptHistorySource);
           const historyDirective = coveredTopics
             ? isExhaustiveMode
-              ? `\n\nCONCEPTOS YA EVALUADOS EN ESTE MAZO O PÁGINAS PREVIAS: ${coveredTopics}.
-DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de esta página que aún NO hayan sido preguntados. No repitas la misma pregunta con ligeras variaciones de redacción.
-NOTA MODO EXHAUSTIVO: Aunque una entidad o tema general aparezca en la lista previa, si la página actual aporta NUEVOS datos, mecanismos, cifras, clasificaciones, funciones o filas de tablas sobre ese mismo tema que aún no han sido preguntados literalmente, DEBES generar todas las tarjetas correspondientes a estos nuevos datos.`
+              ? `\n\nÚLTIMOS CONCEPTOS RECIÉN EVALUADOS (VENTANA DE CONTEXTO): ${coveredTopics}.
+NOTA CRÍTICA MODO EXHAUSTIVO (PROHIBIDO FRENAR LA EXTRACCIÓN): Esta lista solo evita repetir exactamente el mismo dato literal recién preguntado. NO reduzcas el ritmo ni el volumen de extracción en páginas intermedias o finales: exprime al 100% cada nuevo dato, mecanismo, cifra, clasificación, excepción o fila de tabla de esta página (meta 20-25 tarjetas si la página es densa).`
               : `\n\nCONCEPTOS YA EVALUADOS EN ESTE MAZO O PÁGINAS PREVIAS: ${coveredTopics}.
 DEBES explorar conceptos, relaciones, celdas de tablas o párrafos de esta página que aún NO hayan sido preguntados. No repitas la misma pregunta con ligeras variaciones de redacción.`
             : '';

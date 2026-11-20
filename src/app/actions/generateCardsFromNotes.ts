@@ -11,6 +11,7 @@ import {
   buildDidacticModeDirective,
   PRACTICAL_MODE_DIRECTIVE,
   ZERO_MISMATCH_DIRECTIVE,
+  DISTRACTOR_VEROSIMILITUDE_DIRECTIVE,
   buildUniversalTablesDirective,
 } from '@/lib/aiDirectives';
 import type {
@@ -99,12 +100,12 @@ function getFormatInstructions(format: CardFormat = 'multiple_choice'): string {
   switch (format) {
     case 'multiple_choice':
       return `FORMATO OBLIGATORIO: multiple_choice (Opción Múltiple / Test Determinista con Chain of Thought):
-- "justification": Razonamiento factual o fórmula extraída de los apuntes ANTES de elegir la opción correcta.
+- "justification": Micro-explicación directa de 2 frases (30-50 palabras máx., sin tono conversacional): 1) porqué causal o mecanismo basado en los apuntes sin repetir literalmente la opción correcta; 2) contraste breve descartando el distractor más cercano o confusión habitual. Concluye obligatoriamente con "VEREDICTO_EXACTO: [texto exacto de la opción ganadora]".
 - "question": Enunciado limpio de la pregunta sin letras ni opciones.
-- "options": Exactamente 4 alternativas plausibles [opción 0, opción 1, opción 2, opción 3].
+- "options": Exactamente 4 alternativas plausibles y equilibradas en longitud/estructura [opción 0, opción 1, opción 2, opción 3]. Prohibido usar "Todas las anteriores", "Ninguna de las anteriores" o referencias a letras.
 - "correct_option_index": Número entero (0 a 3) de la opción verdadera.
 - "front": Enunciado seguido de las 4 opciones en líneas separadas: a) ..., b) ..., c) ..., d) ...
-- "back": Letra y texto de la opción verdadera, seguida de '\\n\\nExplicación: [Justificación de los apuntes]'.
+- "back": Para optimizar tokens, escribe únicamente "[letra]) [texto exacto de la opción verdadera]" (el sistema anexará automáticamente la explicación desde "justification").
 - "cardFormat": "multiple_choice"`;
 
     case 'cloze':
@@ -384,6 +385,7 @@ export async function generateCardsFromNotesAction(
 
     const isDocenteMode = pedagogicalMode === 'didactic' || (pedagogicalMode as unknown as string) === 'docente';
     const didacticDirective = isDocenteMode ? `\n\n${buildDidacticModeDirective(docenteFormat, targetAudience)}\n` : '';
+    const distractorDirective = !isDocenteMode ? `\n\n${DISTRACTOR_VEROSIMILITUDE_DIRECTIVE}\n` : '';
     const practicalDirective = isPracticalMode ? `\n\n${PRACTICAL_MODE_DIRECTIVE}\n` : '';
 
     // 3. Prompt pedagógico especializado para OCR de caligrafía
@@ -403,7 +405,7 @@ TUS REGLAS DE ORO:
    - Cada tarjeta debe ser autocontenida y evaluar un concepto concreto.
 
 3. REGLAS DE FORMATO SOLICITADO ("${cardFormat}"):
-${getFormatInstructions(cardFormat)}${didacticDirective}${practicalDirective}
+${getFormatInstructions(cardFormat)}${didacticDirective}${distractorDirective}${practicalDirective}
 
 4. TRATAMIENTO DE TABLAS Y ESQUEMAS:
 ${buildUniversalTablesDirective(false)}

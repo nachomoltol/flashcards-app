@@ -43,9 +43,11 @@ La validez y calidad técnica de una prueba depende primordialmente de la plausi
    d) Inversión Causa-Efecto y Falsos Amigos: Intercambiar el orden temporal de una secuencia, invertir una relación de causa/consecuencia o utilizar términos con etimología o apariencia similar pero significado conceptual opuesto.
 
 3. SIMETRÍA ESTRUCTURAL Y LINGÜÍSTICA (ANTI-PISTAS DE EXAMEN):
-   - Homogeneidad de Longitud: Las 4 opciones deben compartir una extensión visual y número de palabras similar (ninguna opción debe ser notablemente más larga o tener el triple de explicaciones que las demás, erradicando la heurística de 'la más larga es la correcta').
-   - Paralelismo Sintáctico: Todas las opciones de una pregunta deben compartir la misma estructura gramatical (mismo tiempo verbal, misma categoría gramatical de inicio, misma formulación afirmativa/negativa).
+   - Homogeneidad de Longitud y Matices: Las 4 opciones deben compartir una extensión visual, nivel de detalle y número de palabras equilibrado (evita que la opción correcta sea una oración larga y matizada frente a 3 distractores cortos o telegráficos, sin caer en redacciones rebuscadas que frenen la cobertura del texto).
+   - Paralelismo Sintáctico y Anti-Eco Léxico: Todas las opciones deben compartir la misma estructura gramatical (mismo tiempo verbal, misma categoría gramatical de inicio y registro técnico). Evita que la opción correcta sea la única que repite literalmente palabras clave del enunciado.
    - Prohibición de Absolutos Reveladores: No emplees calificadores absolutos ('siempre', 'nunca', 'en ningún caso') en los distractores para delatarlos artificialmente mientras la opción correcta usa un lenguaje moderado.
+   - Prohibición de Opciones Meta-Referenciales (Compatible con Barajado Aleatorio): Queda TERMINANTEMENTE PROHIBIDO generar opciones dependientes del orden o que referencien letras, como 'Todas las anteriores', 'Ninguna de las anteriores', 'Todas son correctas', 'Ninguna es correcta' o 'A y B son ciertas', dado que las alternativas se barajan aleatoriamente tras la generación.
+   - Prioridad de Cobertura en Páginas de Concepto Único: La pregunta y la respuesta correcta DEBEN anclarse al 100% en el texto fuente. Para los 3 distractores, prioriza términos del mismo texto; si la página actual solo desarrolla una única entidad y no contiene suficientes elementos para 3 distractores, utiliza términos técnicos plausibles del mismo campo disciplinar exclusivamente como distractores falsos en lugar de crear negaciones obvias o reducir el número de preguntas.
 
 4. CALIBRACIÓN ESPECÍFICA EN FORMATOS ALTERNATIVOS:
    - En 'true_false': La premisa falsa debe construirse alterando sutilmente un matiz crítico, un condicional o un factor limitante de un concepto verídico. PROHIBIDO crear afirmaciones ridículas o invertir una verdad mediante negaciones gramaticales forzadas o burdas.
@@ -68,12 +70,15 @@ export const TEXT_DENSITY_ADAPTIVE_DISTRACTOR_DIRECTIVE = `🔬 RESONANCIA LÉXI
  */
 export const ZERO_MISMATCH_DIRECTIVE = `⚖️ PROTOCOLO DE AUTO-AUDITORÍA LÓGICA (ZERO-MISMATCH / COHERENCIA INQUEBRANTABLE):
 Antes de emitir cada tarjeta en el JSON final, realiza obligatoriamente una verificación interna de consistencia lógica entre todos sus campos:
-1. COHERENCIA UNÍVOCA Y ETIQUETA DE VEREDICTO EXPLÍCITO:
-   - En preguntas tipo test ("multiple_choice"), la propiedad "justification" DEBE concluir OBLIGATORIAMENTE en su última línea con la etiqueta estricta:
-     VEREDICTO_EXACTO: [texto exacto de la opción ganadora]
-   - El inicio del campo "back" DEBE comenzar obligatoriamente con la misma opción ganadora y su letra:
+1. COHERENCIA UNÍVOCA, MICRO-EXPLICACIÓN DE VALOR AÑADIDO Y ETIQUETA DE VEREDICTO EXPLÍCITO:
+   - En preguntas tipo test ("multiple_choice"), la propiedad "justification" DEBE ser una micro-explicación directa de 2 frases (30 a 50 palabras máximo, sin tono conversacional ni preguntas al alumno):
+     * Frase 1 (Fundamento causal): Explica brevemente el *porqué* conceptual, mecanismo o regla que fundamenta la respuesta correcta SIN limitarte a repetir o parafrasear literalmente el enunciado ni la opción ganadora.
+     * Frase 2 (Contraste breve): Aclara en una línea por qué se descarta el distractor más cercano o qué confusión habitual evitar (ej. "No confundir con [distractor], que...").
+     * Última línea obligatoria:
+       VEREDICTO_EXACTO: [texto exacto de la opción ganadora]
+   - Para ahorrar tokens y evitar duplicación, el campo "back" en "multiple_choice" debe contener únicamente la opción ganadora con su letra:
      [letra]) [texto exacto de la opción ganadora]
-     VEREDICTO_EXACTO: [texto exacto de la opción ganadora]
+     (el sistema anexará automáticamente la explicación a partir de "justification").
    - El número entero "correct_option_index" (0 a 3) DEBE coincidir con precisión milimétrica con la posición de dicha opción ganadora en el array "options".
    - Queda ESTRICTAMENTE PROHIBIDO cualquier desajuste lógico o numérico (ejemplo: si la justificación concluye que la respuesta válida son "4 calorías" o "el plazo es de 10 días", el índice 'correct_option_index' bajo ninguna circunstancia puede apuntar a la opción de '7 calorías' o '15 días').
 2. DISTRACTORES PLAUSIBLES PERO INEQUÍVOCAMENTE FALSOS:
