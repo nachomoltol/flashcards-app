@@ -259,16 +259,16 @@ export default function SettingsPage() {
                 id="retention-slider"
                 type="range"
                 min="0.70"
-                max="0.99"
+                max="0.97"
                 step="0.01"
-                value={retention}
+                value={Math.min(0.97, Math.max(0.70, retention))}
                 onChange={(e) => setRetention(parseFloat(e.target.value))}
                 className="w-full h-2 bg-neutral-200 dark:bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
               />
               <div className="flex justify-between text-[11px] text-neutral-500 font-mono mt-1">
                 <span>{t('settings.retention_low', '70% (Menos repasos)')}</span>
                 <span className="text-emerald-600 dark:text-emerald-400 font-bold">{t('settings.retention_opt', '90% (Óptimo)')}</span>
-                <span>{t('settings.retention_high', '99% (Máxima retención)')}</span>
+                <span>{t('settings.retention_high', '97% (Máxima retención)')}</span>
               </div>
             </div>
 
@@ -322,6 +322,7 @@ export default function SettingsPage() {
             {/* Presets Rápidos */}
             <div className="flex flex-wrap gap-2 pt-1">
               {[
+                { label: 'Examen cercano (21d)', value: 21 },
                 { label: '6 meses (180d)', value: 180 },
                 { label: '1 año (365d)', value: 365 },
                 { label: '3 años (1095d)', value: 1095 },

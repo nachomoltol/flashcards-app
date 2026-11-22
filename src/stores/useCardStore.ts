@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import {
   createInitialCardValues,
   scheduleReviewWithLog,
+  scheduleCustomDaysReviewWithLog,
   buildInterleavedCombinedQueue,
   getEndOfLocalDay,
   type FSRSRating,
@@ -49,6 +50,10 @@ interface CardState {
     card: CardRow,
     rating: FSRSRating
   ) => Promise<{ updatedCard: CardRow; isAgain: boolean } | null>;
+  recordCustomDaysReview: (
+    card: CardRow,
+    days: number
+  ) => Promise<{ updatedCard: CardRow; days: number } | null>;
   reset: () => void;
 }
 
@@ -333,6 +338,61 @@ export const useCardStore = create<CardState>((set) => ({
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Error al guardar el repaso FSRS';
       console.error('Error in recordReview:', err);
+      set({ error: message });
+      return null;
+    }
+  },
+
+  recordCustomDaysReview: async (card: CardRow, days: number) => {
+    try {
+      const { card: nextFSRS, review: reviewLog, days: safeDays } = scheduleCustomDaysReviewWithLog(card, days);
+
+      const { data: updatedCard, error: updateErr } = await supabase
+        .from('cards')
+        .update({
+          due: nextFSRS.due,
+          stability: nextFSRS.stability,
+          difficulty: nextFSRS.difficulty,
+          state: nextFSRS.state,
+          reps: nextFSRS.reps,
+          lapses: nextFSRS.lapses,
+          last_review: nextFSRS.last_review,
+        })
+        .eq('id', card.id)
+        .select()
+        .single();
+
+      if (updateErr) throw updateErr;
+
+      const {
+        data: { user: currentUser },
+      } = await supabase.auth.getUser();
+
+      const { error: reviewErr } = await supabase.from('reviews').insert({
+        card_id: card.id,
+        user_id: currentUser?.id,
+        rating: reviewLog.rating,
+        state: reviewLog.state,
+        stability: reviewLog.stability,
+        difficulty: reviewLog.difficulty,
+        due: reviewLog.due,
+      });
+
+      if (reviewErr) {
+        console.warn('Advertencia al registrar custom review log:', reviewErr);
+      }
+
+      set((state) => ({
+        cards: state.cards.map((c) => (c.id === card.id ? updatedCard : c)),
+      }));
+
+      return {
+        updatedCard,
+        days: safeDays,
+      };
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Error al programar días personalizados';
+      console.error('Error in recordCustomDaysReview:', err);
       set({ error: message });
       return null;
     }

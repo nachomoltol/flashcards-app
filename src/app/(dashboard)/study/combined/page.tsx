@@ -14,13 +14,14 @@ import {
   HelpCircle,
   BookOpen,
   Layers,
+  Calendar,
+  ShieldCheck,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useCardStore, useSettingsStore, useLanguageStore, useStreakStore, type CardRow } from '@/stores';
 import { toLocalDateString } from '@/lib/stats/streak';
 import {
   previewNextIntervals,
-  buildInterleavedCombinedQueue,
   type FSRSRating,
 } from '@/lib/fsrs';
 import { FormattedCardView, parseMultipleChoice } from '@/components/cards';
@@ -53,7 +54,7 @@ function CombinedStudyContent() {
       .filter((id) => id.length > 0);
   }, [decksParam]);
 
-  const { cards: allCards, isLoading, fetchCardsByDecks, recordReview, deleteCard, updateCard } = useCardStore();
+  const { cards: allCards, isLoading, fetchCardsByDecks, recordReview, recordCustomDaysReview, deleteCard, updateCard } = useCardStore();
   const { settings, fetchSettings } = useSettingsStore();
   const { t } = useLanguageStore();
 
@@ -63,6 +64,11 @@ function CombinedStudyContent() {
   const [sessionReviews, setSessionReviews] = useState<{ rating: FSRSRating; cardId: string }[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
   const [reviewsTodayCount, setReviewsTodayCount] = useState<number>(0);
+  const [isFreePracticeMode, setIsFreePracticeMode] = useState(false);
+  const [requeuedCardIds, setRequeuedCardIds] = useState<Record<string, number>>({});
+  const [isCustomDaysOpen, setIsCustomDaysOpen] = useState(false);
+  const [customDaysInput, setCustomDaysInput] = useState('7');
+  const [isApplyingCustomDays, setIsApplyingCustomDays] = useState(false);
 
   // Estado para la edición y borrado de la tarjeta activa en modo estudio
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -147,9 +153,8 @@ function CombinedStudyContent() {
     }
     fetchTodayReviewsCount();
     fetchCardsByDecks(deckIds).then((loaded) => {
-      // Cola de Práctica Intercalada (Round-Robin para tarjetas nuevas + prioridad FSRS para repasos)
-      const studyQueue = buildInterleavedCombinedQueue(loaded, deckIds);
-      setQueue(studyQueue);
+      // fetchCardsByDecks ya devuelve la cola intercalada (buildInterleavedCombinedQueue)
+      setQueue(loaded);
       setIsInitialized(true);
     });
   }, [deckIds, fetchCardsByDecks, fetchSettings, fetchTodayReviewsCount]);
@@ -216,11 +221,13 @@ function CombinedStudyContent() {
         document.activeElement.blur();
       }
 
-      // Registrar repaso persistente en Supabase (actualiza cards e inserta en reviews)
-      const result = await recordReview(currentCard, rating);
+      // En Modo Práctica Libre ("Repasar de nuevo") no se sobrescriben los intervalos FSRS futuros en Supabase
+      const result = isFreePracticeMode
+        ? { updatedCard: currentCard, isAgain: rating === 1 }
+        : await recordReview(currentCard, rating);
 
       // Racha diaria: contabilizar el día al calificar con éxito la primera tarjeta de la sesión
-      if (result && !streakSyncedRef.current) {
+      if (result && !isFreePracticeMode && !streakSyncedRef.current) {
         streakSyncedRef.current = true;
         useStreakStore
           .getState()
@@ -233,14 +240,20 @@ function CombinedStudyContent() {
       // Registrar en el resumen de la sesión
       setSessionReviews((prev) => [...prev, { rating, cardId: currentCard.id }]);
 
-      // Si califica Again (1), reinsertar al final de la cola conservando metadatos del mazo de origen
-      if (result && result.isAgain) {
+      // Si califica Again (1), solo reinsertar al final de la cola si hay colchón suficiente (>= 4 tarjetas por delante)
+      // y no se ha reencolado ya en esta misma sesión
+      const remainingAhead = queue.length - 1 - currentIndex;
+      const priorRequeues = requeuedCardIds[currentCard.id] || 0;
+      if (result && result.isAgain && remainingAhead >= 4 && priorRequeues < 1) {
+        setRequeuedCardIds((prev) => ({ ...prev, [currentCard.id]: priorRequeues + 1 }));
         const reinsertedCard: CardRow = {
           ...result.updatedCard,
           decks: currentCard.decks,
         };
         setQueue((prev) => [...prev, reinsertedCard]);
       }
+
+      setIsCustomDaysOpen(false);
 
       // Si califica Again (1), mantener la tarjeta en pantalla y abrir el Tutor Socrático
       if (rating === 1) {
@@ -253,12 +266,48 @@ function CombinedStudyContent() {
       setSelectedOptionForTutor(undefined);
       setCurrentIndex((prev) => prev + 1);
     },
-    [currentCard, recordReview]
+    [currentCard, currentIndex, isFreePracticeMode, queue.length, recordReview, requeuedCardIds]
+  );
+
+  // Programar manualmente el próximo repaso a N días vista elegidos por el usuario
+  const handleCustomDaysSelect = useCallback(
+    async (days: number) => {
+      if (!currentCard || isApplyingCustomDays) return;
+      const parsed = Math.round(days);
+      if (!Number.isFinite(parsed) || parsed < 1) return;
+      const safeDays = Math.max(1, Math.min(36500, parsed));
+
+      setIsApplyingCustomDays(true);
+      try {
+        if (!isFreePracticeMode) {
+          const result = await recordCustomDaysReview(currentCard, safeDays);
+          if (result && !streakSyncedRef.current) {
+            streakSyncedRef.current = true;
+            useStreakStore
+              .getState()
+              .syncDailyStudy(toLocalDateString(new Date()))
+              .then((res) => {
+                if (!res) streakSyncedRef.current = false;
+              });
+          }
+        }
+
+        setSessionReviews((prev) => [...prev, { rating: 3, cardId: currentCard.id }]);
+        setIsCustomDaysOpen(false);
+        setIsAnswerRevealed(false);
+        setSelectedOptionForTutor(undefined);
+        setCurrentIndex((prev) => prev + 1);
+      } finally {
+        setIsApplyingCustomDays(false);
+      }
+    },
+    [currentCard, isApplyingCustomDays, isFreePracticeMode, recordCustomDaysReview]
   );
 
   // Avanzar a la siguiente tarjeta tras la interacción o decisión en el Tutor Socrático
   const handleContinueAfterAgain = useCallback(() => {
     setIsTutorDrawerOpen(false);
+    setIsCustomDaysOpen(false);
     setSelectedOptionForTutor(undefined);
     setIsAnswerRevealed(false);
     setCurrentIndex((prev) => prev + 1);
@@ -668,6 +717,9 @@ function CombinedStudyContent() {
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
           <button
             onClick={() => {
+              setIsFreePracticeMode(true);
+              setRequeuedCardIds({});
+              setIsCustomDaysOpen(false);
               setQueue(allCards);
               setCurrentIndex(0);
               setIsAnswerRevealed(false);
@@ -675,9 +727,11 @@ function CombinedStudyContent() {
               setSelectedOptionForTutor(undefined);
               setSessionReviews([]);
             }}
-            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-800 border-neutral-300 dark:bg-neutral-800 dark:hover:bg-neutral-700 dark:text-white font-medium text-sm border dark:border-neutral-700 transition"
+            title={t('study.free_practice_tooltip', 'Repasa todas las tarjetas seleccionadas sin sobrescribir sus fechas FSRS programadas')}
+            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-800 border-neutral-300 dark:bg-neutral-800 dark:hover:bg-neutral-700 dark:text-white font-medium text-sm border dark:border-neutral-700 transition inline-flex items-center justify-center gap-2"
           >
-            {t('study.review_again_btn', 'Repasar de nuevo')}
+            <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
+            <span>{t('study.review_again_free_btn', 'Práctica libre (sin alterar intervalos)')}</span>
           </button>
           <Link
             href="/"
@@ -731,6 +785,15 @@ function CombinedStudyContent() {
 
           {/* Counter of Remaining Cards & Contextual Help Button */}
           <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+            {isFreePracticeMode && (
+              <span
+                className="inline-flex items-center gap-1 text-[10px] sm:text-xs px-2 py-0.5 rounded-full font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
+                title={t('study.free_practice_badge_hint', 'Los intervalos FSRS programados están protegidos durante la práctica libre')}
+              >
+                <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                <span className="hidden xs:inline">{t('study.free_practice_badge', 'Práctica libre')}</span>
+              </span>
+            )}
             {/* Multi-deck Indicator Pill */}
             <div className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700">
               <Layers className="w-3 h-3 text-indigo-500" />
@@ -1059,9 +1122,82 @@ function CombinedStudyContent() {
                 </button>
               </div>
 
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-2 pt-1.5">
+              {isCustomDaysOpen && (
+                <div className="p-2.5 sm:p-3 rounded-xl bg-neutral-100/90 dark:bg-neutral-800/90 border border-indigo-500/30 space-y-2 animate-in fade-in duration-150">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-200 flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-indigo-500" />
+                      <span>{t('study.custom_days_title', '¿En cuántos días quieres volver a ver esta tarjeta?')}</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsCustomDaysOpen(false)}
+                      className="text-neutral-400 hover:text-neutral-700 dark:hover:text-white p-0.5 rounded cursor-pointer"
+                      aria-label="Cerrar selector de días"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {[1, 2, 3, 5, 7, 14, 30].map((d) => (
+                      <button
+                        key={d}
+                        type="button"
+                        disabled={isApplyingCustomDays}
+                        onClick={() => handleCustomDaysSelect(d)}
+                        className="px-2.5 py-1 rounded-lg text-xs font-mono font-semibold bg-white dark:bg-neutral-900 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 text-neutral-800 dark:text-neutral-200 border border-neutral-300 dark:border-neutral-700 transition active:scale-95 cursor-pointer disabled:opacity-50"
+                      >
+                        {d}d
+                      </button>
+                    ))}
+                    <div className="flex items-center gap-1 ml-auto">
+                      <input
+                        type="number"
+                        min={1}
+                        max={3650}
+                        value={customDaysInput}
+                        onChange={(e) => setCustomDaysInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const val = parseInt(customDaysInput, 10);
+                            if (val >= 1) handleCustomDaysSelect(val);
+                          }
+                        }}
+                        className="w-16 px-2 py-1 text-xs font-mono text-center rounded-lg bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        placeholder="Días"
+                      />
+                      <button
+                        type="button"
+                        disabled={isApplyingCustomDays || !customDaysInput || parseInt(customDaysInput, 10) < 1}
+                        onClick={() => {
+                          const val = parseInt(customDaysInput, 10);
+                          if (val >= 1) handleCustomDaysSelect(val);
+                        }}
+                        className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition active:scale-95 cursor-pointer disabled:opacity-50"
+                      >
+                        {t('study.custom_days_apply', 'Fijar')}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex flex-wrap items-center justify-center gap-2 pt-1.5">
                 <span className="hidden sm:inline text-[11px] text-neutral-500">{t('study.rating_keys_hint', 'Atajos: 1 (Fallo) 2 (Difícil) 3 (Bien) 4 (Fácil)')}</span>
                 <span className="hidden sm:inline text-neutral-300 dark:text-neutral-700">•</span>
+                <button
+                  type="button"
+                  onClick={() => setIsCustomDaysOpen((prev) => !prev)}
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all shadow-sm flex items-center gap-1.5 cursor-pointer active:scale-95 border ${
+                    isCustomDaysOpen
+                      ? 'bg-indigo-600 text-white border-indigo-500'
+                      : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-800 hover:text-neutral-900 border-neutral-300 dark:bg-neutral-800/80 dark:hover:bg-neutral-700 dark:border-neutral-700 dark:text-neutral-200 dark:hover:text-white'
+                  }`}
+                >
+                  <Calendar className={`w-3.5 h-3.5 ${isCustomDaysOpen ? 'text-white' : 'text-indigo-500 dark:text-indigo-400'}`} />
+                  <span>{t('study.custom_days_btn', '📅 Elegir días...')}</span>
+                </button>
                 <button
                   type="button"
                   onClick={() => setIsRatingHelpOpen(true)}

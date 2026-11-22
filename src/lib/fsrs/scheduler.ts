@@ -78,15 +78,39 @@ export const defaultFSRSParams = generatorParameters({
 export const f = fsrs(defaultFSRSParams);
 
 /**
- * Normaliza request_retention a un rango saludable [0.75, 0.94/0.95].
- * Si un perfil tiene > 0.95 (ej. 0.99) o < 0.75, lo restablece a 0.90 para evitar
+ * Normaliza request_retention a un rango saludable [0.70, 0.97].
+ * Si un perfil tiene > 0.97 (ej. 0.99) o < 0.70, lo restablece a 0.90 para evitar
  * que la función exponencial de ts-fsrs comprima todos los intervalos a 1 día.
  */
 export function sanitizeRequestRetention(retention?: number): number {
-  if (typeof retention !== 'number' || Number.isNaN(retention) || retention > 0.95 || retention < 0.75) {
+  if (typeof retention !== 'number' || Number.isNaN(retention) || retention > 0.97 || retention < 0.70) {
     return 0.90;
   }
   return retention;
+}
+
+/**
+ * Calcula la fecha de vencimiento para un intervalo en días naturales anclada a las 04:00 AM hora local,
+ * garantizando además un mínimo de (addDays * 24 - 6) horas reales (mínimo 18h para 1 día).
+ * Esto evita que estudiar por la noche (ej. 22:30) con un intervalo de 1 día haga que la tarjeta
+ * reaparezca a la mañana siguiente tras solo 9-10 horas de descanso.
+ */
+export function getScheduledDayAnchor(now: Date, addDays: number): Date {
+  const safeDays = Math.max(1, Math.round(addDays));
+  const anchor = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate() + safeDays,
+    4,
+    0,
+    0,
+    0
+  );
+  const minElapsedMs = (safeDays * 24 - 6) * 60 * 60 * 1000;
+  if (anchor.getTime() - now.getTime() < minElapsedMs) {
+    return new Date(now.getTime() + safeDays * 24 * 60 * 60 * 1000);
+  }
+  return anchor;
 }
 
 /**
@@ -140,8 +164,30 @@ export function isCardDueForStudy(card: FSRSCardInput, now: Date = new Date()): 
     return dueTime <= now.getTime();
   }
 
+  // Si ya alcanzó la hora exacta de vencimiento, es elegible inmediatamente
+  if (dueTime <= now.getTime()) {
+    return true;
+  }
+
+  // Para tarjetas de repaso en días que vencen más tarde en el día de hoy (hasta las 23:59:59.999),
+  // permitir adelantar su disponibilidad a primera hora de la mañana SIEMPRE QUE hayan transcurrido
+  // al menos 18 horas reales desde su último repaso (evitando que una tarjeta estudiada anoche a las 22:30
+  // con intervalo de 1 día reaparezca hoy a las 08:30 tras solo 10 horas).
   const endOfTodayTime = getEndOfLocalDay(now).getTime();
-  return dueTime <= endOfTodayTime;
+  if (dueTime <= endOfTodayTime) {
+    if (card.last_review) {
+      const lastReviewTime = (
+        card.last_review instanceof Date ? card.last_review : new Date(card.last_review)
+      ).getTime();
+      if (!Number.isNaN(lastReviewTime)) {
+        const MIN_OVERNIGHT_REST_MS = 18 * 60 * 60 * 1000;
+        return now.getTime() - lastReviewTime >= MIN_OVERNIGHT_REST_MS;
+      }
+    }
+    return true;
+  }
+
+  return false;
 }
 
 /**
@@ -280,8 +326,8 @@ function applyShortTermGraduationSafeguards(
       return;
     } else if (isShortTermState) {
       // Tarjeta en Learning (1) o Relearning (3) calificada como 'Difícil':
-      // graduación segura a 1 día (24h) para romper el bucle de 15 minutos de ts-fsrs
-      const due1d = new Date(now.getTime() + 1 * 24 * 60 * 60 * 1000);
+      // graduación segura a 1 día para romper el bucle de 15 minutos de ts-fsrs
+      const due1d = getScheduledDayAnchor(now, 1);
       result.card.due = due1d;
       result.card.state = State.Review;
       result.card.scheduled_days = 1;
@@ -301,16 +347,13 @@ function applyShortTermGraduationSafeguards(
         result.card.stability = minStability;
         result.log.stability = minStability;
       }
-      const minDueTime = now.getTime() + minDays * 24 * 60 * 60 * 1000;
-      if (result.card.due.getTime() < minDueTime || result.card.scheduled_days < minDays) {
-        const safeDue = new Date(minDueTime);
-        result.card.due = safeDue;
-        result.card.state = State.Review;
-        result.card.scheduled_days = Math.max(result.card.scheduled_days, minDays);
-        result.log.due = safeDue;
-        result.log.state = State.Review;
-        result.log.scheduled_days = result.card.scheduled_days;
-      }
+      const safeDue = getScheduledDayAnchor(now, Math.max(result.card.scheduled_days || minDays, minDays));
+      result.card.due = safeDue;
+      result.card.state = State.Review;
+      result.card.scheduled_days = Math.max(result.card.scheduled_days, minDays);
+      result.log.due = safeDue;
+      result.log.state = State.Review;
+      result.log.scheduled_days = result.card.scheduled_days;
     } else if (isShortTermState) {
       // Si sale de Learning/Relearning en el mismo día con 'Good' tras un fallo previo,
       // asegurar estabilidad mínima saludable para no estancarse en 0.24d en días sucesivos
@@ -320,14 +363,14 @@ function applyShortTermGraduationSafeguards(
         result.log.stability = minGoodStability;
       }
       const minGoodDays = fsrsCard.state === State.Learning ? 2 : 1;
-      const minDueTime = now.getTime() + minGoodDays * 24 * 60 * 60 * 1000;
-      if (result.card.due.getTime() < minDueTime) {
-        const safeDue = new Date(minDueTime);
-        result.card.due = safeDue;
-        result.card.scheduled_days = minGoodDays;
-        result.log.due = safeDue;
-        result.log.scheduled_days = minGoodDays;
-      }
+      const targetGoodDays = Math.max(result.card.scheduled_days || minGoodDays, minGoodDays);
+      const safeDue = getScheduledDayAnchor(now, targetGoodDays);
+      result.card.due = safeDue;
+      result.card.state = State.Review;
+      result.card.scheduled_days = targetGoodDays;
+      result.log.due = safeDue;
+      result.log.state = State.Review;
+      result.log.scheduled_days = targetGoodDays;
     }
   } else if (rating === 4 && (isNewCard || isShortTermState)) {
     // Tarjeta nueva o en aprendizaje calificada como 'Easy (4)': garantizar mínimo 4 días
@@ -337,24 +380,29 @@ function applyShortTermGraduationSafeguards(
       result.card.stability = minEasyStability;
       result.log.stability = minEasyStability;
     }
-    const minDueTime = now.getTime() + minEasyDays * 24 * 60 * 60 * 1000;
-    if (result.card.due.getTime() < minDueTime || result.card.scheduled_days < minEasyDays) {
-      const safeDue = new Date(minDueTime);
-      result.card.due = safeDue;
-      result.card.state = State.Review;
-      result.card.scheduled_days = Math.max(result.card.scheduled_days, minEasyDays);
-      result.log.due = safeDue;
-      result.log.state = State.Review;
-      result.log.scheduled_days = result.card.scheduled_days;
-    }
+    const targetEasyDays = Math.max(result.card.scheduled_days || minEasyDays, minEasyDays);
+    const safeDue = getScheduledDayAnchor(now, targetEasyDays);
+    result.card.due = safeDue;
+    result.card.state = State.Review;
+    result.card.scheduled_days = targetEasyDays;
+    result.log.due = safeDue;
+    result.log.state = State.Review;
+    result.log.scheduled_days = targetEasyDays;
   }
 
-  // Escalera progresiva estricta de intervalos para State.Review (rating 2, 3 o 4):
-  // Impide saltos de 30-60 días ("2 meses") por acumulación de elapsed_days y fija un tope absoluto de 21 días.
+  // Progresión monotónica saludable para State.Review (rating 2, 3 o 4):
+  // - Impide que 'Difícil (2)' reduzca la estabilidad/intervalo por debajo de lo que la tarjeta ya había consolidado.
+  // - Respeta el 'maximum_interval' configurado por el usuario en /settings (por defecto 365 días).
   if (result.card.state === State.Review && rating >= 2) {
     const nextReps = Math.max(1, result.card.reps || 1);
+    const prevStability = fsrsCard.state === State.Review ? Math.max(0, Math.round(fsrsCard.stability || 0)) : 0;
+    const userMaxInterval =
+      customParams?.maximum_interval && customParams.maximum_interval > 0
+        ? customParams.maximum_interval
+        : 365;
+
     let minAllowedDays = 1;
-    let maxAllowedDays = 21;
+    let maxAllowedDays = userMaxInterval;
 
     if (nextReps <= 1) {
       // 1.ª vez graduada: Hard = 1d, Good = 2d, Easy = 4d
@@ -369,66 +417,73 @@ function applyShortTermGraduationSafeguards(
         maxAllowedDays = 4;
       }
     } else if (nextReps === 2) {
-      // 2.ª vez: Hard = 2d, Good = 3-4d (máx 4d), Easy = 5-7d (máx 7d)
       if (rating === 2) {
         minAllowedDays = 2;
-        maxAllowedDays = 2;
+        maxAllowedDays = Math.max(3, prevStability + 1);
       } else if (rating === 3) {
         minAllowedDays = 3;
-        maxAllowedDays = 4;
+        maxAllowedDays = Math.max(5, prevStability + 3);
       } else if (rating === 4) {
         minAllowedDays = 5;
-        maxAllowedDays = 7;
+        maxAllowedDays = Math.max(8, prevStability + 5);
       }
     } else if (nextReps === 3) {
-      // 3.ª vez: Hard = 3d, Good = 6-8d (máx 8d), Easy = 9-12d (máx 12d)
       if (rating === 2) {
         minAllowedDays = 3;
-        maxAllowedDays = 3;
+        maxAllowedDays = Math.max(6, Math.round(prevStability * 1.3));
       } else if (rating === 3) {
         minAllowedDays = 6;
-        maxAllowedDays = 8;
+        maxAllowedDays = Math.max(12, Math.round(prevStability * 2.2));
       } else if (rating === 4) {
         minAllowedDays = 9;
-        maxAllowedDays = 12;
+        maxAllowedDays = Math.max(18, Math.round(prevStability * 3.0));
       }
     } else if (nextReps === 4) {
-      // 4.ª vez: Hard = 5d, Good = 10-14d (máx 14d), Easy = 15-18d (máx 18d)
       if (rating === 2) {
         minAllowedDays = 5;
-        maxAllowedDays = 5;
+        maxAllowedDays = Math.max(10, Math.round(prevStability * 1.35));
       } else if (rating === 3) {
         minAllowedDays = 10;
-        maxAllowedDays = 14;
+        maxAllowedDays = Math.max(22, Math.round(prevStability * 2.3));
       } else if (rating === 4) {
         minAllowedDays = 15;
-        maxAllowedDays = 18;
+        maxAllowedDays = Math.max(35, Math.round(prevStability * 3.2));
       }
     } else {
-      // 5.ª vez o más (nextReps >= 5): Hard máx 7d, Good máx 18d, Easy tope absoluto de 21 días
+      // 5.ª vez o más (nextReps >= 5): progresa libremente según FSRS hasta el maximum_interval del usuario
       if (rating === 2) {
-        minAllowedDays = 5;
-        maxAllowedDays = 7;
+        minAllowedDays = Math.max(5, prevStability + 1);
       } else if (rating === 3) {
-        minAllowedDays = 12;
-        maxAllowedDays = 18;
+        minAllowedDays = Math.max(12, prevStability + 2);
       } else {
-        minAllowedDays = 16;
-        maxAllowedDays = 21;
+        minAllowedDays = Math.max(16, prevStability + 4);
       }
+      maxAllowedDays = userMaxInterval;
     }
 
-    if (customParams?.maximum_interval && customParams.maximum_interval > 0) {
-      maxAllowedDays = Math.min(maxAllowedDays, customParams.maximum_interval);
-      minAllowedDays = Math.min(minAllowedDays, maxAllowedDays);
+    // Garantía de no-regresión: si la tarjeta ya estaba en Review con estabilidad previa,
+    // acertarla (rating 2, 3 o 4) nunca debe reducir sus días por debajo de prevStability + incremento mínimo
+    if (prevStability > 0) {
+      const minNonRegressive =
+        rating === 2
+          ? Math.max(prevStability, Math.round(prevStability * 1.15))
+          : rating === 3
+          ? Math.max(prevStability + 1, Math.round(prevStability * 1.6))
+          : Math.max(prevStability + 3, Math.round(prevStability * 2.2));
+      minAllowedDays = Math.max(minAllowedDays, minNonRegressive);
+      maxAllowedDays = Math.max(maxAllowedDays, minAllowedDays);
     }
+
+    // Aplicar tope absoluto configurado por el usuario en /settings
+    maxAllowedDays = Math.min(maxAllowedDays, userMaxInterval);
+    minAllowedDays = Math.min(minAllowedDays, maxAllowedDays);
 
     const MS_PER_DAY = 24 * 60 * 60 * 1000;
     const rawDiffDays = Math.round((result.card.due.getTime() - now.getTime()) / MS_PER_DAY);
     const currentDays = Math.max(result.card.scheduled_days || 0, rawDiffDays);
     const targetDays = Math.min(maxAllowedDays, Math.max(minAllowedDays, currentDays));
 
-    const adjustedDue = new Date(now.getTime() + targetDays * MS_PER_DAY);
+    const adjustedDue = getScheduledDayAnchor(now, targetDays);
     const clampedStability = Math.min(
       maxAllowedDays,
       Math.max(minAllowedDays, result.card.stability || targetDays)
@@ -576,6 +631,51 @@ export function scheduleReviewWithLog(
   };
 
   return { card: updatedCard, review: reviewLog };
+}
+
+/**
+ * Programa manualmente una tarjeta para que vuelva a aparecer exactamente en `customDays` días (1 a 36500).
+ * Actualiza de forma coherente `due`, `stability` (= customDays), `state` (State.Review) y `reps` (+1),
+ * devolviendo tanto el objeto para actualizar `cards` como el registro para `reviews`.
+ */
+export function scheduleCustomDaysReviewWithLog(
+  card: FSRSCardInput,
+  customDays: number,
+  reviewDate: Date | string = new Date()
+): { card: FSRSUpdatedCard; review: FSRSReviewLog; days: number } {
+  const now = reviewDate instanceof Date ? reviewDate : new Date(reviewDate);
+  const safeDays = Math.max(1, Math.min(36500, Math.round(customDays || 1)));
+  const fsrsCard = toFSRSCard(card, now);
+
+  const nextDue = getScheduledDayAnchor(now, safeDays);
+  const nextStability = Number(safeDays.toFixed(4));
+  const nextDifficulty = Number(
+    (fsrsCard.difficulty > 0 ? fsrsCard.difficulty : 5.0).toFixed(4)
+  );
+  const nextReps = (Number(card.reps) || 0) + 1;
+  const nextLapses = Number(card.lapses) || 0;
+  const syntheticRating: FSRSRating = safeDays <= 1 ? 2 : safeDays >= 7 ? 4 : 3;
+
+  const updatedCard: FSRSUpdatedCard = {
+    due: nextDue.toISOString(),
+    stability: nextStability,
+    difficulty: nextDifficulty,
+    state: State.Review,
+    reps: nextReps,
+    lapses: nextLapses,
+    last_review: now.toISOString(),
+  };
+
+  const reviewLog: FSRSReviewLog = {
+    rating: syntheticRating,
+    state: State.Review,
+    stability: nextStability,
+    difficulty: nextDifficulty,
+    due: nextDue.toISOString(),
+    reviewed_at: now.toISOString(),
+  };
+
+  return { card: updatedCard, review: reviewLog, days: safeDays };
 }
 
 /**
