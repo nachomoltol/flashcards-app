@@ -1453,7 +1453,7 @@ async function enforceApiLimit(
           return {
             error: 'DEVICE_LIMIT_REACHED',
             message:
-              'Has alcanzado el límite mensual gratuito (30 generaciones). Tu cuota se renovará automáticamente el próximo mes.',
+              'Has alcanzado el límite mensual gratuito (20 generaciones). Tu cuota se renovará automáticamente el próximo mes.',
           };
         }
         if (res.error === 'AD_REQUIRED') {
@@ -1560,12 +1560,12 @@ async function enforceApiLimit(
       }
 
       // Fase Ads (welcome_generations >= 5):
-      // Si generations_count >= 25 -> LIMIT_REACHED (5 bienvenida + 25 anuncios = 30 total)
-      if (count >= 25) {
+      // Si generations_count >= 15 -> LIMIT_REACHED (5 bienvenida + 15 anuncios = 20 total)
+      if (count >= 15) {
         return { error: 'LIMIT_REACHED' };
       }
 
-      // Si generations_count < 25: verificar bonus_credits
+      // Si generations_count < 15: verificar bonus_credits
       if (bonusCredits <= 0) {
         return { error: 'AD_REQUIRED' };
       }

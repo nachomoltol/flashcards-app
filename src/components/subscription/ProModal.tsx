@@ -391,7 +391,7 @@ export function ProModal({
                   welcomeGenerations: 5,
                   tutorAdCredits: newTutorCredits,
                   adsUsedInCycle: 0,
-                  remainingAds: 25,
+                  remainingAds: 15,
                 };
               }
               return {
@@ -422,7 +422,7 @@ export function ProModal({
               : (count + newBonus);
             const remainingAds = typeof claim.remainingAds === 'number'
               ? claim.remainingAds
-              : Math.max(0, 25 - adsUsedInCycle);
+              : Math.max(0, 15 - adsUsedInCycle);
 
             if (!prev) {
               return {
@@ -741,7 +741,7 @@ export function ProModal({
                     const adsUsedInCycle = userLimits?.adsUsedInCycle ?? ((userLimits?.count || 0) + (userLimits?.bonusCredits || 0));
                     const remainingAds = userLimits?.remainingAds !== undefined
                       ? userLimits.remainingAds
-                      : Math.max(0, 25 - adsUsedInCycle);
+                      : Math.max(0, 15 - adsUsedInCycle);
 
                     return (
                       <div
@@ -776,7 +776,7 @@ export function ProModal({
                         </p>
 
                         <div className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-900 dark:text-amber-300 font-mono">
-                          <span>{isTutor ? 'Consultas con anuncio: ILIMITADAS' : 'Cupo mensual: hasta 25 anuncios'}</span>
+                          <span>{isTutor ? 'Consultas con anuncio: ILIMITADAS' : 'Cupo mensual: hasta 15 anuncios'}</span>
                           <strong className="font-bold">
                             {isTutor
                               ? 'Ilimitadas (1 anuncio / consulta)'
@@ -846,7 +846,7 @@ export function ProModal({
                                   </span>
                                 </>
                               ) : !isTutor && remainingAds <= 0 ? (
-                                <span>Cupo mensual de 25 anuncios completado</span>
+                                <span>Cupo mensual de 15 anuncios completado</span>
                               ) : (
                                 <>
                                   <PlayCircle className="w-4 h-4 fill-neutral-950 text-amber-300 group-hover:scale-110 transition-transform shrink-0" />
@@ -1041,7 +1041,7 @@ export function ProModal({
                     const adsUsedInCycle = userLimits?.adsUsedInCycle ?? ((userLimits?.count || 0) + (userLimits?.bonusCredits || 0));
                     const remainingAdsWeb = userLimits?.remainingAds !== undefined
                       ? userLimits.remainingAds
-                      : Math.max(0, 25 - adsUsedInCycle);
+                      : Math.max(0, 15 - adsUsedInCycle);
 
                     return (
                       <div className="relative p-3.5 sm:p-4 rounded-2xl bg-gradient-to-b from-amber-50/90 via-white to-amber-50/40 dark:from-neutral-900 dark:via-neutral-900 dark:to-neutral-950 border-2 border-amber-400 dark:border-amber-500/60 shadow-md shadow-amber-500/10 space-y-3">

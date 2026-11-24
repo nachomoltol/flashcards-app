@@ -20,7 +20,7 @@ export interface ClaimRewardResult {
  * Server Action que acredita +1 crédito bonificado en Supabase al usuario tras
  * completar la visualización exitosa de un anuncio de vídeo bonificado de Google AdMob.
  * Soporta autenticación dual: cookies web o accessToken JWT de Capacitor.
- * Desacoplado: 'deck' (mazos, máximo 25 al mes) vs 'tutor' (Profesor Socrático, ilimitado).
+ * Desacoplado: 'deck' (mazos, máximo 15 al mes) vs 'tutor' (Profesor Socrático, ilimitado).
  */
 export async function claimAdRewardAction(
   userId?: string,
@@ -132,7 +132,7 @@ export async function claimAdRewardAction(
       };
     }
 
-    // Flujo para Mazos de Estudio (rewardType === 'deck', máximo 25 al mes)
+    // Flujo para Mazos de Estudio (rewardType === 'deck', máximo 15 al mes)
     let userEmail: string | undefined;
     try {
       const { data: profile } = await rpcClient
@@ -178,7 +178,7 @@ export async function claimAdRewardAction(
       };
     }
 
-    // Obtener límites actualizados exclusivos para generación de mazos (máximo 25 anuncios)
+    // Obtener límites actualizados exclusivos para generación de mazos (máximo 15 anuncios)
     let count = 0;
     let bonusCredits = typeof res.bonus_credits === 'number' ? res.bonus_credits : 1;
     try {
@@ -204,7 +204,7 @@ export async function claimAdRewardAction(
     }
 
     const adsUsedInCycle = count + bonusCredits;
-    const remainingAds = Math.max(0, 25 - adsUsedInCycle);
+    const remainingAds = Math.max(0, 15 - adsUsedInCycle);
 
     return {
       success: true,

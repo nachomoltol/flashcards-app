@@ -23,7 +23,7 @@ export interface UserLimitsResult {
 /**
  * Server Action que consulta de forma fidedigna y autorizada (bypass RLS con service_role)
  * los límites de generación del usuario en Supabase (`api_limits`):
- * - Mazos de Estudio Free: 5 bienvenida + 25 anuncios = 30 generaciones máximas/mes.
+ * - Mazos de Estudio Free: 5 bienvenida + 15 anuncios = 20 generaciones máximas/mes.
  * - Profesor Socrático Free: 3 consultas gratis/mes y a partir de la 4.ª ILIMITADO con 1 anuncio/consulta.
  */
 export async function getUserLimitsAction(
@@ -74,7 +74,7 @@ export async function getUserLimitsAction(
       tutorAdCredits: 0,
       tutorAdsUsed: 0,
       adsUsedInCycle: 0,
-      remainingAds: 25,
+      remainingAds: 15,
       error: 'UNAUTHORIZED',
     };
   }
@@ -94,7 +94,7 @@ export async function getUserLimitsAction(
       tutorAdCredits: 0,
       tutorAdsUsed: 0,
       adsUsedInCycle: 0,
-      remainingAds: 25,
+      remainingAds: 15,
       error: 'AUTH_REQUIRED',
     };
   }
@@ -143,7 +143,7 @@ export async function getUserLimitsAction(
         tutorAdCredits: 0,
         tutorAdsUsed: 0,
         adsUsedInCycle: 0,
-        remainingAds: 25,
+        remainingAds: 15,
         error: error.message,
       };
     }
@@ -159,7 +159,7 @@ export async function getUserLimitsAction(
         tutorAdCredits: 0,
         tutorAdsUsed: 0,
         adsUsedInCycle: 0,
-        remainingAds: 25,
+        remainingAds: 15,
       };
     }
 
@@ -202,9 +202,9 @@ export async function getUserLimitsAction(
     const tutorAdCredits = typeof data.tutor_ad_credits === 'number' ? data.tutor_ad_credits : 0;
 
     // Desacoplamiento contable:
-    // 1. Generaciones de mazos con anuncios (base 25 anuncios para mazos):
+    // 1. Generaciones de mazos con anuncios (base 15 anuncios para mazos):
     const adsUsedInCycle = count + bonusCredits;
-    const remainingAds = Math.max(0, 25 - adsUsedInCycle);
+    const remainingAds = Math.max(0, 15 - adsUsedInCycle);
 
     // 2. Profesor Socrático: 3 gratis y a partir de la 4.ª ilimitado con 1 anuncio/consulta
     const tutorAdsUsed = Math.max(0, tutorConsultationsCount - 3);
@@ -240,7 +240,7 @@ export async function getUserLimitsAction(
           const isDevExpired = rawDev.reset_at ? new Date(rawDev.reset_at) <= new Date() : false;
           const currentDevCount = isDevExpired ? 0 : (rawDev.generations_count || 0);
           deviceGenerationsCount = currentDevCount;
-          if (currentDevCount >= 30) {
+          if (currentDevCount >= 20) {
             deviceLimitReached = true;
           }
         }
@@ -275,7 +275,7 @@ export async function getUserLimitsAction(
       tutorAdCredits: 0,
       tutorAdsUsed: 0,
       adsUsedInCycle: 0,
-      remainingAds: 25,
+      remainingAds: 15,
       error: 'SERVER_ERROR',
     };
   }
