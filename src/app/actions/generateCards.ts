@@ -1453,8 +1453,7 @@ async function enforceApiLimit(
           return {
             error: 'DEVICE_LIMIT_REACHED',
             message:
-              res.message ||
-              'Este dispositivo ha alcanzado el límite mensual gratuito (30 generaciones). Pasa a PRO (3,50 €/mes) para continuar sin límites.',
+              'Has alcanzado el límite mensual gratuito (30 generaciones). Tu cuota se renovará automáticamente el próximo mes.',
           };
         }
         if (res.error === 'AD_REQUIRED') {

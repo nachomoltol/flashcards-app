@@ -471,9 +471,14 @@ export function ProModal({
                 : ((userLimits?.bonusCredits ?? 0) + 1),
           });
           } else {
+          const isDeviceLimitOnIOS =
+            platform.isNativeIOS &&
+            (claim.error === 'DEVICE_LIMIT_REACHED' || (claim.message && /PRO|3,50|3\.50/i.test(claim.message)));
           setAdRewardNotice({
             type: 'error',
-            message: claim.message || 'Error al acreditar la bonificación en tu cuenta.',
+            message: isDeviceLimitOnIOS
+              ? 'Has alcanzado el límite mensual gratuito. Tu cuota se renovará automáticamente el próximo mes.'
+              : claim.message || 'Error al acreditar la bonificación en tu cuenta.',
           });
           setIsWatchingAd(false);
           setAdLoadingPhase('idle');
@@ -799,24 +804,26 @@ export function ProModal({
                             </div>
 
                             <div className="space-y-2 pt-1">
-                              {/* Botón 1: Continuar en el PC */}
-                              <button
-                                type="button"
-                                onClick={handleContinueOnPC}
-                                className="w-full min-h-[44px] inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-900 font-bold text-xs sm:text-sm shadow-md transition cursor-pointer group"
-                              >
-                                <Laptop className="w-4 h-4 text-emerald-400 dark:text-emerald-600 group-hover:scale-110 transition-transform" />
-                                <span>{isEn ? 'Continue on PC' : 'Continuar en el PC'}</span>
-                              </button>
+                              {/* Botón 1: Continuar en el PC (oculto en iOS nativo) */}
+                              {!platform.isNativeIOS && (
+                                <button
+                                  type="button"
+                                  onClick={handleContinueOnPC}
+                                  className="w-full min-h-[44px] inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-900 font-bold text-xs sm:text-sm shadow-md transition cursor-pointer group"
+                                >
+                                  <Laptop className="w-4 h-4 text-emerald-400 dark:text-emerald-600 group-hover:scale-110 transition-transform" />
+                                  <span>{isEn ? 'Continue on PC' : 'Continuar en el PC'}</span>
+                                </button>
+                              )}
 
-                              {/* Botón 2: Generar en este móvil */}
+                              {/* Botón 2: Generar en este dispositivo */}
                               <button
                                 type="button"
                                 onClick={handleGenerateOnMobile}
                                 className="w-full min-h-[40px] inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold text-xs shadow-sm transition cursor-pointer group"
                               >
                                 <Smartphone className="w-3.5 h-3.5 text-neutral-950 group-hover:scale-110 transition-transform" />
-                                <span>{isEn ? 'Generate on this mobile' : 'Generar en este móvil'}</span>
+                                <span>{isEn ? 'Continue on this device' : platform.isNativeIOS ? 'Continuar en este dispositivo' : 'Generar en este móvil'}</span>
                               </button>
                             </div>
                           </div>
@@ -1394,8 +1401,8 @@ export function ProModal({
             )
           )}
 
-          {/* Tarjeta de Beneficios Destacados (Solo en Hard Paywall, ocultos en límite agotado para asegurar cero scroll móvil) */}
-          {!isLimitReached && (
+          {/* Tarjeta de Beneficios Destacados (Solo en Hard Paywall, ocultos en límite agotado y en iOS nativo) */}
+          {!isLimitReached && !platform.isNativeIOS && (
             <div className="space-y-2.5">
               <p className="text-[11px] font-bold uppercase tracking-wider text-purple-700 dark:text-purple-300">
                 {t('pro_modal.benefits_title', 'LO QUE INCLUYE EL PLAN PRO')}
@@ -1468,9 +1475,13 @@ export function ProModal({
 
         {/* Footer / Botones de Cierre */}
         <div className={`border-t border-zinc-200 dark:border-zinc-800/80 flex items-center justify-between ${isLimitReached ? 'pt-3 mt-3' : 'pt-5 mt-5'}`}>
-          <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-            {t('pro_modal.cancel_anytime', 'Cancela en cualquier momento')}
-          </span>
+          {!platform.isNativeIOS ? (
+            <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+              {t('pro_modal.cancel_anytime', 'Cancela en cualquier momento')}
+            </span>
+          ) : (
+            <span />
+          )}
           <button
             type="button"
             onClick={handleClose}

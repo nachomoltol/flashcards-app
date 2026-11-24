@@ -1246,16 +1246,15 @@ export function DocumentUploader({
               onClick={() => {
                 if (typeof window === 'undefined') return;
                 const platform = detectPlatform();
-                const isAndroidNative =
+                const isNativeMobile =
                   platform.isNativeAndroid ||
+                  platform.isNativeIOS ||
                   Boolean(
                     (window as unknown as { Capacitor?: { isNativePlatform: () => boolean; getPlatform: () => string } })
-                      .Capacitor?.isNativePlatform() &&
-                    (window as unknown as { Capacitor?: { isNativePlatform: () => boolean; getPlatform: () => string } })
-                      .Capacitor?.getPlatform() === 'android'
+                      .Capacitor?.isNativePlatform()
                   );
 
-                if (isAndroidNative) {
+                if (isNativeMobile) {
                   const printUrl = `https://www.flashmente.com/decks/${deckId}/print`;
                   window.open(printUrl, '_system');
                 } else {

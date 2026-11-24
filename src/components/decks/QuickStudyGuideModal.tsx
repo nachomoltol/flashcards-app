@@ -209,11 +209,16 @@ export function QuickStudyGuideModal({
         } else {
           if (claim.error === 'FREE_MONTHLY_LIMIT_REACHED' || claim.error === 'DEVICE_LIMIT_REACHED') {
             setAdError(
-              claim.message ||
-                t(
-                  'quick_guide.free_quota_exhausted',
-                  'Has alcanzado el límite de 3 guías gratuitas este mes. Pásate a PRO para acceso ilimitado.'
-                )
+              platform.isNativeIOS
+                ? t(
+                    'quick_guide.free_quota_exhausted_ios',
+                    'Has alcanzado el límite mensual gratuito de guías de estudio. Tu cuota se renovará automáticamente el próximo mes.'
+                  )
+                : claim.message ||
+                    t(
+                      'quick_guide.free_quota_exhausted',
+                      'Has alcanzado el límite de 3 guías gratuitas este mes. Pásate a PRO para acceso ilimitado.'
+                    )
             );
           } else {
             setAdError(claim.error || t('quick_guide.ad_failed', 'Debes completar el anuncio para desbloquear.'));
@@ -241,6 +246,12 @@ export function QuickStudyGuideModal({
 
     const printContent = document.getElementById('quick-study-guide-printable');
     if (!printContent) return;
+
+    if (platform.isNativeIOS) {
+      const printUrl = `https://www.flashmente.com/decks/${deckId}/print`;
+      window.open(printUrl, '_system');
+      return;
+    }
 
     const printWindow = window.open('', '_blank', 'width=850,height=950');
     if (!printWindow) {

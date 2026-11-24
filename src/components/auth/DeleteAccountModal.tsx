@@ -25,7 +25,15 @@ export function DeleteAccountModal({ isOpen, onClose }: DeleteAccountModalProps)
     setErrorMessage(null);
 
     try {
-      const res = await deleteAccountAction();
+      let accessToken: string | undefined;
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        accessToken = sessionData?.session?.access_token;
+      } catch (sessionErr) {
+        console.warn('[DeleteAccountModal] No se pudo obtener el token de sesión:', sessionErr);
+      }
+
+      const res = await deleteAccountAction(accessToken);
 
       if (!res.success) {
         setErrorMessage(res.message || 'No se pudo eliminar la cuenta. Inténtalo más tarde.');

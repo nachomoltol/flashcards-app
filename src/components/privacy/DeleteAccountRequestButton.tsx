@@ -2,6 +2,18 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Mail, Check } from 'lucide-react';
+import { usePlatform } from '@/lib/platform';
+
+export function PrivacyProExemptionText() {
+  const platform = usePlatform();
+  if (platform.isNativeIOS) return null;
+  return (
+    <>
+      Los usuarios suscritos al plan <strong>Flashmente PRO</strong> están exentos de
+      publicidad dentro de la aplicación.{' '}
+    </>
+  );
+}
 
 export function DeleteAccountRequestButton() {
   const [copied, setCopied] = useState(false);

@@ -13,7 +13,7 @@ import {
   UserCheck,
   Sparkles,
 } from 'lucide-react';
-import { DeleteAccountRequestButton } from '@/components/privacy/DeleteAccountRequestButton';
+import { DeleteAccountRequestButton, PrivacyProExemptionText } from '@/components/privacy/DeleteAccountRequestButton';
 
 export const metadata: Metadata = {
   title: 'Términos del Servicio y Política de Privacidad | Flashmente',
@@ -241,8 +241,8 @@ export default function PrivacidadPage() {
                 publicitarios.
               </p>
               <p className="text-xs sm:text-sm text-slate-600">
-                Los usuarios suscritos al plan <strong>Flashmente PRO</strong> están exentos de
-                publicidad dentro de la aplicación. Puedes consultar más detalles sobre cómo Google
+                <PrivacyProExemptionText />
+                Puedes consultar más detalles sobre cómo Google
                 utiliza la información de aplicaciones que emplean sus servicios en{' '}
                 <a
                   href="https://policies.google.com/technologies/partner-sites"

@@ -14,24 +14,9 @@ export interface DeleteAccountResult {
  * mediante el cliente administrativo de Supabase (SUPABASE_SERVICE_ROLE_KEY).
  * Cumple con las directivas de seguridad y eliminación de datos de Google Play Store.
  */
-export async function deleteAccountAction(): Promise<DeleteAccountResult> {
+export async function deleteAccountAction(accessToken?: string): Promise<DeleteAccountResult> {
   try {
-    // 1. Obtener el ID del usuario activo exclusivamente desde la sesión del servidor (blindaje IDOR)
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user?.id) {
-      return {
-        success: false,
-        error: 'UNAUTHORIZED',
-        message: 'Debes tener una sesión activa para solicitar la eliminación de tu cuenta.',
-      };
-    }
-
-    const targetUserId = user.id;
-
-    // 2. Instanciar cliente administrativo con SUPABASE_SERVICE_ROLE_KEY
+    // 1. Instanciar cliente administrativo con SUPABASE_SERVICE_ROLE_KEY
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
 
@@ -51,11 +36,47 @@ export async function deleteAccountAction(): Promise<DeleteAccountResult> {
       },
     });
 
+    // 2. Obtener y verificar el ID del usuario activo mediante accessToken JWT (Capacitor / cliente) o sesión del servidor
+    let targetUserId: string | undefined;
+
+    if (accessToken && accessToken.trim()) {
+      try {
+        const {
+          data: { user: tokenUser },
+          error: tokenErr,
+        } = await supabaseAdmin.auth.getUser(accessToken.trim());
+        if (!tokenErr && tokenUser?.id) {
+          targetUserId = tokenUser.id;
+        }
+      } catch (tokenCheckErr) {
+        console.warn('[deleteAccountAction] Error al validar accessToken:', tokenCheckErr);
+      }
+    }
+
+    if (!targetUserId) {
+      const {
+        data: { user: cookieUser },
+      } = await supabase.auth.getUser();
+      if (cookieUser?.id) {
+        targetUserId = cookieUser.id;
+      }
+    }
+
+    if (!targetUserId) {
+      return {
+        success: false,
+        error: 'UNAUTHORIZED',
+        message: 'Debes tener una sesión activa para solicitar la eliminación de tu cuenta.',
+      };
+    }
+
     // 3. Limpieza de datos asociados del usuario en la base de datos
     try {
       await supabaseAdmin.from('reviews').delete().eq('user_id', targetUserId);
+      await supabaseAdmin.from('deck_summaries').delete().filter('deck_id', 'in', `(select id from decks where user_id = '${targetUserId}')`);
       await supabaseAdmin.from('cards').delete().filter('deck_id', 'in', `(select id from decks where user_id = '${targetUserId}')`);
       await supabaseAdmin.from('decks').delete().eq('user_id', targetUserId);
+      await supabaseAdmin.from('user_streaks').delete().eq('user_id', targetUserId);
       await supabaseAdmin.from('profiles').delete().eq('id', targetUserId);
       await supabaseAdmin.from('api_limits').delete().eq('user_id', targetUserId);
     } catch (dbErr) {

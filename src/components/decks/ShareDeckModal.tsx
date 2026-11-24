@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useDeckStore, useLanguageStore, type DeckWithStats } from '@/stores';
 import type { DeckRow } from '@/stores/useDeckStore';
+import { usePlatform } from '@/lib/platform';
 import { X, Check, Copy } from 'lucide-react';
 
 interface ShareDeckModalProps {
@@ -14,6 +15,7 @@ interface ShareDeckModalProps {
 export function ShareDeckModal({ isOpen, onClose, deck }: ShareDeckModalProps) {
   const { shareDeck } = useDeckStore();
   const { t } = useLanguageStore();
+  const platform = usePlatform();
   const [shareId, setShareId] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -157,15 +159,26 @@ export function ShareDeckModal({ isOpen, onClose, deck }: ShareDeckModalProps) {
         {/* Footer Actions */}
         <div className="pt-2 flex items-center justify-between gap-3 border-t border-neutral-200 dark:border-neutral-800">
           {shareUrl ? (
-            <a
-              href={shareUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium inline-flex items-center gap-1 transition hover:underline"
-            >
-              <span>{t('share_modal.view_public_page')}</span>
-              <span>↗</span>
-            </a>
+            platform.isNativeIOS ? (
+              <button
+                type="button"
+                onClick={() => window.open(shareUrl, '_system')}
+                className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium inline-flex items-center gap-1 transition hover:underline cursor-pointer"
+              >
+                <span>{t('share_modal.view_public_page')}</span>
+                <span>↗</span>
+              </button>
+            ) : (
+              <a
+                href={shareUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium inline-flex items-center gap-1 transition hover:underline"
+              >
+                <span>{t('share_modal.view_public_page')}</span>
+                <span>↗</span>
+              </a>
+            )
           ) : (
             <span />
           )}

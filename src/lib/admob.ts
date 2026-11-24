@@ -21,9 +21,9 @@ export const ADMOB_CONFIG = {
 
   // iOS: ID de anuncio bonificado de pruebas oficial de Google para iOS
   IOS_TEST_REWARDED_AD_UNIT_ID: 'ca-app-pub-3940256099942544/1712485313',
-  // iOS: ID de producción (inyectable por variable de entorno; usa el de pruebas hasta crear el bloque real)
+  // iOS: ID oficial de producción en Google AdMob
   IOS_REWARDED_AD_UNIT_ID:
-    process.env.NEXT_PUBLIC_ADMOB_IOS_REWARDED_ID || 'ca-app-pub-3940256099942544/1712485313',
+    process.env.NEXT_PUBLIC_ADMOB_IOS_REWARDED_ID || 'ca-app-pub-8525131609099761/1577605194',
 };
 
 export interface AdReward {
@@ -105,6 +105,7 @@ export function getCapacitorAdMobPlugin(): any {
 }
 
 let isAdMobInitialized = false;
+let initializingPromise: Promise<boolean> | null = null;
 let isAdPreloaded = false;
 let isPreloading = false;
 
@@ -204,6 +205,7 @@ async function requestConsent(): Promise<boolean> {
 export async function initializeAdMob(): Promise<boolean> {
   if (typeof window === 'undefined') return false;
   if (isAdMobInitialized) return true;
+  if (initializingPromise) return initializingPromise;
 
   const platform = detectPlatform();
   if (!platform.isNativeApp) {
@@ -211,43 +213,51 @@ export async function initializeAdMob(): Promise<boolean> {
     return true;
   }
 
-  let AdMob = getCapacitorAdMobPlugin();
-  if (!AdMob) {
-    AdMob = await getAdMobPlugin();
-  }
-
-  if (AdMob) {
-    try {
-      // 0. iOS: solicitar autorización de App Tracking Transparency (ATT) antes de inicializar
-      if (platform.isNativeIOS) {
-        await requestIOSTrackingAuthorization(AdMob);
-      }
-
-      // 1. Solicitar y verificar consentimiento UMP (GDPR) antes de inicializar
-      await requestConsent();
-
-      // 2. Inicializar AdMob configurando modo de pruebas según el entorno
-      const isDev = process.env.NODE_ENV !== 'production';
-      await AdMob.initialize({
-        testingDevices: [],
-        initializeForTesting: isDev,
-      });
-      isAdMobInitialized = true;
-      console.log('[AdMob] SDK inicializado con éxito.');
-
-      // Iniciar precarga inmediata del anuncio en segundo plano tras inicialización
-      preloadRewardedAd().catch((preloadErr) => {
-        console.warn('[AdMob] Error al precargar tras inicialización:', preloadErr);
-      });
-
-      return true;
-    } catch (e) {
-      console.warn('No se pudo inicializar AdMob nativo:', e);
-      return false;
+  initializingPromise = (async (): Promise<boolean> => {
+    let AdMob = getCapacitorAdMobPlugin();
+    if (!AdMob) {
+      AdMob = await getAdMobPlugin();
     }
-  }
 
-  return false;
+    if (AdMob) {
+      try {
+        // 0. iOS: solicitar autorización de App Tracking Transparency (ATT) antes de inicializar
+        if (platform.isNativeIOS) {
+          await requestIOSTrackingAuthorization(AdMob);
+        }
+
+        // 1. Solicitar y verificar consentimiento UMP (GDPR) antes de inicializar
+        await requestConsent();
+
+        // 2. Inicializar AdMob configurando modo de pruebas según el entorno
+        const isDev = process.env.NODE_ENV !== 'production';
+        await AdMob.initialize({
+          testingDevices: [],
+          initializeForTesting: isDev,
+        });
+        isAdMobInitialized = true;
+        console.log('[AdMob] SDK inicializado con éxito.');
+
+        // Iniciar precarga inmediata del anuncio en segundo plano tras inicialización
+        preloadRewardedAd().catch((preloadErr) => {
+          console.warn('[AdMob] Error al precargar tras inicialización:', preloadErr);
+        });
+
+        return true;
+      } catch (e) {
+        console.warn('No se pudo inicializar AdMob nativo:', e);
+        return false;
+      }
+    }
+
+    return false;
+  })();
+
+  try {
+    return await initializingPromise;
+  } finally {
+    initializingPromise = null;
+  }
 }
 
 /**
