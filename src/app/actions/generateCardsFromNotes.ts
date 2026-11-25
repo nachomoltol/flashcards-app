@@ -7,6 +7,7 @@ import { createInitialCardValues } from '@/lib/fsrs';
 import { deduplicateCandidateCards } from '@/lib/cardDeduplication';
 import { randomizeMultipleChoiceCard } from '@/lib/cardUtils';
 import { GEMINI_DEFAULT_MODEL } from '@/lib/aiConfig';
+import { isAdminEmail, isTestDevice } from '@/lib/config/whitelist';
 import {
   buildDidacticModeDirective,
   PRACTICAL_MODE_DIRECTIVE,
@@ -132,31 +133,62 @@ function getFormatInstructions(format: CardFormat = 'multiple_choice'): string {
   }
 }
 
-async function resolveUserId(deckId?: string, explicitUserId?: string): Promise<string | null> {
-  if (explicitUserId && explicitUserId.trim()) {
-    return explicitUserId.trim();
+async function resolveUserId(
+  deckId?: string,
+  explicitUserId?: string,
+  accessToken?: string
+): Promise<string | null> {
+  // 1. Sesión por cookies en servidor
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user?.id) {
+      if (explicitUserId && explicitUserId.trim() && explicitUserId.trim() !== user.id) {
+        console.warn('[generateCardsFromNotes] Discrepancia de userId con sesión de cookie; usando id autenticado.');
+      }
+      return user.id;
+    }
+  } catch {
+    // Siguiente intento
   }
 
+  // 2. Token JWT enviado desde WebView Capacitor (iOS / Android)
+  if (accessToken && accessToken.trim()) {
+    try {
+      const {
+        data: { user: tokenUser },
+        error: tokenErr,
+      } = await supabase.auth.getUser(accessToken.trim());
+      if (!tokenErr && tokenUser?.id) {
+        if (explicitUserId && explicitUserId.trim() && explicitUserId.trim() !== tokenUser.id) {
+          console.warn('[generateCardsFromNotes] Discrepancia de userId con token JWT; usando id verificado.');
+        }
+        return tokenUser.id;
+      }
+    } catch {
+      // Siguiente intento
+    }
+  }
+
+  // 3. Fallback controlado por propietario del mazo
   if (deckId) {
     try {
       const { data, error } = await supabase.rpc('get_deck_owner', {
         p_deck_id: deckId,
       });
       if (!error && data) {
-        return data;
+        if (!explicitUserId || explicitUserId.trim() === data) {
+          return data;
+        }
       }
     } catch (err) {
       console.warn('Advertencia al consultar get_deck_owner:', err);
     }
   }
 
-  try {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (user) return user.id;
-  } catch {
-    // Siguiente intento
+  if (explicitUserId && explicitUserId.trim()) {
+    return explicitUserId.trim();
   }
 
   return null;
@@ -226,23 +258,33 @@ function processGeneratedCards(
 }
 
 /**
- * Valida la cuota de generación del usuario en api_limits exclusivamente desde el servidor
- * mediante el RPC 'check_api_limit' de Supabase (sin importar módulos de cliente).
+ * Valida la cuota de generación del usuario y del dispositivo en api_limits / device_limits
+ * desde el servidor mediante el RPC atómico 'check_api_limit' (fail-closed en caso de fallo).
  */
 async function checkServerQuota(
-  userId: string
-): Promise<{ allowed: boolean; reason?: 'LIMIT_REACHED' | 'AD_REQUIRED' }> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  dbClient: any,
+  userId: string,
+  deviceId?: string,
+  isUserAdmin: boolean = false,
+  isDeviceTest: boolean = false
+): Promise<{ allowed: boolean; reason?: 'LIMIT_REACHED' | 'AD_REQUIRED' | 'DEVICE_LIMIT_REACHED' }> {
+  if (isUserAdmin) {
+    return { allowed: true };
+  }
+
   try {
-    const { data: rpcData, error: rpcError } = await supabase.rpc('check_api_limit', {
+    const { data: rpcData, error: rpcError } = await dbClient.rpc('check_api_limit', {
       p_user_id: userId,
+      p_device_id: deviceId || null,
+      p_is_admin_email: isUserAdmin,
+      p_is_test_device: isDeviceTest,
     });
 
     if (!rpcError && rpcData) {
       const res = rpcData as {
         allowed?: boolean;
-        error?: 'LIMIT_REACHED' | 'AD_REQUIRED';
-        tier?: 'free' | 'pro' | 'vip';
-        bonus_credits?: number;
+        error?: 'LIMIT_REACHED' | 'AD_REQUIRED' | 'DEVICE_LIMIT_REACHED';
       };
 
       if (res.allowed === false) {
@@ -259,33 +301,61 @@ async function checkServerQuota(
       console.warn('[generateCardsFromNotes] RPC check_api_limit error, fallback to table:', rpcError);
     }
 
-    // Fallback a consulta directa sobre la tabla api_limits
-    const { data: directData } = await supabase
+    // Fallback coherente a consulta directa sobre api_limits y device_limits
+    const { data: directData } = await dbClient
       .from('api_limits')
-      .select('tier, generations_count, bonus_credits')
+      .select('tier, generations_count, last_generation_date, bonus_credits, welcome_generations, current_period_end')
       .eq('user_id', userId)
       .maybeSingle();
 
     if (directData) {
-      const tier = (directData.tier as 'free' | 'pro' | 'vip') || 'free';
-      const count = typeof directData.generations_count === 'number' ? directData.generations_count : 0;
+      let tier = (directData.tier as 'free' | 'pro' | 'vip') || 'free';
+      if (tier === 'pro' && directData.current_period_end && new Date(directData.current_period_end).getTime() < Date.now()) {
+        tier = 'free';
+      }
+
+      const currentMonth = new Date().toISOString().slice(0, 7);
+      const lastMonth = directData.last_generation_date
+        ? String(directData.last_generation_date).slice(0, 7)
+        : null;
+      const count = lastMonth === currentMonth ? (directData.generations_count || 0) : 0;
       const bonus = typeof directData.bonus_credits === 'number' ? directData.bonus_credits : 0;
+      const welcome = typeof directData.welcome_generations === 'number' ? directData.welcome_generations : 0;
 
       if (tier === 'pro' || tier === 'vip') {
-        if (count >= 120) return { allowed: false, reason: 'LIMIT_REACHED' };
+        if (count >= 100) return { allowed: false, reason: 'LIMIT_REACHED' };
         return { allowed: true };
       }
 
-      if (count >= 50) return { allowed: false, reason: 'LIMIT_REACHED' };
+      let deviceBlocksWelcome = false;
+      if (deviceId && deviceId.trim() && !isDeviceTest) {
+        const { data: devData } = await dbClient
+          .from('device_limits')
+          .select('generations_count, welcome_generations_used, reset_at')
+          .eq('device_id', deviceId.trim())
+          .maybeSingle();
+
+        if (devData) {
+          const isDevExpired = devData.reset_at ? new Date(devData.reset_at) <= new Date() : false;
+          const devCount = isDevExpired ? 0 : (devData.generations_count || 0);
+          if (devCount >= 20) return { allowed: false, reason: 'DEVICE_LIMIT_REACHED' };
+          if ((devData.welcome_generations_used || 0) >= 5) {
+            deviceBlocksWelcome = true;
+          }
+        }
+      }
+
+      if (count >= 20) return { allowed: false, reason: 'LIMIT_REACHED' };
+      if (welcome < 5 && !deviceBlocksWelcome) return { allowed: true };
       if (bonus <= 0) return { allowed: false, reason: 'AD_REQUIRED' };
 
       return { allowed: true };
     }
 
-    return { allowed: true };
+    return { allowed: false, reason: 'LIMIT_REACHED' };
   } catch (err) {
-    console.error('[generateCardsFromNotes] Error en checkServerQuota:', err);
-    return { allowed: true };
+    console.error('[generateCardsFromNotes] Error en checkServerQuota (fail-closed):', err);
+    return { allowed: false, reason: 'LIMIT_REACHED' };
   }
 }
 
@@ -308,6 +378,8 @@ export async function generateCardsFromNotesAction(
     const {
       deckId,
       userId: explicitUserId,
+      accessToken,
+      deviceId,
       images = [],
       cardFormat = 'multiple_choice',
       cardCount = 10,
@@ -342,30 +414,63 @@ export async function generateCardsFromNotesAction(
       };
     }
 
-    // Inicializar cliente de base de datos en servidor
+    // Inicializar cliente de base de datos en servidor (service_role o JWT autenticado)
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
     const supabaseUrl =
       process.env.NEXT_PUBLIC_SUPABASE_URL ||
       process.env.SUPABASE_URL ||
       'https://placeholder.supabase.co';
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key';
 
     const dbClient = serviceRoleKey
       ? createClient(supabaseUrl, serviceRoleKey, {
           auth: { persistSession: false, autoRefreshToken: false },
         })
+      : accessToken && accessToken.trim()
+      ? createClient(supabaseUrl, supabaseAnonKey, {
+          global: {
+            headers: {
+              Authorization: `Bearer ${accessToken.trim()}`,
+            },
+          },
+          auth: { persistSession: false, autoRefreshToken: false },
+        })
       : supabase;
 
-    // 1. Control de cuota de generación 100% Server-Side
-    const resolvedUserId = await resolveUserId(deckId, explicitUserId);
+    // 1. Control de cuota de generación 100% Server-Side con soporte de device_limits
+    const resolvedUserId = await resolveUserId(deckId, explicitUserId, accessToken);
     if (!resolvedUserId) {
       return { success: false, error: 'LIMIT_REACHED', cards: [] };
     }
 
-    const quotaCheck = await checkServerQuota(resolvedUserId);
+    let userEmail: string | undefined;
+    try {
+      const { data: profile } = await dbClient
+        .from('profiles')
+        .select('email')
+        .eq('id', resolvedUserId)
+        .maybeSingle();
+      if (profile?.email) {
+        userEmail = profile.email;
+      }
+    } catch {
+      // Silencioso
+    }
+
+    const isUserAdmin = isAdminEmail(userEmail);
+    const isDeviceTest = isTestDevice(deviceId);
+
+    const quotaCheck = await checkServerQuota(
+      dbClient,
+      resolvedUserId,
+      deviceId,
+      isUserAdmin,
+      isDeviceTest
+    );
     if (!quotaCheck.allowed) {
       return {
         success: false,
-        error: quotaCheck.reason === 'AD_REQUIRED' ? 'AD_REQUIRED' : 'LIMIT_REACHED',
+        error: quotaCheck.reason || 'LIMIT_REACHED',
         cards: [],
       };
     }
@@ -505,9 +610,12 @@ IDIOMA DE SALIDA: ${language === 'en' ? 'Inglés' : 'Español'}.`;
       }
     }
 
-    // 7. Registro de uso de cuota en api_limits
+    // 7. Registro de uso de cuota en api_limits y device_limits
     await dbClient.rpc('increment_api_generation', {
       p_user_id: resolvedUserId,
+      p_device_id: deviceId || null,
+      p_is_admin_email: isUserAdmin,
+      p_is_test_device: isDeviceTest,
     });
 
     const isExhausted = Boolean(parsed.core_exhausted) || processedCards.length < cardCount;

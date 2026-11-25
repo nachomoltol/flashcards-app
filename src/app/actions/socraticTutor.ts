@@ -402,7 +402,7 @@ Estructura obligatoria de tu respuesta (máximo 150-180 palabras en total, lengu
       config: {
         systemInstruction,
         temperature: 0.55,
-        maxOutputTokens: 260,
+        maxOutputTokens: 320,
       },
     });
 

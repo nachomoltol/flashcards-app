@@ -30,6 +30,7 @@ import {
   unlockDeckSummaryWithAdAction,
   type ExhaustiveDeckSummaryGuide,
 } from '@/app/actions/generateDeckSummary';
+import { createPrintGrantAction } from '@/app/actions/getDeckForPrint';
 import { showAdMobRewardedAd, preloadRewardedAd } from '@/lib/admob';
 import { usePlatform } from '@/lib/platform';
 import { getClientDeviceId } from '@/lib/deviceId';
@@ -46,6 +47,659 @@ function isFillerText(text?: string | null): boolean {
   const trimmed = text.trim();
   if (!trimmed) return true;
   return /^(no\s*especificad[oa]|no\s*aplica|n\/?a|ningun[oa]|none|not\s*specified|-)$/i.test(trimmed);
+}
+
+export const STUDY_GUIDE_PRINT_CSS = `
+  @media print {
+    @page {
+      size: A4;
+      margin: 10mm 10mm 15mm 10mm;
+      @top-left { content: "" !important; }
+      @top-center { content: "" !important; }
+      @top-right { content: "" !important; }
+      @bottom-left { content: "" !important; }
+      @bottom-center { content: "" !important; }
+      @bottom-right {
+        content: "Pág. " counter(page) " de " counter(pages) !important;
+        font-size: 8.5pt !important;
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+        color: #6b7280 !important;
+        font-weight: 500 !important;
+      }
+    }
+
+    html, body {
+      height: auto !important;
+      overflow: visible !important;
+      background: #ffffff !important;
+      color: #000000 !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+
+    body * {
+      visibility: hidden;
+    }
+
+    #quick-study-guide-printable,
+    #quick-study-guide-printable * {
+      visibility: visible;
+    }
+
+    #quick-study-guide-printable {
+      position: static !important;
+      width: 100% !important;
+      height: auto !important;
+      max-height: none !important;
+      overflow: visible !important;
+      margin: 0 !important;
+      padding: 0 0 12mm 0 !important;
+      background: #ffffff !important;
+      color: #111827 !important;
+      border: none !important;
+      box-shadow: none !important;
+      font-size: 11px !important;
+      line-height: 1.35 !important;
+      box-sizing: border-box !important;
+    }
+
+    .no-print,
+    .no-print * {
+      display: none !important;
+      visibility: hidden !important;
+    }
+
+    .modal-backdrop-print-fix,
+    .modal-dialog-print-fix {
+      position: static !important;
+      inset: auto !important;
+      width: 100% !important;
+      height: auto !important;
+      max-height: none !important;
+      max-width: none !important;
+      overflow: visible !important;
+      background: transparent !important;
+      box-shadow: none !important;
+      border: none !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      display: block !important;
+    }
+
+    .print-card {
+      background-color: #ffffff !important;
+      color: #111827 !important;
+      border: 1px solid #d1d5db !important;
+      box-shadow: none !important;
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+      margin-bottom: 8px !important;
+      padding: 8px 10px !important;
+      border-radius: 8px !important;
+    }
+
+    p, h1, h2, h3, h4, h5, h6, span, tr, td, th, li {
+      page-break-inside: auto !important;
+      break-inside: auto !important;
+    }
+
+    .print-table {
+      width: 100% !important;
+      border-collapse: collapse !important;
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+      margin-bottom: 8px !important;
+    }
+
+    .print-table th {
+      background-color: #f3f4f6 !important;
+      color: #111827 !important;
+      border: 1px solid #9ca3af !important;
+      padding: 4px 6px !important;
+      font-size: 10px !important;
+      font-weight: 700 !important;
+    }
+
+    .print-table td {
+      background-color: #ffffff !important;
+      color: #111827 !important;
+      border: 1px solid #d1d5db !important;
+      padding: 4px 6px !important;
+      font-size: 10px !important;
+      line-height: 1.3 !important;
+    }
+
+    .bg-neutral-900,
+    .bg-neutral-900\\/50,
+    .bg-neutral-900\\/60,
+    .bg-neutral-900\\/80,
+    .bg-neutral-900\\/90,
+    .bg-neutral-950,
+    .bg-neutral-950\\/60,
+    .bg-black {
+      background-color: #ffffff !important;
+      color: #111827 !important;
+      border-color: #e5e7eb !important;
+    }
+
+    .text-white,
+    .text-neutral-100,
+    .text-neutral-200,
+    .text-neutral-300,
+    .text-neutral-400 {
+      color: #111827 !important;
+    }
+
+    .text-neutral-500,
+    .text-neutral-600 {
+      color: #374151 !important;
+    }
+
+    .bg-amber-500\\/10,
+    .bg-amber-500\\/15,
+    .bg-emerald-500\\/10,
+    .bg-emerald-500\\/15,
+    .bg-indigo-500\\/10,
+    .bg-violet-500\\/10,
+    .bg-rose-500\\/10 {
+      background-color: #f9fafb !important;
+      border: 1px solid #e5e7eb !important;
+      color: #111827 !important;
+    }
+
+    .text-amber-200, .text-amber-300, .text-amber-400 { color: #92400e !important; }
+    .text-emerald-300, .text-emerald-400 { color: #065f46 !important; }
+    .text-cyan-400 { color: #0e7490 !important; }
+    .text-indigo-400 { color: #3730a3 !important; }
+    .text-violet-200, .text-violet-300, .text-violet-400 { color: #5b21b6 !important; }
+    .text-rose-200, .text-rose-300, .text-rose-400 { color: #991b1b !important; }
+  }
+`;
+
+export interface StudyGuidePrintableContentProps {
+  guide: ExhaustiveDeckSummaryGuide;
+  deckTitle: string;
+  isUnlocked: boolean;
+  freeRemaining?: number;
+  adError?: string | null;
+  isWatchingAd?: boolean;
+  onWatchAd?: () => void;
+  isNativeIOS?: boolean;
+  onOpenPro?: () => void;
+}
+
+export function StudyGuidePrintableContent({
+  guide,
+  deckTitle,
+  isUnlocked,
+  freeRemaining = 0,
+  adError = null,
+  isWatchingAd = false,
+  onWatchAd,
+  isNativeIOS = false,
+  onOpenPro,
+}: StudyGuidePrintableContentProps) {
+  const { t } = useLanguageStore();
+
+  return (
+    <>
+      {/* Cabecera compacta visible únicamente al imprimir en Página 1 */}
+      <div className="hidden print:block border-b border-neutral-300 pb-2 mb-3">
+        <div className="flex items-center justify-between">
+          <h1 className="text-base font-bold text-neutral-900">
+            {guide.title || `${t('quick_guide.modal_title', 'Guía de Repaso')}: ${deckTitle}`}
+          </h1>
+          <span className="text-[10px] text-neutral-500 font-mono">Flashmente</span>
+        </div>
+        {guide.subtitle && (
+          <p className="text-xs text-neutral-600 mt-0.5">{guide.subtitle}</p>
+        )}
+      </div>
+
+      <div className="space-y-5 print:space-y-3">
+        {/* 1. SECCIÓN: VISIÓN PANORÁMICA Y OBJETIVOS (Visible siempre para todos) */}
+        <section className="space-y-2">
+          <div className="flex items-center gap-2 border-b border-neutral-800 pb-1.5 print:border-neutral-300">
+            <BookOpen className="w-4 h-4 text-emerald-400 shrink-0 print:text-neutral-800" />
+            <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-emerald-400 print:text-neutral-900 print:text-xs">
+              {t('quick_guide.section_overview', '📖 Visión Panorámica y Objetivos')}
+            </h4>
+          </div>
+
+          <div className="print-card p-3.5 sm:p-4 rounded-2xl bg-neutral-950/60 border border-neutral-800/80 space-y-3 print:p-2.5">
+            {/* Resumen Global */}
+            <p className="text-xs sm:text-sm text-neutral-200 leading-relaxed print:text-[11px] print:text-neutral-800 print:leading-snug">
+              {guide.overview?.summary || `Resumen integral del capítulo ${deckTitle}.`}
+            </p>
+
+            {/* Objetivos de Aprendizaje */}
+            {guide.overview?.learningObjectives && guide.overview.learningObjectives.length > 0 && (
+              <div className="pt-2 border-t border-neutral-800/80 print:border-neutral-200 space-y-1.5">
+                <div className="text-xs font-bold text-emerald-300 print:text-neutral-900 print:text-[11px] flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 print:text-neutral-700" />
+                  <span>{t('quick_guide.learning_objectives', 'Objetivos de Aprendizaje:')}</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 print:grid-cols-2 gap-1.5">
+                  {guide.overview.learningObjectives.map((obj, oIdx) => (
+                    <div
+                      key={`obj-${oIdx}`}
+                      className="p-2 rounded-xl bg-neutral-900/60 border border-neutral-800 flex items-start gap-1.5 text-xs text-neutral-300 print:bg-neutral-50 print:border-neutral-200 print:text-[10px] print:text-neutral-800 print:p-1.5"
+                    >
+                      <span className="text-emerald-400 font-bold shrink-0 print:text-neutral-700">✓</span>
+                      <span className="leading-snug">{obj}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* OVERLAY CONVERSIÓN PRO / REWARDED AD PARA USUARIOS FREE */}
+        {!isUnlocked && (
+          <div className="my-6 p-6 sm:p-7 rounded-3xl bg-neutral-900/95 border-2 border-amber-500/40 shadow-2xl backdrop-blur-xl space-y-4 no-print text-center">
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-amber-500/20 to-amber-600/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shadow-lg">
+              <Crown className="w-7 h-7" />
+            </div>
+            <div className="max-w-lg mx-auto">
+              <h4 className="text-base sm:text-lg font-bold text-white">
+                {t('quick_guide.pro_locked_title', 'Desbloquea la Guía Completa de este Capítulo')}
+              </h4>
+              <p className="text-xs text-neutral-300 mt-1.5 leading-relaxed">
+                {t(
+                  'quick_guide.pro_locked_desc',
+                  'Accede a la taxonomía completa, fichas detalladas por elemento, tablas comparativas, cifras y dosis oficiales y descarga en PDF.'
+                )}
+              </p>
+            </div>
+
+            {/* Contador de guías mensuales */}
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-neutral-800 border border-neutral-700 text-neutral-200">
+              {freeRemaining > 0 ? (
+                <>
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>
+                    {t('quick_guide.free_quota_remaining', { count: freeRemaining })}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="w-2 h-2 rounded-full bg-rose-400" />
+                  <span className="text-rose-300">
+                    {t('quick_guide.free_quota_exhausted', 'Has alcanzado el límite de 3 guías gratuitas este mes')}
+                  </span>
+                </>
+              )}
+            </div>
+
+            {adError && (
+              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs max-w-md mx-auto">
+                {adError}
+              </div>
+            )}
+
+            {/* Botones de acción */}
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+              {freeRemaining > 0 && onWatchAd && (
+                <button
+                  type="button"
+                  onClick={onWatchAd}
+                  disabled={isWatchingAd}
+                  className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-neutral-800 hover:bg-neutral-700 text-neutral-100 border border-neutral-600 text-xs font-semibold transition active:scale-95 cursor-pointer disabled:opacity-75 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-md"
+                >
+                  {isWatchingAd ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-amber-400 shrink-0" />
+                      <span>{t('quick_guide.preparing_ad', 'Preparing ad...')}</span>
+                    </>
+                  ) : (
+                    <>
+                      <PlayCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                      <span>{t('quick_guide.unlock_with_ad_btn', '🎬 Desbloquear Guía Completa viendo un vídeo')}</span>
+                    </>
+                  )}
+                </button>
+              )}
+
+              {!isNativeIOS && onOpenPro && (
+                <button
+                  type="button"
+                  onClick={onOpenPro}
+                  className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-bold text-xs transition shadow-lg shadow-amber-500/20 active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <Crown className="w-4 h-4 shrink-0" />
+                  <span>{t('quick_guide.unlock_with_pro_btn', '👑 Desbloquear Guías Ilimitadas con PRO (3,50 €/mes)')}</span>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* BLOQUES 2 AL 6 (Visibles al desbloquear o con teaser blur si Free) */}
+        <div
+          className={`space-y-5 print:space-y-3 transition-all duration-300 ${
+            !isUnlocked
+              ? 'filter blur-[5px] select-none pointer-events-none opacity-30 max-h-[380px] overflow-hidden no-print'
+              : ''
+          }`}
+        >
+          {/* 2. SECCIÓN: ESQUEMA Y CLASIFICACIÓN COMPLETA (Taxonomy Tree) */}
+          {guide.taxonomy_tree && guide.taxonomy_tree.length > 0 && (
+            <section className="space-y-2">
+              <div className="flex items-center gap-2 border-b border-neutral-800 pb-1.5 print:border-neutral-300">
+                <ListTree className="w-4 h-4 text-emerald-400 shrink-0 print:text-neutral-800" />
+                <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-emerald-400 print:text-neutral-900 print:text-xs">
+                  {t('quick_guide.section_taxonomy', '🌳 Esquema y Clasificación Completa')}
+                </h4>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-2.5 sm:gap-3 print:gap-2">
+                {guide.taxonomy_tree.map((group, gIdx) => (
+                  <div
+                    key={`tax-${gIdx}`}
+                    className="print-card p-3 sm:p-3.5 rounded-2xl bg-neutral-950/60 border border-neutral-800/80 space-y-2 print:p-2.5"
+                  >
+                    <div className="flex items-center justify-between gap-2 border-b border-neutral-800/60 print:border-neutral-200 pb-1.5">
+                      <h5 className="text-xs sm:text-sm font-bold text-white print:text-xs print:text-neutral-900 flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 print:bg-neutral-800" />
+                        {group.category}
+                      </h5>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-neutral-800 text-neutral-300 border border-neutral-700 print:bg-neutral-100 print:text-neutral-700 print:border-neutral-300">
+                        {group.elements?.length || 0} elementos
+                      </span>
+                    </div>
+                    {group.description && (
+                      <p className="text-xs text-neutral-400 print:text-[10px] print:text-neutral-600 leading-snug">
+                        {group.description}
+                      </p>
+                    )}
+                    <div className="flex flex-wrap gap-1 pt-0.5">
+                      {group.elements?.map((el, elIdx) => (
+                        <span
+                          key={`el-${gIdx}-${elIdx}`}
+                          className="px-2 py-0.5 rounded-md text-[11px] print:text-[10px] font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/25 print:bg-neutral-50 print:text-neutral-800 print:border-neutral-300"
+                        >
+                          {el}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* 3. SECCIÓN: DESARROLLO DETALLADO POR ELEMENTO / CONCEPTO (Rejilla Compacta de 2 Columnas) */}
+          {guide.item_breakdown && guide.item_breakdown.length > 0 && (
+            <section className="space-y-2">
+              <div className="flex items-center gap-2 border-b border-neutral-800 pb-1.5 print:border-neutral-300">
+                <Layers className="w-4 h-4 text-cyan-400 shrink-0 print:text-neutral-800" />
+                <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-cyan-400 print:text-neutral-900 print:text-xs">
+                  {t('quick_guide.section_breakdown', '🔬 Desarrollo Detallado por Elemento / Concepto')}
+                </h4>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-2.5 sm:gap-3 print:gap-2">
+                {guide.item_breakdown.map((item, iIdx) => {
+                  const validSources = Array.isArray(item.dietarySources)
+                    ? item.dietarySources.filter((s) => !isFillerText(s))
+                    : [];
+                  const hasSources = validSources.length > 0;
+                  const hasDeficiency = !isFillerText(item.deficiency);
+                  const hasToxicity = !isFillerText(item.toxicity);
+                  const hasKeyFact = !isFillerText(item.keyFact);
+
+                  return (
+                    <div
+                      key={`item-${iIdx}`}
+                      className="print-card p-3 sm:p-3.5 rounded-2xl bg-neutral-950/60 border border-neutral-800/80 space-y-2 flex flex-col justify-between print:p-2.5 print:text-[11px] print:leading-snug"
+                    >
+                      <div className="space-y-1.5">
+                        {/* Cabecera del Elemento */}
+                        <div className="flex items-start justify-between gap-1.5 border-b border-neutral-800/70 print:border-neutral-200 pb-1.5">
+                          <h5 className="text-sm font-bold text-white print:text-xs print:text-neutral-950 flex items-center gap-1.5">
+                            <span className="text-emerald-400 font-mono text-xs print:text-neutral-700">#{iIdx + 1}</span>
+                            <span>{item.name}</span>
+                          </h5>
+                          {item.role && (
+                            <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-neutral-800 text-neutral-300 border border-neutral-700 shrink-0 print:bg-neutral-100 print:text-neutral-800 print:border-neutral-300">
+                              {item.role}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Fuentes Dietéticas / Ejemplos Prácticos */}
+                        {hasSources && (
+                          <div className="flex flex-wrap items-center gap-1 text-[11px] print:text-[10px]">
+                            <span className="text-neutral-400 font-semibold print:text-neutral-600 flex items-center gap-1">
+                              <Utensils className="w-3 h-3 text-emerald-400 print:text-neutral-600" />
+                              <span>Ej./Fuentes:</span>
+                            </span>
+                            {validSources.map((source, sIdx) => (
+                              <span
+                                key={`source-${iIdx}-${sIdx}`}
+                                className="px-1.5 py-0.5 rounded bg-neutral-900 border border-neutral-700/80 text-neutral-300 print:bg-neutral-50 print:text-neutral-800 print:border-neutral-200"
+                              >
+                                {source}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Déficit y Toxicidad / Excepciones (Ocultación limpia si no aplican) */}
+                        {(hasDeficiency || hasToxicity) && (
+                          <div className="grid grid-cols-1 gap-1.5 pt-0.5">
+                            {hasDeficiency && (
+                              <div className="p-1.5 sm:p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-200 print:bg-neutral-50 print:border-neutral-300 print:text-neutral-800 print:text-[10px] leading-tight">
+                                <div className="flex items-center gap-1 font-bold text-amber-300 print:text-neutral-900 mb-0.5">
+                                  <AlertTriangle className="w-3 h-3 shrink-0" />
+                                  <span>Déficit / Carencia:</span>
+                                </div>
+                                <p className="leading-snug text-amber-200/90 print:text-neutral-800">{item.deficiency}</p>
+                              </div>
+                            )}
+                            {hasToxicity && (
+                              <div className="p-1.5 sm:p-2 rounded-xl bg-rose-500/10 border border-rose-500/20 text-[11px] text-rose-200 print:bg-neutral-50 print:border-neutral-300 print:text-neutral-800 print:text-[10px] leading-tight">
+                                <div className="flex items-center gap-1 font-bold text-rose-300 print:text-neutral-900 mb-0.5">
+                                  <Flame className="w-3 h-3 shrink-0" />
+                                  <span>Toxicidad / Riesgo:</span>
+                                </div>
+                                <p className="leading-snug text-rose-200/90 print:text-neutral-800">{item.toxicity}</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Dato Clave de Examen */}
+                      {hasKeyFact && (
+                        <div className="mt-1 p-2 rounded-xl bg-gradient-to-r from-amber-500/15 to-amber-600/10 border border-amber-500/30 text-[11px] text-amber-200 print:bg-neutral-100 print:border-neutral-300 print:text-neutral-900 print:text-[10px] leading-tight font-medium flex items-start gap-1.5 shadow-sm">
+                          <ShieldCheck className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5 print:text-neutral-800" />
+                          <div className="leading-tight">
+                            <strong className="text-amber-300 mr-1 print:text-neutral-950">
+                              {t('quick_guide.key_fact', 'Clave Examen:')}
+                            </strong>
+                            <span>{item.keyFact}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          {/* RETROCOMPATIBILIDAD CON GUÍAS V1 (Si no hay item_breakdown pero sí key_concepts) */}
+          {(!guide.item_breakdown || guide.item_breakdown.length === 0) &&
+            guide.key_concepts &&
+            guide.key_concepts.length > 0 && (
+              <section className="space-y-2">
+                <div className="flex items-center gap-2 border-b border-neutral-800 pb-1.5 print:border-neutral-300">
+                  <Lightbulb className="w-4 h-4 text-amber-400 shrink-0 print:text-neutral-800" />
+                  <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-amber-400 print:text-neutral-900 print:text-xs">
+                    {t('quick_guide.section_key_concepts', '💡 Conceptos Clave y Fundamentos')}
+                  </h4>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-2.5 sm:gap-3 print:gap-2">
+                  {guide.key_concepts.map((concept, idx) => (
+                    <div
+                      key={`concept-${idx}`}
+                      className="print-card p-3 sm:p-3.5 rounded-2xl bg-neutral-950/60 border border-neutral-800/80 space-y-2 flex flex-col justify-between print:p-2.5"
+                    >
+                      <div>
+                        <h5 className="text-xs sm:text-sm font-bold text-white print:text-xs print:text-neutral-900 mb-1">
+                          {concept.title}
+                        </h5>
+                        <p className="text-xs text-neutral-300 print:text-[10px] print:text-neutral-700 leading-snug">
+                          {concept.description}
+                        </p>
+                      </div>
+                      <div className="p-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300 print:bg-neutral-50 print:border-neutral-200 print:text-[10px] print:text-neutral-900 flex items-start gap-1 font-medium">
+                        <span className="font-bold shrink-0">{t('quick_guide.takeaway', 'Clave:')}</span>
+                        <span>{concept.keyTakeaway}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+          {/* 4. SECCIÓN: TABLAS COMPARATIVAS Y TRAMPAS DE EXAMEN (Ocultación limpia si []) */}
+          {guide.contrast_tables && guide.contrast_tables.length > 0 && (
+            <section className="space-y-2">
+              <div className="flex items-center gap-2 border-b border-neutral-800 pb-1.5 print:border-neutral-300">
+                <Table className="w-4 h-4 text-indigo-400 shrink-0 print:text-neutral-800" />
+                <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-indigo-400 print:text-neutral-900 print:text-xs">
+                  {t('quick_guide.section_contrast_tables', '⚖️ Tablas Comparativas y Trampas')}
+                </h4>
+              </div>
+
+              <div className="space-y-3">
+                {guide.contrast_tables.map((table, tIdx) => (
+                  <div
+                    key={`table-${tIdx}`}
+                    className="print-card rounded-2xl border border-neutral-800/80 bg-neutral-950/60 overflow-hidden"
+                  >
+                    <div className="p-2.5 bg-neutral-900/60 border-b border-neutral-800 print:bg-neutral-100 print:border-neutral-200">
+                      <h5 className="text-xs sm:text-sm font-bold text-white print:text-xs print:text-neutral-900">
+                        {table.title}
+                      </h5>
+                      {table.description && (
+                        <p className="text-[11px] text-neutral-400 print:text-[10px] print:text-neutral-600 mt-0.5">
+                          {table.description}
+                        </p>
+                      )}
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="print-table w-full text-left text-xs">
+                        <thead className="bg-neutral-900/80 text-neutral-300 font-semibold border-b border-neutral-800 print:bg-neutral-100 print:text-neutral-900 print:border-neutral-300">
+                          <tr>
+                            {table.headers.map((h, hIdx) => (
+                              <th key={`th-${hIdx}`} className="p-2 sm:p-2.5 font-semibold">
+                                {h}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-neutral-800/60 text-neutral-300 print:divide-neutral-200 print:text-neutral-800">
+                          {table.rows.map((row, rIdx) => (
+                            <tr key={`tr-${rIdx}`} className="hover:bg-neutral-900/30 print:hover:bg-transparent">
+                              {row.map((cell, cIdx) => (
+                                <td key={`td-${cIdx}`} className="p-2 sm:p-2.5 align-top leading-snug">
+                                  {cell}
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* 5. SECCIÓN: CIFRAS CRÍTICAS Y DOSIS OFICIALES (Sin almohadilla literal, sin truncamiento) */}
+          {guide.critical_data && guide.critical_data.length > 0 && (
+            <section className="space-y-2">
+              <div className="flex items-center gap-2 border-b border-neutral-800 pb-1.5 print:border-neutral-300">
+                <Target className="w-4 h-4 text-emerald-400 shrink-0 print:text-neutral-800" />
+                <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-emerald-400 print:text-neutral-900 print:text-xs">
+                  {t('quick_guide.section_critical_data', '🎯 Cifras Críticas y Dosis Oficiales')}
+                </h4>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 print:grid-cols-3 gap-2.5 print:gap-2">
+                {guide.critical_data.map((data, dIdx) => (
+                  <div
+                    key={`data-${dIdx}`}
+                    className="print-card p-2.5 sm:p-3 rounded-2xl bg-neutral-950/60 border border-neutral-800/80 space-y-1 flex flex-col justify-between print:p-2"
+                  >
+                    <div className="text-xs font-semibold text-neutral-300 print:text-neutral-900 break-words leading-tight">
+                      {data.label}
+                    </div>
+                    <div className="text-base sm:text-lg font-bold text-emerald-400 font-mono tracking-tight print:text-sm print:text-neutral-950">
+                      {data.value}
+                    </div>
+                    <p className="text-[11px] text-neutral-400 print:text-[10px] print:text-neutral-700 leading-tight">
+                      {data.context}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* 6. SECCIÓN: REGLAS MNEMOTÉCNICAS (Ocultación limpia si []) */}
+          {guide.mnemonics && guide.mnemonics.length > 0 && (
+            <section className="space-y-2">
+              <div className="flex items-center gap-2 border-b border-neutral-800 pb-1.5 print:border-neutral-300">
+                <Sparkles className="w-4 h-4 text-violet-400 shrink-0 print:text-neutral-800" />
+                <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-violet-400 print:text-neutral-900 print:text-xs">
+                  {t('quick_guide.section_mnemonics', '🧠 Reglas Mnemotécnicas')}
+                </h4>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 print:grid-cols-2 gap-2.5 sm:gap-3 print:gap-2">
+                {guide.mnemonics.map((mnem, mIdx) => (
+                  <div
+                    key={`mnem-${mIdx}`}
+                    className="print-card p-3 sm:p-3.5 rounded-2xl bg-neutral-950/60 border border-violet-500/25 space-y-1.5 flex flex-col justify-between print:p-2.5"
+                  >
+                    <div className="flex items-center justify-between gap-1.5">
+                      <h5 className="text-xs font-bold text-neutral-200 print:text-neutral-900">{mnem.concept}</h5>
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300 border border-violet-500/30 print:bg-neutral-100 print:text-neutral-800 print:border-neutral-300">
+                        Mnemotecnia
+                      </span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-violet-500/10 border border-violet-500/30 font-mono font-bold text-xs text-violet-200 print:bg-neutral-50 print:border-neutral-300 print:text-neutral-950">
+                      {mnem.rule}
+                    </div>
+                    <p className="text-xs text-neutral-300 print:text-[10px] print:text-neutral-700 leading-snug">
+                      {mnem.explanation}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Pie de página para impresión directa (@media print fallback) */}
+          <div className="direct-print-footer hidden print:flex items-center justify-start gap-1.5 pt-2 mt-4 border-t border-neutral-300 text-[8.5pt] text-[#4b5563] font-sans">
+            <img
+              src="/icons/android-chrome-192x192.png"
+              alt="Flashmente"
+              className="w-3.5 h-3.5 rounded-[3px] object-contain inline-block mr-1.5"
+            />
+            <span className="font-medium text-[#4b5563]">flashmente.com</span>
+          </div>
+        </div>
+      </div>
+    </>
+  );
 }
 
 export function QuickStudyGuideModal({
@@ -69,6 +723,7 @@ export function QuickStudyGuideModal({
   const [adError, setAdError] = useState<string | null>(null);
   const [guidesUnlockedThisMonth, setGuidesUnlockedThisMonth] = useState<number>(0);
   const [maxFreeGuidesPerMonth, setMaxFreeGuidesPerMonth] = useState<number>(3);
+  const [guidePrintToken, setGuidePrintToken] = useState<string | null>(null);
 
   // Comprobar suscripción PRO y cuota de guías del usuario
   useEffect(() => {
@@ -109,12 +764,14 @@ export function QuickStudyGuideModal({
       setErrorMsg(null);
 
       try {
+        const clientDeviceId = await getClientDeviceId();
         const res = await getOrGenerateDeckSummaryAction(
           deckId,
           user?.id,
           language === 'en' ? 'en' : 'es',
           force,
-          session?.access_token
+          session?.access_token,
+          clientDeviceId
         );
 
         if (res.success) {
@@ -127,6 +784,9 @@ export function QuickStudyGuideModal({
             if (res.isUnlocked) {
               setIsAdUnlocked(true);
             }
+          }
+          if (res.printToken) {
+            setGuidePrintToken(res.printToken);
           }
           if (typeof res.guidesUnlockedThisMonth === 'number') {
             setGuidesUnlockedThisMonth(res.guidesUnlockedThisMonth);
@@ -203,6 +863,9 @@ export function QuickStudyGuideModal({
         if (claim.success && claim.summary) {
           setGuide(claim.summary);
           setIsAdUnlocked(true);
+          if (claim.printToken) {
+            setGuidePrintToken(claim.printToken);
+          }
           if (typeof claim.guidesUnlockedThisMonth === 'number') {
             setGuidesUnlockedThisMonth(claim.guidesUnlockedThisMonth);
           }
@@ -238,7 +901,31 @@ export function QuickStudyGuideModal({
   const isUnlocked = isPro || isAdUnlocked;
   const freeRemaining = Math.max(0, maxFreeGuidesPerMonth - guidesUnlockedThisMonth);
 
-  const handlePrintGuide = () => {
+  // Asegurar token de impresión firmado si la guía está desbloqueada y aún no se tenía token en memoria
+  useEffect(() => {
+    if (!isOpen || !isUnlocked || !deckId || guidePrintToken) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        let token = session?.access_token;
+        if (!token) {
+          const { data } = await supabase.auth.getSession();
+          token = data?.session?.access_token;
+        }
+        const grant = await createPrintGrantAction(deckId, 'guide', token);
+        if (!cancelled && grant.token) {
+          setGuidePrintToken(grant.token);
+        }
+      } catch {
+        // Silencioso
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, isUnlocked, deckId, guidePrintToken, session?.access_token]);
+
+  const handlePrintGuide = async () => {
     if (!isUnlocked) {
       openProModal(true);
       return;
@@ -247,9 +934,45 @@ export function QuickStudyGuideModal({
     const printContent = document.getElementById('quick-study-guide-printable');
     if (!printContent) return;
 
-    if (platform.isNativeIOS) {
-      const printUrl = `https://www.flashmente.com/decks/${deckId}/print`;
-      window.open(printUrl, '_system');
+    const isNativeMobile =
+      platform.isNativeApp || platform.isNativeIOS || platform.isNativeAndroid;
+
+    if (isNativeMobile) {
+      const openExternalGuidePrint = (token?: string | null) => {
+        const params = new URLSearchParams({
+          mode: 'guide',
+          lang: language === 'en' ? 'en' : 'es',
+        });
+        if (token) {
+          params.set('pt', token);
+        }
+        const printUrl = `https://www.flashmente.com/decks/${deckId}/print?${params.toString()}`;
+        window.open(printUrl, '_system');
+      };
+
+      // Ejecución síncrona directa cuando el token ya fue pre-emitido (evita bloqueos de WKWebView en iOS)
+      if (guidePrintToken) {
+        openExternalGuidePrint(guidePrintToken);
+        return;
+      }
+
+      let activeToken: string | null = null;
+      try {
+        const { data } = await supabase.auth.getSession();
+        const grant = await createPrintGrantAction(
+          deckId,
+          'guide',
+          data?.session?.access_token
+        );
+        if (grant.token) {
+          activeToken = grant.token;
+          setGuidePrintToken(grant.token);
+        }
+      } catch {
+        // Continuar con fallback de sesión si existe en navegador
+      }
+
+      openExternalGuidePrint(activeToken);
       return;
     }
 
@@ -472,175 +1195,11 @@ export function QuickStudyGuideModal({
   return (
     <>
       {/* Estilos para impresión limpia de alta definición (@media print) */}
-      <style>{`
-        @media print {
-          @page {
-            size: A4;
-            margin: 10mm 10mm 15mm 10mm;
-            @top-left { content: "" !important; }
-            @top-center { content: "" !important; }
-            @top-right { content: "" !important; }
-            @bottom-left { content: "" !important; }
-            @bottom-center { content: "" !important; }
-            @bottom-right {
-              content: "Pág. " counter(page) " de " counter(pages) !important;
-              font-size: 8.5pt !important;
-              font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
-              color: #6b7280 !important;
-              font-weight: 500 !important;
-            }
-          }
+      <style>{STUDY_GUIDE_PRINT_CSS}</style>
 
-          html, body {
-            height: auto !important;
-            overflow: visible !important;
-            background: #ffffff !important;
-            color: #000000 !important;
-            margin: 0 !important;
-            padding: 0 !important;
-          }
-
-          body * {
-            visibility: hidden;
-          }
-
-          #quick-study-guide-printable,
-          #quick-study-guide-printable * {
-            visibility: visible;
-          }
-
-          #quick-study-guide-printable {
-            position: static !important;
-            width: 100% !important;
-            height: auto !important;
-            max-height: none !important;
-            overflow: visible !important;
-            margin: 0 !important;
-            padding: 0 0 12mm 0 !important;
-            background: #ffffff !important;
-            color: #111827 !important;
-            font-size: 11px !important;
-            line-height: 1.35 !important;
-            box-sizing: border-box !important;
-          }
-
-          .no-print,
-          .no-print * {
-            display: none !important;
-            visibility: hidden !important;
-          }
-
-          .modal-backdrop-print-fix,
-          .modal-dialog-print-fix {
-            position: static !important;
-            inset: auto !important;
-            width: 100% !important;
-            height: auto !important;
-            max-height: none !important;
-            max-width: none !important;
-            overflow: visible !important;
-            background: transparent !important;
-            box-shadow: none !important;
-            border: none !important;
-            padding: 0 !important;
-            margin: 0 !important;
-            display: block !important;
-          }
-
-          .print-card {
-            background-color: #ffffff !important;
-            color: #111827 !important;
-            border: 1px solid #d1d5db !important;
-            box-shadow: none !important;
-            page-break-inside: avoid !important;
-            break-inside: avoid !important;
-            margin-bottom: 8px !important;
-            padding: 8px 10px !important;
-            border-radius: 8px !important;
-          }
-
-          p, h1, h2, h3, h4, h5, h6, span, tr, td, th, li {
-            page-break-inside: auto !important;
-            break-inside: auto !important;
-          }
-
-          .print-table {
-            width: 100% !important;
-            border-collapse: collapse !important;
-            page-break-inside: avoid !important;
-            break-inside: avoid !important;
-            margin-bottom: 8px !important;
-          }
-
-          .print-table th {
-            background-color: #f3f4f6 !important;
-            color: #111827 !important;
-            border: 1px solid #9ca3af !important;
-            padding: 4px 6px !important;
-            font-size: 10px !important;
-            font-weight: 700 !important;
-          }
-
-          .print-table td {
-            background-color: #ffffff !important;
-            color: #111827 !important;
-            border: 1px solid #d1d5db !important;
-            padding: 4px 6px !important;
-            font-size: 10px !important;
-            line-height: 1.3 !important;
-          }
-
-
-          .bg-neutral-900,
-          .bg-neutral-900\\/50,
-          .bg-neutral-900\\/60,
-          .bg-neutral-900\\/80,
-          .bg-neutral-900\\/90,
-          .bg-neutral-950,
-          .bg-neutral-950\\/60,
-          .bg-black {
-            background-color: #ffffff !important;
-            color: #111827 !important;
-            border-color: #e5e7eb !important;
-          }
-
-          .text-white,
-          .text-neutral-100,
-          .text-neutral-200,
-          .text-neutral-300,
-          .text-neutral-400 {
-            color: #111827 !important;
-          }
-
-          .text-neutral-500,
-          .text-neutral-600 {
-            color: #374151 !important;
-          }
-
-          .bg-amber-500\\/10,
-          .bg-amber-500\\/15,
-          .bg-emerald-500\\/10,
-          .bg-emerald-500\\/15,
-          .bg-indigo-500\\/10,
-          .bg-violet-500\\/10,
-          .bg-rose-500\\/10 {
-            background-color: #f9fafb !important;
-            border: 1px solid #e5e7eb !important;
-            color: #111827 !important;
-          }
-
-          .text-amber-200, .text-amber-300, .text-amber-400 { color: #92400e !important; }
-          .text-emerald-300, .text-emerald-400 { color: #065f46 !important; }
-          .text-cyan-400 { color: #0e7490 !important; }
-          .text-indigo-400 { color: #3730a3 !important; }
-          .text-violet-200, .text-violet-300, .text-violet-400 { color: #5b21b6 !important; }
-          .text-rose-200, .text-rose-300, .text-rose-400 { color: #991b1b !important; }
-        }
-      `}</style>
-
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200 modal-backdrop-print-fix">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 pt-[calc(env(safe-area-inset-top,0px)+0.5rem)] pb-[calc(env(safe-area-inset-bottom,0px)+0.5rem)] pl-[calc(env(safe-area-inset-left,0px)+0.5rem)] pr-[calc(env(safe-area-inset-right,0px)+0.5rem)] bg-black/80 backdrop-blur-md animate-in fade-in duration-200 modal-backdrop-print-fix">
         <div
-          className="w-full max-w-5xl max-h-[92vh] flex flex-col rounded-3xl bg-neutral-900 border border-neutral-700/80 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 modal-dialog-print-fix"
+          className="w-full max-w-5xl max-h-[min(94dvh,92vh)] flex flex-col rounded-3xl bg-neutral-900 border border-neutral-700/80 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 modal-dialog-print-fix"
           role="dialog"
           aria-modal="true"
           onClick={(e) => e.stopPropagation()}
@@ -689,15 +1248,17 @@ export function QuickStudyGuideModal({
                     <span className="hidden sm:inline">{t('quick_guide.print_btn', 'Guardar PDF')}</span>
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={() => fetchGuide(true)}
-                    disabled={isRegenerating || isLoading}
-                    className="p-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white border border-neutral-700 transition cursor-pointer active:scale-95 disabled:opacity-50"
-                    title={t('quick_guide.regenerate_btn', 'Regenerar síntesis')}
-                  >
-                    <RefreshCw className={`w-4 h-4 ${isRegenerating ? 'animate-spin text-emerald-400' : ''}`} />
-                  </button>
+                  {isUnlocked && (
+                    <button
+                      type="button"
+                      onClick={() => fetchGuide(true)}
+                      disabled={isRegenerating || isLoading}
+                      className="p-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white border border-neutral-700 transition cursor-pointer active:scale-95 disabled:opacity-50"
+                      title={t('quick_guide.regenerate_btn', 'Regenerar síntesis')}
+                    >
+                      <RefreshCw className={`w-4 h-4 ${isRegenerating ? 'animate-spin text-emerald-400' : ''}`} />
+                    </button>
+                  )}
                 </>
               )}
 
@@ -717,21 +1278,6 @@ export function QuickStudyGuideModal({
             id="quick-study-guide-printable"
             className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 print:space-y-3 text-left relative"
           >
-
-            {/* Cabecera compacta visible únicamente al imprimir en Página 1 */}
-            {guide && (
-              <div className="hidden print:block border-b border-neutral-300 pb-2 mb-3">
-                <div className="flex items-center justify-between">
-                  <h1 className="text-base font-bold text-neutral-900">
-                    {guide.title || `${t('quick_guide.modal_title', 'Guía de Repaso')}: ${deckTitle}`}
-                  </h1>
-                  <span className="text-[10px] text-neutral-500 font-mono">Flashmente</span>
-                </div>
-                {guide.subtitle && (
-                  <p className="text-xs text-neutral-600 mt-0.5">{guide.subtitle}</p>
-                )}
-              </div>
-            )}
 
             {/* Estado: Cargando generación inicial */}
             {isLoading && (
@@ -770,448 +1316,17 @@ export function QuickStudyGuideModal({
 
             {/* Contenido Completo de la Guía */}
             {guide && !isLoading && (
-              <div className="space-y-5 print:space-y-3">
-                {/* 1. SECCIÓN: VISIÓN PANORÁMICA Y OBJETIVOS (Visible siempre para todos) */}
-                <section className="space-y-2">
-                  <div className="flex items-center gap-2 border-b border-neutral-800 pb-1.5 print:border-neutral-300">
-                    <BookOpen className="w-4 h-4 text-emerald-400 shrink-0 print:text-neutral-800" />
-                    <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-emerald-400 print:text-neutral-900 print:text-xs">
-                      {t('quick_guide.section_overview', '📖 Visión Panorámica y Objetivos')}
-                    </h4>
-                  </div>
-
-                  <div className="print-card p-3.5 sm:p-4 rounded-2xl bg-neutral-950/60 border border-neutral-800/80 space-y-3 print:p-2.5">
-                    {/* Resumen Global */}
-                    <p className="text-xs sm:text-sm text-neutral-200 leading-relaxed print:text-[11px] print:text-neutral-800 print:leading-snug">
-                      {guide.overview?.summary || `Resumen integral del capítulo ${deckTitle}.`}
-                    </p>
-
-                    {/* Objetivos de Aprendizaje */}
-                    {guide.overview?.learningObjectives && guide.overview.learningObjectives.length > 0 && (
-                      <div className="pt-2 border-t border-neutral-800/80 print:border-neutral-200 space-y-1.5">
-                        <div className="text-xs font-bold text-emerald-300 print:text-neutral-900 print:text-[11px] flex items-center gap-1.5">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 print:text-neutral-700" />
-                          <span>{t('quick_guide.learning_objectives', 'Objetivos de Aprendizaje:')}</span>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 print:grid-cols-2 gap-1.5">
-                          {guide.overview.learningObjectives.map((obj, oIdx) => (
-                            <div
-                              key={`obj-${oIdx}`}
-                              className="p-2 rounded-xl bg-neutral-900/60 border border-neutral-800 flex items-start gap-1.5 text-xs text-neutral-300 print:bg-neutral-50 print:border-neutral-200 print:text-[10px] print:text-neutral-800 print:p-1.5"
-                            >
-                              <span className="text-emerald-400 font-bold shrink-0 print:text-neutral-700">✓</span>
-                              <span className="leading-snug">{obj}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </section>
-
-                {/* OVERLAY CONVERSIÓN PRO / REWARDED AD PARA USUARIOS FREE */}
-                {!isUnlocked && (
-                  <div className="my-6 p-6 sm:p-7 rounded-3xl bg-neutral-900/95 border-2 border-amber-500/40 shadow-2xl backdrop-blur-xl space-y-4 no-print text-center">
-                    <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-amber-500/20 to-amber-600/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shadow-lg">
-                      <Crown className="w-7 h-7" />
-                    </div>
-                    <div className="max-w-lg mx-auto">
-                      <h4 className="text-base sm:text-lg font-bold text-white">
-                        {t('quick_guide.pro_locked_title', 'Desbloquea la Guía Completa de este Capítulo')}
-                      </h4>
-                      <p className="text-xs text-neutral-300 mt-1.5 leading-relaxed">
-                        {t(
-                          'quick_guide.pro_locked_desc',
-                          'Accede a la taxonomía completa, fichas detalladas por elemento, tablas comparativas, cifras y dosis oficiales y descarga en PDF.'
-                        )}
-                      </p>
-                    </div>
-
-                    {/* Contador de guías mensuales */}
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-neutral-800 border border-neutral-700 text-neutral-200">
-                      {freeRemaining > 0 ? (
-                        <>
-                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                          <span>
-                            {t('quick_guide.free_quota_remaining', { count: freeRemaining })}
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          <span className="w-2 h-2 rounded-full bg-rose-400" />
-                          <span className="text-rose-300">
-                            {t('quick_guide.free_quota_exhausted', 'Has alcanzado el límite de 3 guías gratuitas este mes')}
-                          </span>
-                        </>
-                      )}
-                    </div>
-
-                    {adError && (
-                      <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs max-w-md mx-auto">
-                        {adError}
-                      </div>
-                    )}
-
-                    {/* Botones de acción */}
-                    <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-                      {freeRemaining > 0 && (
-                        <button
-                          type="button"
-                          onClick={handleWatchAd}
-                          disabled={isWatchingAd}
-                          className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-neutral-800 hover:bg-neutral-700 text-neutral-100 border border-neutral-600 text-xs font-semibold transition active:scale-95 cursor-pointer disabled:opacity-75 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-md"
-                        >
-                          {isWatchingAd ? (
-                            <>
-                              <Loader2 className="w-4 h-4 animate-spin text-amber-400 shrink-0" />
-                              <span>{t('quick_guide.preparing_ad', 'Preparing ad...')}</span>
-                            </>
-                          ) : (
-                            <>
-                              <PlayCircle className="w-4 h-4 text-amber-400 shrink-0" />
-                              <span>{t('quick_guide.unlock_with_ad_btn', '🎬 Desbloquear Guía Completa viendo un vídeo')}</span>
-                            </>
-                          )}
-                        </button>
-                      )}
-
-                      {!platform.isNativeIOS && (
-                        <button
-                          type="button"
-                          onClick={() => openProModal(true)}
-                          className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-bold text-xs transition shadow-lg shadow-amber-500/20 active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
-                        >
-                          <Crown className="w-4 h-4 shrink-0" />
-                          <span>{t('quick_guide.unlock_with_pro_btn', '👑 Desbloquear Guías Ilimitadas con PRO (3,50 €/mes)')}</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* BLOQUES 2 AL 6 (Visibles al desbloquear o con teaser blur si Free) */}
-                <div
-                  className={`space-y-5 print:space-y-3 transition-all duration-300 ${
-                    !isUnlocked
-                      ? 'filter blur-[5px] select-none pointer-events-none opacity-30 max-h-[380px] overflow-hidden no-print'
-                      : ''
-                  }`}
-                >
-                  {/* 2. SECCIÓN: ESQUEMA Y CLASIFICACIÓN COMPLETA (Taxonomy Tree) */}
-                  {guide.taxonomy_tree && guide.taxonomy_tree.length > 0 && (
-                    <section className="space-y-2">
-                      <div className="flex items-center gap-2 border-b border-neutral-800 pb-1.5 print:border-neutral-300">
-                        <ListTree className="w-4 h-4 text-emerald-400 shrink-0 print:text-neutral-800" />
-                        <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-emerald-400 print:text-neutral-900 print:text-xs">
-                          {t('quick_guide.section_taxonomy', '🌳 Esquema y Clasificación Completa')}
-                        </h4>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-2.5 sm:gap-3 print:gap-2">
-                        {guide.taxonomy_tree.map((group, gIdx) => (
-                          <div
-                            key={`tax-${gIdx}`}
-                            className="print-card p-3 sm:p-3.5 rounded-2xl bg-neutral-950/60 border border-neutral-800/80 space-y-2 print:p-2.5"
-                          >
-                            <div className="flex items-center justify-between gap-2 border-b border-neutral-800/60 print:border-neutral-200 pb-1.5">
-                              <h5 className="text-xs sm:text-sm font-bold text-white print:text-xs print:text-neutral-900 flex items-center gap-1.5">
-                                <span className="w-2 h-2 rounded-full bg-emerald-400 print:bg-neutral-800" />
-                                {group.category}
-                              </h5>
-                              <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-neutral-800 text-neutral-300 border border-neutral-700 print:bg-neutral-100 print:text-neutral-700 print:border-neutral-300">
-                                {group.elements?.length || 0} elementos
-                              </span>
-                            </div>
-                            {group.description && (
-                              <p className="text-xs text-neutral-400 print:text-[10px] print:text-neutral-600 leading-snug">
-                                {group.description}
-                              </p>
-                            )}
-                            <div className="flex flex-wrap gap-1 pt-0.5">
-                              {group.elements?.map((el, elIdx) => (
-                                <span
-                                  key={`el-${gIdx}-${elIdx}`}
-                                  className="px-2 py-0.5 rounded-md text-[11px] print:text-[10px] font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/25 print:bg-neutral-50 print:text-neutral-800 print:border-neutral-300"
-                                >
-                                  {el}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </section>
-                  )}
-
-                  {/* 3. SECCIÓN: DESARROLLO DETALLADO POR ELEMENTO / CONCEPTO (Rejilla Compacta de 2 Columnas) */}
-                  {guide.item_breakdown && guide.item_breakdown.length > 0 && (
-                    <section className="space-y-2">
-                      <div className="flex items-center gap-2 border-b border-neutral-800 pb-1.5 print:border-neutral-300">
-                        <Layers className="w-4 h-4 text-cyan-400 shrink-0 print:text-neutral-800" />
-                        <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-cyan-400 print:text-neutral-900 print:text-xs">
-                          {t('quick_guide.section_breakdown', '🔬 Desarrollo Detallado por Elemento / Concepto')}
-                        </h4>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-2.5 sm:gap-3 print:gap-2">
-                        {guide.item_breakdown.map((item, iIdx) => {
-                          const validSources = Array.isArray(item.dietarySources)
-                            ? item.dietarySources.filter((s) => !isFillerText(s))
-                            : [];
-                          const hasSources = validSources.length > 0;
-                          const hasDeficiency = !isFillerText(item.deficiency);
-                          const hasToxicity = !isFillerText(item.toxicity);
-                          const hasKeyFact = !isFillerText(item.keyFact);
-
-                          return (
-                            <div
-                              key={`item-${iIdx}`}
-                              className="print-card p-3 sm:p-3.5 rounded-2xl bg-neutral-950/60 border border-neutral-800/80 space-y-2 flex flex-col justify-between print:p-2.5 print:text-[11px] print:leading-snug"
-                            >
-                              <div className="space-y-1.5">
-                                {/* Cabecera del Elemento */}
-                                <div className="flex items-start justify-between gap-1.5 border-b border-neutral-800/70 print:border-neutral-200 pb-1.5">
-                                  <h5 className="text-sm font-bold text-white print:text-xs print:text-neutral-950 flex items-center gap-1.5">
-                                    <span className="text-emerald-400 font-mono text-xs print:text-neutral-700">#{iIdx + 1}</span>
-                                    <span>{item.name}</span>
-                                  </h5>
-                                  {item.role && (
-                                    <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-neutral-800 text-neutral-300 border border-neutral-700 shrink-0 print:bg-neutral-100 print:text-neutral-800 print:border-neutral-300">
-                                      {item.role}
-                                    </span>
-                                  )}
-                                </div>
-
-                                {/* Fuentes Dietéticas / Ejemplos Prácticos */}
-                                {hasSources && (
-                                  <div className="flex flex-wrap items-center gap-1 text-[11px] print:text-[10px]">
-                                    <span className="text-neutral-400 font-semibold print:text-neutral-600 flex items-center gap-1">
-                                      <Utensils className="w-3 h-3 text-emerald-400 print:text-neutral-600" />
-                                      <span>Ej./Fuentes:</span>
-                                    </span>
-                                    {validSources.map((source, sIdx) => (
-                                      <span
-                                        key={`source-${iIdx}-${sIdx}`}
-                                        className="px-1.5 py-0.5 rounded bg-neutral-900 border border-neutral-700/80 text-neutral-300 print:bg-neutral-50 print:text-neutral-800 print:border-neutral-200"
-                                      >
-                                        {source}
-                                      </span>
-                                    ))}
-                                  </div>
-                                )}
-
-                                {/* Déficit y Toxicidad / Excepciones (Ocultación limpia si no aplican) */}
-                                {(hasDeficiency || hasToxicity) && (
-                                  <div className="grid grid-cols-1 gap-1.5 pt-0.5">
-                                    {hasDeficiency && (
-                                      <div className="p-1.5 sm:p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-200 print:bg-neutral-50 print:border-neutral-300 print:text-neutral-800 print:text-[10px] leading-tight">
-                                        <div className="flex items-center gap-1 font-bold text-amber-300 print:text-neutral-900 mb-0.5">
-                                          <AlertTriangle className="w-3 h-3 shrink-0" />
-                                          <span>Déficit / Carencia:</span>
-                                        </div>
-                                        <p className="leading-snug text-amber-200/90 print:text-neutral-800">{item.deficiency}</p>
-                                      </div>
-                                    )}
-                                    {hasToxicity && (
-                                      <div className="p-1.5 sm:p-2 rounded-xl bg-rose-500/10 border border-rose-500/20 text-[11px] text-rose-200 print:bg-neutral-50 print:border-neutral-300 print:text-neutral-800 print:text-[10px] leading-tight">
-                                        <div className="flex items-center gap-1 font-bold text-rose-300 print:text-neutral-900 mb-0.5">
-                                          <Flame className="w-3 h-3 shrink-0" />
-                                          <span>Toxicidad / Riesgo:</span>
-                                        </div>
-                                        <p className="leading-snug text-rose-200/90 print:text-neutral-800">{item.toxicity}</p>
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* Dato Clave de Examen */}
-                              {hasKeyFact && (
-                                <div className="mt-1 p-2 rounded-xl bg-gradient-to-r from-amber-500/15 to-amber-600/10 border border-amber-500/30 text-[11px] text-amber-200 print:bg-neutral-100 print:border-neutral-300 print:text-neutral-900 print:text-[10px] leading-tight font-medium flex items-start gap-1.5 shadow-sm">
-                                  <ShieldCheck className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5 print:text-neutral-800" />
-                                  <div className="leading-tight">
-                                    <strong className="text-amber-300 mr-1 print:text-neutral-950">
-                                      {t('quick_guide.key_fact', 'Clave Examen:')}
-                                    </strong>
-                                    <span>{item.keyFact}</span>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </section>
-                  )}
-
-                  {/* RETROCOMPATIBILIDAD CON GUÍAS V1 (Si no hay item_breakdown pero sí key_concepts) */}
-                  {(!guide.item_breakdown || guide.item_breakdown.length === 0) &&
-                    guide.key_concepts &&
-                    guide.key_concepts.length > 0 && (
-                      <section className="space-y-2">
-                        <div className="flex items-center gap-2 border-b border-neutral-800 pb-1.5 print:border-neutral-300">
-                          <Lightbulb className="w-4 h-4 text-amber-400 shrink-0 print:text-neutral-800" />
-                          <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-amber-400 print:text-neutral-900 print:text-xs">
-                            {t('quick_guide.section_key_concepts', '💡 Conceptos Clave y Fundamentos')}
-                          </h4>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-2.5 sm:gap-3 print:gap-2">
-                          {guide.key_concepts.map((concept, idx) => (
-                            <div
-                              key={`concept-${idx}`}
-                              className="print-card p-3 sm:p-3.5 rounded-2xl bg-neutral-950/60 border border-neutral-800/80 space-y-2 flex flex-col justify-between print:p-2.5"
-                            >
-                              <div>
-                                <h5 className="text-xs sm:text-sm font-bold text-white print:text-xs print:text-neutral-900 mb-1">
-                                  {concept.title}
-                                </h5>
-                                <p className="text-xs text-neutral-300 print:text-[10px] print:text-neutral-700 leading-snug">
-                                  {concept.description}
-                                </p>
-                              </div>
-                              <div className="p-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300 print:bg-neutral-50 print:border-neutral-200 print:text-[10px] print:text-neutral-900 flex items-start gap-1 font-medium">
-                                <span className="font-bold shrink-0">{t('quick_guide.takeaway', 'Clave:')}</span>
-                                <span>{concept.keyTakeaway}</span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </section>
-                    )}
-
-                  {/* 4. SECCIÓN: TABLAS COMPARATIVAS Y TRAMPAS DE EXAMEN (Ocultación limpia si []) */}
-                  {guide.contrast_tables && guide.contrast_tables.length > 0 && (
-                    <section className="space-y-2">
-                      <div className="flex items-center gap-2 border-b border-neutral-800 pb-1.5 print:border-neutral-300">
-                        <Table className="w-4 h-4 text-indigo-400 shrink-0 print:text-neutral-800" />
-                        <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-indigo-400 print:text-neutral-900 print:text-xs">
-                          {t('quick_guide.section_contrast_tables', '⚖️ Tablas Comparativas y Trampas')}
-                        </h4>
-                      </div>
-
-                      <div className="space-y-3">
-                        {guide.contrast_tables.map((table, tIdx) => (
-                          <div
-                            key={`table-${tIdx}`}
-                            className="print-card rounded-2xl border border-neutral-800/80 bg-neutral-950/60 overflow-hidden"
-                          >
-                            <div className="p-2.5 bg-neutral-900/60 border-b border-neutral-800 print:bg-neutral-100 print:border-neutral-200">
-                              <h5 className="text-xs sm:text-sm font-bold text-white print:text-xs print:text-neutral-900">
-                                {table.title}
-                              </h5>
-                              {table.description && (
-                                <p className="text-[11px] text-neutral-400 print:text-[10px] print:text-neutral-600 mt-0.5">
-                                  {table.description}
-                                </p>
-                              )}
-                            </div>
-                            <div className="overflow-x-auto">
-                              <table className="print-table w-full text-left text-xs">
-                                <thead className="bg-neutral-900/80 text-neutral-300 font-semibold border-b border-neutral-800 print:bg-neutral-100 print:text-neutral-900 print:border-neutral-300">
-                                  <tr>
-                                    {table.headers.map((h, hIdx) => (
-                                      <th key={`th-${hIdx}`} className="p-2 sm:p-2.5 font-semibold">
-                                        {h}
-                                      </th>
-                                    ))}
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-neutral-800/60 text-neutral-300 print:divide-neutral-200 print:text-neutral-800">
-                                  {table.rows.map((row, rIdx) => (
-                                    <tr key={`tr-${rIdx}`} className="hover:bg-neutral-900/30 print:hover:bg-transparent">
-                                      {row.map((cell, cIdx) => (
-                                        <td key={`td-${cIdx}`} className="p-2 sm:p-2.5 align-top leading-snug">
-                                          {cell}
-                                        </td>
-                                      ))}
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </section>
-                  )}
-
-                  {/* 5. SECCIÓN: CIFRAS CRÍTICAS Y DOSIS OFICIALES (Sin almohadilla literal, sin truncamiento) */}
-                  {guide.critical_data && guide.critical_data.length > 0 && (
-                    <section className="space-y-2">
-                      <div className="flex items-center gap-2 border-b border-neutral-800 pb-1.5 print:border-neutral-300">
-                        <Target className="w-4 h-4 text-emerald-400 shrink-0 print:text-neutral-800" />
-                        <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-emerald-400 print:text-neutral-900 print:text-xs">
-                          {t('quick_guide.section_critical_data', '🎯 Cifras Críticas y Dosis Oficiales')}
-                        </h4>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 print:grid-cols-3 gap-2.5 print:gap-2">
-                        {guide.critical_data.map((data, dIdx) => (
-                          <div
-                            key={`data-${dIdx}`}
-                            className="print-card p-2.5 sm:p-3 rounded-2xl bg-neutral-950/60 border border-neutral-800/80 space-y-1 flex flex-col justify-between print:p-2"
-                          >
-                            <div className="text-xs font-semibold text-neutral-300 print:text-neutral-900 break-words leading-tight">
-                              {data.label}
-                            </div>
-                            <div className="text-base sm:text-lg font-bold text-emerald-400 font-mono tracking-tight print:text-sm print:text-neutral-950">
-                              {data.value}
-                            </div>
-                            <p className="text-[11px] text-neutral-400 print:text-[10px] print:text-neutral-700 leading-tight">
-                              {data.context}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    </section>
-                  )}
-
-                  {/* 6. SECCIÓN: REGLAS MNEMOTÉCNICAS (Ocultación limpia si []) */}
-                  {guide.mnemonics && guide.mnemonics.length > 0 && (
-                    <section className="space-y-2">
-                      <div className="flex items-center gap-2 border-b border-neutral-800 pb-1.5 print:border-neutral-300">
-                        <Sparkles className="w-4 h-4 text-violet-400 shrink-0 print:text-neutral-800" />
-                        <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-violet-400 print:text-neutral-900 print:text-xs">
-                          {t('quick_guide.section_mnemonics', '🧠 Reglas Mnemotécnicas')}
-                        </h4>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 print:grid-cols-2 gap-2.5 sm:gap-3 print:gap-2">
-                        {guide.mnemonics.map((mnem, mIdx) => (
-                          <div
-                            key={`mnem-${mIdx}`}
-                            className="print-card p-3 sm:p-3.5 rounded-2xl bg-neutral-950/60 border border-violet-500/25 space-y-1.5 flex flex-col justify-between print:p-2.5"
-                          >
-                            <div className="flex items-center justify-between gap-1.5">
-                              <h5 className="text-xs font-bold text-neutral-200 print:text-neutral-900">{mnem.concept}</h5>
-                              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300 border border-violet-500/30 print:bg-neutral-100 print:text-neutral-800 print:border-neutral-300">
-                                Mnemotecnia
-                              </span>
-                            </div>
-                            <div className="p-2 rounded-xl bg-violet-500/10 border border-violet-500/30 font-mono font-bold text-xs text-violet-200 print:bg-neutral-50 print:border-neutral-300 print:text-neutral-950">
-                              {mnem.rule}
-                            </div>
-                            <p className="text-xs text-neutral-300 print:text-[10px] print:text-neutral-700 leading-snug">
-                              {mnem.explanation}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    </section>
-                  )}
-
-                  {/* Pie de página para impresión directa (@media print fallback) */}
-                  <div className="direct-print-footer hidden print:flex items-center justify-start gap-1.5 pt-2 mt-4 border-t border-neutral-300 text-[8.5pt] text-[#4b5563] font-sans">
-                    <img
-                      src="/icons/android-chrome-192x192.png"
-                      alt="Flashmente"
-                      className="w-3.5 h-3.5 rounded-[3px] object-contain inline-block mr-1.5"
-                    />
-                    <span className="font-medium text-[#4b5563]">flashmente.com</span>
-                  </div>
-                </div>
-              </div>
+              <StudyGuidePrintableContent
+                guide={guide}
+                deckTitle={deckTitle}
+                isUnlocked={isUnlocked}
+                freeRemaining={freeRemaining}
+                adError={adError}
+                isWatchingAd={isWatchingAd}
+                onWatchAd={handleWatchAd}
+                isNativeIOS={platform.isNativeIOS}
+                onOpenPro={() => openProModal(true)}
+              />
             )}
           </div>
 

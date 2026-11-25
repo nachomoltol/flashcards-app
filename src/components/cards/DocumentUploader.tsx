@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuthStore, useCardStore, useDeckStore, useProModalStore, useLanguageStore } from '@/stores';
 import { generateCardsFromDocumentAction } from '@/app/actions/generateCards';
 import { generateExhaustiveSummaryFromRawText } from '@/app/actions/generateDeckSummary';
+import { createPrintGrantAction } from '@/app/actions/getDeckForPrint';
 import { checkUserGenerationQuota } from '@/lib/quotaGuard';
 import type { CardFormat, GeneratedCard, DocenteFormat, TargetAudience } from '@/types/cards';
 import { FormattedCardView } from './FormattedCardView';
@@ -256,6 +257,26 @@ export function DocumentUploader({
   const [generatedCardsPreview, setGeneratedCardsPreview] = useState<GeneratedCard[]>([]);
   const [showPreview, setShowPreview] = useState<boolean>(false);
   const [materialExhaustedNotice, setMaterialExhaustedNotice] = useState<{ generated: number; requested: number } | null>(null);
+  const [examPrintToken, setExamPrintToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!deckId || !user?.id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const grant = await createPrintGrantAction(deckId, 'exam', data?.session?.access_token);
+        if (!cancelled && grant.token) {
+          setExamPrintToken(grant.token);
+        }
+      } catch {
+        // Silencioso
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [deckId, user?.id, status]);
 
   // Estatus de suscripción PRO / VIP del usuario
   const [isPro, setIsPro] = useState(false);
@@ -1255,7 +1276,9 @@ export function DocumentUploader({
                   );
 
                 if (isNativeMobile) {
-                  const printUrl = `https://www.flashmente.com/decks/${deckId}/print`;
+                  const printUrl = examPrintToken
+                    ? `https://www.flashmente.com/decks/${deckId}/print?pt=${encodeURIComponent(examPrintToken)}`
+                    : `https://www.flashmente.com/decks/${deckId}/print`;
                   window.open(printUrl, '_system');
                 } else {
                   window.print();

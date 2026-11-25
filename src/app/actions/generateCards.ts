@@ -1385,14 +1385,14 @@ interface ApiLimitCheck {
 }
 
 /**
- * Valida la cuota de generación del usuario en api_limits antes de llamar a Gemini según el modelo Freemium (5/25/120)
+ * Valida la cuota de generación del usuario en api_limits antes de llamar a Gemini según el modelo Freemium (20 Free / 100 PRO)
  * y el escudo físico por dispositivo en device_limits:
  * 0. Administradores (UNLIMITED_ADMIN_EMAILS): Barra libre total sin consumo ni límites.
- * 1. TIER 'pro' o 'vip': Límite de 120 mensuales. Ignora device_limits.
+ * 1. TIER 'pro' o 'vip': Límite de 100 mensuales. Ignora device_limits.
  * 2. TIER 'free':
- *    - Valida límite por dispositivo (máx 30/mes entre cuentas Free en el mismo hardware).
+ *    - Valida límite por dispositivo (máx 20/mes entre cuentas Free en el mismo hardware).
  *    - Si el dispositivo ya consumió 5 generaciones de bienvenida, no concede bienvenida gratuita a cuentas nuevas.
- *    - Valida cuenta (5 bienvenida + hasta 25 con anuncios = 30 mensuales totales).
+ *    - Valida cuenta (máx 20/mes: 5 bienvenida en el primer mes + hasta 15 con anuncios; en meses siguientes hasta 20 con anuncios).
  */
 async function enforceApiLimit(
   userId: string,
@@ -1526,9 +1526,9 @@ async function enforceApiLimit(
         }
       }
 
-      // 1. TIER 'pro' o 'vip': límite 120 mensuales
+      // 1. TIER 'pro' o 'vip': límite 100 mensuales
       if (tier === 'pro' || tier === 'vip') {
-        if (count >= 120) {
+        if (count >= 100) {
           return { error: 'LIMIT_REACHED' };
         }
         return {
@@ -1543,7 +1543,11 @@ async function enforceApiLimit(
         };
       }
 
-      // 2. TIER 'free':
+      // 2. TIER 'free': tope mensual total de 20 generaciones
+      if (count >= 20) {
+        return { error: 'LIMIT_REACHED' };
+      }
+
       // Fase Bienvenida: Si welcome_generations < 5 -> permite directamente
       if (welcomeGenerations < 5) {
         return {
@@ -1559,13 +1563,7 @@ async function enforceApiLimit(
         };
       }
 
-      // Fase Ads (welcome_generations >= 5):
-      // Si generations_count >= 15 -> LIMIT_REACHED (5 bienvenida + 15 anuncios = 20 total)
-      if (count >= 15) {
-        return { error: 'LIMIT_REACHED' };
-      }
-
-      // Si generations_count < 15: verificar bonus_credits
+      // Fase Ads (welcome_generations >= 5): requiere crédito bonificado hasta el tope mensual de 20
       if (bonusCredits <= 0) {
         return { error: 'AD_REQUIRED' };
       }
@@ -1594,9 +1592,9 @@ async function enforceApiLimit(
 
 /**
  * Incrementa el uso en api_limits tras completarse la generación con la IA mediante RPC atómico:
- * - TIER 'pro'/'vip': suma 1 a generations_count (hasta 120).
- * - TIER 'free' Fase Bienvenida (< 5): suma 1 a welcome_generations y NO altera generations_count.
- * - TIER 'free' Fase Ads (>= 5): resta 1 a bonus_credits y suma 1 a generations_count.
+ * - TIER 'pro'/'vip': suma 1 a generations_count (hasta 100).
+ * - TIER 'free' Fase Bienvenida (< 5): suma 1 a welcome_generations y suma 1 a generations_count.
+ * - TIER 'free' Fase Ads (>= 5): resta 1 a bonus_credits y suma 1 a generations_count (tope mensual 20).
  */
 async function recordApiUsage(userId: string, deviceId?: string) {
   try {
@@ -1654,9 +1652,10 @@ async function recordApiUsage(userId: string, deviceId?: string) {
             updated_at: new Date().toISOString(),
           }).eq('user_id', userId);
         } else if (welcome < 5) {
-          // Fase Bienvenida: suma 1 a welcome_generations y NO altera generations_count
+          // Fase Bienvenida: suma 1 a welcome_generations y suma 1 a generations_count del mes
           await dbClient.from('api_limits').update({
             welcome_generations: welcome + 1,
+            generations_count: currentCount + 1,
             last_generation_date: todayStr,
             updated_at: new Date().toISOString(),
           }).eq('user_id', userId);
@@ -1673,7 +1672,7 @@ async function recordApiUsage(userId: string, deviceId?: string) {
         await dbClient.from('api_limits').upsert({
           user_id: userId,
           welcome_generations: 1,
-          generations_count: 0,
+          generations_count: 1,
           last_generation_date: todayStr,
           tier: 'free',
           bonus_credits: 0,

@@ -90,6 +90,8 @@ export interface NoteImageInput {
 export interface HandwrittenNotesInput {
   deckId: string;
   userId?: string;
+  accessToken?: string;
+  deviceId?: string;
   images: NoteImageInput[];
   cardFormat?: CardFormat;
   cardCount?: number;

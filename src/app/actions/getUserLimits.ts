@@ -23,7 +23,8 @@ export interface UserLimitsResult {
 /**
  * Server Action que consulta de forma fidedigna y autorizada (bypass RLS con service_role)
  * los límites de generación del usuario en Supabase (`api_limits`):
- * - Mazos de Estudio Free: 5 bienvenida + 15 anuncios = 20 generaciones máximas/mes.
+ * - Mazos de Estudio PRO/VIP: hasta 100 generaciones/mes.
+ * - Mazos de Estudio Free: máximo 20 generaciones/mes (5 bienvenida en el primer mes sin anuncio + hasta 15 anuncios; en meses sucesivos, hasta 20 con anuncio).
  * - Profesor Socrático Free: 3 consultas gratis/mes y a partir de la 4.ª ILIMITADO con 1 anuncio/consulta.
  */
 export async function getUserLimitsAction(
@@ -202,11 +203,7 @@ export async function getUserLimitsAction(
     const tutorAdCredits = typeof data.tutor_ad_credits === 'number' ? data.tutor_ad_credits : 0;
 
     // Desacoplamiento contable:
-    // 1. Generaciones de mazos con anuncios (base 15 anuncios para mazos):
-    const adsUsedInCycle = count + bonusCredits;
-    const remainingAds = Math.max(0, 15 - adsUsedInCycle);
-
-    // 2. Profesor Socrático: 3 gratis y a partir de la 4.ª ilimitado con 1 anuncio/consulta
+    // 1. Profesor Socrático: 3 gratis y a partir de la 4.ª ilimitado con 1 anuncio/consulta
     const tutorAdsUsed = Math.max(0, tutorConsultationsCount - 3);
 
     // Comprobar si el usuario es administrador por lista blanca de Vercel
@@ -225,20 +222,26 @@ export async function getUserLimitsAction(
 
     // Comprobar límites de dispositivo si el usuario es Free y no es dispositivo de prueba
     let deviceGenerationsCount: number | undefined;
+    let deviceWelcomeUsed = 0;
     let deviceLimitReached: boolean | undefined;
 
     if (tier === 'free' && deviceId && !isTestDevice(deviceId)) {
       try {
         const { data: devData } = await client
           .from('device_limits')
-          .select('generations_count, reset_at')
+          .select('generations_count, welcome_generations_used, reset_at')
           .eq('device_id', deviceId.trim())
           .maybeSingle();
 
         if (devData) {
-          const rawDev = devData as { generations_count?: number; reset_at?: string };
+          const rawDev = devData as {
+            generations_count?: number;
+            welcome_generations_used?: number;
+            reset_at?: string;
+          };
           const isDevExpired = rawDev.reset_at ? new Date(rawDev.reset_at) <= new Date() : false;
           const currentDevCount = isDevExpired ? 0 : (rawDev.generations_count || 0);
+          deviceWelcomeUsed = rawDev.welcome_generations_used || 0;
           deviceGenerationsCount = currentDevCount;
           if (currentDevCount >= 20) {
             deviceLimitReached = true;
@@ -247,6 +250,16 @@ export async function getUserLimitsAction(
       } catch {
         // Silencioso
       }
+    }
+
+    // 2. Generaciones de mazos en Free: tope mensual de 20 en total
+    // (Mes 1: 5 bienvenida + hasta 15 con anuncios = 20; Mes 2+: welcome >= 5 -> hasta 20 con anuncios)
+    const effectiveWelcome = deviceWelcomeUsed >= 5 ? 5 : welcomeGenerations;
+    const reservedWelcome = Math.max(0, 5 - effectiveWelcome);
+    const adsUsedInCycle = count + reservedWelcome + bonusCredits;
+    let remainingAds = Math.max(0, 20 - adsUsedInCycle);
+    if (typeof deviceGenerationsCount === 'number') {
+      remainingAds = Math.min(remainingAds, Math.max(0, 20 - (deviceGenerationsCount + bonusCredits)));
     }
 
     return {

@@ -13,7 +13,12 @@ import {
   UserCheck,
   Sparkles,
 } from 'lucide-react';
-import { DeleteAccountRequestButton, PrivacyProExemptionText } from '@/components/privacy/DeleteAccountRequestButton';
+import {
+  DeleteAccountRequestButton,
+  PrivacyProExemptionText,
+  PrivacyStripeProviderBlock,
+  PrivacyTermsModelProSection,
+} from '@/components/privacy/DeleteAccountRequestButton';
 
 export const metadata: Metadata = {
   title: 'Términos del Servicio y Política de Privacidad | Flashmente',
@@ -311,16 +316,7 @@ export default function PrivacidadPage() {
                 </p>
               </div>
 
-              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/60 space-y-1.5">
-                <div className="flex items-center gap-2 text-slate-900 font-semibold text-sm">
-                  <CreditCard className="w-4 h-4 text-indigo-600" />
-                  <span>Stripe / Pasarelas Oficiales</span>
-                </div>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  Para el procesamiento seguro de pagos del plan PRO sin almacenar datos bancarios en
-                  nuestros servidores.
-                </p>
-              </div>
+              <PrivacyStripeProviderBlock />
             </div>
           </section>
 
@@ -407,24 +403,7 @@ export default function PrivacidadPage() {
                 </p>
               </div>
 
-              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/60 space-y-1.5">
-                <div className="flex items-center gap-2 text-slate-900 font-semibold text-sm">
-                  <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
-                  <span>7.2. Plan Gratuito y Suscripción Flashmente PRO</span>
-                </div>
-                <p className="text-xs sm:text-sm text-slate-700 leading-relaxed">
-                  Flashmente ofrece una <strong>modalidad gratuita</strong> con funciones completas
-                  de repaso y cuota diaria de generación con IA (ampliable mediante anuncios
-                  recompensados de Google AdMob), así como una{' '}
-                  <strong>modalidad de pago (Flashmente PRO)</strong> que elimina la publicidad y
-                  desbloquea límites ampliados de generación con IA y modos avanzados de estudio. Los
-                  precios, impuestos incluidos, condiciones de renovación y métodos de cancelación se
-                  muestran de forma clara y transparente antes de completar cualquier compra. El
-                  usuario puede gestionar o cancelar su suscripción PRO en cualquier momento sin
-                  penalización, manteniendo los beneficios contratados hasta el final del periodo de
-                  facturación en curso.
-                </p>
-              </div>
+              <PrivacyTermsModelProSection />
 
               <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/60 space-y-1.5">
                 <div className="flex items-center gap-2 text-slate-900 font-semibold text-sm">
@@ -434,7 +413,7 @@ export default function PrivacidadPage() {
                 <p className="text-xs sm:text-sm text-slate-700 leading-relaxed">
                   Para cualquier consulta técnica, ejercicio de derechos de consumidor, facturación
                   del modelo PRO o comunicación legal relacionada con la Ley de Servicios Digitales
-                  (DSA) y Google Play Store, el titular responsable{' '}
+                  (DSA), Google Play Store y Apple App Store, el titular responsable{' '}
                   <strong>Ignacio Molina Toledo</strong> atiende directamente en el correo
                   electrónico{' '}
                   <a

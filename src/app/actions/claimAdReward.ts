@@ -168,7 +168,15 @@ export async function claimAdRewardAction(
       };
     }
 
-    const res = data as { success?: boolean; bonus_credits?: number; error?: string; message?: string };
+    const res = data as {
+      success?: boolean;
+      bonus_credits?: number;
+      generations_count?: number;
+      ads_used_in_cycle?: number;
+      remaining_ads?: number;
+      error?: string;
+      message?: string;
+    };
     if (!res || !res.success) {
       return {
         success: false,
@@ -178,13 +186,14 @@ export async function claimAdRewardAction(
       };
     }
 
-    // Obtener límites actualizados exclusivos para generación de mazos (máximo 15 anuncios)
-    let count = 0;
+    // Obtener límites actualizados exclusivos para generación de mazos (tope mensual de 20 generaciones Free)
+    let count = typeof res.generations_count === 'number' ? res.generations_count : 0;
+    let welcomeGenerations = 5;
     let bonusCredits = typeof res.bonus_credits === 'number' ? res.bonus_credits : 1;
     try {
       const { data: updatedRec } = await rpcClient
         .from('api_limits')
-        .select('generations_count, last_generation_date, bonus_credits')
+        .select('generations_count, last_generation_date, bonus_credits, welcome_generations')
         .eq('user_id', targetUserId)
         .maybeSingle();
 
@@ -195,6 +204,9 @@ export async function claimAdRewardAction(
           : null;
         const isSameMonth = lastMonth === currentMonth;
         count = isSameMonth ? (updatedRec.generations_count || 0) : 0;
+        if (typeof updatedRec.welcome_generations === 'number') {
+          welcomeGenerations = updatedRec.welcome_generations;
+        }
         if (typeof updatedRec.bonus_credits === 'number') {
           bonusCredits = updatedRec.bonus_credits;
         }
@@ -203,8 +215,12 @@ export async function claimAdRewardAction(
       console.warn('[claimAdRewardAction] Error al refrescar registro actualizado:', fetchErr);
     }
 
-    const adsUsedInCycle = count + bonusCredits;
-    const remainingAds = Math.max(0, 15 - adsUsedInCycle);
+    const reservedWelcome = Math.max(0, 5 - welcomeGenerations);
+    const adsUsedInCycle = count + reservedWelcome + bonusCredits;
+    const remainingAds =
+      typeof res.remaining_ads === 'number'
+        ? res.remaining_ads
+        : Math.max(0, 20 - adsUsedInCycle);
 
     return {
       success: true,

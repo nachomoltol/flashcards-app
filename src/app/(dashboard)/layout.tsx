@@ -275,7 +275,7 @@ export default function DashboardLayout({
     >
       {/* Mobile Top Bar (Oculto en Modo Estudio y Examen para permitir pantalla completa real) */}
       {!isFullscreen && (
-        <header className="md:hidden flex items-center justify-between px-3 sm:px-4 py-2.5 sm:py-3 border-b border-neutral-200 dark:border-neutral-800 bg-white/90 dark:bg-neutral-900/80 backdrop-blur sticky top-0 z-40">
+        <header className="md:hidden flex items-center justify-between px-3 sm:px-4 py-2.5 sm:py-3 pt-[calc(env(safe-area-inset-top,0px)+0.625rem)] pl-[calc(env(safe-area-inset-left,0px)+0.75rem)] pr-[calc(env(safe-area-inset-right,0px)+0.75rem)] border-b border-neutral-200 dark:border-neutral-800 bg-white/90 dark:bg-neutral-900/80 backdrop-blur sticky top-0 z-40">
           <Suspense fallback={<MobileBrandFallback />}>
             <MobileHeaderBrand />
           </Suspense>

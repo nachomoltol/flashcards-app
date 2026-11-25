@@ -3,25 +3,32 @@ import Capacitor
 
 @objc(SafeAreaBridgeViewController)
 class SafeAreaBridgeViewController: CAPBridgeViewController {
+    
+    // Color de fondo adaptativo dinámico según el modo del sistema (oscuro #0a0a0a / claro systemBackground)
+    private let adaptiveBg = UIColor { traitCollection in
+        if traitCollection.userInterfaceStyle == .dark {
+            return UIColor(red: 10.0 / 255.0, green: 10.0 / 255.0, blue: 10.0 / 255.0, alpha: 1.0)
+        } else {
+            return UIColor.systemBackground
+        }
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        self.statusBarStyle = .lightContent
+        self.statusBarStyle = traitCollection.userInterfaceStyle == .dark ? .lightContent : .darkContent
         setNeedsStatusBarAppearanceUpdate()
 
         guard let webView = self.webView else { return }
 
-        // Fondo oscuro acorde con el tema principal de Flashmente (#0a0a0a)
-        let darkBg = UIColor(red: 10.0 / 255.0, green: 10.0 / 255.0, blue: 10.0 / 255.0, alpha: 1.0)
-
         let containerView = UIView(frame: UIScreen.main.bounds)
-        containerView.backgroundColor = darkBg
+        containerView.backgroundColor = adaptiveBg
 
-        // Reemplazar la vista raíz por el contenedor y anclar el WKWebView al Safe Area
+        // Reemplazar la vista raíz por el contenedor adaptativo y anclar el WKWebView al Safe Area
         self.view = containerView
 
-        webView.backgroundColor = darkBg
-        webView.scrollView.backgroundColor = darkBg
+        webView.backgroundColor = adaptiveBg
+        webView.scrollView.backgroundColor = adaptiveBg
         webView.scrollView.contentInsetAdjustmentBehavior = .never
         webView.translatesAutoresizingMaskIntoConstraints = false
         containerView.addSubview(webView)
@@ -34,8 +41,16 @@ class SafeAreaBridgeViewController: CAPBridgeViewController {
         ])
     }
 
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        if traitCollection.hasDifferentColorAppearance(comparedTo: previousTraitCollection) {
+            self.statusBarStyle = traitCollection.userInterfaceStyle == .dark ? .lightContent : .darkContent
+            setNeedsStatusBarAppearanceUpdate()
+        }
+    }
+
     override var preferredStatusBarStyle: UIStatusBarStyle {
-        return .lightContent
+        return traitCollection.userInterfaceStyle == .dark ? .lightContent : .darkContent
     }
 }
 
@@ -45,9 +60,16 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         guard let windowScene = scene as? UIWindowScene else { return }
 
-        let darkBg = UIColor(red: 10.0 / 255.0, green: 10.0 / 255.0, blue: 10.0 / 255.0, alpha: 1.0)
+        let adaptiveBg = UIColor { traitCollection in
+            if traitCollection.userInterfaceStyle == .dark {
+                return UIColor(red: 10.0 / 255.0, green: 10.0 / 255.0, blue: 10.0 / 255.0, alpha: 1.0)
+            } else {
+                return UIColor.systemBackground
+            }
+        }
+
         let appWindow = UIWindow(windowScene: windowScene)
-        appWindow.backgroundColor = darkBg
+        appWindow.backgroundColor = adaptiveBg
         appWindow.rootViewController = SafeAreaBridgeViewController()
         appWindow.makeKeyAndVisible()
         window = appWindow

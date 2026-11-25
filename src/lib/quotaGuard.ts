@@ -1,6 +1,7 @@
 'use client';
 
 import { supabase } from '@/lib/supabase';
+import { getClientDeviceId } from '@/lib/deviceId';
 
 export interface QuotaCheckResult {
   canGenerate: boolean;
@@ -10,7 +11,7 @@ export interface QuotaCheckResult {
   bonusCredits: number;
   welcomeGenerations: number;
   monthlyLimit: number;
-  reason?: 'AD_REQUIRED' | 'LIMIT_REACHED';
+  reason?: 'AD_REQUIRED' | 'LIMIT_REACHED' | 'DEVICE_LIMIT_REACHED';
 }
 
 /**
@@ -18,10 +19,10 @@ export interface QuotaCheckResult {
  * antes de iniciar loaders de UI o disparar llamadas de backend a Gemini (Zero Latency Guard).
  *
  * Reglas de negocio:
- * 1. PRO / VIP: hasta 120 generaciones/mes.
- * 2. FREE:
- *    - Fase Bienvenida (< 5 generaciones iniciales): Permitido sin anuncios.
- *    - Fase Anuncios (>= 5 generaciones):
+ * 1. PRO / VIP: hasta 100 generaciones/mes.
+ * 2. FREE: máximo 20 generaciones/mes en total (y tope de 20 en device_limits):
+ *    - Fase Bienvenida (< 5 generaciones iniciales en primer mes): Permitido sin anuncios.
+ *    - Fase Anuncios (>= 5 generaciones o meses siguientes):
  *        - Si generaciones del mes >= 20: Bloqueado por cuota mensual agotada ('LIMIT_REACHED').
  *        - Si bonus_credits <= 0: Bloqueado requiriendo anuncio ('AD_REQUIRED').
  *        - Si bonus_credits > 0: Permitido (+1 generación disponible).
@@ -42,15 +43,18 @@ export async function checkUserGenerationQuota(
   }
 
   try {
-    // 1. Intentar validar atómicamente mediante RPC check_api_limit (con reseteo mensual persistente)
+    const clientDeviceId = await getClientDeviceId();
+
+    // 1. Intentar validar atómicamente mediante RPC check_api_limit (con reseteo mensual persistente y device_limits)
     const { data: rpcData, error: rpcError } = await supabase.rpc('check_api_limit', {
       p_user_id: userId,
+      p_device_id: clientDeviceId || null,
     });
 
     if (!rpcError && rpcData) {
       const res = rpcData as {
         allowed?: boolean;
-        error?: 'LIMIT_REACHED' | 'AD_REQUIRED';
+        error?: 'LIMIT_REACHED' | 'AD_REQUIRED' | 'DEVICE_LIMIT_REACHED';
         tier?: 'free' | 'pro' | 'vip';
         count?: number;
         bonus_credits?: number;
@@ -63,7 +67,7 @@ export async function checkUserGenerationQuota(
       const count = typeof res.count === 'number' ? res.count : 0;
       const bonusCredits = typeof res.bonus_credits === 'number' ? res.bonus_credits : 0;
       const welcomeGenerations = typeof res.welcome_generations === 'number' ? res.welcome_generations : 0;
-      const monthlyLimit = res.monthly_limit || (tier === 'pro' || tier === 'vip' ? 120 : 20);
+      const monthlyLimit = res.monthly_limit || (tier === 'pro' || tier === 'vip' ? 100 : 20);
 
       if (res.allowed === false) {
         return {
@@ -112,16 +116,16 @@ export async function checkUserGenerationQuota(
       const isSameMonth = lastDate === currentMonth;
       const count = isSameMonth ? generationsCount : 0;
 
-      // Tier PRO / VIP
+      // Tier PRO / VIP: hasta 100 generaciones/mes
       if (tier === 'pro' || tier === 'vip') {
-        if (count >= 120) {
+        if (count >= 100) {
           return {
             canGenerate: false,
             tier,
             currentCount: count,
             bonusCredits,
             welcomeGenerations,
-            monthlyLimit: 120,
+            monthlyLimit: 100,
             reason: 'LIMIT_REACHED',
           };
         }
@@ -131,11 +135,24 @@ export async function checkUserGenerationQuota(
           currentCount: count,
           bonusCredits,
           welcomeGenerations,
-          monthlyLimit: 120,
+          monthlyLimit: 100,
         };
       }
 
-      // Tier FREE:
+      // Tier FREE: máximo 20 generaciones/mes en total
+      if (count >= 20) {
+        return {
+          canGenerate: false,
+          tier: 'free',
+          phase: 'ads',
+          currentCount: count,
+          bonusCredits,
+          welcomeGenerations,
+          monthlyLimit: 20,
+          reason: 'LIMIT_REACHED',
+        };
+      }
+
       // Fase Bienvenida: 5 generaciones iniciales sin anuncios
       if (welcomeGenerations < 5) {
         return {
@@ -149,21 +166,7 @@ export async function checkUserGenerationQuota(
         };
       }
 
-      // Fase Anuncios: máximo 15 con anuncios (5 bienvenida + 15 anuncios = 20 mensuales totales)
-      if (count >= 15) {
-        return {
-          canGenerate: false,
-          tier: 'free',
-          phase: 'ads',
-          currentCount: count,
-          bonusCredits,
-          welcomeGenerations,
-          monthlyLimit: 20,
-          reason: 'LIMIT_REACHED',
-        };
-      }
-
-      // Saldo de créditos bonificados
+      // Fase Anuncios (welcome_generations >= 5): requiere crédito bonificado hasta las 20 mensuales
       if (bonusCredits <= 0) {
         return {
           canGenerate: false,

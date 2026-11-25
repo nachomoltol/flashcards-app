@@ -537,7 +537,7 @@ export default function SettingsPage() {
                     <p className="font-semibold">{promoResult.message}</p>
                     {promoResult.tier && (
                       <p className="text-[11px] opacity-90 mt-0.5">
-                        {t('settings.tier_active', 'Nivel activo:')} <span className="uppercase font-bold tracking-wider">{promoResult.tier}</span> {t('settings.tier_unlimited', '(Generaciones ilimitadas)')}
+                        {t('settings.tier_active', 'Nivel activo:')} <span className="uppercase font-bold tracking-wider">{promoResult.tier}</span> {t('settings.tier_unlimited', '(Hasta 100 generaciones/mes)')}
                       </p>
                     )}
                   </div>
@@ -554,7 +554,7 @@ export default function SettingsPage() {
               </h2>
             </div>
             <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed">
-              Flashmente para iOS ofrece una experiencia de estudio completa sustentada por anuncios bonificados. Puedes generar tarjetas de estudio y consultar al tutor socrático con tu cuota diaria y ampliarla en cualquier momento viendo vídeos cortos sin coste alguno.
+              Flashmente para iOS ofrece una experiencia de estudio completa sustentada por anuncios bonificados. Puedes generar tarjetas de estudio, guías y consultar al tutor socrático con tu cuota mensual y ampliarla en cualquier momento viendo vídeos cortos sin coste alguno.
             </p>
           </div>
         )}

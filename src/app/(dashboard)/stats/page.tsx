@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { useAuthStore, useStreakStore } from '@/stores';
+import { useAuthStore, useStreakStore, useLanguageStore } from '@/stores';
 import { toLocalDateString } from '@/lib/stats/streak';
 import type { Database } from '@/types/database';
 import { RefreshCw, ShieldCheck, Flame, CheckCircle2 } from 'lucide-react';
@@ -13,6 +13,9 @@ type DeckItem = Database['public']['Tables']['decks']['Row'];
 
 export default function StatsPage() {
   const { user, isLoading: authLoading } = useAuthStore();
+  const { t, language } = useLanguageStore();
+  const isEn = language === 'en';
+
   const [cards, setCards] = useState<CardItem[]>([]);
   const [reviews, setReviews] = useState<ReviewItem[]>([]);
   const [decks, setDecks] = useState<DeckItem[]>([]);
@@ -134,7 +137,7 @@ export default function StatsPage() {
 
       setReviews(loadedReviews);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Error al cargar las estadísticas';
+      const msg = err instanceof Error ? err.message : t('stats_page.error_loading', 'Error al cargar las estadísticas');
       console.error('Error fetching stats:', err);
       setError(msg);
     } finally {
@@ -255,8 +258,12 @@ export default function StatsPage() {
       isToday: boolean;
     }[] = [];
 
-    const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-    const dayInitials = ['D', 'L', 'M', 'X', 'J', 'V', 'S'];
+    const dayNames = isEn
+      ? ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+      : ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+    const dayInitials = isEn
+      ? ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+      : ['D', 'L', 'M', 'X', 'J', 'V', 'S'];
 
     // 2. Construir los 7 días cronológicamente (desde hace 6 días hasta hoy)
     for (let i = 6; i >= 0; i--) {
@@ -281,7 +288,7 @@ export default function StatsPage() {
 
     const maxCount = Math.max(...days.map((d) => d.count), 1);
     return { days, maxCount };
-  }, [reviews]);
+  }, [reviews, isEn]);
 
   // Estabilidad y dificultad media
   const averageMetrics = useMemo(() => {
@@ -305,13 +312,13 @@ export default function StatsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-neutral-200 dark:border-neutral-800/80">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-neutral-900 dark:text-white flex items-center gap-3">
-            <span>Panel de Estadísticas FSRS</span>
+            <span>{t('stats_page.title', 'Panel de Estadísticas FSRS')}</span>
             <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-mono font-medium">
-              Datos en Vivo
+              {t('stats_page.live_data', 'Datos en Vivo')}
             </span>
           </h1>
           <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
-            Análisis de retención de memoria, volumen de estudio y estados cognitivos del algoritmo FSRS.
+            {t('stats_page.subtitle', 'Análisis de retención de memoria, volumen de estudio y estados cognitivos del algoritmo FSRS.')}
           </p>
         </div>
 
@@ -321,7 +328,7 @@ export default function StatsPage() {
           className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white text-xs font-medium transition active:scale-95 shrink-0 shadow-sm cursor-pointer"
         >
           <RefreshCw className={`w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400 ${isLoading ? 'animate-spin' : ''}`} />
-          <span>Sincronizar Datos</span>
+          <span>{t('stats_page.sync_data', 'Sincronizar Datos')}</span>
         </button>
       </div>
 
@@ -329,7 +336,7 @@ export default function StatsPage() {
         <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs flex items-center justify-between">
           <span>{error}</span>
           <button onClick={fetchData} className="underline hover:text-rose-700 dark:hover:text-rose-300 font-medium ml-2">
-            Reintentar
+            {t('common.retry', 'Reintentar')}
           </button>
         </div>
       )}
@@ -340,7 +347,7 @@ export default function StatsPage() {
         <div className="p-5 rounded-2xl bg-white dark:bg-neutral-900/50 border border-neutral-200 dark:border-neutral-800/80 shadow-sm backdrop-blur-sm relative overflow-hidden group hover:border-emerald-500/40 transition-all duration-200">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
-              Tarjetas Consolidadas
+              {t('stats_page.consolidated_cards', 'Tarjetas Consolidadas')}
             </span>
             <div className="w-8 h-8 rounded-lg bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
               <ShieldCheck className="w-4 h-4" />
@@ -350,11 +357,16 @@ export default function StatsPage() {
             <span className="text-3xl font-extrabold text-neutral-900 dark:text-white">
               {stateCounts.reviewCards}
             </span>
-            <span className="text-xs text-neutral-500 dark:text-neutral-400">maduras (A Revisar)</span>
+            <span className="text-xs text-neutral-500 dark:text-neutral-400">
+              {t('stats_page.mature_review', 'maduras (A Revisar)')}
+            </span>
           </div>
           <div className="mt-2 text-xs flex items-center justify-between font-medium">
             <span className="text-emerald-600 dark:text-emerald-400">
-              {totalCards > 0 ? Math.round((stateCounts.reviewCards / totalCards) * 100) : 0}% de tu temario
+              {t('stats_page.syllabus_share', '{pct}% de tu temario').replace(
+                '{pct}',
+                String(totalCards > 0 ? Math.round((stateCounts.reviewCards / totalCards) * 100) : 0)
+              )}
             </span>
             <span className="text-neutral-500 dark:text-neutral-400 font-mono text-[11px]">
               FSRS State 2
@@ -375,7 +387,7 @@ export default function StatsPage() {
         <div className="p-5 rounded-2xl bg-white dark:bg-neutral-900/50 border border-neutral-200 dark:border-neutral-800/80 shadow-sm backdrop-blur-sm relative overflow-hidden group hover:border-amber-500/40 transition-all duration-200">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider flex items-center gap-1.5">
-              <span>🔥 Racha Activa</span>
+              <span>{t('stats_page.active_streak', '🔥 Racha Activa')}</span>
             </span>
             <div className="w-8 h-8 rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
               <Flame className="w-4 h-4" />
@@ -386,21 +398,30 @@ export default function StatsPage() {
               {streak.current}
             </span>
             <span className="text-xs text-neutral-500 dark:text-neutral-400">
-              {streak.current === 1 ? 'día consecutivo' : 'días consecutivos'}
+              {streak.current === 1
+                ? t('stats_page.day_consecutive', 'día consecutivo')
+                : t('stats_page.days_consecutive', 'días consecutivos')}
             </span>
           </div>
           <div className="mt-2 text-xs flex items-center justify-between font-medium">
             <span className={streak.studiedToday ? 'text-amber-600 dark:text-amber-400' : 'text-neutral-500 dark:text-neutral-400'}>
-              {streak.studiedToday ? '🔥 Racha activa hoy' : '⏳ Repasa hoy para sumar'}
+              {streak.studiedToday
+                ? t('stats_page.streak_active_today', '🔥 Racha activa hoy')
+                : t('stats_page.streak_pending_today', '⏳ Repasa hoy para sumar')}
             </span>
             <span className="text-neutral-600 dark:text-neutral-400 font-mono text-[11px] bg-neutral-100 dark:bg-neutral-800/80 px-2 py-0.5 rounded-md">
-              Racha máx: <strong className="text-amber-600 dark:text-amber-400">{streak.max}d</strong>
+              {t('stats_page.max_streak', 'Racha máx:')}{' '}
+              <strong className="text-amber-600 dark:text-amber-400">{streak.max}d</strong>
             </span>
           </div>
           {/* Indicador Cronológico de Racha (Últimos 7 días) */}
           <div className="mt-3 pt-2 border-t border-neutral-100 dark:border-neutral-800/60 flex items-center justify-between gap-1.5">
             {last7DaysData.days.map((day) => {
-              const tooltip = `${day.label} (${day.dateStr}): ${day.count} repaso${day.count === 1 ? '' : 's'}${day.isToday ? ' · Hoy' : ''}`;
+              const reviewsWord = day.count === 1
+                ? (isEn ? 'review' : 'repaso')
+                : (isEn ? 'reviews' : 'repasos');
+              const todayWord = isEn ? ' · Today' : ' · Hoy';
+              const tooltip = `${day.label} (${day.dateStr}): ${day.count} ${reviewsWord}${day.isToday ? todayWord : ''}`;
               return (
                 <div
                   key={day.dateStr}
@@ -439,7 +460,7 @@ export default function StatsPage() {
         <div className="p-5 rounded-2xl bg-white dark:bg-neutral-900/50 border border-neutral-200 dark:border-neutral-800/80 shadow-sm backdrop-blur-sm relative overflow-hidden group hover:border-indigo-500/40 transition-all duration-200">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
-              Tasa de Aciertos
+              {t('stats_page.accuracy_rate', 'Tasa de Aciertos')}
             </span>
             <div className="w-8 h-8 rounded-lg bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
               <CheckCircle2 className="w-4 h-4" />
@@ -450,15 +471,23 @@ export default function StatsPage() {
               {accuracyStats.accuracyRate}%
             </span>
             <span className="text-xs text-neutral-500 dark:text-neutral-400">
-              {accuracyStats.hasData ? 'respuestas acertadas' : 'sin repasos'}
+              {accuracyStats.hasData
+                ? t('stats_page.correct_answers', 'respuestas acertadas')
+                : t('stats_page.no_reviews', 'sin repasos')}
             </span>
           </div>
           <div className="mt-2 text-xs flex items-center justify-between font-medium">
             <span className="text-indigo-600 dark:text-indigo-400">
-              {accuracyStats.goodOrEasyCount} aciertos (Good/Easy)
+              {t('stats_page.good_easy_count', '{count} aciertos (Good/Easy)').replace(
+                '{count}',
+                String(accuracyStats.goodOrEasyCount)
+              )}
             </span>
             <span className="text-neutral-500 dark:text-neutral-400 font-mono text-[11px]">
-              {accuracyStats.againOrHardCount} fallos (Again/Hard)
+              {t('stats_page.again_hard_count', '{count} fallos (Again/Hard)').replace(
+                '{count}',
+                String(accuracyStats.againOrHardCount)
+              )}
             </span>
           </div>
           {/* Progress bar */}
@@ -478,28 +507,36 @@ export default function StatsPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div>
             <h2 className="text-lg font-bold text-neutral-900 dark:text-white tracking-tight flex items-center gap-2">
-              <span>Desglose del Estado FSRS</span>
+              <span>{t('stats_page.fsrs_breakdown_title', 'Desglose del Estado FSRS')}</span>
               <span className="text-xs px-2 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 font-mono font-normal">
-                {totalCards} tarjetas en {decks.length} {decks.length === 1 ? 'mazo' : 'mazos'}
+                {t('stats_page.cards_in_decks', '{total} tarjetas en {count} {decks}')
+                  .replace('{total}', String(totalCards))
+                  .replace('{count}', String(decks.length))
+                  .replace(
+                    '{decks}',
+                    decks.length === 1
+                      ? t('stats_page.deck_singular', 'mazo')
+                      : t('stats_page.deck_plural', 'mazos')
+                  )}
               </span>
             </h2>
             <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
-              Distribución de tus flashcards según su fase en el ciclo de repetición espaciada FSRS.
+              {t('stats_page.fsrs_breakdown_desc', 'Distribución de tus flashcards según su fase en el ciclo de repetición espaciada FSRS.')}
             </p>
           </div>
 
           <div className="flex items-center gap-4 text-xs font-medium">
             <span className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
               <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-              Nuevas ({stateCounts.newCards})
+              {t('stats_page.state_new', 'Nuevas')} ({stateCounts.newCards})
             </span>
             <span className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
               <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-              En Aprendizaje ({stateCounts.learningCards})
+              {t('stats_page.state_learning', 'En Aprendizaje')} ({stateCounts.learningCards})
             </span>
             <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-              A Revisar / Maduras ({stateCounts.reviewCards})
+              {t('stats_page.state_review', 'A Revisar / Maduras')} ({stateCounts.reviewCards})
             </span>
           </div>
         </div>
@@ -509,24 +546,24 @@ export default function StatsPage() {
           {totalCards > 0 ? (
             <>
               <div
-                title={`Nuevas: ${stateCounts.newCards} (${Math.round((stateCounts.newCards / totalCards) * 100)}%)`}
+                title={`${t('stats_page.state_new', 'Nuevas')}: ${stateCounts.newCards} (${Math.round((stateCounts.newCards / totalCards) * 100)}%)`}
                 className="bg-blue-500 h-full transition-all duration-500 hover:opacity-90"
                 style={{ width: `${(stateCounts.newCards / totalCards) * 100}%` }}
               />
               <div
-                title={`En Aprendizaje: ${stateCounts.learningCards} (${Math.round((stateCounts.learningCards / totalCards) * 100)}%)`}
+                title={`${t('stats_page.state_learning', 'En Aprendizaje')}: ${stateCounts.learningCards} (${Math.round((stateCounts.learningCards / totalCards) * 100)}%)`}
                 className="bg-amber-500 h-full transition-all duration-500 hover:opacity-90"
                 style={{ width: `${(stateCounts.learningCards / totalCards) * 100}%` }}
               />
               <div
-                title={`A Revisar: ${stateCounts.reviewCards} (${Math.round((stateCounts.reviewCards / totalCards) * 100)}%)`}
+                title={`${t('stats_page.state_review', 'A Revisar / Maduras')}: ${stateCounts.reviewCards} (${Math.round((stateCounts.reviewCards / totalCards) * 100)}%)`}
                 className="bg-emerald-500 h-full transition-all duration-500 hover:opacity-90"
                 style={{ width: `${(stateCounts.reviewCards / totalCards) * 100}%` }}
               />
             </>
           ) : (
             <div className="w-full h-full bg-neutral-100 dark:bg-neutral-800 text-neutral-400 dark:text-neutral-500 text-[10px] flex items-center justify-center font-mono">
-              Sin tarjetas registradas
+              {t('stats_page.no_cards_registered', 'Sin tarjetas registradas')}
             </div>
           )}
         </div>
@@ -538,7 +575,7 @@ export default function StatsPage() {
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-blue-500" />
-                Nuevas (State 0)
+                {t('stats_page.state_new', 'Nuevas')} (State 0)
               </span>
               <span className="text-xs font-mono font-bold text-neutral-900 dark:text-white">
                 {totalCards > 0 ? Math.round((stateCounts.newCards / totalCards) * 100) : 0}%
@@ -546,7 +583,7 @@ export default function StatsPage() {
             </div>
             <p className="text-2xl font-black text-neutral-900 dark:text-white">{stateCounts.newCards}</p>
             <p className="text-[11px] text-neutral-600 dark:text-neutral-400 leading-relaxed">
-              Tarjetas pendientes de su primera sesión de estudio. FSRS aún no ha calculado estabilidad ni dificultad personalizada.
+              {t('stats_page.new_cards_desc', 'Tarjetas pendientes de su primera sesión de estudio. FSRS aún no ha calculado estabilidad ni dificultad personalizada.')}
             </p>
           </div>
 
@@ -555,7 +592,7 @@ export default function StatsPage() {
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-amber-500" />
-                En Aprendizaje (State 1/3)
+                {t('stats_page.state_learning', 'En Aprendizaje')} (State 1/3)
               </span>
               <span className="text-xs font-mono font-bold text-neutral-900 dark:text-white">
                 {totalCards > 0 ? Math.round((stateCounts.learningCards / totalCards) * 100) : 0}%
@@ -563,7 +600,7 @@ export default function StatsPage() {
             </div>
             <p className="text-2xl font-black text-neutral-900 dark:text-white">{stateCounts.learningCards}</p>
             <p className="text-[11px] text-neutral-600 dark:text-neutral-400 leading-relaxed">
-              En proceso de fijación a corto plazo o recuperación tras un fallo (&ldquo;Again&rdquo;). Repasos en intervalos breves.
+              {t('stats_page.learning_cards_desc', 'En proceso de fijación a corto plazo o recuperación tras un fallo ("Again"). Repasos en intervalos breves.')}
             </p>
           </div>
 
@@ -572,7 +609,7 @@ export default function StatsPage() {
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                A Revisar (State 2)
+                {t('stats_page.state_review', 'A Revisar')} (State 2)
               </span>
               <span className="text-xs font-mono font-bold text-neutral-900 dark:text-white">
                 {totalCards > 0 ? Math.round((stateCounts.reviewCards / totalCards) * 100) : 0}%
@@ -580,7 +617,7 @@ export default function StatsPage() {
             </div>
             <p className="text-2xl font-black text-neutral-900 dark:text-white">{stateCounts.reviewCards}</p>
             <p className="text-[11px] text-neutral-600 dark:text-neutral-400 leading-relaxed">
-              Consolidadas en memoria a largo plazo. Programadas en intervalos expansivos optimizados según su estabilidad.
+              {t('stats_page.review_cards_desc', 'Consolidadas en memoria a largo plazo. Programadas en intervalos expansivos optimizados según su estabilidad.')}
             </p>
           </div>
         </div>
@@ -592,10 +629,10 @@ export default function StatsPage() {
         <div className="lg:col-span-6 p-6 rounded-2xl bg-white dark:bg-neutral-900/60 border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-5">
           <div>
             <h3 className="text-base font-bold text-neutral-900 dark:text-white tracking-tight">
-              Distribución de Calificaciones FSRS
+              {t('stats_page.rating_distribution_title', 'Distribución de Calificaciones FSRS')}
             </h3>
             <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
-              Respuestas otorgadas en el botón de calificación durante tus sesiones de estudio.
+              {t('stats_page.rating_distribution_desc', 'Respuestas otorgadas en el botón de calificación durante tus sesiones de estudio.')}
             </p>
           </div>
 
@@ -604,7 +641,7 @@ export default function StatsPage() {
             <div className="space-y-1">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-semibold text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
-                  <span>1. Again (Fallo / Olvido)</span>
+                  <span>{t('stats_page.rating_again', '1. Again (Fallo / Olvido)')}</span>
                 </span>
                 <span className="font-mono text-neutral-600 dark:text-neutral-300">
                   {ratingDistribution.again.count} ({ratingDistribution.again.pct}%)
@@ -622,7 +659,7 @@ export default function StatsPage() {
             <div className="space-y-1">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
-                  <span>2. Hard (Difícil)</span>
+                  <span>{t('stats_page.rating_hard', '2. Hard (Difícil)')}</span>
                 </span>
                 <span className="font-mono text-neutral-600 dark:text-neutral-300">
                   {ratingDistribution.hard.count} ({ratingDistribution.hard.pct}%)
@@ -640,7 +677,7 @@ export default function StatsPage() {
             <div className="space-y-1">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-semibold text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
-                  <span>3. Good (Bueno / Correcto)</span>
+                  <span>{t('stats_page.rating_good', '3. Good (Bueno / Correcto)')}</span>
                 </span>
                 <span className="font-mono text-neutral-600 dark:text-neutral-300">
                   {ratingDistribution.good.count} ({ratingDistribution.good.pct}%)
@@ -658,7 +695,7 @@ export default function StatsPage() {
             <div className="space-y-1">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
-                  <span>4. Easy (Fácil)</span>
+                  <span>{t('stats_page.rating_easy', '4. Easy (Fácil)')}</span>
                 </span>
                 <span className="font-mono text-neutral-600 dark:text-neutral-300">
                   {ratingDistribution.easy.count} ({ratingDistribution.easy.pct}%)
@@ -678,10 +715,10 @@ export default function StatsPage() {
         <div className="lg:col-span-6 p-6 rounded-2xl bg-white dark:bg-neutral-900/60 border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-5">
           <div>
             <h3 className="text-base font-bold text-neutral-900 dark:text-white tracking-tight">
-              Actividad Semanal de Repaso
+              {t('stats_page.weekly_activity_title', 'Actividad Semanal de Repaso')}
             </h3>
             <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
-              Volumen de tarjetas repasadas durante los últimos 7 días.
+              {t('stats_page.weekly_activity_desc', 'Volumen de tarjetas repasadas durante los últimos 7 días.')}
             </p>
           </div>
 
@@ -716,9 +753,11 @@ export default function StatsPage() {
           </div>
 
           <div className="pt-2 border-t border-neutral-200 dark:border-neutral-800/60 flex items-center justify-between text-xs text-neutral-500 dark:text-neutral-400">
-            <span>Racha activa y constancia</span>
+            <span>{t('stats_page.streak_consistency', 'Racha activa y constancia')}</span>
             <span className="font-mono text-indigo-600 dark:text-indigo-400">
-              {reviews.length > 0 ? `${reviews.length} repasos registrados` : 'Sin actividad aún'}
+              {reviews.length > 0
+                ? t('stats_page.reviews_recorded', '{count} repasos registrados').replace('{count}', String(reviews.length))
+                : t('stats_page.no_activity_yet', 'Sin actividad aún')}
             </span>
           </div>
         </div>
@@ -728,37 +767,44 @@ export default function StatsPage() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="p-4 rounded-2xl bg-white dark:bg-neutral-900/40 border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-1">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
-            Estabilidad Media FSRS
+            {t('stats_page.avg_stability_title', 'Estabilidad Media FSRS')}
           </span>
           <p className="text-2xl font-black text-neutral-900 dark:text-white">
-            {averageMetrics.stability} <span className="text-xs font-normal text-neutral-500 dark:text-neutral-400">días</span>
+            {averageMetrics.stability}{' '}
+            <span className="text-xs font-normal text-neutral-500 dark:text-neutral-400">
+              {t('stats_page.days_unit', 'días')}
+            </span>
           </p>
           <p className="text-[11px] text-neutral-500 dark:text-neutral-500">
-            Tiempo estimado en que una tarjeta mantiene al menos el 90% de probabilidad de recuerdo.
+            {t('stats_page.avg_stability_desc', 'Tiempo estimado en que una tarjeta mantiene al menos el 90% de probabilidad de recuerdo.')}
           </p>
         </div>
 
         <div className="p-4 rounded-2xl bg-white dark:bg-neutral-900/40 border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-1">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
-            Dificultad Media FSRS
+            {t('stats_page.avg_difficulty_title', 'Dificultad Media FSRS')}
           </span>
           <p className="text-2xl font-black text-neutral-900 dark:text-white">
-            {averageMetrics.difficulty} <span className="text-xs font-normal text-neutral-500 dark:text-neutral-400">/ 10</span>
+            {averageMetrics.difficulty}{' '}
+            <span className="text-xs font-normal text-neutral-500 dark:text-neutral-400">/ 10</span>
           </p>
           <p className="text-[11px] text-neutral-500 dark:text-neutral-500">
-            Complejidad intrínseca calculada dinámicamente según tus calificaciones individuales.
+            {t('stats_page.avg_difficulty_desc', 'Complejidad intrínseca calculada dinámicamente según tus calificaciones individuales.')}
           </p>
         </div>
 
         <div className="p-4 rounded-2xl bg-white dark:bg-neutral-900/40 border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-1">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
-            Lapsos Totales (Olvidos)
+            {t('stats_page.total_lapses_title', 'Lapsos Totales (Olvidos)')}
           </span>
           <p className="text-2xl font-black text-neutral-900 dark:text-white">
-            {averageMetrics.totalLapses} <span className="text-xs font-normal text-neutral-500 dark:text-neutral-400">veces</span>
+            {averageMetrics.totalLapses}{' '}
+            <span className="text-xs font-normal text-neutral-500 dark:text-neutral-400">
+              {t('stats_page.times_unit', 'veces')}
+            </span>
           </p>
           <p className="text-[11px] text-neutral-500 dark:text-neutral-500">
-            Frecuencia con que tarjetas consolidadas fueron olvidadas y reprogramadas con FSRS.
+            {t('stats_page.total_lapses_desc', 'Frecuencia con que tarjetas consolidadas fueron olvidadas y reprogramadas con FSRS.')}
           </p>
         </div>
       </div>

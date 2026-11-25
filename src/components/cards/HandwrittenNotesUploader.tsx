@@ -18,6 +18,9 @@ import { Capacitor } from '@capacitor/core';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { generateCardsFromNotesAction } from '@/app/actions/generateCardsFromNotes';
 import { useAuthStore, useCardStore, useDeckStore, useProModalStore, useLanguageStore } from '@/stores';
+import { supabase } from '@/lib/supabase';
+import { checkUserGenerationQuota } from '@/lib/quotaGuard';
+import { getClientDeviceId } from '@/lib/deviceId';
 import { InfoTooltip } from './InfoTooltip';
 import type { CardFormat } from '@/types/cards';
 
@@ -331,6 +334,15 @@ export function HandwrittenNotesUploader({
       return;
     }
 
+    // Zero Latency Guard: verificar cuota antes de comprimir o invocar Gemini
+    const quota = await checkUserGenerationQuota(user?.id);
+    if (!quota.canGenerate) {
+      openProModal(true, null, () => {
+        handleProcessNotes();
+      });
+      return;
+    }
+
     setErrorMessage(null);
     setStatus('compressing');
     setCompressionProgress({ current: 0, total: pages.length });
@@ -350,12 +362,23 @@ export function HandwrittenNotesUploader({
         });
       }
 
-      // 2. Transmisión efímera en memoria al Server Action con Gemini
+      // 2. Resolver token JWT y deviceId físico antes de transmitir al Server Action
       setStatus('generating');
+
+      let accessToken: string | undefined;
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        accessToken = sessionData?.session?.access_token;
+      } catch {
+        // Silencioso
+      }
+      const clientDeviceId = await getClientDeviceId();
 
       const result = await generateCardsFromNotesAction({
         deckId,
         userId: user?.id,
+        accessToken,
+        deviceId: clientDeviceId,
         images: processedImages,
         cardFormat,
         cardCount,
@@ -365,7 +388,11 @@ export function HandwrittenNotesUploader({
       });
 
       if (!result.success || !result.cards || result.cards.length === 0) {
-        if (result.error === 'LIMIT_REACHED' || result.error === 'AD_REQUIRED') {
+        if (
+          result.error === 'LIMIT_REACHED' ||
+          result.error === 'AD_REQUIRED' ||
+          result.error === 'DEVICE_LIMIT_REACHED'
+        ) {
           setStatus('idle');
           openProModal(true, null, () => handleProcessNotes());
           return;

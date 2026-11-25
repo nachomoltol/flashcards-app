@@ -5,6 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { GEMINI_DEFAULT_MODEL } from '@/lib/aiConfig';
 import { isAdminEmail, isTestDevice } from '@/lib/config/whitelist';
+import { mintPrintGrantToken } from '@/lib/printToken';
 import type { Database, Json } from '@/types/database';
 
 // ---------------------------------------------------------------------------
@@ -85,6 +86,7 @@ export interface GenerateDeckSummaryResult {
   summary?: ExhaustiveDeckSummaryGuide;
   previewGuide?: Partial<ExhaustiveDeckSummaryGuide>;
   isUnlocked?: boolean;
+  printToken?: string;
   guidesUnlockedThisMonth?: number;
   maxFreeGuidesPerMonth?: number;
   cached?: boolean;
@@ -646,7 +648,8 @@ export async function getOrGenerateDeckSummaryAction(
   userIdOrLocale?: string,
   localeOrForce?: 'es' | 'en' | boolean,
   forceRegenerate: boolean = false,
-  accessToken?: string
+  accessToken?: string,
+  deviceId?: string
 ): Promise<GenerateDeckSummaryResult> {
   const cleanDeckId = deckId?.trim();
   if (!cleanDeckId) {
@@ -727,6 +730,38 @@ export async function getOrGenerateDeckSummaryAction(
     if (authenticatedUserId) {
       quota = await checkAndResetMonthlyGuideQuota(db, authenticatedUserId);
       isPro = quota.tier === 'pro' || quota.tier === 'vip';
+
+      if (!isPro) {
+        try {
+          const { data: profile } = await db
+            .from('profiles')
+            .select('email')
+            .eq('id', authenticatedUserId)
+            .maybeSingle();
+          if (profile?.email && isAdminEmail(profile.email)) {
+            isPro = true;
+          }
+        } catch {
+          // Silencioso
+        }
+      }
+
+      if (!isPro && deviceId && deviceId.trim() && !isTestDevice(deviceId)) {
+        try {
+          const { data: devData } = await db
+            .from('device_limits')
+            .select('guides_unlocked_this_month, reset_at')
+            .eq('device_id', deviceId.trim())
+            .maybeSingle();
+          if (devData) {
+            const isDevExpired = devData.reset_at ? new Date(devData.reset_at) <= new Date() : false;
+            const devGuides = isDevExpired ? 0 : (devData.guides_unlocked_this_month || 0);
+            quota.guidesUnlockedThisMonth = Math.max(quota.guidesUnlockedThisMonth, devGuides);
+          }
+        } catch {
+          // Silencioso
+        }
+      }
     }
 
     // 4. Cooldown y Protección Anti-Abuso en forceRegenerate (VULN-02)
@@ -739,6 +774,17 @@ export async function getOrGenerateDeckSummaryAction(
             resolvedLocale === 'en'
               ? 'Only the deck owner can regenerate the study guide.'
               : 'Solo el creador del mazo puede regenerar la guía de estudio.',
+        };
+      }
+
+      // En Free, no se permite regenerar sin haber desbloqueado previamente al menos una guía con anuncio este mes
+      if (!isPro && quota.guidesUnlockedThisMonth <= 0) {
+        return {
+          success: false,
+          error:
+            resolvedLocale === 'en'
+              ? 'Watch a short rewarded video to unlock the full study guide first.'
+              : 'Desbloquea primero la guía completa viendo un vídeo bonificado.',
         };
       }
 
@@ -762,53 +808,6 @@ export async function getOrGenerateDeckSummaryAction(
                 ? `Please wait ${waitMin} min before regenerating this guide.`
                 : `Debes esperar ${waitMin} min antes de regenerar la guía de este mazo.`,
           };
-        }
-      }
-
-      // Si es Free, requiere tener el mazo desbloqueado o descuenta 1 crédito de generación habitual
-      if (!isPro) {
-        if (quota.guidesUnlockedThisMonth === 0) {
-          const { data: userLimits } = await db
-            .from('api_limits')
-            .select('welcome_generations, bonus_credits, generations_count')
-            .eq('user_id', authenticatedUserId)
-            .maybeSingle();
-
-          const welcome = userLimits?.welcome_generations || 0;
-          const bonus = userLimits?.bonus_credits || 0;
-          const count = userLimits?.generations_count || 0;
-
-          if (welcome >= 5 && bonus <= 0) {
-            return {
-              success: false,
-              error:
-                resolvedLocale === 'en'
-                  ? 'You need an available generation credit to regenerate this guide.'
-                  : 'Necesitas un crédito de generación para regenerar la guía.',
-            };
-          }
-
-          const todayStr = new Date().toISOString().slice(0, 10);
-          if (welcome < 5) {
-            await db
-              .from('api_limits')
-              .update({
-                welcome_generations: welcome + 1,
-                last_generation_date: todayStr,
-                updated_at: new Date().toISOString(),
-              })
-              .eq('user_id', authenticatedUserId);
-          } else {
-            await db
-              .from('api_limits')
-              .update({
-                bonus_credits: Math.max(0, bonus - 1),
-                generations_count: count + 1,
-                last_generation_date: todayStr,
-                updated_at: new Date().toISOString(),
-              })
-              .eq('user_id', authenticatedUserId);
-          }
         }
       }
     }
@@ -931,6 +930,9 @@ export async function getOrGenerateDeckSummaryAction(
       return {
         success: true,
         isUnlocked: true,
+        printToken: authenticatedUserId
+          ? mintPrintGrantToken(cleanDeckId, authenticatedUserId, 'guide')
+          : undefined,
         summary: completeGuide,
         guidesUnlockedThisMonth: quota.guidesUnlockedThisMonth,
         maxFreeGuidesPerMonth: 3,
@@ -1121,6 +1123,7 @@ export async function unlockDeckSummaryWithAdAction(
     return {
       success: true,
       isUnlocked: true,
+      printToken: mintPrintGrantToken(cleanDeckId, authenticatedUserId, 'guide'),
       summary: fullGuide,
       guidesUnlockedThisMonth: claimData.guides_unlocked_this_month,
       maxFreeGuidesPerMonth: 3,

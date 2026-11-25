@@ -93,7 +93,7 @@ export function ProModal({
     tier?: string;
   } | null>(null);
 
-  // Estado de nivel y consumo para mensajes de límite duros (50 Free / 120 Pro) y cupo de anuncios
+  // Estado de nivel y consumo para mensajes de límite duros (20 Free / 100 Pro) y cupo de anuncios
   // Estado para la comprobación manual interactiva de saldo en PC / Web
   const [isCheckingBalance, setIsCheckingBalance] = useState(false);
   const [balanceFeedback, setBalanceFeedback] = useState<{
@@ -403,7 +403,7 @@ export function ProModal({
             fetchUserLimits();
             setIsWatchingAd(false);
             setAdLoadingPhase('idle');
-            close();
+            handleClose();
             // Ejecutar inmediatamente la consulta que estaba esperando el anuncio
             store.onRewardSuccess?.();
             return;
@@ -417,12 +417,14 @@ export function ProModal({
                 ? claim.bonusCredits
                 : currentBonus + 1;
             const count = typeof claim.generationsCount === 'number' ? claim.generationsCount : (prev?.count ?? 0);
+            const welcome = prev?.welcomeGenerations ?? 5;
+            const reservedWelcome = Math.max(0, 5 - welcome);
             const adsUsedInCycle = typeof claim.adsUsedInCycle === 'number'
               ? claim.adsUsedInCycle
-              : (count + newBonus);
+              : (count + reservedWelcome + newBonus);
             const remainingAds = typeof claim.remainingAds === 'number'
               ? claim.remainingAds
-              : Math.max(0, 15 - adsUsedInCycle);
+              : Math.max(0, 20 - adsUsedInCycle);
 
             if (!prev) {
               return {
@@ -573,11 +575,11 @@ export function ProModal({
       case 'pdf':
         return {
           icon: Printer,
-          badge: isEn ? 'PRO EXCLUSIVE • PDF EXPORT' : 'EXCLUSIVO PRO • EXPORTACIÓN A PDF',
-          title: isEn ? 'Ace Your Exams Anywhere' : 'Aprueba tus exámenes en papel y digital',
+          badge: isEn ? 'FLASHMENTE PRO • UNLIMITED STUDY GUIDES & PDF' : 'FLASHMENTE PRO • GUÍAS Y PDF SIN LÍMITES',
+          title: isEn ? 'Unlimited Study Guides Ready for PDF' : 'Guías de Estudio Ilimitadas en PDF',
           subtitle: isEn
-            ? 'Generate ready-to-print compact exam sheets and official answer keys for realistic exam prep.'
-            : 'Genera exámenes oficiales listos para imprimir y hojas de estudio compactas para preparar tus pruebas con éxito.',
+            ? 'Generate and export unlimited structured study guides and synthesis sheets in PDF without monthly caps or ads.'
+            : 'Genera y exporta sin límite mensual ni anuncios todas las guías de síntesis estructuradas de tus mazos en PDF.',
         };
       default:
         return {
@@ -596,7 +598,7 @@ export function ProModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-md animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] pb-[calc(env(safe-area-inset-bottom,0px)+0.75rem)] pl-[calc(env(safe-area-inset-left,0px)+0.75rem)] pr-[calc(env(safe-area-inset-right,0px)+0.75rem)] bg-black/85 backdrop-blur-md animate-in fade-in duration-200"
       role="dialog"
       aria-modal="true"
       aria-labelledby="pro-modal-title"
@@ -608,8 +610,8 @@ export function ProModal({
         aria-hidden="true"
       />
 
-      {/* Contenedor del Modal */}
-      <div className={`relative w-full max-w-xl max-h-[94vh] overflow-y-auto bg-white dark:bg-neutral-900/95 border border-purple-500/30 rounded-3xl shadow-2xl shadow-purple-950/20 dark:shadow-purple-950/50 ${isLimitReached ? 'p-4 sm:p-6' : 'p-5 sm:p-7'} text-neutral-900 dark:text-neutral-100 flex flex-col justify-between scrollbar-thin scrollbar-thumb-neutral-300 dark:scrollbar-thumb-neutral-800 scrollbar-track-transparent animate-in zoom-in-95 duration-200`}>
+      {/* Contenedor del Modal (Cero scroll viable en pantalla móvil gracias a layout adaptativo y dvh) */}
+      <div className={`relative w-full max-w-xl max-h-[min(94dvh,94vh)] overflow-y-auto bg-white dark:bg-neutral-900/95 border border-purple-500/30 rounded-3xl shadow-2xl shadow-purple-950/20 dark:shadow-purple-950/50 ${isLimitReached ? 'p-3.5 sm:p-5' : 'p-5 sm:p-7'} text-neutral-900 dark:text-neutral-100 flex flex-col justify-between scrollbar-thin scrollbar-thumb-neutral-300 dark:scrollbar-thumb-neutral-800 scrollbar-track-transparent animate-in zoom-in-95 duration-200`}>
         {/* Glow de fondo morado/violeta */}
         <div
           className="absolute -top-24 -left-24 w-64 h-64 bg-purple-600/15 dark:bg-purple-600/20 rounded-full blur-3xl pointer-events-none"
@@ -651,7 +653,7 @@ export function ProModal({
               </h2>
               <p className="text-xs sm:text-sm font-medium text-zinc-600 dark:text-zinc-300 leading-normal">
                 {userLimits?.tier === 'pro' || userLimits?.tier === 'vip'
-                  ? 'Has completado 120 generaciones este mes. Tu cuota se reinicia el día 1.'
+                  ? 'Has completado 100 generaciones este mes. Tu cuota se reinicia el día 1.'
                   : platform.isNativeIOS
                   ? 'Desbloquea generaciones adicionales viendo un breve vídeo sin coste:'
                   : 'Elige una de las dos opciones para continuar generando flashcards:'}
@@ -718,7 +720,7 @@ export function ProModal({
                       </div>
 
                       <p className="text-xs text-neutral-700 dark:text-neutral-300 leading-snug">
-                        Alta Capacidad: Hasta 120 generaciones de mazos al mes (¡suficiente para todo tu temario!), sin pausas por anuncios y con acceso total.
+                        Alta Capacidad: Hasta 100 generaciones de mazos al mes (¡suficiente para todo tu temario!), sin pausas por anuncios y con acceso total.
                       </p>
 
                       {/* CUMPLIMIENTO GOOGLE PLAY (GUIDELINE 3.1.3): EN APP NATIVA NO SE MUESTRA CHECKOUT DE PAGO DIRECTO */}
@@ -738,10 +740,11 @@ export function ProModal({
                     const isZeroBalance = isTutor
                       ? isFreeTier && (userLimits?.tutorAdCredits ?? 0) <= 0
                       : isFreeTier && (userLimits?.bonusCredits ?? 0) <= 0;
-                    const adsUsedInCycle = userLimits?.adsUsedInCycle ?? ((userLimits?.count || 0) + (userLimits?.bonusCredits || 0));
+                    const reservedWelcome = Math.max(0, 5 - (userLimits?.welcomeGenerations ?? 5));
+                    const adsUsedInCycle = userLimits?.adsUsedInCycle ?? ((userLimits?.count || 0) + reservedWelcome + (userLimits?.bonusCredits || 0));
                     const remainingAds = userLimits?.remainingAds !== undefined
                       ? userLimits.remainingAds
-                      : Math.max(0, 15 - adsUsedInCycle);
+                      : Math.max(0, 20 - adsUsedInCycle);
 
                     return (
                       <div
@@ -776,7 +779,7 @@ export function ProModal({
                         </p>
 
                         <div className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-900 dark:text-amber-300 font-mono">
-                          <span>{isTutor ? 'Consultas con anuncio: ILIMITADAS' : 'Cupo mensual: hasta 15 anuncios'}</span>
+                          <span>{isTutor ? 'Consultas con anuncio: ILIMITADAS' : 'Tope mensual Free: hasta 20 generaciones'}</span>
                           <strong className="font-bold">
                             {isTutor
                               ? 'Ilimitadas (1 anuncio / consulta)'
@@ -846,7 +849,7 @@ export function ProModal({
                                   </span>
                                 </>
                               ) : !isTutor && remainingAds <= 0 ? (
-                                <span>Cupo mensual de 15 anuncios completado</span>
+                                <span>Límite mensual de 20 generaciones alcanzado</span>
                               ) : (
                                 <>
                                   <PlayCircle className="w-4 h-4 fill-neutral-950 text-amber-300 group-hover:scale-110 transition-transform shrink-0" />
@@ -913,7 +916,7 @@ export function ProModal({
                     </div>
 
                     <p className="text-xs text-neutral-700 dark:text-neutral-300 leading-snug">
-                      Alta Capacidad: Hasta 120 generaciones de mazos al mes (¡suficiente para todo tu temario!), sin pausas ni esperas con acceso a todas las funciones premium.
+                      Alta Capacidad: Hasta 100 generaciones de mazos al mes (¡suficiente para todo tu temario!), sin pausas ni esperas con acceso a todas las funciones premium.
                     </p>
 
                     <button
@@ -957,22 +960,26 @@ export function ProModal({
                       </div>
 
                       <div className="text-right pl-2 shrink-0">
-                        <span className="inline-block px-2.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-500/20 border border-purple-300 dark:border-purple-500/40 text-purple-900 dark:text-purple-300 font-extrabold text-[10px] uppercase tracking-wider">
-                          Próximamente en iOS
+                        <span className="inline-block px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 border border-emerald-300 dark:border-emerald-500/40 text-emerald-900 dark:text-emerald-300 font-extrabold text-[10px] uppercase tracking-wider">
+                          {isEn ? 'Available on App Store' : 'Ya disponible en App Store'}
                         </span>
                       </div>
                     </div>
 
                     <p className="text-xs sm:text-sm font-medium text-zinc-700 dark:text-zinc-200 leading-snug">
-                      Actualmente los anuncios bonificados solo están disponibles en la App de Android. Estamos preparando el lanzamiento en la App Store de Apple.
+                      {isEn
+                        ? 'Download the official Flashmente app from the Apple App Store to enjoy free rewarded generations and full offline study.'
+                        : 'Descarga la app oficial de Flashmente en la Apple App Store para disfrutar de generaciones gratuitas con anuncios bonificados y estudio completo.'}
                     </p>
 
                     <a
-                      href="mailto:nachomoltol@gmail.com?subject=Aviso%20disponibilidad%20iOS%20-%20Flashmente&body=Hola,%20deseo%20que%20me%20avises%20cuando%20Flashmente%20est%C3%A9%20disponible%20en%20la%20App%20Store%20de%20Apple."
+                      href="https://apps.apple.com/app/flashmente/id6831512051"
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="w-full min-h-[44px] sm:min-h-[46px] inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-200 text-white dark:text-neutral-900 font-bold text-xs sm:text-sm shadow-md active:scale-[0.99] transition cursor-pointer group"
                     >
-                      <Mail className="w-4 h-4 text-purple-400 dark:text-purple-600 group-hover:scale-110 transition-transform" />
-                      <span>Avísame cuando esté disponible en iPhone</span>
+                      <Download className="w-4 h-4 text-purple-400 dark:text-purple-600 group-hover:scale-110 transition-transform" />
+                      <span>{isEn ? 'Download on the App Store' : 'Descargar en la App Store'}</span>
                       <ChevronRight className="w-3.5 h-3.5 text-neutral-400 dark:text-neutral-600 group-hover:translate-x-0.5 transition-transform" />
                     </a>
                   </div>
@@ -1005,7 +1012,7 @@ export function ProModal({
                     </div>
 
                     <p className="text-xs sm:text-sm font-medium text-zinc-700 dark:text-zinc-200 leading-snug">
-                      Alta Capacidad: Hasta 120 generaciones de mazos al mes (¡suficiente para todo tu temario!). Sin anuncios, máxima velocidad y cancelación flexible.
+                      Alta Capacidad: Hasta 100 generaciones de mazos al mes (¡suficiente para todo tu temario!). Sin anuncios, máxima velocidad y cancelación flexible.
                     </p>
 
                     <button
@@ -1038,10 +1045,11 @@ export function ProModal({
                   {/* NIVEL 2: OPCIÓN GRATUITA (DISPONIBLE EN APP ANDROID / FLUJO HÍBRIDO GUIADO) */}
                   {(() => {
                     const isTutor = featureName === 'tutor';
-                    const adsUsedInCycle = userLimits?.adsUsedInCycle ?? ((userLimits?.count || 0) + (userLimits?.bonusCredits || 0));
+                    const reservedWelcomeWeb = Math.max(0, 5 - (userLimits?.welcomeGenerations ?? 5));
+                    const adsUsedInCycle = userLimits?.adsUsedInCycle ?? ((userLimits?.count || 0) + reservedWelcomeWeb + (userLimits?.bonusCredits || 0));
                     const remainingAdsWeb = userLimits?.remainingAds !== undefined
                       ? userLimits.remainingAds
-                      : Math.max(0, 15 - adsUsedInCycle);
+                      : Math.max(0, 20 - adsUsedInCycle);
 
                     return (
                       <div className="relative p-3.5 sm:p-4 rounded-2xl bg-gradient-to-b from-amber-50/90 via-white to-amber-50/40 dark:from-neutral-900 dark:via-neutral-900 dark:to-neutral-950 border-2 border-amber-400 dark:border-amber-500/60 shadow-md shadow-amber-500/10 space-y-3">
@@ -1049,7 +1057,7 @@ export function ProModal({
                           <div className="space-y-0.5">
                             <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-500/25 border border-amber-300 dark:border-amber-400/60 text-amber-950 dark:text-amber-200 text-[10px] font-extrabold uppercase tracking-wider">
                               <PlayCircle className="w-3 h-3 text-amber-700 dark:text-amber-300" />
-                              {isEn ? 'Free Option • Via Android App' : 'Opción Gratuita • Vía App Android'}
+                              {isEn ? 'Free Option • Mobile App' : 'Opción Gratuita • App Móvil (iOS y Android)'}
                             </div>
                             <h3 className="text-sm sm:text-base font-extrabold text-zinc-950 dark:text-white tracking-tight">
                               {isTutor
@@ -1080,7 +1088,7 @@ export function ProModal({
                                 1
                               </span>
                               <span>
-                                {isEn ? 'Open Flashmente on your Android mobile with this account: ' : 'Abre Flashmente en tu móvil Android con esta cuenta: '}
+                                {isEn ? 'Open Flashmente on your iPhone or Android mobile with this account: ' : 'Abre Flashmente en tu iPhone o móvil Android con esta cuenta: '}
                                 <strong className="font-bold underline text-amber-900 dark:text-amber-300">
                                   {user?.email || (isEn ? 'your registered email' : 'tu email registrado')}
                                 </strong>.
@@ -1209,7 +1217,7 @@ export function ProModal({
                         Plan Mensual Alta Capacidad
                       </h3>
                       <p className="text-xs text-neutral-700 dark:text-neutral-300 leading-relaxed max-w-md">
-                        Alta Capacidad: Hasta 120 generaciones de mazos al mes (¡suficiente para todo tu temario!), generación desde Vídeo, Audio, PDF, Tutor Socrático 24/7 y exportación a PDF.
+                        Alta Capacidad: Hasta 100 generaciones de mazos al mes (¡suficiente para todo tu temario!), generación desde Vídeo, Audio, PDF, Tutor Socrático 24/7 y Guías de Estudio ilimitadas exportables a PDF.
                       </p>
                     </div>
 
@@ -1390,7 +1398,7 @@ export function ProModal({
                             <span className="uppercase font-bold tracking-wider">
                               {redeemStatus.tier}
                             </span>{' '}
-                            {t('pro_modal.unlimited_gens', '(Hasta 120 generaciones/mes)')}
+                            {t('pro_modal.unlimited_gens', '(Hasta 100 generaciones/mes)')}
                           </p>
                         )}
                       </div>
@@ -1439,17 +1447,17 @@ export function ProModal({
                   </div>
                 </div>
 
-                {/* BENEFICIO 3: EXPORTACIÓN E IMPRESIÓN */}
+                {/* BENEFICIO 3: GUÍAS DE ESTUDIO ILIMITADAS EN PDF */}
                 <div className="flex items-start gap-3 p-3 rounded-xl bg-neutral-50 dark:bg-neutral-950/60 border border-neutral-200 dark:border-neutral-800">
                   <div className="p-2 rounded-lg bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-300 shrink-0 mt-0.5">
                     <Printer className="w-4 h-4" />
                   </div>
                   <div>
                     <h4 className="text-xs font-bold text-neutral-900 dark:text-white">
-                      Exportación e Impresión a PDF
+                      Guías de Estudio Ilimitadas (Exportables a PDF)
                     </h4>
                     <p className="text-[11px] text-neutral-600 dark:text-neutral-300 leading-snug mt-0.5">
-                      Exporta e imprime simulacros de examen reales, solucionarios oficiales y hojas de estudio ultra-compactas en PDF para repasar en papel.
+                      Desbloquea y exporta en PDF todas las guías de síntesis estructuradas, tablas comparativas y reglas mnemotécnicas de tus mazos sin límite mensual ni anuncios.
                     </p>
                   </div>
                 </div>
@@ -1461,7 +1469,7 @@ export function ProModal({
                   </div>
                   <div>
                     <h4 className="text-xs font-bold text-neutral-900 dark:text-white">
-                      Alta Capacidad: Hasta 120 generaciones de mazos al mes
+                      Alta Capacidad: Hasta 100 generaciones de mazos al mes
                     </h4>
                     <p className="text-[11px] text-neutral-600 dark:text-neutral-300 leading-snug mt-0.5">
                       Suficiente para todo tu temario de estudio mensual, procesamiento prioritario de alta velocidad sin colas ni esperas.

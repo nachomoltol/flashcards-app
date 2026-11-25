@@ -8,10 +8,12 @@ import { CardEditor, DocumentUploader, FormattedCardView, UrlCardGenerator, Hand
 import { ShareDeckModal, QuickStudyGuideModal, StudyModesHelpModal, PrintExamSheet } from '@/components/decks';
 import { generateCardsAction } from '@/app/actions/generateCards';
 import { generateExhaustiveSummaryFromRawText } from '@/app/actions/generateDeckSummary';
+import { createPrintGrantAction } from '@/app/actions/getDeckForPrint';
 import { checkUserGenerationQuota } from '@/lib/quotaGuard';
 import { getDeckColorStyles } from '@/lib/colors';
 import { detectPlatform } from '@/lib/platform';
 import { getClientDeviceId } from '@/lib/deviceId';
+import { supabase } from '@/lib/supabase';
 import type { CardFormat } from '@/types/database';
 
 interface DeckPageProps {
@@ -55,11 +57,32 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
 
   // Estado para el acordeón del Editor Manual de Tarjetas (cerrado por defecto para evitar saturar la pantalla)
   const [isManualEditorOpen, setIsManualEditorOpen] = useState(false);
+  const [examPrintToken, setExamPrintToken] = useState<string | null>(null);
 
   useEffect(() => {
     fetchDeckById(id);
     fetchCardsByDeck(id);
   }, [id, fetchDeckById, fetchCardsByDeck]);
+
+  // Pre-emitir token firmado efímero para que la impresión móvil (_system Safari/Chrome) funcione en mazos privados sin fuga pública
+  useEffect(() => {
+    if (!id || !user?.id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const grant = await createPrintGrantAction(id, 'exam', data?.session?.access_token);
+        if (!cancelled && grant.token) {
+          setExamPrintToken(grant.token);
+        }
+      } catch {
+        // Silencioso
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [id, user?.id]);
 
   const handleDeleteCard = async (cardId: string) => {
     if (confirm(t('deck_detail.confirm_delete_card'))) {
@@ -95,7 +118,9 @@ export default function DeckDetailPage({ params }: DeckPageProps) {
       );
 
     if (isNativeMobile) {
-      const printUrl = `https://www.flashmente.com/decks/${id}/print`;
+      const printUrl = examPrintToken
+        ? `https://www.flashmente.com/decks/${id}/print?pt=${encodeURIComponent(examPrintToken)}`
+        : `https://www.flashmente.com/decks/${id}/print`;
       window.open(printUrl, '_system');
     } else {
       window.print();
