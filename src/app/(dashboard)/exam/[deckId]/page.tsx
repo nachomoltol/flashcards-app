@@ -8,7 +8,6 @@ import {
   HelpCircle,
   ChevronLeft,
   ChevronRight,
-  Flag,
   CheckCircle,
   Layers,
   X,
@@ -132,12 +131,11 @@ export default function ExamPage({ params }: ExamPageProps) {
   };
 
   const currentCard = examCards[currentIndex] || null;
-  const isCurrentFlagged = currentCard ? flagged.includes(currentCard.id) : false;
 
   // 1. ESTADO: PREPARACIÓN Y CONFIGURACIÓN PREVIA
   if (!isStarted) {
     return (
-      <div className="w-full min-h-screen overflow-y-auto">
+      <div className="w-full h-full overflow-y-auto">
         <ExamSetup
           deckTitle={currentDeck?.title || t('deck_detail.untitled_deck', 'Mazo de estudio')}
           deckId={deckId}
@@ -151,7 +149,7 @@ export default function ExamPage({ params }: ExamPageProps) {
   // 2. ESTADO: RESULTADOS Y CALIFICACIÓN FINAL
   if (isFinished) {
     return (
-      <div className="w-full min-h-screen overflow-y-auto">
+      <div className="w-full h-full overflow-y-auto">
         <ExamResultsView
           deckId={deckId}
           deckTitle={currentDeck?.title || t('deck_detail.untitled_deck', 'Mazo de estudio')}
@@ -163,7 +161,7 @@ export default function ExamPage({ params }: ExamPageProps) {
 
   // 3. ESTADO: SIMULACRO ACTIVO EN CURSO
   return (
-    <div className="w-full max-w-5xl mx-auto min-h-screen md:min-h-0 md:h-full flex flex-col justify-between p-2.5 sm:p-4 md:p-6 pb-20 sm:pb-6 overflow-y-auto md:overflow-hidden animate-in fade-in duration-200">
+    <div className="w-full max-w-5xl mx-auto h-full flex flex-col justify-between p-2 sm:p-4 md:p-6 pb-safe overflow-hidden animate-in fade-in duration-200">
       {/* Top Exam Header */}
       <div className="shrink-0 pb-2 border-b border-neutral-200 dark:border-neutral-800 space-y-2">
         <div className="flex items-center justify-between gap-2">
@@ -234,9 +232,9 @@ export default function ExamPage({ params }: ExamPageProps) {
       </div>
 
       {/* Main Content Area: Responsive Grid (Desktop 2-cols vs Mobile focused 1-col) */}
-      <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-12 gap-4 py-2 sm:py-3 overflow-visible md:overflow-hidden">
+      <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-12 gap-3 sm:gap-4 py-2 sm:py-3 overflow-hidden">
         {/* Left / Center Column: Question Card */}
-        <div className="md:col-span-8 lg:col-span-9 flex flex-col justify-between rounded-2xl sm:rounded-3xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/60 backdrop-blur-xl p-4 sm:p-6 shadow-xl overflow-visible md:overflow-hidden min-h-[380px] md:min-h-0">
+        <div className="md:col-span-8 lg:col-span-9 flex flex-col justify-between rounded-2xl sm:rounded-3xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/60 backdrop-blur-xl p-3.5 sm:p-6 shadow-xl overflow-hidden min-h-0">
           <div className="flex-1 min-h-0 overflow-y-auto pr-1">
             {currentCard && (
               <ExamQuestionView
@@ -248,51 +246,34 @@ export default function ExamPage({ params }: ExamPageProps) {
           </div>
 
           {/* Question Card Bottom Navigation Bar */}
-          <div className="shrink-0 pt-3 border-t border-neutral-200 dark:border-neutral-800/80 flex items-center justify-between gap-1 sm:gap-2">
+          <div className="shrink-0 pt-3 border-t border-neutral-200 dark:border-neutral-800/80 flex items-center justify-between gap-2">
             <button
               type="button"
               onClick={() => goToQuestion(currentIndex - 1)}
               disabled={currentIndex === 0}
-              className="px-2.5 sm:px-4 py-2 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white hover:bg-neutral-50 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 text-xs sm:text-sm font-semibold transition flex items-center gap-1 sm:gap-1.5 disabled:opacity-30 disabled:pointer-events-none cursor-pointer active:scale-95 shrink-0"
+              className="px-3 sm:px-4 py-2 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white hover:bg-neutral-50 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 text-xs sm:text-sm font-semibold transition flex items-center gap-1 sm:gap-1.5 disabled:opacity-30 disabled:pointer-events-none cursor-pointer active:scale-95 shrink-0"
             >
               <ChevronLeft className="w-4 h-4 shrink-0" />
-              <span className="hidden min-[380px]:inline">{t('exam.prev', 'Anterior')}</span>
-              <span className="min-[380px]:hidden">Ant.</span>
+              <span className="hidden sm:inline">{t('exam.prev', 'Anterior')}</span>
+              <span className="sm:hidden">Ant.</span>
             </button>
 
-            {/* Mobile Controls: Duda 🚩 and Interactive Questions Pill */}
-            <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-              <button
-                type="button"
-                onClick={() => toggleFlag(currentCard?.id || '')}
-                className={`md:hidden px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-full sm:rounded-xl border text-[11px] sm:text-xs font-bold transition flex items-center gap-1 active:scale-95 cursor-pointer shrink-0 ${
-                  isCurrentFlagged
-                    ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/40 shadow-xs'
-                    : 'bg-white dark:bg-neutral-900 text-neutral-600 dark:text-neutral-400 border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50'
-                }`}
-                title={isCurrentFlagged ? t('exam.flag_remove', 'Quitar duda') : t('exam.flag_add', 'Marcar con duda 🚩')}
-              >
-                <Flag className={`w-3.5 h-3.5 shrink-0 ${isCurrentFlagged ? 'fill-amber-500 text-amber-500' : 'text-neutral-400'}`} />
-                <span>Duda 🚩</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setIsMobileGridOpen(true)}
-                className="md:hidden inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full border border-indigo-200 dark:border-indigo-800/80 bg-indigo-50/90 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 text-[11px] sm:text-xs font-bold transition-all shadow-xs active:scale-95 cursor-pointer shrink-0"
-                title="Abrir mapa de preguntas"
-              >
-                <Layers className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
-                <span className="hidden min-[390px]:inline">Preguntas ({currentIndex + 1}/{examCards.length})</span>
-                <span className="min-[390px]:hidden">({currentIndex + 1}/{examCards.length})</span>
-              </button>
-            </div>
+            {/* Mobile Question Pill (Compact and centered) */}
+            <button
+              type="button"
+              onClick={() => setIsMobileGridOpen(true)}
+              className="md:hidden inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-indigo-200 dark:border-indigo-800/80 bg-indigo-50/90 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 text-xs font-bold transition-all shadow-xs active:scale-95 cursor-pointer shrink-0"
+              title="Abrir mapa de preguntas"
+            >
+              <Layers className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+              <span>{currentIndex + 1}/{examCards.length}</span>
+            </button>
 
             {currentIndex === examCards.length - 1 ? (
               <button
                 type="button"
                 onClick={handleAttemptFinish}
-                className="px-2.5 sm:px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-bold transition flex items-center gap-1 sm:gap-1.5 shadow-md shadow-emerald-600/20 active:scale-95 cursor-pointer shrink-0"
+                className="px-3.5 sm:px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-bold transition flex items-center gap-1 sm:gap-1.5 shadow-md shadow-emerald-600/20 active:scale-95 cursor-pointer shrink-0"
               >
                 <span>{t('exam.finish_cta', 'Finalizar')}</span>
                 <CheckCircle className="w-4 h-4 shrink-0" />
@@ -301,10 +282,10 @@ export default function ExamPage({ params }: ExamPageProps) {
               <button
                 type="button"
                 onClick={() => goToQuestion(currentIndex + 1)}
-                className="px-2.5 sm:px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-bold transition flex items-center gap-1 sm:gap-1.5 shadow-md shadow-indigo-600/20 active:scale-95 cursor-pointer shrink-0"
+                className="px-3.5 sm:px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-bold transition flex items-center gap-1 sm:gap-1.5 shadow-md shadow-indigo-600/20 active:scale-95 cursor-pointer shrink-0"
               >
-                <span className="hidden min-[390px]:inline">{t('exam.next', 'Siguiente')}</span>
-                <span className="min-[390px]:hidden">Sig.</span>
+                <span className="hidden sm:inline">{t('exam.next', 'Siguiente')}</span>
+                <span className="sm:hidden">Sig.</span>
                 <ChevronRight className="w-4 h-4 shrink-0" />
               </button>
             )}

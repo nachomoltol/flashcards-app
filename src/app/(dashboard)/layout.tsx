@@ -266,10 +266,8 @@ export default function DashboardLayout({
   return (
     <div
       className={
-        isStudyPage
+        isFullscreen
           ? "h-[100dvh] md:min-h-screen bg-neutral-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 flex flex-col md:flex-row overflow-hidden transition-colors duration-150"
-          : isExamPage
-          ? "min-h-screen w-full bg-neutral-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 flex flex-col md:flex-row overflow-y-auto transition-colors duration-150"
           : "min-h-screen bg-neutral-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 flex flex-col md:flex-row transition-colors duration-150"
       }
     >
@@ -911,10 +909,8 @@ export default function DashboardLayout({
       {/* Main Content Area */}
       <div
         className={
-          isStudyPage
+          isFullscreen
             ? "flex-1 flex flex-col min-w-0 h-[100dvh] overflow-hidden"
-            : isExamPage
-            ? "flex-1 flex flex-col min-w-0 min-h-screen w-full overflow-y-auto"
             : "flex-1 flex flex-col min-w-0"
         }
       >
@@ -931,7 +927,7 @@ export default function DashboardLayout({
             isStudyPage
               ? "flex-1 w-full mx-auto h-full flex flex-col p-2 sm:p-4 max-w-4xl overflow-hidden"
               : isExamPage
-              ? "flex-1 w-full mx-auto min-h-screen flex flex-col p-2 sm:p-4 max-w-5xl overflow-y-auto"
+              ? "flex-1 w-full mx-auto h-full flex flex-col p-2 sm:p-4 max-w-5xl overflow-hidden"
               : "flex-1 p-4 sm:p-8 md:p-10 max-w-6xl w-full mx-auto"
           }
         >

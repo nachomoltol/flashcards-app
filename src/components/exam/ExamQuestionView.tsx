@@ -292,12 +292,12 @@ export function ExamQuestionView({ card, index, total }: ExamQuestionViewProps) 
       <div className="space-y-1.5 pt-2">
         <label className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 flex items-center justify-between">
           <span>{t('exam.typed_answer_label', 'Tu respuesta (opcional para comparar al final):')}</span>
-          <span className="text-[11px] font-normal text-neutral-400">
+          <span className="text-[11px] font-normal text-neutral-400 hidden sm:inline">
             {t('exam.typed_answer_hint', 'Se revisará en el veredicto final')}
           </span>
         </label>
         <textarea
-          rows={3}
+          rows={4}
           value={currentAnswer}
           onChange={(e) => selectAnswer(card.id, e.target.value)}
           placeholder={t(
